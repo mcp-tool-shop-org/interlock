@@ -34,6 +34,34 @@ def test_home_directory_paths_and_unpinned_bytes_are_refused():
     validate_row(unpinned)
 
 
+def test_device_lost_cannot_carry_timing():
+    lost = row()
+    lost["outcome"] = "device_lost"
+    lost["latency"] = {
+        "cold_ms": None,
+        "warm_p50_ms": None,
+        "warm_p95_ms": None,
+        "throughput": None,
+        "throughput_unit": None,
+        "compile_ms": None,
+        "first_call_ms": None,
+    }
+    lost["quality"] = []
+    validate_row(lost)
+    lost["latency"]["cold_ms"] = 12
+    with pytest.raises(ReceiptError, match="no timing"):
+        validate_row(lost)
+    lost["latency"]["cold_ms"] = None
+    lost["artifacts"] = {"slots": [{"latency_ms": 12}]}
+    with pytest.raises(ReceiptError, match="no timing"):
+        validate_row(lost)
+    hung = row()
+    hung["outcome"] = "hang"
+    hung["latency"]["cold_ms"] = 60_000
+    with pytest.raises(ReceiptError, match="a hang row has no timing"):
+        validate_row(hung)
+
+
 def test_experiment_provenance_is_the_other_legal_shape():
     validate_row(row(provenance={"experiment_spec": "experiments/e1-cold-warm/spec.yaml", "run_id": "dry-run"}))
 

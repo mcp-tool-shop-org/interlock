@@ -35,8 +35,15 @@ from switchyard.harness.e5 import (
     search,
 )
 from switchyard.harness.lock import require_unmodified
-from switchyard.harness.receipts import write_run
-from switchyard.harness.runner import RunnerError, check_flags, dry_run, run_interleaved
+from switchyard.harness.receipts import device_lost_row, import_receipt, write_run
+from switchyard.harness.runner import (
+    RunnerError,
+    check_flags,
+    device_lost_error,
+    dry_run,
+    hang_error,
+    run_interleaved,
+)
 from switchyard.harness.spec import SpecError, load_spec, validate_spec
 from switchyard.harness.timing import (
     TimingError,
@@ -166,6 +173,7 @@ def _invoke(repo: Path, spec_path: Path, adapters: dict, **kwargs):
         spec_path=spec_path,
         run_id=kwargs.get("run_id", "run-1"),
         date="2026-10-09",
+        notes=kwargs.get("notes", ""),
     )
 
 
@@ -217,6 +225,321 @@ def test_a_failed_step_stops_and_writes_nothing(tmp_path: Path):
     assert not (repo / "receipts").exists()
 
 
+def test_a_hang_is_not_a_device_loss():
+    assert hang_error("hang: no result within 60 s") is True
+    assert device_lost_error("hang: no result within 60 s") is False
+    assert device_lost_error("device hung") is True
+    assert device_lost_error("ZE_RESULT_ERROR_DEVICE_LOST") is True
+    assert device_lost_error("") is False
+    assert device_lost_error(None) is False
+
+
+def test_a_hang_keeps_finished_arms_and_stops_without_retry(tmp_path: Path):
+    repo = tmp_path / "repo"
+    spec = _spec()
+    spec["warmups"] = 0
+    spec["repeats"] = 1
+    spec["arms"] = [_arm("A", "5090"), _arm("B", "NPU"), _arm("C", "iGPU")]
+    spec_path = _bind(repo, spec)
+    seen = {}
+
+    class Watch(Scripted):
+        def run(self, request):
+            if request.step_id == "B" and len(self.samples["B"]) == 1:
+                stored = load_jsonl(repo / "receipts" / "run-1.jsonl")
+                seen["ids"] = [row["id"] for row in stored]
+                seen["partial"] = stored[0]["partial"]
+                seen["cold"] = stored[0]["latency"]["cold_ms"]
+            return super().run(request)
+
+    script = Watch(
+        {
+            "A": [_result(100, 4), _result(20, 8)],
+            "B": [_result(5, 1), _result(999, ok=False, error="hang: no result within 60 s")],
+            "C": [_result(7, 1)],
+        }
+    )
+    (repo / "table").mkdir()
+    with pytest.raises(RunnerError, match="hang:"):
+        _invoke(repo, spec_path, {"fake": script})
+    assert script.calls == ["A", "B", "C", "A", "B"]
+    assert seen == {"ids": ["T/A/run-1"], "partial": True, "cold": 100}
+    stored = {row["id"]: row for row in load_jsonl(repo / "receipts" / "run-1.jsonl")}
+    assert set(stored) == {"T/A/run-1", "T/B/run-1"}
+    assert stored["T/A/run-1"]["partial"] is True
+    assert stored["T/A/run-1"]["latency"]["cold_ms"] == 100
+    assert "outcome" not in stored["T/A/run-1"]
+    hung = stored["T/B/run-1"]
+    assert hung["outcome"] == "hang"
+    assert hung["partial"] is True
+    assert hung["notes"] == "this device can't do this setting"
+    assert all(value is None for value in hung["latency"].values())
+    assert "artifacts" not in hung
+    table = {row["id"]: row for row in load_jsonl(repo / "table" / "routing.jsonl")}
+    assert table["T/B/run-1"]["outcome"] == "hang"
+    assert table["T/B/run-1"]["latency"]["cold_ms"] is None
+    assert table["T/B/run-1"]["notes"] == "this device can't do this setting"
+    assert script.unloaded == [("qwen3:8b", "5090"), ("qwen3:8b", "NPU"), ("qwen3:8b", "iGPU")]
+
+
+def test_a_device_loss_keeps_a_finished_arm_and_the_other_device_goes_on(tmp_path: Path):
+    repo = tmp_path / "repo"
+    spec = _spec()
+    spec["warmups"] = 0
+    spec["repeats"] = 1
+    spec["arms"] = [_arm("B", "NPU"), _arm("D", "NPU"), _arm("A", "5090")]
+    spec_path = _bind(repo, spec)
+    script = Scripted(
+        {
+            "B": [_result(100, 4), _result(20, 8)],
+            "D": [_result(5, 1), _result(999, ok=True, resolved={"outcome": "device_lost"})],
+            "A": [_result(50, 2), _result(40, 3)],
+        }
+    )
+    (repo / "table").mkdir()
+    rows = _invoke(repo, spec_path, {"fake": script})
+    assert script.calls == ["B", "D", "A", "B", "D", "A"]
+    by_id = {row["id"]: row for row in rows}
+    assert set(by_id) == {"T/B/run-1", "T/D/run-1", "T/A/run-1"}
+    assert "outcome" not in by_id["T/B/run-1"]
+    assert by_id["T/B/run-1"]["latency"]["cold_ms"] == 100
+    assert "partial" not in by_id["T/B/run-1"]
+    assert by_id["T/A/run-1"]["latency"]["cold_ms"] == 50
+    lost = by_id["T/D/run-1"]
+    assert lost["outcome"] == "device_lost"
+    assert "partial" not in lost
+    assert lost["notes"] == "this device can't do this setting"
+    assert all(value is None for value in lost["latency"].values())
+    assert "artifacts" not in lost
+    table = {row["id"]: row for row in load_jsonl(repo / "table" / "routing.jsonl")}
+    assert table["T/D/run-1"]["latency"]["cold_ms"] is None
+    assert table["T/D/run-1"]["notes"] == "this device can't do this setting"
+
+
+def test_a_not_run_step_writes_no_row_and_is_listed_in_the_notes(tmp_path: Path):
+    repo = tmp_path / "repo"
+    spec = _spec()
+    spec["warmups"] = 0
+    spec["repeats"] = 1
+    spec_path = _bind(repo, spec)
+    script = Scripted(
+        {
+            "A": [_result(100, 4), _result(20, 8)],
+            "B": [_result(None, ok=True, resolved={"outcome": "not run"})],
+        }
+    )
+    rows = _invoke(repo, spec_path, {"fake": script}, notes="kept")
+    assert script.calls == ["A", "B", "A"]
+    assert [row["id"] for row in rows] == ["T/A/run-1"]
+    assert "outcome" not in rows[0]
+    assert rows[0]["latency"]["cold_ms"] == 100
+    assert rows[0]["notes"] == "kept. not run: B cold, B repeat 0"
+
+
+def test_a_failed_device_loss_marks_the_device_off_and_continues(tmp_path: Path):
+    repo = tmp_path / "repo"
+    spec = _spec()
+    spec["warmups"] = 0
+    spec["repeats"] = 1
+    spec_path = _bind(repo, spec)
+    script = Scripted(
+        {
+            "A": [_result(100, 4), _result(20, 8)],
+            "B": [_result(999, ok=False, error="device lost: NPU disappeared")],
+        }
+    )
+    rows = _invoke(repo, spec_path, {"fake": script})
+    assert script.calls == ["A", "B", "A"]
+    by_id = {row["id"]: row for row in rows}
+    assert by_id["T/B/run-1"]["outcome"] == "device_lost"
+    assert all(value is None for value in by_id["T/B/run-1"]["latency"].values())
+    assert by_id["T/A/run-1"]["latency"]["cold_ms"] == 100
+
+
+def test_a_raised_hang_stops_the_run(tmp_path: Path):
+    repo = tmp_path / "repo"
+    spec = _spec()
+    spec["warmups"] = 0
+    spec["repeats"] = 1
+    spec_path = _bind(repo, spec)
+
+    class Hang:
+        def __init__(self):
+            self.calls = []
+
+        def run(self, request):
+            self.calls.append(request.step_id)
+            if request.step_id == "B":
+                raise AdapterError("hang: no result within 60 s")
+            return _result(10, 1)
+
+        def unload(self, model, device=None):
+            return None
+
+    script = Hang()
+    with pytest.raises(RunnerError, match="hang:"):
+        _invoke(repo, spec_path, {"fake": script})
+    assert script.calls == ["A", "B"]
+    stored = load_jsonl(repo / "receipts" / "run-1.jsonl")
+    assert [row["id"] for row in stored] == ["T/B/run-1"]
+    assert stored[0]["outcome"] == "hang"
+    assert all(value is None for value in stored[0]["latency"].values())
+
+
+def test_a_raised_device_loss_marks_the_device_off_and_continues(tmp_path: Path):
+    repo = tmp_path / "repo"
+    spec = _spec()
+    spec["warmups"] = 0
+    spec["repeats"] = 1
+    spec_path = _bind(repo, spec)
+
+    class Loss:
+        def __init__(self):
+            self.calls = []
+
+        def run(self, request):
+            self.calls.append(request.step_id)
+            if request.step_id == "B":
+                raise AdapterError("ZE_RESULT_ERROR_DEVICE_LOST")
+            return _result(100, 4)
+
+        def unload(self, model, device=None):
+            return None
+
+    script = Loss()
+    rows = _invoke(repo, spec_path, {"fake": script})
+    assert script.calls == ["A", "B", "A"]
+    by_id = {row["id"]: row for row in rows}
+    assert set(by_id) == {"T/A/run-1", "T/B/run-1"}
+    assert by_id["T/A/run-1"]["latency"]["cold_ms"] == 100
+    assert by_id["T/B/run-1"]["outcome"] == "device_lost"
+    assert all(value is None for value in by_id["T/B/run-1"]["latency"].values())
+    assert by_id["T/B/run-1"]["notes"] == "this device can't do this setting. not run: B repeat 0"
+
+
+def test_an_unsupported_length_stays_a_measured_row(tmp_path: Path):
+    repo = tmp_path / "repo"
+    spec = _spec()
+    spec["warmups"] = 0
+    spec["repeats"] = 1
+    spec["arms"] = [_arm("A", "NPU")]
+    spec_path = _bind(repo, spec)
+    script = Scripted(
+        {
+            "A": [
+                _result(10, 1, resolved={"outcome": "unsupported length"}),
+                _result(12, 1, resolved={"outcome": "unsupported length"}),
+            ],
+        }
+    )
+    rows = _invoke(repo, spec_path, {"fake": script})
+    assert len(rows) == 1
+    assert "outcome" not in rows[0]
+    assert rows[0]["latency"]["cold_ms"] == 10
+
+
+def test_the_importer_drops_a_speed_figure_from_device_lost(tmp_path: Path):
+    repo = tmp_path / "repo"
+    arm = _arm("B", "NPU")
+    lost = device_lost_row(
+        spec_id="T",
+        arm=arm,
+        repeats=2,
+        date="2026-10-09",
+        spec_rel="experiments/t/spec.yaml",
+        run_id="run-1",
+        grant="grant-t",
+        env={"nvidia_driver": "unrecorded"},
+    )
+    lost["latency"]["cold_ms"] = 12
+    lost["latency"]["throughput"] = 9
+    lost["artifacts"] = {"slots": [{"latency_ms": 12}]}
+    lost["notes"] = "arm B"
+    receipts = repo / "receipts"
+    receipts.mkdir(parents=True)
+    (receipts / "run-1.jsonl").write_text(json.dumps(lost) + "\n", encoding="utf-8")
+    (repo / "table").mkdir()
+    imported = import_receipt(repo, "run-1")
+    assert imported[0]["outcome"] == "device_lost"
+    assert imported[0]["notes"] == "this device can't do this setting. arm B"
+    assert all(value is None for value in imported[0]["latency"].values())
+    assert "artifacts" not in imported[0]
+    stored = load_jsonl(repo / "table" / "routing.jsonl")
+    assert stored[0]["latency"]["throughput"] is None
+    assert "artifacts" not in load_jsonl(repo / "receipts" / "run-1.jsonl")[0]
+    hung_row = device_lost_row(
+        spec_id="T",
+        arm=arm,
+        repeats=2,
+        date="2026-10-09",
+        spec_rel="experiments/t/spec.yaml",
+        run_id="run-2",
+        grant="grant-t",
+        env={"nvidia_driver": "unrecorded"},
+        outcome="hang",
+    )
+    hung_row["latency"]["cold_ms"] = 12
+    hung_row["notes"] = "arm B"
+    (receipts / "run-2.jsonl").write_text(json.dumps(hung_row) + "\n", encoding="utf-8")
+    hung = import_receipt(repo, "run-2")
+    assert hung[0]["outcome"] == "hang"
+    assert hung[0]["latency"]["cold_ms"] is None
+    assert hung[0]["notes"] == "this device can't do this setting. arm B"
+
+
+def test_a_raised_spec_error_keeps_a_finished_arm(tmp_path: Path):
+    repo = tmp_path / "repo"
+    spec = _spec()
+    spec["warmups"] = 0
+    spec["repeats"] = 1
+    spec_path = _bind(repo, spec)
+
+    class Boom:
+        def __init__(self):
+            self.calls = []
+            self.unloaded = []
+
+        def run(self, request):
+            self.calls.append(request.step_id)
+            if len(self.calls) == 4:
+                raise AdapterError("the NPU needs a static_shape")
+            return _result(10, 1)
+
+        def unload(self, model, device=None):
+            self.unloaded.append((model, device))
+
+    script = Boom()
+    with pytest.raises(AdapterError, match="static_shape"):
+        _invoke(repo, spec_path, {"fake": script})
+    assert script.calls == ["A", "B", "A", "B"]
+    stored = load_jsonl(repo / "receipts" / "run-1.jsonl")
+    assert [row["id"] for row in stored] == ["T/A/run-1"]
+    assert stored[0]["partial"] is True
+    assert "outcome" not in stored[0]
+
+
+def test_a_later_failure_keeps_a_finished_arm_without_calling_it_device_lost(tmp_path: Path):
+    repo = tmp_path / "repo"
+    spec = _spec()
+    spec["warmups"] = 0
+    spec["repeats"] = 1
+    spec_path = _bind(repo, spec)
+    script = Scripted(
+        {
+            "A": [_result(100, 4), _result(20, 8)],
+            "B": [_result(5, 1), _result(1, ok=False, error="stopped")],
+        }
+    )
+    with pytest.raises(RunnerError, match="stopped"):
+        _invoke(repo, spec_path, {"fake": script})
+    assert script.calls == ["A", "B", "A", "B"]
+    stored = load_jsonl(repo / "receipts" / "run-1.jsonl")
+    assert [row["id"] for row in stored] == ["T/A/run-1"]
+    assert stored[0]["partial"] is True
+    assert stored[0]["latency"]["cold_ms"] == 100
+    assert "outcome" not in stored[0]
+
+
 def test_repeats_build_a_receipt_and_keep_cold_separate(tmp_path: Path):
     repo = tmp_path / "repo"
     spec_path = _bind(repo, _spec())
@@ -242,6 +565,7 @@ def test_repeats_build_a_receipt_and_keep_cold_separate(tmp_path: Path):
     assert "keep_alive" not in arm_a["settings"]
     assert arm_a["settings"]["environment"]["nvidia_driver"] == "unrecorded"
     assert arm_a["provenance"] == {"experiment_spec": "experiments/t/spec.yaml", "run_id": "run-1"}
+    assert "partial" not in arm_a and "outcome" not in arm_a
     assert arm_a["model_family"] == "qwen"
     stored = load_jsonl(repo / "table" / "routing.jsonl")
     assert {row["id"] for row in stored} == {row["id"] for row in rows}

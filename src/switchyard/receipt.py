@@ -51,6 +51,7 @@ def validate_row(row: dict) -> None:
         _check_interval(row, metric)
     _check_family(row)
     _check_residency(row)
+    _check_device_lost(row)
     provenance = row["provenance"]
     if "source_receipt_path" in provenance and not provenance.get("commit_sha"):
         if not provenance.get("content_sha256"):
@@ -110,6 +111,23 @@ def load_jsonl(path: Path) -> list[dict]:
         except json.JSONDecodeError as exc:
             raise ReceiptError(f"{path}:{line_number}: {exc}") from exc
     return rows
+
+
+_TIMING = ("cold_ms", "warm_p50_ms", "warm_p95_ms", "throughput", "compile_ms", "first_call_ms")
+_UNTIMED = frozenset({"device_lost", "hang"})
+
+
+def _check_device_lost(row: dict) -> None:
+    """A device_lost or hang row says the device cannot do the setting. It is not a speed."""
+
+    outcome = row.get("outcome")
+    if outcome not in _UNTIMED:
+        return
+    latency = row.get("latency") or {}
+    if any(latency.get(key) is not None for key in _TIMING) or latency.get("throughput_unit"):
+        raise ReceiptError(f"{row['id']}: a {outcome} row has no timing")
+    if row.get("artifacts"):
+        raise ReceiptError(f"{row['id']}: a {outcome} row has no timing")
 
 
 def _reject_home_paths(value: object, where: str = "$") -> None:

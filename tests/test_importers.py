@@ -285,6 +285,21 @@ def test_gap_report_names_the_missing_field_on_a_partial_row():
     assert "probe/bge/NPU" in text
     assert "cold_ms" in text
     assert "unnamed GPU" in text
+    lost = {
+        "id": "e1/npu/lost",
+        "task": "embed",
+        "device": "NPU",
+        "outcome": "device_lost",
+        "model": {"repo_or_tag": "BAAI/bge-base-en-v1.5"},
+        "settings": {},
+        "latency": {"cold_ms": 10, "warm_p50_ms": 10},
+        "quality": [],
+    }
+    hung = {**lost, "id": "e1/npu/hung", "outcome": "hang"}
+    lost_text = render_gaps(rows + [lost, hung], candidates, ladder_note="Ladder note.")
+    assert "e1/npu/lost" not in lost_text
+    assert "e1/npu/hung" not in lost_text
+    assert "probe/bge/NPU" in lost_text
 
 
 def test_import_command_writes_jsonl_and_the_gap_report(tmp_path: Path, monkeypatch, capsys):
