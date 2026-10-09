@@ -14,6 +14,8 @@ dependencies = [
 intel = [
     "openvino==2026.4.1",
     "openvino-tokenizers==2026.4.1.0",
+    "openvino-genai==2026.4.1.0",
+    "transformers==5.5.4",
 ]
 
 [project.scripts]
