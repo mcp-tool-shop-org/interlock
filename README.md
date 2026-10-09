@@ -1,6 +1,6 @@
 # switchyard
 
-<img src="assets/logo/switchyard_512.png" width="256" alt="switchyard">
+<img src="assets/logo/switchyard-wordmark.png" width="560" alt="switchyard: a rail crossing routing jobs to devices">
 
 A rail switchyard sends each car onto the right track. This one sends each job to a model, an engine and a device.
 
