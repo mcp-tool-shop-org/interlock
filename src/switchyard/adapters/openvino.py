@@ -73,16 +73,20 @@ _SESSION_NEW_TOKENS = 8
 _QUANTS = ("int4", "int8", "fp16", "fp32")
 # Level Zero device-loss signature, seen live: nomic NPU 8x1024 reset the
 # device mid-run (driver 32.0.100.5540; no Windows event-log entry — the L0
-# result code was the only witness). The markers carry the code on purpose:
-# every loss text seen so far (the live one too) includes it, and a bare
-# "device hung" substring could false-positive on unrelated prose. Distinct
+# result code was the only witness). The list is exactly what the runner
+# matches (#19/#20): the L0 code and its outcome-string forms, lowering the
+# text first. The driver's own sentence says "device hung", but that phrase
+# was never seen without the code, so it is not a match on its own. Distinct
 # from a 60 s timeout hang: a hang ends the run, a device loss becomes a
 # result row and the device is then off for the rest of the run.
-_LOST_MARKERS = ("ZE_RESULT_ERROR_DEVICE_LOST", "DEVICE_LOST")
+_LOST_MARKERS = ("ze_result_error_device_lost", "device_lost", "device lost")
 
 
 def _is_device_lost(exc: BaseException) -> bool:
-    return any(marker in str(exc) for marker in _LOST_MARKERS)
+    text = str(exc).lower()
+    if text.startswith("hang:"):  # the same precedence the runner applies
+        return False
+    return any(marker in text for marker in _LOST_MARKERS)
 
 
 def _need_openvino() -> None:
