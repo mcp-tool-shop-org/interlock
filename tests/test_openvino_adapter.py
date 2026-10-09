@@ -509,3 +509,39 @@ def test_last_pooling_records_eos_state(tmp_path, monkeypatch):
     r2 = a.run(req(model=m, device="CPU", static_shape="1x8", prompt=long_prompt))
     assert r2.resolved["eos_appended"] is True      # the tokenizer appended it
     assert r2.resolved["last_row_is_eos"] is False  # truncation cut it off
+
+
+# --- NPU genai pipeline sizing (E3 review) --------------------------------
+
+
+def test_generate_npu_records_genai_config(tmp_path):
+    a = make_adapter()
+    r = a.run(req(task="generate", model=str(tmp_path), device="NPU", num_predict=64, prompt="hi there"))
+    assert r.ok
+    # FakeTokenizer: "hi there" -> [101, w1, w2, 102] = 4 tokens + 64 margin
+    assert r.resolved["genai_config"] == {"MAX_PROMPT_LEN": 68, "MIN_RESPONSE_LEN": 96}
+    assert a._pipelines[(str(tmp_path), "NPU")]["pipe"].config["MAX_PROMPT_LEN"] == 68
+
+
+def test_generate_npu_unsupported_length_is_recorded_not_fatal(tmp_path):
+    class NpuFailGenai(FakeGenai):
+        class LLMPipeline(FakePipeline):
+            def __init__(self, path, device, config):
+                if device == "NPU":
+                    raise RuntimeError("programmatic crash at 4096")
+                super().__init__(path, device, config)
+
+    a = make_adapter(genai_module=NpuFailGenai)
+    r = a.run(req(task="generate", model=str(tmp_path), device="NPU", prompt="hi"))
+    assert r.ok is True
+    assert r.latency_ms is None and r.throughput is None
+    assert r.resolved["outcome"] == "unsupported length"
+    # the same model builds fine elsewhere — the marker is NPU-specific
+    r2 = a.run(req(task="generate", model=str(tmp_path), device="CPU", prompt="hi"))
+    assert r2.ok and r2.latency_ms is not None
+
+
+def test_generate_non_npu_has_no_genai_config(tmp_path):
+    a = make_adapter()
+    r = a.run(req(task="generate", model=str(tmp_path), device="CPU"))
+    assert r.ok and "genai_config" not in r.resolved

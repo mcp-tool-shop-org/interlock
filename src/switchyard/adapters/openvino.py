@@ -22,7 +22,13 @@ instead of silently measuring something else.
 
 ``generate`` steps run openvino-genai's LLMPipeline, greedy unless the arm
 sets a temperature. Decode throughput and TTFT come from genai's own
-performance counters, echoed raw under ``resolved["genai"]``.
+performance counters, echoed raw under ``resolved["genai"]``. On the NPU the
+KV cache is sized explicitly (MAX_PROMPT_LEN = prompt + 64, MIN_RESPONSE_LEN
+= num_predict + 32; genai 2026.4.1 NPU pipeline keys, default 1024), the
+values are recorded under ``resolved["genai_config"]``, and a pipeline that
+still cannot cover the prompt ends the arm with ``ok`` true and
+``resolved["outcome"] = "unsupported length"`` — recorded, not retried, and
+the sequence continues.
 
 The NPU infers static shapes only, so a NPU step without ``static_shape``
 (``"BxL"``) is refused before any compile. AUTO, HETERO, Multi and GPU.1 are
@@ -447,11 +453,31 @@ def _run_generate(self, request: StepRequest, s: _Settings, resolved: dict) -> S
         raise AdapterError(
             f"{request.model} on {ov_id} hung earlier in this run; the device pair is poisoned for the run"
         )
-    pipe, compile_s = self._pipeline(request.model, ov_id, _compile_config(s))
+    compile_config = _compile_config(s)
+    num_predict = int(s.get("num_predict", 128))
+    if ov_id == "NPU":
+        repo, ref = parse_model_ref(request.model)
+        prompt_tokens = len(self._encode(self._load_tokenizer(repo, ref), str(s.get("prompt") or "hello"))[0])
+        compile_config.update(_npu_genai_config(prompt_tokens, num_predict))
+        resolved["genai_config"] = {
+            "MAX_PROMPT_LEN": compile_config["MAX_PROMPT_LEN"],
+            "MIN_RESPONSE_LEN": compile_config["MIN_RESPONSE_LEN"],
+        }
+    try:
+        pipe, compile_s = self._pipeline(request.model, ov_id, compile_config)
+    except AdapterError:
+        raise
+    except Exception as exc:
+        if ov_id == "NPU":
+            # recorded, not retried: the KV cache cannot cover this prompt;
+            # ok stays true so the sequence continues past the arm
+            resolved["outcome"] = "unsupported length"
+            return StepResult(ok=True, resolved=resolved or None, sensors=None)
+        raise AdapterError(f"the pipeline for {request.model} on {ov_id} did not build: {exc}") from exc
     key = (request.model, ov_id)
     genai = self._genai_module or _real_genai_module()
     config = genai.GenerationConfig()
-    config.max_new_tokens = int(s.get("num_predict", 128))
+    config.max_new_tokens = num_predict
     if s.get("temperature") is not None:
         config.do_sample = True
         config.temperature = float(s.get("temperature"))
@@ -516,6 +542,17 @@ def _real_genai_module():
             ) from exc
         _GENAI_REAL = module
     return _GENAI_REAL
+
+
+def _npu_genai_config(prompt_tokens: int, num_predict: int) -> dict:
+    """NPU LLM pipeline sizing (openvino-genai 2026.4.1: the NPU pipeline
+    allocates the KV cache statically, MAX_PROMPT_LEN defaulting to 1024).
+    The prompt gets a 64-token margin; the response floor covers
+    num_predict plus 32."""
+    return {
+        "MAX_PROMPT_LEN": int(prompt_tokens) + 64,
+        "MIN_RESPONSE_LEN": int(num_predict) + 32,
+    }
 
 
 def _model_dir(model: str) -> Path:
@@ -596,7 +633,12 @@ def _start_session(self, request: StepRequest) -> None:
         try:
             if request.task == "generate":
                 genai = self._genai_module or _real_genai_module()
-                pipe, _ = _pipeline(self, request.model, ov_id, _compile_config(s))
+                config_map = _compile_config(s)
+                if ov_id == "NPU":
+                    repo, ref = parse_model_ref(request.model)
+                    n_tok = len(self._encode(self._load_tokenizer(repo, ref), str(s.get("prompt") or "hello"))[0])
+                    config_map.update(_npu_genai_config(n_tok, int(s.get("num_predict", 128))))
+                pipe, _ = _pipeline(self, request.model, ov_id, config_map)
                 config = genai.GenerationConfig()
                 config.max_new_tokens = _SESSION_NEW_TOKENS
                 while not stop.is_set():
