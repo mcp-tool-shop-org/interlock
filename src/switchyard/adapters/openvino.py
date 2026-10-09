@@ -381,6 +381,10 @@ def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> Step
     pooling = _pooling_for(request.task, repo)  # refused before anything loads
     tokenizer = self._load_tokenizer(repo, ref)
     ids, mask = self._encode(tokenizer, str(s.get("prompt") or "hello"))
+    eos_appended = None
+    if pooling == "last":
+        eos_id = getattr(tokenizer, "eos_token_id", None)
+        eos_appended = bool(eos_id is not None and ids and ids[-1] == eos_id)
     dropped = 0
     if static is not None:
         ids, mask, dropped = pad_truncate(ids, static[1], int(getattr(tokenizer, "pad_token_id", 0) or 0),
@@ -411,6 +415,12 @@ def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> Step
     )
     if dropped:
         resolved["truncated_tokens"] = dropped
+    if eos_appended is not None:
+        # Last-token pooling reads the last unmasked row: correct only when
+        # that row is the tokenizer's EOS. Truncation cuts EOS off the kept
+        # region, so a truncated "last" arm records last_row_is_eos false.
+        resolved["eos_appended"] = eos_appended
+        resolved["last_row_is_eos"] = eos_appended and dropped == 0
     if (static[0] if static else batch_rows) > 1:
         resolved["batch_fill"] = "repeat"
     kwargs = dict(

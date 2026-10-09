@@ -24,6 +24,7 @@ class FakeClock:
 class FakeTokenizer:
     pad_token_id = 0
     model_max_length = 512
+    eos_token_id = 102
 
     def __call__(self, text: str, return_attention_mask: bool = True):
         ids = [101] + [abs(hash(w)) % 30000 + 1 for w in str(text).split()] + [102]
@@ -41,7 +42,8 @@ class FakeCompiled:
             raise OSError("device exploded")
         mask = inputs["attention_mask"]
         n = sum(mask)
-        return [[float(n), 1.0, 2.0]] * batch_rows
+        # one row per position, like a real last_hidden_state — last-token pooling needs it
+        return [[float(n), 1.0, 2.0]] * max(len(mask), 1)
 
 
 class FakeGraph:
@@ -491,3 +493,16 @@ def test_pool_last_token():
     with pytest.raises(AdapterError):
         ovm.pool(matrix, [0, 0, 0], "last")
     assert ovm._POOLING["OpenVINO/Qwen3-Embedding-0.6B-fp16-ov"] == "last"
+
+
+def test_last_pooling_records_eos_state(tmp_path, monkeypatch):
+    m = local_model(tmp_path)
+    monkeypatch.setitem(ovm._POOLING, m, "last")
+    a = make_adapter()
+    r = a.run(req(model=m, device="CPU", static_shape="1x64", prompt="two words here"))
+    assert r.ok and r.resolved["pooling"] == "last"
+    assert r.resolved["eos_appended"] is True and r.resolved["last_row_is_eos"] is True
+    long_prompt = " ".join(f"w{i}" for i in range(600))
+    r2 = a.run(req(model=m, device="CPU", static_shape="1x8", prompt=long_prompt))
+    assert r2.resolved["eos_appended"] is True      # the tokenizer appended it
+    assert r2.resolved["last_row_is_eos"] is False  # truncation cut it off
