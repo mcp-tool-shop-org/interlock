@@ -1,6 +1,6 @@
 # switchyard: how it works
 
-Mapped at 2026-10-09 from commit 29c57fb by Atlas 1.24.0.
+Mapped at 2026-10-09 from commit 0e19c5c by Atlas 1.24.0.
 
 ## What this is
 
@@ -8,10 +8,9 @@ switchyard routes each job to a model, engine and device from a receipt-backed t
 
 7 parts, mostly Python (35 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.
 
-## What changed since 2026-10-09 (a4c84a3)
+## What changed since 2026-10-09 (29c57fb)
 
-- experiments is a new part, drawn from `experiments/**`.
-- 15 files added and 3 changed content, across 4 parts.
+Nothing structural changed since 2026-10-09; 12 files changed content.
 
 ## What comes in
 
@@ -72,7 +71,7 @@ Read those in order to follow one run of switchyard end to end. This path follow
 
 - 1 import could not be resolved: `src/switchyard/adapters/registry.py` imports `switchyard.adapters.openvino`, which is no module on its import path and no declared dependency.
 - 1 read uses a path built at run time and is not named here.
-- 3 writes and 7 reads go to a path their caller passes, not to this repository.
+- 3 writes and 6 reads go to a path their caller passes, not to this repository.
 - 3 files belong to no part: table/candidates.json, table/gaps.md and table/routing.jsonl.
 - Statistics confidence is low: fewer than 30 qualifying commits in the window, and fewer than 25 source files reach 10 revisions.
 
