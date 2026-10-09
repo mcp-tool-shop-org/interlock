@@ -1,0 +1,8 @@
+{
+  "gemma4:31b": "gemma",
+  "granite4.1:30b": "granite",
+  "llama3.1:8b": "llama",
+  "mistral-small:24b": "mistral",
+  "qwen3:14b": "qwen",
+  "qwen3:8b": "qwen"
+}

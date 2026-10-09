@@ -13,6 +13,7 @@ from pathlib import Path
 import yaml
 
 from switchyard.harness.e5 import PROMPT_RATIO, SHARED_GROWTH_MIB
+from switchyard.tasks import TASKS
 
 PROCEDURES = frozenset({"interleaved", "fill-card", "offrig-calibrate"})
 ABORT_MIB = 30500
@@ -57,6 +58,7 @@ def validate_spec(data: object) -> dict:
         _fill_card(data)
     else:
         _offrig(data)
+    _choice_rule(data)
     return data
 
 
@@ -83,6 +85,8 @@ def _interleaved(data: dict) -> None:
                 raise SpecError(f"arm {arm['id']} is missing {key}")
         if arm["device"] not in DEVICES:
             raise SpecError(f"arm {arm['id']} names a device the resolver does not allow")
+        if arm["task"] not in TASKS:
+            raise SpecError(f"arm {arm['id']} task {arm['task']!r} is not an exact routing task")
         batch = arm.get("batch")
         if arm["task"] == "nli" and batch != 1:
             raise SpecError(f"arm {arm['id']} NLI batch must be 1")
@@ -161,6 +165,40 @@ def _pairs(data: dict, arm_ids: set) -> None:
             raise SpecError(f"paired arm {paired_id} needs companion_device")
         if arms[companion]["device"] != expected:
             raise SpecError(f"arm {paired_id} companion_device does not match the companion arm")
+
+
+def _choice_rule(data: dict) -> None:
+    if "choice_rule" not in data:
+        if "selection_sha" in data:
+            raise SpecError("selection_sha belongs with a choice_rule")
+        return
+    rule = data["choice_rule"]
+    if not isinstance(rule, dict):
+        raise SpecError("choice_rule must be a mapping")
+    allowed = {"eligibility_floor", "ranking_key", "tie_rule", "fallback"}
+    extra = set(rule) - allowed
+    if extra or set(rule) != allowed:
+        raise SpecError("choice_rule holds the eligibility floor, ranking key, tie rule, and fallback")
+    floor = rule["eligibility_floor"]
+    if not isinstance(floor, dict) or set(floor) != {"metric", "minimum"}:
+        raise SpecError("choice_rule.eligibility_floor holds a metric and a minimum")
+    if not isinstance(floor["metric"], str) or not floor["metric"]:
+        raise SpecError("choice_rule.eligibility_floor.metric must name a quality metric")
+    minimum = floor["minimum"]
+    if isinstance(minimum, bool) or not isinstance(minimum, (int, float)):
+        raise SpecError("choice_rule.eligibility_floor.minimum must be a number")
+    if not isinstance(rule["ranking_key"], str) or not rule["ranking_key"]:
+        raise SpecError("choice_rule.ranking_key must name a quality metric")
+    tie = rule["tie_rule"]
+    if not isinstance(tie, dict) or set(tie) != {"toward"}:
+        raise SpecError("choice_rule.tie_rule holds toward, the committed choice")
+    if not isinstance(tie["toward"], str) or not tie["toward"]:
+        raise SpecError("choice_rule.tie_rule.toward must name the committed choice")
+    if not isinstance(rule["fallback"], str) or not rule["fallback"]:
+        raise SpecError("choice_rule.fallback must name a row")
+    sha = data.get("selection_sha")
+    if not isinstance(sha, str) or not sha:
+        raise SpecError("a choice_rule needs the frozen selection_sha beside it")
 
 
 def _offrig(data: dict) -> None:

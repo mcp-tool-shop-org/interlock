@@ -18,7 +18,9 @@ from switchyard.importers.common import (
     sha256_bytes,
     source_provenance,
 )
+from switchyard.families import stamp_family
 from switchyard.receipt import validate_row
+from switchyard.tasks import MATH_LADDER_TASK
 
 VIEWS = ("final_verdict", "model_verdict")
 
@@ -53,7 +55,7 @@ def ladder_rows(
                 note += " n<30, tentative."
             row = {
                 "id": f"ladder/{model}/{cell}/q-{rule}/{view}",
-                "task": "verify",
+                "task": MATH_LADDER_TASK,
                 "model": {
                     "repo_or_tag": model,
                     "revision_or_digest": manifest["model_digest"],
@@ -83,6 +85,7 @@ def ladder_rows(
                 "provenance": source_provenance(f"{source_dir}/verdicts.jsonl", commit_sha, content),
                 "notes": note,
             }
+            stamp_family(row)
             validate_row(row)
             rows.append(row)
     return rows

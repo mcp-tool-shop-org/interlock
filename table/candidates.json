@@ -133,11 +133,25 @@
     "why": "No measurement of iGPU NLI latency with and without the 5090 busy. Batch 8 on the NPU is not this cell."
   },
   {
-    "id": "quote-rule-2",
+    "id": "quote-rule-2-grounded",
     "experiment": "other",
-    "match": {"task": "verify", "quote_rule": 2},
+    "match": {"task": "verify:grounded", "quote_rule": 2},
     "needs": ["quote_rule"],
-    "why": "No verify row is pinned to quote rule 2. Chain and ladder rows whose verdicts omit pins.quote_rule are quote rule 1 by the pre-#47 inference, and that source is on the row. They are not merged with rule 2."
+    "why": "No verify:grounded row is pinned to quote rule 2. Chain rows whose verdicts omit pins.quote_rule are quote rule 1 by the pre-#47 inference, and that source is on the row. A math-ladder row does not fill this cell."
+  },
+  {
+    "id": "quote-rule-2-reasoning",
+    "experiment": "other",
+    "match": {"task": "verify:reasoning", "quote_rule": 2},
+    "needs": ["quote_rule"],
+    "why": "No verify:reasoning row is pinned to quote rule 2. Chain rows whose verdicts omit pins.quote_rule are quote rule 1 by the pre-#47 inference, and that source is on the row. A grounded row does not fill this cell."
+  },
+  {
+    "id": "quote-rule-2-math-ladder",
+    "experiment": "other",
+    "match": {"task": "verify:math-ladder", "quote_rule": 2},
+    "needs": ["quote_rule"],
+    "why": "No verify:math-ladder row is pinned to quote rule 2. Ladder rows whose verdicts omit pins.quote_rule are quote rule 1 by the pre-#47 inference, and that source is on the row. A chain row does not fill this cell."
   },
   {
     "id": "runpod-snapshot",
@@ -154,10 +168,17 @@
     "why": "The table has no rerank row."
   },
   {
-    "id": "qwen3-8b-heldout",
+    "id": "qwen3-8b-heldout-grounded",
     "experiment": "other",
-    "match": {"task": "verify", "model": "qwen3:8b", "split": "heldout"},
+    "match": {"task": "verify:grounded", "model": "qwen3:8b", "split": "heldout"},
     "needs": ["quote_rule"],
-    "why": "qwen3:8b verify rows in this import are the tune chain. Held-out is not in the table."
+    "why": "qwen3:8b verify:grounded rows in this import are the tune split. Held-out is not in the table."
+  },
+  {
+    "id": "qwen3-8b-heldout-reasoning",
+    "experiment": "other",
+    "match": {"task": "verify:reasoning", "model": "qwen3:8b", "split": "heldout"},
+    "needs": ["quote_rule"],
+    "why": "qwen3:8b verify:reasoning rows in this import are the tune split. Held-out is not in the table."
   }
 ]

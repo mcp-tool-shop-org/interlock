@@ -242,6 +242,7 @@ def test_repeats_build_a_receipt_and_keep_cold_separate(tmp_path: Path):
     assert "keep_alive" not in arm_a["settings"]
     assert arm_a["settings"]["environment"]["nvidia_driver"] == "unrecorded"
     assert arm_a["provenance"] == {"experiment_spec": "experiments/t/spec.yaml", "run_id": "run-1"}
+    assert arm_a["model_family"] == "qwen"
     stored = load_jsonl(repo / "table" / "routing.jsonl")
     assert {row["id"] for row in stored} == {row["id"] for row in rows}
     assert script.calls[:4] == ["A", "B", "A", "B"]
@@ -257,6 +258,7 @@ def test_e4_and_e5_specs_pin_the_rules():
     assert e4["compile_cache"] == "fresh"
     assert e4["order"] == "aba"
     assert e4["rest_s"] == 900
+    assert "choice_rule" not in e4 and "choice_rule" not in e5
     assert [pair["id"] for pair in e4["pairs"]] == ["5090-npu", "5090-igpu", "npu-5090", "igpu-5090"]
     arms = {arm["id"]: arm for arm in e4["arms"]}
     assert arms["5090-with-npu"]["companion"] == "npu-alone"
@@ -570,6 +572,10 @@ def test_spec_rejects_a_contract_that_is_not_pre_registered(tmp_path: Path):
         validate_spec({**good, "arms": [nameless]})
     with pytest.raises(SpecError, match="device"):
         validate_spec({**good, "arms": [_arm("A", "GPU.1")]})
+    legacy = _arm("A", "5090")
+    legacy["task"] = "verify"
+    with pytest.raises(SpecError, match="exact routing task"):
+        validate_spec({**good, "arms": [legacy]})
 
     card = load_spec(E5)
     with pytest.raises(SpecError, match="2048"):

@@ -17,6 +17,7 @@ from switchyard.importers.common import (
     sha256_bytes,
     source_provenance,
 )
+from switchyard.families import stamp_family
 from switchyard.receipt import validate_row
 
 _BLOCKS = ("false_accept", "false_accept_unsupported_only", "abstain")
@@ -78,6 +79,7 @@ def nli_rows(document: dict, *, source_path: str, commit_sha: str, prereg_says_i
                 f"Truncated items in this leg: {leg.get('truncated_n')}."
             ),
         }
+        stamp_family(row)
         validate_row(row)
         rows.append(row)
     return rows
