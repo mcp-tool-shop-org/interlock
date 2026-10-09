@@ -32,14 +32,15 @@ class FakeTokenizer:
 
 
 class FakeCompiled:
-    def __init__(self, fail=False):
+    def __init__(self, fail=False, msg="device exploded"):
         self.calls = 0
         self.fail = fail
+        self.msg = msg
 
     def infer_lists(self, inputs, batch_rows: int):
         self.calls += 1
         if self.fail:
-            raise OSError("device exploded")
+            raise OSError(self.msg)
         mask = inputs["attention_mask"]
         n = sum(mask)
         # one row per position, like a real last_hidden_state — last-token pooling needs it
@@ -545,3 +546,113 @@ def test_generate_non_npu_has_no_genai_config(tmp_path):
     a = make_adapter()
     r = a.run(req(task="generate", model=str(tmp_path), device="CPU"))
     assert r.ok and "genai_config" not in r.resolved
+# --- device loss (Level Zero DEVICE_LOST, seen live 2026-10-09) ------------
+
+LOST_MSG = "infer request failed: ZE_RESULT_ERROR_DEVICE_LOST: device hung or reset"
+
+
+class LostCore(FakeCore):
+    def compile_model(self, graph, device, config):
+        if device == "NPU":
+            raise RuntimeError(LOST_MSG)
+        return super().compile_model(graph, device, config)
+
+
+class LostInferCore(FakeCore):
+    def compile_model(self, graph, device, config):
+        self.compiled.append((device, dict(config)))
+        if device == "NPU":
+            return FakeCompiled(fail=True, msg=LOST_MSG)
+        return FakeCompiled()
+
+
+def test_device_loss_at_compile_is_a_recorded_result(tmp_path, monkeypatch):
+    m = local_model(tmp_path)
+    monkeypatch.setitem(ovm._POOLING, m, "cls")
+    a = make_adapter(core=LostCore())
+    r = a.run(req(model=m, device="NPU", static_shape="1x16"))
+    assert r.ok is True
+    assert r.resolved["outcome"] == "device_lost"
+    assert r.latency_ms is None and r.throughput is None
+    assert r.compile_ms is None and r.first_call_ms is None
+    assert not a._poisoned  # a device loss is not a poison: the pair is recorded, not refused
+
+
+def test_device_loss_blocks_only_that_device(tmp_path, monkeypatch):
+    m = local_model(tmp_path)
+    monkeypatch.setitem(ovm._POOLING, m, "cls")
+    a = make_adapter(core=LostCore())
+    first = a.run(req(model=m, device="NPU", static_shape="1x16"))
+    assert first.resolved["outcome"] == "device_lost"
+    compiles_after_loss = len(a._injected_core.compiled)
+    rest = a.run(req(model=m, device="NPU", static_shape="1x32"))
+    assert rest.ok and rest.resolved["outcome"] == "not run"
+    assert rest.latency_ms is None and rest.throughput is None
+    assert len(a._injected_core.compiled) == compiles_after_loss  # nothing touched the NPU again
+    cpu = a.run(req(model=m, device="CPU", static_shape="1x16"))
+    assert cpu.ok and cpu.latency_ms is not None  # other devices run on
+
+
+def test_device_loss_mid_infer_records_and_purges(tmp_path, monkeypatch):
+    m = local_model(tmp_path)
+    monkeypatch.setitem(ovm._POOLING, m, "cls")
+    a = make_adapter(core=LostInferCore())
+    r = a.run(req(model=m, device="NPU", static_shape="1x16"))
+    assert r.ok and r.resolved["outcome"] == "device_lost"
+    assert r.latency_ms is None and r.throughput is None
+    # the dead compiled entry is dropped, not kept as if still loaded
+    assert not [key for key in a._compiled if key[2] == "NPU"]
+
+
+def test_non_loss_failures_keep_their_old_shape(tmp_path, monkeypatch):
+    m = local_model(tmp_path)
+    monkeypatch.setitem(ovm._POOLING, m, "cls")
+    a = make_adapter(core=FakeCore(fail_compile=True))
+    r = a.run(req(model=m, device="CPU", static_shape="1x16"))
+    assert r.ok is False and "compile blew up" in r.error
+    assert a._lost_devices == set()
+
+
+def test_device_loss_generate_build_is_a_result_not_unsupported_length(tmp_path):
+    class LostGenai(FakeGenai):
+        class LLMPipeline(FakePipeline):
+            def __init__(self, path, device, config):
+                if device == "NPU":
+                    raise RuntimeError(LOST_MSG)
+                super().__init__(path, device, config)
+
+    a = make_adapter(genai_module=LostGenai)
+    r = a.run(req(task="generate", model=str(tmp_path), device="NPU", prompt="hi"))
+    assert r.ok is True and r.resolved["outcome"] == "device_lost"
+    assert r.latency_ms is None and r.throughput is None
+    assert (str(tmp_path), "NPU") not in a._pipelines
+    cpu = a.run(req(task="generate", model=str(tmp_path), device="CPU", prompt="hi"))
+    assert cpu.ok and cpu.latency_ms is not None
+
+
+def test_device_loss_generate_call_marks_and_skips(tmp_path):
+    class LostCallGenai(FakeGenai):
+        class LLMPipeline(FakePipeline):
+            def generate(self, prompt, config=None):
+                if self.device == "NPU":
+                    raise RuntimeError(LOST_MSG)
+                return super().generate(prompt, config)
+
+    a = make_adapter(genai_module=LostCallGenai)
+    r = a.run(req(task="generate", model=str(tmp_path), device="NPU", prompt="hi"))
+    assert r.ok is True and r.resolved["outcome"] == "device_lost"
+    assert (str(tmp_path), "NPU") not in a._pipelines
+    rest = a.run(req(task="generate", model=str(tmp_path), device="NPU", prompt="hi there"))
+    assert rest.ok and rest.resolved["outcome"] == "not run"
+
+
+def test_device_loss_in_companion_start_marks_the_device(tmp_path, monkeypatch):
+    m = local_model(tmp_path)
+    monkeypatch.setitem(ovm._POOLING, m, "cls")
+    a = make_adapter(core=LostCore())
+    # the fault still surfaces: concurrent measurements are invalid without the load
+    with pytest.raises(AdapterError, match="failed to start"):
+        a.start_session(req(model=m, device="NPU", static_shape="1x16"))
+    # but later one-shot steps on that device are recorded, not attempted
+    r = a.run(req(model=m, device="NPU", static_shape="1x16"))
+    assert r.ok and r.resolved["outcome"] == "not run"

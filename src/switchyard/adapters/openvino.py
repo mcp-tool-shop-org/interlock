@@ -28,7 +28,13 @@ KV cache is sized explicitly (MAX_PROMPT_LEN = prompt + 64, MIN_RESPONSE_LEN
 values are recorded under ``resolved["genai_config"]``, and a pipeline that
 still cannot cover the prompt ends the arm with ``ok`` true and
 ``resolved["outcome"] = "unsupported length"`` — recorded, not retried, and
-the sequence continues.
+the sequence continues. A Level Zero device loss is a capability row too,
+``resolved["outcome"] = "device_lost"`` with no timing fields, after which
+that device is off for the rest of the run and its remaining steps report
+``"not run"`` without touching the hardware. A companion session that loses
+its device still surfaces the fault — the concurrent measurements are invalid
+without the load — and the device is marked the same way, so later one-shot
+steps on it are recorded, not attempted.
 
 The NPU infers static shapes only, so a NPU step without ``static_shape``
 (``"BxL"``) is refused before any compile. AUTO, HETERO, Multi and GPU.1 are
@@ -65,6 +71,16 @@ EMBED_UNIT = "items/s"
 GENERATE_UNIT = "tok/s"
 _SESSION_NEW_TOKENS = 8
 _QUANTS = ("int4", "int8", "fp16", "fp32")
+# Level Zero device-loss signature, seen live: nomic NPU 8x1024 reset the
+# device mid-run (driver 32.0.100.5540; no Windows event-log entry — the L0
+# result code was the only witness). Distinct from a 60 s timeout hang: a
+# hang ends the run, a device loss becomes a result row and the device is
+# then off for the rest of the run.
+_LOST_MARKERS = ("ZE_RESULT_ERROR_DEVICE_LOST", "DEVICE_LOST", "device hung")
+
+
+def _is_device_lost(exc: BaseException) -> bool:
+    return any(marker in str(exc) for marker in _LOST_MARKERS)
 
 
 def _need_openvino() -> None:
@@ -178,6 +194,7 @@ class OpenvinoAdapter:
         self._pipelines: dict = {}
         self._session: dict | None = None
         self._poisoned: set = set()  # (model, device) keys that hung once
+        self._lost_devices: set = set()  # ov ids that reset this run
 
     @staticmethod
     def enumerate_devices(core) -> list[dict]:
@@ -376,6 +393,9 @@ def _pooling_for(task: str, repo: str) -> str:
 
 def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> StepResult:
     ov_id = self._resolve_ov_id(request.device)
+    if ov_id in self._lost_devices:
+        resolved["outcome"] = "not run"
+        return StepResult(ok=True, resolved=resolved, sensors=None)
     if (parse_model_ref(request.model)[0], ov_id) in self._poisoned:
         raise AdapterError(
             f"{request.model} on {ov_id} hung earlier in this run; the device pair is poisoned for the run"
@@ -396,13 +416,30 @@ def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> Step
         ids, mask, dropped = pad_truncate(ids, static[1], int(getattr(tokenizer, "pad_token_id", 0) or 0),
                                           allow_truncate=bool(s.get("truncate", True)))
     batch_rows = int(s.get("batch", 1))
-    entry = self._embedder(repo, ref, ov_id, static, _compile_config(s))
+    try:
+        entry = self._embedder(repo, ref, ov_id, static, _compile_config(s))
+    except AdapterError:
+        raise
+    except Exception as exc:
+        if _is_device_lost(exc):
+            self._lost_devices.add(ov_id)
+            resolved["outcome"] = "device_lost"
+            return StepResult(ok=True, resolved=resolved, sensors=None)
+        raise
     compiled_now = not entry["warmed"]
     t0 = self.clock()
-    status, matrix = _timed_call(
-        lambda: self._infer_embed(entry, ids, mask, batch_rows if static is None else static[0]),
-        self.call_timeout_s,
-    )
+    try:
+        status, matrix = _timed_call(
+            lambda: self._infer_embed(entry, ids, mask, batch_rows if static is None else static[0]),
+            self.call_timeout_s,
+        )
+    except Exception as exc:
+        if _is_device_lost(exc):
+            self._lost_devices.add(ov_id)
+            self._compiled = {k: v for k, v in self._compiled.items() if not (k[0] == repo and k[2] == ov_id)}
+            resolved["outcome"] = "device_lost"
+            return StepResult(ok=True, resolved=resolved, sensors=None)
+        raise
     if status == "hang":
         self._compiled = {k: v for k, v in self._compiled.items() if not (k[0] == repo and k[2] == ov_id)}
         self._poisoned.add((repo, ov_id))
@@ -449,6 +486,9 @@ def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> Step
 
 def _run_generate(self, request: StepRequest, s: _Settings, resolved: dict) -> StepResult:
     ov_id = self._resolve_ov_id(request.device)
+    if ov_id in self._lost_devices:
+        resolved["outcome"] = "not run"
+        return StepResult(ok=True, resolved=resolved, sensors=None)
     if (request.model, ov_id) in self._poisoned:
         raise AdapterError(
             f"{request.model} on {ov_id} hung earlier in this run; the device pair is poisoned for the run"
@@ -468,6 +508,10 @@ def _run_generate(self, request: StepRequest, s: _Settings, resolved: dict) -> S
     except AdapterError:
         raise
     except Exception as exc:
+        if _is_device_lost(exc):
+            self._lost_devices.add(ov_id)
+            resolved["outcome"] = "device_lost"
+            return StepResult(ok=True, resolved=resolved or None, sensors=None)
         if ov_id == "NPU":
             # recorded, not retried: the KV cache cannot cover this prompt;
             # ok stays true so the sequence continues past the arm
@@ -482,7 +526,15 @@ def _run_generate(self, request: StepRequest, s: _Settings, resolved: dict) -> S
         config.do_sample = True
         config.temperature = float(s.get("temperature"))
     t0 = self.clock()
-    status, out = _timed_call(lambda: pipe.generate(str(s.get("prompt") or "hello"), config), self.call_timeout_s)
+    try:
+        status, out = _timed_call(lambda: pipe.generate(str(s.get("prompt") or "hello"), config), self.call_timeout_s)
+    except Exception as exc:
+        if _is_device_lost(exc):
+            self._lost_devices.add(ov_id)
+            self._pipelines.pop((request.model, ov_id), None)
+            resolved["outcome"] = "device_lost"
+            return StepResult(ok=True, resolved=resolved, sensors=None)
+        raise
     if status == "hang":
         self._pipelines.pop((request.model, ov_id), None)
         self._poisoned.add((request.model, ov_id))
@@ -667,6 +719,8 @@ def _start_session(self, request: StepRequest) -> None:
                         return
                     box["call_s"] = self.clock() - t0
         except Exception as exc:  # surfaced as a refusal on start, or on stop mid-run
+            if _is_device_lost(exc):
+                self._lost_devices.add(ov_id)
             box["fault"] = exc
 
     worker = threading.Thread(target=loop, name=f"switchyard-ov-{request.step_id}", daemon=True)
