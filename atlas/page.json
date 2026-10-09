@@ -1,0 +1,59 @@
+{
+  "authored": [
+    ".github/",
+    "assets/",
+    "docs/",
+    "root"
+  ],
+  "breaks": [],
+  "changes": {
+    "first": true
+  },
+  "changesTogether": [],
+  "changesTogetherNote": [
+    "Window: 180 days; a pair counts from 3 shared commits, since the window holds fewer than 30 qualifying commits."
+  ],
+  "changesTogetherWithTests": 0,
+  "commit": "a65b12ffd16a6f6b5f08019f07ac74c75baa0961",
+  "defaultBranch": "main",
+  "derived": "6 parts. No workflows were found, so this page has no doors.",
+  "doors": [],
+  "duplicates": [],
+  "duplicatesLead": null,
+  "duplicatesNote": [],
+  "edges": [],
+  "engine": "1.24.0",
+  "generated": [],
+  "generatedAt": "2026-10-09T17:59:23.950Z",
+  "limits": [
+    "Statistics confidence is low: fewer than 30 qualifying commits in the window, and fewer than 20 source files reach 10 revisions."
+  ],
+  "mainDoor": null,
+  "partLabels": {
+    ".github": ".github",
+    "assets": "assets",
+    "docs": "docs",
+    "root": "the repository root",
+    "src": "src",
+    "tests": "tests"
+  },
+  "parts": 6,
+  "readers": [],
+  "repo": "mcp-tool-shop-org/switchyard",
+  "sequences": [],
+  "startDoor": null,
+  "startHere": [],
+  "summary": "switchyard routes each job to a model, engine and device from a receipt-backed table.",
+  "summaryFrom": "person",
+  "testFiles": 0,
+  "testedBy": {},
+  "unnamedWrites": 0,
+  "unread": [],
+  "unreadFiles": 0,
+  "unreadNote": [],
+  "untested": [],
+  "untestedNote": [
+    "No test files were found by name."
+  ],
+  "written": 0
+}

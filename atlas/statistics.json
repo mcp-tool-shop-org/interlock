@@ -1,0 +1,163 @@
+{
+  "authorship": {
+    "parts": [],
+    "places": []
+  },
+  "boundaries": [
+    {
+      "breakage": {
+        "coChangesOnly": [],
+        "collapsed": true,
+        "confidence": "low",
+        "importsAndCoChanges": [],
+        "importsOnly": []
+      },
+      "cohesion": null,
+      "cohesionDropped": false,
+      "confidence": "low",
+      "highWater": null,
+      "name": ".github",
+      "qualifyingSourceCommits": 0,
+      "rebaseline": null
+    },
+    {
+      "breakage": {
+        "coChangesOnly": [],
+        "collapsed": true,
+        "confidence": "low",
+        "importsAndCoChanges": [],
+        "importsOnly": []
+      },
+      "cohesion": null,
+      "cohesionDropped": false,
+      "confidence": "low",
+      "highWater": null,
+      "name": "assets",
+      "qualifyingSourceCommits": 0,
+      "rebaseline": null
+    },
+    {
+      "breakage": {
+        "coChangesOnly": [],
+        "collapsed": true,
+        "confidence": "low",
+        "importsAndCoChanges": [],
+        "importsOnly": []
+      },
+      "cohesion": null,
+      "cohesionDropped": false,
+      "confidence": "low",
+      "highWater": null,
+      "name": "docs",
+      "qualifyingSourceCommits": 0,
+      "rebaseline": null
+    },
+    {
+      "breakage": {
+        "coChangesOnly": [],
+        "collapsed": true,
+        "confidence": "low",
+        "importsAndCoChanges": [],
+        "importsOnly": []
+      },
+      "cohesion": null,
+      "cohesionDropped": false,
+      "confidence": "low",
+      "highWater": null,
+      "name": "root",
+      "qualifyingSourceCommits": 0,
+      "rebaseline": null
+    },
+    {
+      "breakage": {
+        "coChangesOnly": [],
+        "collapsed": true,
+        "confidence": "low",
+        "importsAndCoChanges": [],
+        "importsOnly": []
+      },
+      "cohesion": null,
+      "cohesionDropped": false,
+      "confidence": "low",
+      "highWater": null,
+      "name": "src",
+      "qualifyingSourceCommits": 0,
+      "rebaseline": null
+    },
+    {
+      "breakage": {
+        "coChangesOnly": [],
+        "collapsed": true,
+        "confidence": "low",
+        "importsAndCoChanges": [],
+        "importsOnly": []
+      },
+      "cohesion": null,
+      "cohesionDropped": false,
+      "confidence": "low",
+      "highWater": null,
+      "name": "tests",
+      "qualifyingSourceCommits": 0,
+      "rebaseline": null
+    }
+  ],
+  "churn": {
+    "definition": "commits is how many commits in the window touch the file, including merges and commits dropped from coupling. lines is added plus deleted in those commits.",
+    "files": [
+      {
+        "commits": 1,
+        "lines": 21,
+        "path": "LICENSE"
+      }
+    ]
+  },
+  "confidence": {
+    "level": "low",
+    "reason": "fewer than 30 qualifying commits in the window, and fewer than 20 source files reach 10 revisions"
+  },
+  "generatedAt": "2026-10-09T17:59:23.950Z",
+  "generatedFrom": {
+    "commit": "a65b12ffd16a6f6b5f08019f07ac74c75baa0961"
+  },
+  "pairs": [],
+  "parameters": {
+    "appliedChangesetLimit": 0.25,
+    "changeset": 50,
+    "changesetFraction": 0.25,
+    "cohesionDrop": 0.2,
+    "couplingPopulation": "source",
+    "fallenShared": 3,
+    "floor": "fallen",
+    "floorHeld": false,
+    "floorTrigger": "both",
+    "headDate": "2026-10-09T05:18:44-04:00",
+    "inScopeFiles": 1,
+    "pinnedStart": null,
+    "priorFloor": null,
+    "qualifyingCommits": 0,
+    "qualifyingMinimum": 30,
+    "revisions": 5,
+    "shared": 10,
+    "sharedFloorUsed": 3,
+    "since": "2026-04-12T09:18:44.000Z",
+    "sourceExtensions": [
+      ".js",
+      ".mjs",
+      ".cjs",
+      ".jsx",
+      ".ts",
+      ".tsx",
+      ".mts",
+      ".cts",
+      ".py",
+      ".rs",
+      ".gd"
+    ],
+    "sourceFileReach": 20,
+    "sourceFileRise": 25,
+    "sourceFilesReachingStrongFloor": 0,
+    "strength": 0.5,
+    "windowDays": 180
+  },
+  "strengthDefinition": "strength is the shared qualifying commits divided by either. either is the number of qualifying commits that touch either file."
+}

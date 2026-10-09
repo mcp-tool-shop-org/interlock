@@ -1,0 +1,60 @@
+# Standards compliance
+#
+# PIN_PER_STEP: 2. uv.lock pins the packages this workflow installs. Atlas is pinned
+#   to 1.24.0. Coverage measured 97% on this commit; the floor in pyproject.toml is 90.
+# ANDON_AUTHORITY: 2. pytest --cov-fail-under and atlas check are required steps.
+#   A red step fails the job. There is no continue-on-error.
+# NAMED_COMPENSATORS: 2. This workflow only checks out the repo and runs tests.
+#   It does not publish, deploy, or write outside the runner. Undo is to close
+#   the pull request. Owner: the author of the pull request. The Publisher merges.
+# DECOMPOSE_BY_SECRETS: 2. One push-triggered workflow. Lint, test and the map
+#   check live in this file.
+# UNCERTAINTY_GATED_HUMANS: 2. A failing check stops the merge. R&D reviews the
+#   pull request. The Publisher merges.
+# EXTERNAL_VERIFIER: n/a. No specialised claim is decided here. R&D reviews the
+#   pull request.
+
+name: CI
+
+on:
+  push:
+    paths:
+      - "pyproject.toml"
+      - "uv.lock"
+      - "src/**"
+      - "tests/**"
+      - "experiments/**"
+      - "table/**"
+      - "receipts/**"
+      - "docs/**"
+      - "atlas/**"
+      - ".github/workflows/**"
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: "3.12"
+
+      - name: Install
+        run: uv sync --frozen
+
+      - name: Test
+        run: uv run pytest
+
+      - name: Atlas check
+        run: npx --yes @dogfood-lab/atlas@1.24.0 check
+
+      - name: Empty table
+        run: uv run switchyard check

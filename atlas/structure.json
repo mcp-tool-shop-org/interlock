@@ -1,0 +1,130 @@
+{
+  "boundaries": [
+    {
+      "dynamicReads": 0,
+      "dynamicSpawns": 0,
+      "dynamicSpawnsInTests": 0,
+      "dynamicWrites": 0,
+      "entryPoints": [],
+      "externals": 0,
+      "files": [],
+      "globs": [
+        ".github/**"
+      ],
+      "importConfidence": "full",
+      "name": ".github",
+      "origin": "authored",
+      "role": "config",
+      "testedBy": 0,
+      "unresolvedSites": 0
+    },
+    {
+      "dynamicReads": 0,
+      "dynamicSpawns": 0,
+      "dynamicSpawnsInTests": 0,
+      "dynamicWrites": 0,
+      "entryPoints": [],
+      "externals": 0,
+      "files": [],
+      "globs": [
+        "assets/**"
+      ],
+      "importConfidence": "full",
+      "name": "assets",
+      "origin": "authored",
+      "role": "data",
+      "testedBy": 0,
+      "unresolvedSites": 0
+    },
+    {
+      "dynamicReads": 0,
+      "dynamicSpawns": 0,
+      "dynamicSpawnsInTests": 0,
+      "dynamicWrites": 0,
+      "entryPoints": [],
+      "externals": 0,
+      "files": [],
+      "globs": [
+        "docs/**"
+      ],
+      "importConfidence": "full",
+      "name": "docs",
+      "origin": "authored",
+      "role": "docs",
+      "testedBy": 0,
+      "unresolvedSites": 0
+    },
+    {
+      "dynamicReads": 0,
+      "dynamicSpawns": 0,
+      "dynamicSpawnsInTests": 0,
+      "dynamicWrites": 0,
+      "entryPoints": [],
+      "externals": 0,
+      "files": [
+        {
+          "hash": "367e5141e4f5884e5791c4021f33a9faa958840a5decf44e1b273a87aad1c459",
+          "path": "LICENSE"
+        }
+      ],
+      "globs": [
+        "*"
+      ],
+      "importConfidence": "full",
+      "name": "root",
+      "origin": "authored",
+      "role": "config",
+      "testedBy": 0,
+      "unresolvedSites": 0
+    },
+    {
+      "dynamicReads": 0,
+      "dynamicSpawns": 0,
+      "dynamicSpawnsInTests": 0,
+      "dynamicWrites": 0,
+      "entryPoints": [],
+      "externals": 0,
+      "files": [],
+      "globs": [
+        "src/**"
+      ],
+      "importConfidence": "full",
+      "name": "src",
+      "origin": "authored",
+      "role": "code",
+      "testedBy": 0,
+      "unresolvedSites": 0
+    },
+    {
+      "dynamicReads": 0,
+      "dynamicSpawns": 0,
+      "dynamicSpawnsInTests": 0,
+      "dynamicWrites": 0,
+      "entryPoints": [],
+      "externals": 0,
+      "files": [],
+      "globs": [
+        "tests/**"
+      ],
+      "importConfidence": "full",
+      "name": "tests",
+      "origin": "authored",
+      "role": "test",
+      "testedBy": 0,
+      "unresolvedSites": 0
+    }
+  ],
+  "doors": [],
+  "edges": [],
+  "engine": "1.24.0",
+  "generatedFrom": {
+    "commit": "a65b12ffd16a6f6b5f08019f07ac74c75baa0961",
+    "tracked": 1
+  },
+  "landings": [],
+  "overlaps": [],
+  "submodules": [],
+  "symlinks": [],
+  "testFiles": 0,
+  "unassigned": []
+}
