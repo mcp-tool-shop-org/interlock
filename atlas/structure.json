@@ -1,0 +1,852 @@
+{
+  "boundaries": [
+    {
+      "dynamicReads": 0,
+      "dynamicSpawns": 0,
+      "dynamicSpawnsInTests": 0,
+      "dynamicWrites": 0,
+      "entryPoints": [],
+      "externals": 0,
+      "files": [
+        {
+          "hash": "5a4106ac9663b18604d3e1db72377978463c016d3e537d8aeb2ff262b37b40d1",
+          "path": ".github/workflows/ci.yml"
+        }
+      ],
+      "globs": [
+        ".github/**"
+      ],
+      "importConfidence": "full",
+      "name": ".github",
+      "origin": "authored",
+      "role": "config",
+      "testedBy": 0,
+      "unresolvedSites": 0
+    },
+    {
+      "dynamicReads": 0,
+      "dynamicSpawns": 0,
+      "dynamicSpawnsInTests": 0,
+      "dynamicWrites": 0,
+      "entryPoints": [],
+      "externals": 0,
+      "files": [
+        {
+          "hash": "e8edb7d07d137014c61097fb81353c2d3470da06f47f02f408369b70d8ba6269",
+          "path": "assets/logo/switchyard-master.png"
+        },
+        {
+          "hash": "4b5525d5d287c6a8f4015b986c3b8429a0d1400ba0f969ff154ee51178f144a7",
+          "path": "assets/logo/switchyard_128.png"
+        },
+        {
+          "hash": "2f877430a72d59b1c3ba939a18ce45cab5ea57543bccc4707f3708d1454ec03f",
+          "path": "assets/logo/switchyard_16.png"
+        },
+        {
+          "hash": "93ea42f79c473304ab0e02428a1a10f58acedc25db1843704ab53392bc719228",
+          "path": "assets/logo/switchyard_256.png"
+        },
+        {
+          "hash": "58eff8874a4a518d73d432d41d0b4ef60288697dfc31156585268ca5ddeaeec8",
+          "path": "assets/logo/switchyard_32.png"
+        },
+        {
+          "hash": "cc6f3f23fdf58af390fd9ea06adbe542c75a95bb5e42709861abae5f4cc1f6be",
+          "path": "assets/logo/switchyard_512.png"
+        },
+        {
+          "hash": "db2e4ebe052304e923de25c5e66c45ee42fa5f0f0813618541ca354abd76dfb5",
+          "path": "assets/logo/switchyard_64.png"
+        }
+      ],
+      "globs": [
+        "assets/**"
+      ],
+      "importConfidence": "full",
+      "name": "assets",
+      "origin": "authored",
+      "role": "data",
+      "testedBy": 0,
+      "unresolvedSites": 0
+    },
+    {
+      "dynamicReads": 0,
+      "dynamicSpawns": 0,
+      "dynamicSpawnsInTests": 0,
+      "dynamicWrites": 0,
+      "entryPoints": [],
+      "externals": 0,
+      "files": [
+        {
+          "hash": "32c446a961d684b1f0ff950e30416673f935a312ecdb7c9a68085d8b25319e80",
+          "path": "docs/handoff/README.md"
+        },
+        {
+          "hash": "ceaa73f9b8eb313a0af2a1a5f17cc7483086175d72cf7174d4e26b2e03114e7d",
+          "path": "docs/handoff/feedback_check_ci_after_every_push.md"
+        },
+        {
+          "hash": "ee767514a8a2df1ac15b6f3f9e5acb963a740e4328c258d5102eb98f406b39d1",
+          "path": "docs/handoff/feedback_git_add_explicit_paths.md"
+        },
+        {
+          "hash": "fd875575165fe20f5fc07a39049dc3d01766aa2c231ac677a7f883cced2b0603",
+          "path": "docs/handoff/feedback_gpu_use_through_the_publisher.md"
+        },
+        {
+          "hash": "c01b9f1d6773164e4b9d4a193c1758ce69acf047094a6617c60717a9769686f5",
+          "path": "docs/handoff/feedback_read_exit_before_next_gpu_step.md"
+        },
+        {
+          "hash": "5974789f649de8dec1503192cf26944265b52a34bde3a6ad43efeea2a6c43b23",
+          "path": "docs/handoff/switchyard-router-buildout-handoff.md"
+        }
+      ],
+      "globs": [
+        "docs/**"
+      ],
+      "importConfidence": "full",
+      "name": "docs",
+      "origin": "authored",
+      "role": "docs",
+      "testedBy": 0,
+      "unresolvedSites": 0
+    },
+    {
+      "dynamicReads": 0,
+      "dynamicSpawns": 0,
+      "dynamicSpawnsInTests": 0,
+      "dynamicWrites": 0,
+      "entryPoints": [],
+      "externals": 0,
+      "files": [
+        {
+          "hash": "93699a1108fd9da226b06f84ee12e317f4ea4d2f18a8fd05260443fd1bf2faef",
+          "path": ".gitattributes"
+        },
+        {
+          "hash": "d76885d4cec940ebc8b9ea32ab4dc6311a34f35dc1f17f6644edc4076df8c225",
+          "path": ".gitignore"
+        },
+        {
+          "hash": "7b55f8e67b5623c4bef3fa691288da9437d79d3aba156de48d481db32ac7d16d",
+          "path": ".python-version"
+        },
+        {
+          "hash": "367e5141e4f5884e5791c4021f33a9faa958840a5decf44e1b273a87aad1c459",
+          "path": "LICENSE"
+        },
+        {
+          "hash": "c08a7ba6cd83a008c91466b7fe9e7a0b47b48bfaf288a3ed673a19bd5753d5d0",
+          "path": "README.md"
+        },
+        {
+          "hash": "28ab2ef733689a95d419ddcf8bc45a861f67a08a250e489bebe5082ff93af92c",
+          "path": "pyproject.toml"
+        },
+        {
+          "hash": "6ea89c55c654c99de27cec986c20edeba79d85810cf5bd19140b05fd1d1b5f75",
+          "path": "uv.lock"
+        }
+      ],
+      "globs": [
+        "*"
+      ],
+      "importConfidence": "full",
+      "name": "root",
+      "origin": "authored",
+      "role": "config",
+      "testedBy": 0,
+      "unresolvedSites": 0
+    },
+    {
+      "dynamicReads": 1,
+      "dynamicSpawns": 0,
+      "dynamicSpawnsInTests": 0,
+      "dynamicWrites": 0,
+      "entryPoints": [
+        "src/switchyard/cli.py"
+      ],
+      "externals": 0,
+      "files": [
+        {
+          "constantOnly": true,
+          "hash": "090b4f291b8b7a0be76b1ef248029fc430283d3f46f75b12aff14a0a6b50f56f",
+          "path": "src/switchyard/__init__.py"
+        },
+        {
+          "failurePaths": [
+            {
+              "kind": "raise",
+              "line": 4
+            }
+          ],
+          "hash": "3947af17c7d14a3307f8348d18370a184726107a84fb4cce16d3c65e4e0ac4fd",
+          "importsFiles": [
+            "src/switchyard/cli.py"
+          ],
+          "path": "src/switchyard/__main__.py"
+        },
+        {
+          "entry": "main",
+          "entryRule": 0,
+          "exports": [
+            "main"
+          ],
+          "hash": "2eaaa515a9fe0d81348a52830629490640955874119ef1a5b18be1e7c75b484b",
+          "importsFiles": [
+            "src/switchyard/receipt.py"
+          ],
+          "path": "src/switchyard/cli.py",
+          "sequences": [
+            {
+              "calls": [
+                {
+                  "line": 26,
+                  "name": "check_tree",
+                  "target": {
+                    "file": "src/switchyard/receipt.py"
+                  }
+                },
+                {
+                  "line": 41,
+                  "name": "receipt_paths",
+                  "target": {
+                    "file": "src/switchyard/receipt.py"
+                  },
+                  "via": "_count_rows"
+                },
+                {
+                  "line": 43,
+                  "name": "load_jsonl",
+                  "target": {
+                    "file": "src/switchyard/receipt.py"
+                  },
+                  "via": "_count_rows"
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_cmd_check"
+            },
+            {
+              "calls": [
+                {
+                  "line": 41,
+                  "name": "receipt_paths",
+                  "target": {
+                    "file": "src/switchyard/receipt.py"
+                  }
+                },
+                {
+                  "line": 43,
+                  "name": "load_jsonl",
+                  "target": {
+                    "file": "src/switchyard/receipt.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_count_rows"
+            }
+          ]
+        },
+        {
+          "exports": [
+            "resolve_device"
+          ],
+          "failurePaths": [
+            {
+              "in": "_as_text",
+              "kind": "raise",
+              "line": 35
+            },
+            {
+              "in": "resolve_device",
+              "kind": "raise",
+              "line": 51
+            },
+            {
+              "in": "resolve_device",
+              "kind": "raise",
+              "line": 53
+            },
+            {
+              "in": "resolve_device",
+              "kind": "raise",
+              "line": 63
+            },
+            {
+              "in": "_catalog",
+              "kind": "raise",
+              "line": 70
+            },
+            {
+              "in": "_catalog",
+              "kind": "raise",
+              "line": 75
+            },
+            {
+              "in": "_require_id",
+              "kind": "raise",
+              "line": 83
+            },
+            {
+              "in": "_resolve_gpu_id",
+              "kind": "raise",
+              "line": 96
+            },
+            {
+              "in": "_resolve_gpu_id",
+              "kind": "raise",
+              "line": 98
+            },
+            {
+              "in": "_resolve_gpu_id",
+              "kind": "raise",
+              "line": 102
+            },
+            {
+              "in": "_resolve_gpu_id",
+              "kind": "raise",
+              "line": 104
+            },
+            {
+              "in": "_intel_igpu",
+              "kind": "raise",
+              "line": 117
+            },
+            {
+              "in": "_intel_igpu",
+              "kind": "raise",
+              "line": 120
+            }
+          ],
+          "hash": "5010bf29babb1e761e6c0445fa654dc5913db5b1047aeb93cd3301691fc5a5d3",
+          "path": "src/switchyard/devices.py"
+        },
+        {
+          "exports": [
+            "assess_step",
+            "heartbeat_age_s",
+            "require_card_empty",
+            "require_cpu_window",
+            "require_grant",
+            "require_heartbeat",
+            "require_npu_session",
+            "require_rest"
+          ],
+          "failurePaths": [
+            {
+              "in": "require_grant",
+              "kind": "raise",
+              "line": 25
+            },
+            {
+              "in": "require_npu_session",
+              "kind": "raise",
+              "line": 33
+            },
+            {
+              "in": "require_cpu_window",
+              "kind": "raise",
+              "line": 41
+            },
+            {
+              "in": "heartbeat_age_s",
+              "kind": "except",
+              "line": 50
+            },
+            {
+              "in": "require_heartbeat",
+              "kind": "raise",
+              "line": 59
+            },
+            {
+              "in": "require_card_empty",
+              "kind": "raise",
+              "line": 66
+            },
+            {
+              "in": "require_rest",
+              "kind": "raise",
+              "line": 73
+            },
+            {
+              "in": "assess_step",
+              "kind": "raise",
+              "line": 104
+            }
+          ],
+          "hash": "19788e8e8dd45ba7c52e31204b6a7367fa49e458b0164a537c0883cc3b5bc69e",
+          "importsFiles": [
+            "src/switchyard/devices.py"
+          ],
+          "path": "src/switchyard/guards.py"
+        },
+        {
+          "entry": "check_tree",
+          "entryRule": 4,
+          "exports": [
+            "check_tree",
+            "load_jsonl",
+            "receipt_paths",
+            "schema",
+            "validate_row",
+            "validator"
+          ],
+          "failurePaths": [
+            {
+              "in": "validate_row",
+              "kind": "raise",
+              "line": 44
+            },
+            {
+              "in": "validate_row",
+              "kind": "raise",
+              "line": 49
+            },
+            {
+              "in": "validate_row",
+              "kind": "raise",
+              "line": 53
+            },
+            {
+              "in": "check_tree",
+              "kind": "except",
+              "line": 65
+            },
+            {
+              "in": "check_tree",
+              "kind": "except",
+              "line": 71
+            },
+            {
+              "in": "_rows_in",
+              "kind": "raise",
+              "line": 94
+            },
+            {
+              "in": "load_jsonl",
+              "kind": "except",
+              "line": 106
+            },
+            {
+              "in": "load_jsonl",
+              "kind": "raise",
+              "line": 107
+            },
+            {
+              "in": "_reject_home_paths",
+              "kind": "raise",
+              "line": 114
+            }
+          ],
+          "hash": "e038270d672699e024f3a33a277f5e41204948a00f0dcead64e96a746bf762ec",
+          "path": "src/switchyard/receipt.py",
+          "sequences": [
+            {
+              "calls": [
+                {
+                  "line": 99,
+                  "name": "is_file",
+                  "target": null,
+                  "via": "load_jsonl"
+                },
+                {
+                  "line": 101,
+                  "name": "read_text",
+                  "target": null,
+                  "via": "load_jsonl"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "check_tree"
+            },
+            {
+              "calls": [
+                {
+                  "line": 99,
+                  "name": "is_file",
+                  "target": null
+                },
+                {
+                  "line": 101,
+                  "name": "read_text",
+                  "target": null
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "load_jsonl"
+            }
+          ]
+        },
+        {
+          "hash": "f4a0be134c6487cca77fada3137944d6d9838f11e4ceca56d1d8e6c6a725c647",
+          "path": "src/switchyard/schema/routing-row.schema.json"
+        }
+      ],
+      "globs": [
+        "src/**"
+      ],
+      "importConfidence": "full",
+      "name": "src",
+      "origin": "authored",
+      "outsidePlaces": [
+        {
+          "reads": 2,
+          "where": [
+            "caller"
+          ],
+          "writes": 0
+        }
+      ],
+      "outsideReads": 2,
+      "role": "code",
+      "testRunners": [
+        "pytest"
+      ],
+      "testedBy": 4,
+      "unresolvedSites": 0
+    },
+    {
+      "dynamicReads": 0,
+      "dynamicSpawns": 0,
+      "dynamicSpawnsInTests": 0,
+      "dynamicWrites": 0,
+      "entryPoints": [],
+      "externals": 0,
+      "files": [
+        {
+          "exports": [
+            "row"
+          ],
+          "hash": "e3fe1b27867749f41a532e0e64336e1d78c51c0505dc673aebb215331f0c3e75",
+          "path": "tests/support.py"
+        },
+        {
+          "exports": [
+            "test_check_fails_on_a_bad_receipt",
+            "test_check_is_green_on_an_empty_root",
+            "test_module_entrypoint_parses_check"
+          ],
+          "hash": "71956a2c2e62977e19f44de37202de6611d112ec87b6d3226603c3a2384c75af",
+          "importsFiles": [
+            "src/switchyard/cli.py",
+            "tests/support.py"
+          ],
+          "path": "tests/test_cli.py",
+          "testFramework": "pytest"
+        },
+        {
+          "exports": [
+            "test_gpu_0_intel_is_the_igpu",
+            "test_gpu_1_is_never_the_igpu_even_if_the_name_says_intel",
+            "test_malformed_entries_and_unknown_names_are_refused",
+            "test_missing_device_does_not_fall_back",
+            "test_named_devices_resolve",
+            "test_resolver_refuses",
+            "test_two_intel_gpus_are_not_guessed"
+          ],
+          "hash": "21aef31f865b9cc8bd5ee98bebb6b17b90758fce8e78222ede5d5c3d2b4b93d7",
+          "importsFiles": [
+            "src/switchyard/devices.py"
+          ],
+          "path": "tests/test_devices.py",
+          "testFramework": "pytest"
+        },
+        {
+          "exports": [
+            "test_assess_step_refuses_the_wrong_flag_and_unknown_devices",
+            "test_card_must_be_empty_and_the_rest_is_fifteen_minutes",
+            "test_cpu_window_is_required_only_when_the_leg_is_heavy",
+            "test_grant_is_required_only_for_the_5090",
+            "test_heartbeat_uses_mtime_and_refuses_a_stale_or_missing_file",
+            "test_npu_session_covers_npu_and_igpu_only"
+          ],
+          "hash": "52dec42f330414b62ad523582fa7cc28bc93dd1b8bbdb968be30c9d4ca358fb1",
+          "importsFiles": [
+            "src/switchyard/guards.py"
+          ],
+          "path": "tests/test_guards.py",
+          "testFramework": "pytest"
+        },
+        {
+          "exports": [
+            "test_a_complete_row_validates",
+            "test_a_list_of_rows_and_a_non_object_are_both_handled",
+            "test_check_is_green_on_an_empty_tree_and_red_on_a_bad_receipt",
+            "test_check_reads_a_jsonl_table",
+            "test_experiment_provenance_is_the_other_legal_shape",
+            "test_home_directory_paths_and_unpinned_bytes_are_refused",
+            "test_schema_refuses_gpu_1_and_a_broken_interval"
+          ],
+          "hash": "59c78f4a64e238b1a5cf9351faeaf78d574bb03943a2e8a6449988eab2047665",
+          "importsFiles": [
+            "src/switchyard/receipt.py",
+            "tests/support.py"
+          ],
+          "path": "tests/test_receipt.py",
+          "testFramework": "pytest"
+        }
+      ],
+      "globs": [
+        "tests/**"
+      ],
+      "importConfidence": "full",
+      "name": "tests",
+      "origin": "authored",
+      "role": "test",
+      "testRunners": [
+        "pytest"
+      ],
+      "testedBy": 0,
+      "unresolvedSites": 0
+    }
+  ],
+  "doors": [
+    {
+      "checksCount": 0,
+      "commands": [
+        {
+          "dir": "",
+          "job": "test",
+          "programs": [
+            "uv"
+          ],
+          "step": "Install"
+        },
+        {
+          "dir": "",
+          "job": "test",
+          "programs": [
+            "uv"
+          ],
+          "step": "Test"
+        },
+        {
+          "dir": "",
+          "job": "test",
+          "programs": [
+            "npx"
+          ],
+          "step": "Atlas check"
+        },
+        {
+          "dir": "",
+          "job": "test",
+          "programs": [
+            "uv"
+          ],
+          "step": "Empty table"
+        }
+      ],
+      "elsewhere": [],
+      "file": ".github/workflows/ci.yml",
+      "jobs": [
+        {
+          "basis": "declared",
+          "name": "test",
+          "runsOn": [
+            {
+              "labels": [
+                "ubuntu-latest"
+              ],
+              "platform": {
+                "cpu": "x64",
+                "libc": "glibc",
+                "os": "linux"
+              }
+            }
+          ]
+        }
+      ],
+      "landings": [],
+      "mentions": [],
+      "name": "CI",
+      "permissions": [],
+      "pushes": false,
+      "reach": [
+        {
+          "boundary": "tests",
+          "depth": 0,
+          "files": 5
+        },
+        {
+          "boundary": "src",
+          "depth": 1,
+          "enters": {
+            "file": "src/switchyard/cli.py",
+            "from": "tests/test_cli.py"
+          },
+          "files": 4
+        }
+      ],
+      "readers": [],
+      "runs": [
+        {
+          "directory": true,
+          "job": "test",
+          "matched": true,
+          "path": "tests/",
+          "runKind": "executes",
+          "via": "pytest pyproject.toml"
+        }
+      ],
+      "runsCount": 1,
+      "secrets": [],
+      "sends": {
+        "deploysPages": false,
+        "dispatchesTo": [],
+        "opensIssues": false,
+        "opensIssuesOnFailure": false,
+        "opensPullRequests": false,
+        "publishes": false,
+        "publishesTo": [],
+        "releases": false
+      },
+      "stages": [],
+      "tests": [
+        {
+          "config": "pyproject.toml",
+          "coverage": true,
+          "files": 5,
+          "job": "test",
+          "runner": "pytest",
+          "step": "Test"
+        }
+      ],
+      "triggers": [
+        {
+          "event": "pull_request"
+        },
+        {
+          "event": "push",
+          "paths": [
+            ".github/workflows/**",
+            "atlas/**",
+            "docs/**",
+            "experiments/**",
+            "pyproject.toml",
+            "receipts/**",
+            "src/**",
+            "table/**",
+            "tests/**",
+            "uv.lock"
+          ]
+        },
+        {
+          "event": "workflow_dispatch"
+        }
+      ],
+      "unresolvedChecks": [
+        {
+          "job": "test",
+          "manifest": "pyproject.toml",
+          "requires": ">=3.12,<3.13",
+          "rule": "D1-python",
+          "step": "Install",
+          "tool": "uv sync",
+          "why": "no setup-python step before it"
+        }
+      ],
+      "uses": [
+        "actions/checkout",
+        "astral-sh/setup-uv"
+      ],
+      "usesWorkflowToken": false
+    },
+    {
+      "checksCount": 0,
+      "commands": [],
+      "elsewhere": [],
+      "file": "pyproject.toml",
+      "kind": "command",
+      "landings": [],
+      "mentions": [],
+      "name": "switchyard",
+      "permissions": [],
+      "pushes": false,
+      "reach": [
+        {
+          "boundary": "src",
+          "depth": 0,
+          "files": 2
+        }
+      ],
+      "readers": [],
+      "runs": [
+        {
+          "path": "src/switchyard/cli.py",
+          "runKind": "executes"
+        }
+      ],
+      "runsCount": 1,
+      "secrets": [],
+      "sends": {
+        "deploysPages": false,
+        "dispatchesTo": [],
+        "opensIssues": false,
+        "opensIssuesOnFailure": false,
+        "opensPullRequests": false,
+        "publishes": false,
+        "publishesTo": [],
+        "releases": false
+      },
+      "stages": [],
+      "triggers": [],
+      "uses": [],
+      "usesWorkflowToken": false
+    }
+  ],
+  "edges": [
+    {
+      "from": "tests",
+      "fromTests": true,
+      "kind": "file",
+      "to": "src"
+    }
+  ],
+  "engine": "1.24.0",
+  "generatedFrom": {
+    "commit": "f4f2b4b7ae43f003e772bcfe3145e7e340dd36a6",
+    "tracked": 33
+  },
+  "landings": [
+    {
+      "readers": [
+        {
+          "by": "pyproject.toml",
+          "call": "configuration",
+          "confidence": "config"
+        }
+      ],
+      "target": "README.md",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "src/switchyard/receipt.py",
+          "call": "read_text",
+          "confidence": "ast"
+        }
+      ],
+      "target": "src/switchyard/schema/routing-row.schema.json",
+      "writers": []
+    }
+  ],
+  "overlaps": [],
+  "submodules": [],
+  "symlinks": [],
+  "testFiles": 5,
+  "unassigned": []
+}

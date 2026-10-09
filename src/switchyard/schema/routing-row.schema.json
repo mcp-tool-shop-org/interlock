@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "switchyard/routing-row",
+  "title": "switchyard routing row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "task",
+    "model",
+    "engine",
+    "device",
+    "settings",
+    "quality",
+    "latency",
+    "date",
+    "repeats",
+    "provisional",
+    "provenance"
+  ],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "task": {"enum": ["embed", "rerank", "nli", "verify", "generate", "engine"]},
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repo_or_tag", "revision_or_digest", "quant", "licence"],
+      "properties": {
+        "repo_or_tag": {"type": "string", "minLength": 1},
+        "revision_or_digest": {"type": "string", "minLength": 1},
+        "quant": {"type": "string", "minLength": 1},
+        "licence": {"type": "string", "minLength": 1}
+      }
+    },
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "minLength": 1}
+      }
+    },
+    "device": {"enum": ["NPU", "CPU", "iGPU", "5090"]},
+    "settings": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["thinking_level", "num_predict", "num_ctx", "batch", "static_shape", "precision"],
+      "properties": {
+        "thinking_level": {"type": ["string", "null"]},
+        "num_predict": {"type": ["integer", "null"], "minimum": 0},
+        "num_ctx": {"type": ["integer", "null"], "minimum": 0},
+        "batch": {"type": ["integer", "null"], "minimum": 1},
+        "static_shape": {"type": ["string", "null"]},
+        "precision": {"type": ["string", "null"]}
+      }
+    },
+    "quality": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/metric"}
+    },
+    "latency": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["cold_ms", "warm_p50_ms", "warm_p95_ms", "throughput", "compile_ms"],
+      "properties": {
+        "cold_ms": {"type": ["number", "null"], "minimum": 0},
+        "warm_p50_ms": {"type": ["number", "null"], "minimum": 0},
+        "warm_p95_ms": {"type": ["number", "null"], "minimum": 0},
+        "throughput": {"type": ["number", "null"]},
+        "throughput_unit": {"type": ["string", "null"]},
+        "compile_ms": {"type": ["number", "null"], "minimum": 0}
+      }
+    },
+    "date": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+    "repeats": {"type": "integer", "minimum": 1},
+    "provisional": {"type": "boolean"},
+    "provenance": {"$ref": "#/$defs/provenance"},
+    "notes": {"type": "string"}
+  },
+  "$defs": {
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value", "n", "interval", "dataset_hash"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "value": {"type": ["number", "null"]},
+        "n": {"type": "integer", "minimum": 0},
+        "interval": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["low", "high", "method"],
+          "properties": {
+            "low": {"type": "number"},
+            "high": {"type": "number"},
+            "method": {"type": "string", "minLength": 1}
+          }
+        },
+        "dataset_hash": {"type": "string", "minLength": 1}
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "required": ["source_receipt_path", "commit_sha"],
+          "properties": {
+            "source_receipt_path": {"type": "string", "minLength": 1},
+            "commit_sha": {"type": ["string", "null"]},
+            "content_sha256": {"type": "string", "minLength": 1}
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": ["experiment_spec", "run_id"],
+          "properties": {
+            "experiment_spec": {"type": "string", "minLength": 1},
+            "run_id": {"type": "string", "minLength": 1}
+          }
+        }
+      ]
+    }
+  }
+}

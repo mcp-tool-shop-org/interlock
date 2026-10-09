@@ -1,0 +1,26 @@
+summary: "switchyard routes each job to a model, engine and device from a receipt-backed table."
+boundaries:
+  - name: .github
+    globs:
+      - .github/**
+    role: config
+  - name: assets
+    globs:
+      - assets/**
+    role: data
+  - name: docs
+    globs:
+      - docs/**
+    role: docs
+  - name: src
+    globs:
+      - src/**
+    role: code
+  - name: tests
+    globs:
+      - tests/**
+    role: test
+  - name: root
+    globs:
+      - "*"
+    role: config

@@ -1,0 +1,78 @@
+# Standards compliance
+#
+# PIN_PER_STEP: 2. uv.lock pins the packages. Actions are pinned by commit sha.
+#   Atlas is pinned to 1.24.0. The coverage floor in pyproject.toml is 90.
+#   Codecov project and patch targets are 90% with a 1% threshold.
+# ANDON_AUTHORITY: 2. pytest --cov-fail-under and atlas check are required steps.
+#   A red step fails the job. The Codecov upload uses fail_ci_if_error: false
+#   so a non-public repo's upload cannot block the gate. The floor is the gate.
+# NAMED_COMPENSATORS: 2. This workflow only checks out the repo and runs tests.
+#   It does not publish, deploy, or write outside the runner. Undo is to close
+#   the pull request. Owner: the author of the pull request. The Publisher merges.
+# DECOMPOSE_BY_SECRETS: 2. One push-triggered workflow. Lint, test and the map
+#   check live in this file.
+# UNCERTAINTY_GATED_HUMANS: 2. A failing check stops the merge. R&D reviews the
+#   pull request. The Publisher merges.
+# EXTERNAL_VERIFIER: n/a. No specialised claim is decided here. R&D reviews the
+#   pull request.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "pyproject.toml"
+      - "uv.lock"
+      - "src/**"
+      - "tests/**"
+      - "experiments/**"
+      - "table/**"
+      - "receipts/**"
+      - "docs/**"
+      - "atlas/**"
+      - "codecov.yml"
+      - ".github/workflows/**"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          enable-cache: true
+          python-version: "3.12"
+
+      - name: Install
+        run: uv sync --frozen
+
+      - name: Test
+        run: uv run pytest --cov-report=xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          version: v11.3.1
+          use_oidc: true
+          fail_ci_if_error: false
+          disable_search: true
+          files: coverage.xml
+
+      - name: Atlas check
+        run: npx --yes @dogfood-lab/atlas@1.24.0 check
+
+      - name: Empty table
+        run: uv run switchyard check
