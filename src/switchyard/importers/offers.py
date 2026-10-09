@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 
 from switchyard.importers.common import UNRECORDED, ImportError_, blank_latency, blank_settings, source_provenance
+from switchyard.families import stamp_family
 from switchyard.receipt import validate_row
 
 SNAPSHOT_VERSION = 1
@@ -82,6 +83,7 @@ def _gpu_row(item: dict, date: str, source_path: str, content: bytes) -> dict:
             "Not parsed from offrig's text, and not read from its database."
         ),
     }
+    stamp_family(row)
     validate_row(row)
     return row
 
@@ -123,6 +125,7 @@ def _budget_rows(budget: dict, date: str, source_path: str, content: bytes) -> l
                 "Read-only snapshot. switchyard does not set a cap."
             ),
         }
+        stamp_family(row)
         validate_row(row)
         rows.append(row)
     return rows

@@ -24,7 +24,9 @@ from switchyard.importers.common import (
     source_provenance,
     spread,
 )
+from switchyard.families import stamp_family
 from switchyard.receipt import validate_row
+from switchyard.tasks import CHECK_TO_TASK
 
 _DEFAULT_BLOCKS = ("false_accept", "false_accept_unsupported_only", "abstain")
 
@@ -48,6 +50,7 @@ def calibration_rows(
     device = device_for_ollama(settings_src["url"])
     model = manifest["model"]
     check = settings_src["check_type"]
+    task = task_for_check(check)
     split = settings_src["split"]
     date = date_from_unix(manifest["started_at"])
     rule, rule_source = quote_rule_of(manifest, verdicts)
@@ -70,6 +73,7 @@ def calibration_rows(
     provenance = source_provenance(f"{source_dir}/metrics.json", commit_sha)
     parent = _row(
         row_id=parent_id,
+        task=task,
         model=model,
         digest=manifest["model_digest"],
         engine_version=manifest["ollama_version"],
@@ -104,6 +108,7 @@ def calibration_rows(
         rows.append(
             _row(
                 row_id=f"{parent_id}/tier/{tier}",
+                task=task,
                 model=model,
                 digest=manifest["model_digest"],
                 engine_version=manifest["ollama_version"],
@@ -217,10 +222,19 @@ def _tier_counts(verdicts: list[dict], tiers: dict, check: str, split: str) -> d
     return cells
 
 
+def task_for_check(check: str) -> str:
+    """The exact task for a calibration check. An unknown check is not ``verify``."""
+
+    try:
+        return CHECK_TO_TASK[check]
+    except KeyError:
+        raise ImportError_(f"check_type {check!r} has no task; refusing to call it verify") from None
+
+
 def _row(**kwargs) -> dict:
     row = {
         "id": kwargs["row_id"],
-        "task": "verify",
+        "task": kwargs["task"],
         "model": {
             "repo_or_tag": kwargs["model"],
             "revision_or_digest": kwargs["digest"],
@@ -238,5 +252,6 @@ def _row(**kwargs) -> dict:
         "provenance": kwargs["provenance"],
         "notes": kwargs["notes"],
     }
+    stamp_family(row)
     validate_row(row)
     return row

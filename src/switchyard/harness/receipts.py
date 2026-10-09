@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 
 from switchyard.harness.timing import Summary
+from switchyard.families import stamp_family
 from switchyard.receipt import load_jsonl, validate_row
 
 UNRECORDED = "unrecorded"
@@ -91,6 +92,7 @@ def measured_row(
     }
     if artifacts:
         row["artifacts"] = artifacts
+    stamp_family(row)
     validate_row(row)
     return row
 

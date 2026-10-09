@@ -14,6 +14,8 @@ from pathlib import Path
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
+from switchyard.families import FamilyError, family_of
+
 _HOME = re.compile(r"(?i)(?:[A-Za-z]:[\\/]+Users[\\/]|[\\/]Users[\\/]|[\\/]home[\\/])")
 _VALIDATOR: Draft202012Validator | None = None
 
@@ -44,9 +46,11 @@ def validate_row(row: dict) -> None:
         raise ReceiptError(_format_error(errors[0]))
     _reject_home_paths(row)
     for metric in row["quality"]:
-        interval = metric["interval"]
-        if interval["low"] > interval["high"]:
-            raise ReceiptError(f"{row['id']}: interval low is above high for {metric['name']}")
+        _check_interval(row, metric)
+    for metric in row.get("per_type", {}).values():
+        _check_interval(row, metric)
+    _check_family(row)
+    _check_residency(row)
     provenance = row["provenance"]
     if "source_receipt_path" in provenance and not provenance.get("commit_sha"):
         if not provenance.get("content_sha256"):
@@ -120,6 +124,43 @@ def _reject_home_paths(value: object, where: str = "$") -> None:
     if isinstance(value, list):
         for index, item in enumerate(value):
             _reject_home_paths(item, f"{where}[{index}]")
+
+
+def _check_interval(row: dict, metric: dict) -> None:
+    interval = metric["interval"]
+    if interval["low"] > interval["high"]:
+        raise ReceiptError(f"{row['id']}: interval low is above high for {metric['name']}")
+
+
+def _check_family(row: dict) -> None:
+    tag = row["model"]["repo_or_tag"]
+    try:
+        expected = family_of(tag)
+    except FamilyError as exc:
+        raise ReceiptError(f"{row['id']}: {exc}") from exc
+    actual = row["model_family"] if "model_family" in row else None
+    if expected is None:
+        if actual is not None:
+            raise ReceiptError(f"{row['id']}: {tag} is not in the family table, so model_family must be absent")
+        return
+    if actual != expected:
+        raise ReceiptError(f"{row['id']}: model_family for {tag} is {expected}, from the family table")
+
+
+def _check_residency(row: dict) -> None:
+    model = row["model"]
+    size = model.get("size")
+    vram = model.get("size_vram")
+    stated = row["gpu_resident"] if "gpu_resident" in row else None
+    measured = size is not None and vram is not None
+    if not measured:
+        if stated is not None:
+            raise ReceiptError(f"{row['id']}: gpu_resident needs model.size and model.size_vram from the load")
+        return
+    if stated is None:
+        raise ReceiptError(f"{row['id']}: gpu_resident must record whether size_vram equals size")
+    if stated != (size == vram):
+        raise ReceiptError(f"{row['id']}: gpu_resident is true only when size_vram equals size")
 
 
 def _format_error(error: ValidationError) -> str:

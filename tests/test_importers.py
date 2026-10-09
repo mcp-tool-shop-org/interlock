@@ -99,6 +99,8 @@ def test_calibration_copies_the_published_interval_and_infers_quote_rule_1():
     assert parent["settings"]["quote_rule_source"] == INFERRED_QUOTE_RULE_SOURCE
     assert "/q-1/" in parent["id"]
     assert parent["date"] == "2026-10-09"
+    assert parent["task"] == "verify:grounded"
+    assert parent["model_family"] == "qwen"
     assert quote_rule_of(manifest, _verdicts()) == (1, INFERRED_QUOTE_RULE_SOURCE)
 
 
@@ -147,6 +149,17 @@ def test_ladder_cell_is_tallied_on_both_views():
     assert "/q-1/" in final["id"]
     assert final["provenance"]["commit_sha"] is None
     assert len(final["provenance"]["content_sha256"]) == 64
+    assert final["task"] == "verify:math-ladder"
+    assert final["model_family"] == "qwen"
+
+
+def test_an_unknown_check_type_is_not_called_verify():
+    manifest = _manifest()
+    manifest["settings"]["check_type"] = "planted-error"
+    with pytest.raises(ImportError_, match="planted-error"):
+        calibration_rows(
+            manifest, _METRICS, _verdicts(), _tiers(), source_dir="runs/cal", commit_sha="e" * 40
+        )
 
 
 def test_probe_keeps_a_named_intel_gpu_and_skips_an_unnamed_one():
@@ -313,7 +326,7 @@ def test_table_filters_by_task(tmp_path: Path, capsys):
     table.mkdir()
     rows = [
         {"id": "a", "task": "embed", "device": "NPU", "model": {"repo_or_tag": "bge"}},
-        {"id": "b", "task": "verify", "device": "5090", "model": {"repo_or_tag": "qwen3:8b"}},
+        {"id": "b", "task": "verify:math-ladder", "device": "5090", "model": {"repo_or_tag": "qwen3:8b"}},
     ]
     (table / "routing.jsonl").write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
     assert main(["table", "--root", str(tmp_path), "--task", "embed"]) == 0

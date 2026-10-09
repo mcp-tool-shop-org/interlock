@@ -10,6 +10,7 @@ why E1 exists.
 from __future__ import annotations
 
 from switchyard.importers.common import UNRECORDED, blank_latency, blank_settings, sha256_bytes, source_provenance
+from switchyard.families import stamp_family
 from switchyard.receipt import validate_row
 
 
@@ -82,6 +83,7 @@ def probe_rows(document: dict, *, source_path: str, commit_sha: str, file_date: 
             "provenance": source_provenance(source_path, commit_sha),
             "notes": notes,
         }
+        stamp_family(row)
         validate_row(row)
         rows.append(row)
     return rows, skipped

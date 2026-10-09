@@ -99,7 +99,7 @@
       "confidence": "low",
       "highWater": null,
       "name": "src",
-      "qualifyingSourceCommits": 2,
+      "qualifyingSourceCommits": 1,
       "rebaseline": null
     },
     {
@@ -115,7 +115,7 @@
       "confidence": "low",
       "highWater": null,
       "name": "tests",
-      "qualifyingSourceCommits": 2,
+      "qualifyingSourceCommits": 1,
       "rebaseline": null
     }
   ],
@@ -133,8 +133,8 @@
         "path": ".github/workflows/ci.yml"
       },
       {
-        "commits": 3,
-        "lines": 20,
+        "commits": 4,
+        "lines": 23,
         "path": ".gitignore"
       },
       {
@@ -148,48 +148,53 @@
         "path": "LICENSE"
       },
       {
-        "commits": 4,
-        "lines": 143,
+        "commits": 5,
+        "lines": 145,
         "path": "README.md"
       },
       {
-        "commits": 2,
+        "commits": 3,
         "lines": 0,
         "path": "assets/logo/switchyard-master.png"
       },
       {
-        "commits": 2,
+        "commits": 1,
+        "lines": 0,
+        "path": "assets/logo/switchyard-wordmark.png"
+      },
+      {
+        "commits": 3,
         "lines": 0,
         "path": "assets/logo/switchyard_128.png"
       },
       {
-        "commits": 2,
+        "commits": 3,
         "lines": 0,
         "path": "assets/logo/switchyard_16.png"
       },
       {
-        "commits": 2,
+        "commits": 3,
         "lines": 0,
         "path": "assets/logo/switchyard_256.png"
       },
       {
-        "commits": 2,
+        "commits": 3,
         "lines": 0,
         "path": "assets/logo/switchyard_32.png"
       },
       {
-        "commits": 2,
+        "commits": 3,
         "lines": 0,
         "path": "assets/logo/switchyard_512.png"
       },
       {
-        "commits": 2,
+        "commits": 3,
         "lines": 0,
         "path": "assets/logo/switchyard_64.png"
       },
       {
         "commits": 5,
-        "lines": 225,
+        "lines": 224,
         "path": "atlas/README.md"
       },
       {
@@ -199,17 +204,17 @@
       },
       {
         "commits": 5,
-        "lines": 563,
+        "lines": 568,
         "path": "atlas/page.json"
       },
       {
         "commits": 5,
-        "lines": 1118,
+        "lines": 1124,
         "path": "atlas/statistics.json"
       },
       {
         "commits": 5,
-        "lines": 3438,
+        "lines": 3889,
         "path": "atlas/structure.json"
       },
       {
@@ -248,13 +253,13 @@
         "path": "docs/handoff/switchyard-router-buildout-handoff.md"
       },
       {
-        "commits": 2,
-        "lines": 217,
+        "commits": 1,
+        "lines": 197,
         "path": "experiments/e4/spec.yaml"
       },
       {
-        "commits": 2,
-        "lines": 128,
+        "commits": 1,
+        "lines": 114,
         "path": "experiments/e5/spec.yaml"
       },
       {
@@ -278,18 +283,18 @@
         "path": "src/switchyard/adapters/__init__.py"
       },
       {
-        "commits": 2,
-        "lines": 78,
+        "commits": 1,
+        "lines": 74,
         "path": "src/switchyard/adapters/base.py"
       },
       {
-        "commits": 2,
-        "lines": 93,
+        "commits": 1,
+        "lines": 91,
         "path": "src/switchyard/adapters/offrig_calibrate.py"
       },
       {
-        "commits": 2,
-        "lines": 276,
+        "commits": 1,
+        "lines": 244,
         "path": "src/switchyard/adapters/ollama.py"
       },
       {
@@ -308,6 +313,11 @@
         "path": "src/switchyard/devices.py"
       },
       {
+        "commits": 1,
+        "lines": 53,
+        "path": "src/switchyard/families.py"
+      },
+      {
         "commits": 2,
         "lines": 208,
         "path": "src/switchyard/guards.py"
@@ -318,8 +328,13 @@
         "path": "src/switchyard/harness/__init__.py"
       },
       {
-        "commits": 2,
-        "lines": 237,
+        "commits": 1,
+        "lines": 85,
+        "path": "src/switchyard/harness/choice.py"
+      },
+      {
+        "commits": 1,
+        "lines": 207,
         "path": "src/switchyard/harness/e5.py"
       },
       {
@@ -329,22 +344,22 @@
       },
       {
         "commits": 2,
-        "lines": 128,
+        "lines": 124,
         "path": "src/switchyard/harness/receipts.py"
       },
       {
-        "commits": 2,
-        "lines": 483,
+        "commits": 1,
+        "lines": 405,
         "path": "src/switchyard/harness/runner.py"
       },
       {
         "commits": 2,
-        "lines": 187,
+        "lines": 209,
         "path": "src/switchyard/harness/spec.py"
       },
       {
-        "commits": 2,
-        "lines": 183,
+        "commits": 1,
+        "lines": 175,
         "path": "src/switchyard/harness/timing.py"
       },
       {
@@ -358,8 +373,8 @@
         "path": "src/switchyard/importers/assemble.py"
       },
       {
-        "commits": 1,
-        "lines": 242,
+        "commits": 2,
+        "lines": 259,
         "path": "src/switchyard/importers/calibration.py"
       },
       {
@@ -373,18 +388,18 @@
         "path": "src/switchyard/importers/gaps.py"
       },
       {
-        "commits": 1,
-        "lines": 106,
+        "commits": 2,
+        "lines": 111,
         "path": "src/switchyard/importers/ladder.py"
       },
       {
-        "commits": 1,
-        "lines": 100,
+        "commits": 2,
+        "lines": 102,
         "path": "src/switchyard/importers/nli.py"
       },
       {
-        "commits": 1,
-        "lines": 128,
+        "commits": 2,
+        "lines": 131,
         "path": "src/switchyard/importers/offers.py"
       },
       {
@@ -393,33 +408,48 @@
         "path": "src/switchyard/importers/pins.py"
       },
       {
-        "commits": 1,
-        "lines": 155,
+        "commits": 2,
+        "lines": 157,
         "path": "src/switchyard/importers/probe.py"
       },
       {
-        "commits": 2,
-        "lines": 254,
+        "commits": 3,
+        "lines": 301,
         "path": "src/switchyard/receipt.py"
       },
       {
-        "commits": 4,
-        "lines": 274,
+        "commits": 5,
+        "lines": 309,
         "path": "src/switchyard/schema/routing-row.schema.json"
       },
       {
         "commits": 1,
-        "lines": 163,
-        "path": "table/candidates.json"
+        "lines": 50,
+        "path": "src/switchyard/scope.py"
       },
       {
         "commits": 1,
-        "lines": 79,
+        "lines": 41,
+        "path": "src/switchyard/tasks.py"
+      },
+      {
+        "commits": 2,
+        "lines": 196,
+        "path": "table/candidates.json"
+      },
+      {
+        "commits": 2,
+        "lines": 90,
         "path": "table/gaps.md"
       },
       {
         "commits": 1,
-        "lines": 408,
+        "lines": 8,
+        "path": "table/model-families.json"
+      },
+      {
+        "commits": 2,
+        "lines": 1140,
         "path": "table/routing.jsonl"
       },
       {
@@ -444,18 +474,23 @@
       },
       {
         "commits": 2,
-        "lines": 1276,
+        "lines": 1092,
         "path": "tests/test_harness.py"
       },
       {
-        "commits": 1,
-        "lines": 444,
+        "commits": 2,
+        "lines": 459,
         "path": "tests/test_importers.py"
       },
       {
         "commits": 2,
         "lines": 136,
         "path": "tests/test_receipt.py"
+      },
+      {
+        "commits": 1,
+        "lines": 335,
+        "path": "tests/test_task_scope.py"
       },
       {
         "commits": 2,
@@ -468,13 +503,13 @@
     "level": "low",
     "reason": "fewer than 30 qualifying commits in the window, and fewer than 25 source files reach 10 revisions"
   },
-  "generatedAt": "2026-10-09T19:57:08.512Z",
+  "generatedAt": "2026-10-09T20:22:46.087Z",
   "generatedFrom": {
-    "commit": "0e19c5c9636b1312757c7e1e9f444e7fb5fe8f6d"
+    "commit": "82e20592727e96ffea4cb094f597be21c333f7c5"
   },
   "pairs": [],
   "parameters": {
-    "appliedChangesetLimit": 17,
+    "appliedChangesetLimit": 18.75,
     "changeset": 50,
     "changesetFraction": 0.25,
     "cohesionDrop": 0.2,
@@ -483,16 +518,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "both",
-    "headDate": "2026-10-09T15:56:59-04:00",
-    "inScopeFiles": 68,
+    "headDate": "2026-10-09T16:22:35-04:00",
+    "inScopeFiles": 75,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 7,
+    "qualifyingCommits": 6,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-04-12T19:56:59.000Z",
+    "since": "2026-04-12T20:22:35.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",

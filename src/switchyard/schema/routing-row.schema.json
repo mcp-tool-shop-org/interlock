@@ -20,7 +20,21 @@
   ],
   "properties": {
     "id": {"type": "string", "minLength": 1},
-    "task": {"enum": ["embed", "rerank", "nli", "verify", "generate", "engine", "offer"]},
+    "task": {
+      "enum": [
+        "embed",
+        "rerank",
+        "nli",
+        "generate",
+        "engine",
+        "offer",
+        "verify:grounded",
+        "verify:reasoning",
+        "verify:math-ladder",
+        "judge:planted-error",
+        "judge:same-meaning-rewrite"
+      ]
+    },
     "model": {
       "type": "object",
       "additionalProperties": false,
@@ -29,7 +43,9 @@
         "repo_or_tag": {"type": "string", "minLength": 1},
         "revision_or_digest": {"type": "string", "minLength": 1},
         "quant": {"type": "string", "minLength": 1},
-        "licence": {"type": "string", "minLength": 1}
+        "licence": {"type": "string", "minLength": 1},
+        "size": {"type": ["integer", "null"], "minimum": 0},
+        "size_vram": {"type": ["integer", "null"], "minimum": 0}
       }
     },
     "engine": {
@@ -90,6 +106,21 @@
     "repeats": {"type": "integer", "minimum": 1},
     "provisional": {"type": "boolean"},
     "provenance": {"$ref": "#/$defs/provenance"},
+    "model_family": {"type": ["string", "null"]},
+    "gpu_resident": {"type": ["boolean", "null"]},
+    "cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seconds", "tokens"],
+      "properties": {
+        "seconds": {"type": ["number", "null"], "minimum": 0},
+        "tokens": {"type": ["integer", "null"], "minimum": 0}
+      }
+    },
+    "per_type": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/metric"}
+    },
     "notes": {"type": "string"}
   },
   "$defs": {

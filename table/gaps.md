@@ -50,10 +50,13 @@ Ladder rows are imported from rnd at 08ca419f647a3ed69ee645610eaa1c7f35f40f91. D
 
 ## Other open cells
 
-- `quote-rule-2`. No verify row is pinned to quote rule 2. Chain and ladder rows whose verdicts omit pins.quote_rule are quote rule 1 by the pre-#47 inference, and that source is on the row. They are not merged with rule 2.
+- `quote-rule-2-grounded`. No verify:grounded row is pinned to quote rule 2. Chain rows whose verdicts omit pins.quote_rule are quote rule 1 by the pre-#47 inference, and that source is on the row. A math-ladder row does not fill this cell.
+- `quote-rule-2-reasoning`. No verify:reasoning row is pinned to quote rule 2. Chain rows whose verdicts omit pins.quote_rule are quote rule 1 by the pre-#47 inference, and that source is on the row. A grounded row does not fill this cell.
+- `quote-rule-2-math-ladder`. No verify:math-ladder row is pinned to quote rule 2. Ladder rows whose verdicts omit pins.quote_rule are quote rule 1 by the pre-#47 inference, and that source is on the row. A chain row does not fill this cell.
 - `runpod-snapshot`. No dated RunPod offer or budget snapshot is in the table. offrig gpus and offrig budget --show print text today. switchyard does not parse that text and does not open offrig's database. A version-1 snapshot file can be imported when one is recorded.
 - `rerank-any`. The table has no rerank row.
-- `qwen3-8b-heldout`. qwen3:8b verify rows in this import are the tune chain. Held-out is not in the table.
+- `qwen3-8b-heldout-grounded`. qwen3:8b verify:grounded rows in this import are the tune split. Held-out is not in the table.
+- `qwen3-8b-heldout-reasoning`. qwen3:8b verify:reasoning rows in this import are the tune split. Held-out is not in the table.
 
 ## What the table does hold
 
@@ -65,7 +68,9 @@ Ladder rows are imported from rnd at 08ca419f647a3ed69ee645610eaa1c7f35f40f91. D
 - nli / CPU: 2
 - nli / NPU: 1
 - nli / iGPU: 4
-- verify / 5090: 366
+- verify:grounded / 5090: 24
+- verify:math-ladder / 5090: 312
+- verify:reasoning / 5090: 30
 
 ## Skipped source rows
 
