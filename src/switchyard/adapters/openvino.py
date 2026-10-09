@@ -73,10 +73,12 @@ _SESSION_NEW_TOKENS = 8
 _QUANTS = ("int4", "int8", "fp16", "fp32")
 # Level Zero device-loss signature, seen live: nomic NPU 8x1024 reset the
 # device mid-run (driver 32.0.100.5540; no Windows event-log entry — the L0
-# result code was the only witness). Distinct from a 60 s timeout hang: a
-# hang ends the run, a device loss becomes a result row and the device is
-# then off for the rest of the run.
-_LOST_MARKERS = ("ZE_RESULT_ERROR_DEVICE_LOST", "DEVICE_LOST", "device hung")
+# result code was the only witness). The markers carry the code on purpose:
+# every loss text seen so far (the live one too) includes it, and a bare
+# "device hung" substring could false-positive on unrelated prose. Distinct
+# from a 60 s timeout hang: a hang ends the run, a device loss becomes a
+# result row and the device is then off for the rest of the run.
+_LOST_MARKERS = ("ZE_RESULT_ERROR_DEVICE_LOST", "DEVICE_LOST")
 
 
 def _is_device_lost(exc: BaseException) -> bool:
