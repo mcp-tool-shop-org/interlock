@@ -27,3 +27,12 @@ between runs.**
   rest before it and one after. Every sustained run gets its own rest.
 - A health monitor logs the card every 30 s overnight and may pause a run, so chains must stop on an
   incomplete run and resume cleanly. rnd `experiments/verifier-gold/calibration/chain_step.sh` does this.
+
+**The watchdog does not guard Ollama (learned 2026-10-09, from the Publisher reading `E:/AI/training/_watchdog.ps1`).**
+- It kills only listed processes: venv interpreters, `E:/AI/llama.cpp/llama-server.exe`, a WSL pattern. It acts
+  after 3 consecutive 2-second breaches (VRAM ≥ 31200 MiB, ≥ 87 °C, RAM ≥ 90%).
+- Ollama's bundled runner isn't on that list. A breach from an Ollama run kills nothing and only writes
+  `_watchdog_NO_TARGET`.
+- **So, for Ollama runs:** the heartbeat check proves only that the watchdog is alive, not that it will
+  protect the run. Keep your own temperature/VRAM Monitor running, and unload the model yourself
+  (`keep_alive: 0`) on a breach.

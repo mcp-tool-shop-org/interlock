@@ -1,0 +1,79 @@
+# Gap report
+
+This is the experiment backlog. A cell is open when the table has no row that fills it.
+Imported rows: 408.
+
+Ladder rows are imported from rnd at 08ca419f647a3ed69ee645610eaa1c7f35f40f91. Difficulty length quartiles are not imported. Tier rows are. Chain and ladder rows with no pins.quote_rule are quote rule 1 by the pre-#47 inference.
+
+## Why E1–E4 are open
+
+### E1
+
+- `E1-nomic-NPU`. No cold-versus-warm split for nomic-embed-text v1.5 on the NPU. A speed row that lacks cold_ms and warm_p50_ms does not answer whether the NPU may be treated as warm-only.
+- `E1-nomic-iGPU`. Same cold-versus-warm question for nomic-embed-text v1.5 on the iGPU, at batch 1 and 8 and three lengths.
+- `E1-nomic-CPU`. Same cold-versus-warm question for nomic-embed-text v1.5 on the CPU.
+- `E1-bge-NPU`. bge-base may already have a probe speed row. It still has no cold_ms or warm_p50_ms, so E1 stays open.
+  - Partial `probe/2026-10-09-probe/BAAI/bge-base-en-v1.5/NPU/b1/embed` is missing cold_ms, warm_p50_ms.
+  - Partial `probe/2026-10-09-probe/BAAI/bge-base-en-v1.5/NPU/b8/embed` is missing cold_ms, warm_p50_ms.
+- `E1-bge-iGPU`. bge-base on the iGPU has no cold-versus-warm split.
+- `E1-bge-CPU`. bge-base on the CPU has no cold-versus-warm split.
+  - Partial `probe/2026-10-09-probe/BAAI/bge-base-en-v1.5/CPU/b1/embed` is missing cold_ms, warm_p50_ms.
+  - Partial `probe/2026-10-09-probe/BAAI/bge-base-en-v1.5/CPU/b8/embed` is missing cold_ms, warm_p50_ms.
+
+### E2
+
+- `E2-qwen3-embed-NPU`. No speed or CPU-parity row for Qwen3-Embedding-0.6B on the NPU. This is not a retrieval-quality claim.
+- `E2-qwen3-embed-iGPU`. No speed or CPU-parity row for Qwen3-Embedding-0.6B on the iGPU.
+- `E2-qwen3-embed-CPU`. No CPU reference row for Qwen3-Embedding-0.6B. Parity is measured against this device.
+
+### E3
+
+- `E3-qwen3-8b-ov-NPU`. No OpenVINO generation receipt for Qwen3-8B-int4-cw-ov on the NPU. Verify rows do not fill a generate cell.
+- `E3-qwen3-8b-ov-iGPU`. No OpenVINO generation receipt for Qwen3-8B-int4-cw-ov on the iGPU.
+- `E3-qwen3-8b-ov-CPU`. No OpenVINO generation receipt for Qwen3-8B-int4-cw-ov on the CPU.
+- `E3-phi-NPU`. The smaller channel-wise model chosen for E3 is Phi-3.5-mini-instruct-int4-cw-ov (MIT, text). No generation receipt on the NPU.
+- `E3-phi-iGPU`. No generation receipt for Phi-3.5-mini-instruct-int4-cw-ov on the iGPU.
+- `E3-phi-CPU`. No generation receipt for Phi-3.5-mini-instruct-int4-cw-ov on the CPU.
+- `E3-qwen3-8b-5090`. qwen3:8b has verify rows on the 5090. Those are not a generation speed reference. E3's 5090 leg is speed only, inside a grant.
+
+### E4
+
+- `E4-5090-alone`. No contention measurement: 5090 decode alone versus with an NPU embed load and versus with an iGPU NLI load.
+- `E4-npu-embed`. No measurement of NPU embed latency with and without the 5090 busy. E4 uses bge-base so it does not depend on E2.
+  - Partial `probe/2026-10-09-probe/BAAI/bge-base-en-v1.5/NPU/b1/embed` is missing contention.
+  - Partial `probe/2026-10-09-probe/BAAI/bge-base-en-v1.5/NPU/b8/embed` is missing contention.
+- `E4-igpu-nli`. No measurement of iGPU NLI latency with and without the 5090 busy. Batch 8 on the NPU is not this cell.
+  - Partial `nli/cross-encoder/nli-deberta-v3-base/grounded/heldout` is missing contention.
+  - Partial `nli/cross-encoder/nli-deberta-v3-base/grounded/tune` is missing contention.
+  - Partial `nli/cross-encoder/nli-deberta-v3-base/reasoning/heldout` is missing contention.
+  - Partial `nli/cross-encoder/nli-deberta-v3-base/reasoning/tune` is missing contention.
+
+## Other open cells
+
+- `quote-rule-2`. No verify row is pinned to quote rule 2. Chain and ladder rows whose verdicts omit pins.quote_rule are quote rule 1 by the pre-#47 inference, and that source is on the row. They are not merged with rule 2.
+- `runpod-snapshot`. No dated RunPod offer or budget snapshot is in the table. offrig gpus and offrig budget --show print text today. switchyard does not parse that text and does not open offrig's database. A version-1 snapshot file can be imported when one is recorded.
+- `rerank-any`. The table has no rerank row.
+- `qwen3-8b-heldout`. qwen3:8b verify rows in this import are the tune chain. Held-out is not in the table.
+
+## What the table does hold
+
+- embed / CPU: 4
+- embed / NPU: 4
+- engine / CPU: 8
+- engine / NPU: 11
+- engine / iGPU: 8
+- nli / CPU: 2
+- nli / NPU: 1
+- nli / iGPU: 4
+- verify / 5090: 366
+
+## Skipped source rows
+
+6 source row(s) were not imported.
+- experiments/npu-probe/results/2026-10-09-probe.json#11: error row, not a routing row
+- experiments/npu-probe/results/2026-10-09-mac-chain.json#1: GPU.0 has no Intel full name in this file
+- experiments/npu-probe/results/2026-10-09-mac-chain.json#3: GPU.0 has no Intel full name in this file
+- experiments/npu-probe/results/2026-10-09-mac-chain.json#4: error row, not a routing row
+- experiments/npu-probe/results/2026-10-09-mac-chain.json#5: GPU.0 has no Intel full name in this file
+- experiments/npu-probe/results/2026-10-09-mac-chain.json#7: GPU.0 has no Intel full name in this file
+

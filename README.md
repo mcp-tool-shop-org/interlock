@@ -49,10 +49,11 @@ switchyard touches local devices and local HTTP, and the network only to downloa
 - A 5090 step without `--grant` does not start. An NPU or iGPU step without `--npu-session` does not start.
 - The 5090 path checks that the VRAM watchdog heartbeat is at most 60 seconds old, that no model is loaded, and that the card has rested 15 minutes since the previous model. The heartbeat file is not opened. Only its modified time is read.
 - Nothing here listens on a port.
+- switchyard does not rent a GPU, set a spending cap, or open offrig's database. A remote price enters only as a dated snapshot file.
 
 ## Layout
 
-`devices` is the allow-list. `guards` is the grant, the session, the heartbeat, the empty card and the rest. `receipt` is the schema and `switchyard check`. Importers, the experiment harness and the advisory router land in later changes, each on its own branch.
+`devices` is the allow-list. `guards` is the grant, the session, the heartbeat, the empty card and the rest. `receipt` is the schema and `switchyard check`. `importers` rebuilds `table/routing.jsonl` from pinned receipts. `switchyard table` prints that table, filtered by task or device. `table/gaps.md` is the experiment backlog. The harness and the advisory router land on later branches.
 
 The build brief and the four feedback notes it names are snapshotted in `docs/handoff/`. The copy in the studio memory store stays authoritative.
 
