@@ -341,6 +341,8 @@ def _commit(repo: Path) -> str:
     subprocess.run(["git", "config", "user.email", "dev@example.com"], cwd=repo, check=True)
     subprocess.run(["git", "config", "user.name", "dev"], cwd=repo, check=True)
     subprocess.run(["git", "config", "core.autocrlf", "false"], cwd=repo, check=True)
+    # The ladder paths exceed MAX_PATH when pytest's temp dir is already long.
+    subprocess.run(["git", "config", "core.longpaths", "true"], cwd=repo, check=True)
     subprocess.run(["git", "add", "."], cwd=repo, check=True)
     subprocess.run(["git", "commit", "-m", "fixture"], cwd=repo, check=True, capture_output=True)
     return subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
