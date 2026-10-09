@@ -10,7 +10,8 @@ Measurement policy, fixed by the adapter and recorded in ``resolved``:
 
 ``embed`` steps pool per model from the committed ``_POOLING`` table (cls
 for the bge family, mean for nomic — the recipes the npu-probe rows were
-measured with), then L2-normalise. An embed arm on a repo with no recipe is
+measured with — and last-token for Qwen3-Embedding, its documented
+recipe), then L2-normalise. An embed arm on a repo with no recipe is
 refused rather than pooled silently. ``nli`` and ``rerank`` steps return the
 single-row logits un-pooled. Batch rows above the first repeat the same
 input (``batch_fill: repeat``) because a step carries one prompt; the NLI
@@ -128,6 +129,11 @@ def pool(matrix, mask, how: str) -> list[float]:
         raise AdapterError("the model returned no rows")
     if how in ("cls", "none"):
         return rows[0]
+    if how == "last":  # Qwen3-Embedding's recipe: the last unmasked row
+        keep = [i for i, m in enumerate(mask) if m]
+        if not keep:
+            raise AdapterError("the attention mask is all zeros")
+        return rows[keep[-1]]
     total = float(sum(mask))
     if total <= 0:
         raise AdapterError("the attention mask is all zeros")
@@ -346,6 +352,7 @@ _POOLING = {
     "BAAI/bge-base-en-v1.5": "cls",
     "BAAI/bge-small-en-v1.5": "cls",
     "nomic-ai/nomic-embed-text-v1.5": "mean",
+    "OpenVINO/Qwen3-Embedding-0.6B-fp16-ov": "last",
 }
 
 
@@ -374,6 +381,10 @@ def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> Step
     pooling = _pooling_for(request.task, repo)  # refused before anything loads
     tokenizer = self._load_tokenizer(repo, ref)
     ids, mask = self._encode(tokenizer, str(s.get("prompt") or "hello"))
+    eos_appended = None
+    if pooling == "last":
+        eos_id = getattr(tokenizer, "eos_token_id", None)
+        eos_appended = bool(eos_id is not None and ids and ids[-1] == eos_id)
     dropped = 0
     if static is not None:
         ids, mask, dropped = pad_truncate(ids, static[1], int(getattr(tokenizer, "pad_token_id", 0) or 0),
@@ -404,6 +415,12 @@ def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> Step
     )
     if dropped:
         resolved["truncated_tokens"] = dropped
+    if eos_appended is not None:
+        # Last-token pooling reads the last unmasked row: correct only when
+        # that row is the tokenizer's EOS. Truncation cuts EOS off the kept
+        # region, so a truncated "last" arm records last_row_is_eos false.
+        resolved["eos_appended"] = eos_appended
+        resolved["last_row_is_eos"] = eos_appended and dropped == 0
     if (static[0] if static else batch_rows) > 1:
         resolved["batch_fill"] = "repeat"
     kwargs = dict(
