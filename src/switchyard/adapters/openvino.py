@@ -26,9 +26,15 @@ performance counters, echoed raw under ``resolved["genai"]``.
 The NPU infers static shapes only, so a NPU step without ``static_shape``
 (``"BxL"``) is refused before any compile. AUTO, HETERO, Multi and GPU.1 are
 refused by devices.resolve_device. A ``compile_cache: fresh`` spec gets a
-new driver cache directory from the harness, which keeps cold compile times
-honest. ``keep_alive`` is an Ollama concept and is ignored here; ``shift``
-belongs to the adaptive-window lane and is likewise ignored.
+new driver cache directory from the harness; the first compile into it is
+B_fresh's numerator, and an immediate second compile into the same dir is
+recorded as ``resolved["compile_warm_reload_ms"]`` — the realistic reload
+with the driver cache warm, B_reuse's numerator. Every measured call carries
+a hard per-call bound (``call_timeout_s``, 60 s by default): a hang returns
+``ok=False`` with a "hang:" error, drops the entry, and poisons the
+model+device pair for the rest of the run. ``keep_alive`` is an Ollama
+concept and is ignored here; ``shift`` belongs to the adaptive-window lane
+and is likewise ignored.
 """
 
 from __future__ import annotations
@@ -148,16 +154,18 @@ class OpenvinoAdapter:
     ``tokenizer_loader``, ``genai_module`` and ``clock``.
     """
 
-    def __init__(self, *, core=None, tokenizer_loader=None, genai_module=None, clock=None, default_device: str | None = None) -> None:
+    def __init__(self, *, core=None, tokenizer_loader=None, genai_module=None, clock=None, default_device: str | None = None, call_timeout_s: float = 60.0) -> None:
         self._injected_core = core
         self._tokenizer_loader = tokenizer_loader
         self._genai_module = genai_module
         self.clock = clock or time.perf_counter
         self.default_device = default_device
+        self.call_timeout_s = float(call_timeout_s)
         self._tokenizers: dict = {}
         self._compiled: dict = {}
         self._pipelines: dict = {}
         self._session: dict | None = None
+        self._poisoned: set = set()  # (model, device) keys that hung once
 
     @staticmethod
     def enumerate_devices(core) -> list[dict]:
@@ -234,7 +242,13 @@ class OpenvinoAdapter:
         if entry is None:
             file = self._model_path(model, revision)
             compiled, compile_s = self._load_compiled(file, ov_id, static, compile_config)
-            entry = {"model": compiled, "compile_s": compile_s, "warmed": False, "path": str(file)}
+            warm_reload_s = None
+            if compile_config.get("CACHE_DIR"):
+                # The realistic reload: same graph, same dir, driver cache already
+                # populated by the first compile. B_reuse is counted from this.
+                _reload, warm_reload_s = self._load_compiled(file, ov_id, static, compile_config)
+            entry = {"model": compiled, "compile_s": compile_s, "warm_reload_s": warm_reload_s,
+                     "warmed": False, "path": str(file)}
             self._compiled[key] = entry
         return entry
 
@@ -289,6 +303,31 @@ class _Settings:
         return self.values.get(key, default)
 
 
+def _timed_call(fn, timeout_s: float):
+    """Run one measured call with a hard bound. A hang returns ("hang", None);
+    the worker is a daemon and cannot outlive the process.
+
+    A hang on the NPU is a real failure mode (seen with a batch-8 cross
+    encoder on npu-buildout), so the bound is measurement, not courtesy.
+    """
+    box: dict = {}
+
+    def work() -> None:
+        try:
+            box["value"] = fn()
+        except Exception as exc:  # re-raised by the caller
+            box["fault"] = exc
+
+    worker = threading.Thread(target=work, name="switchyard-ov-call", daemon=True)
+    worker.start()
+    worker.join(timeout=timeout_s)
+    if worker.is_alive():
+        return "hang", None
+    if "fault" in box:
+        raise box["fault"]
+    return "ok", box.get("value")
+
+
 def _compile_config(s: _Settings) -> dict:
     config: dict = {}
     if s.compile_cache == "fresh" and s.compile_cache_dir:
@@ -324,6 +363,10 @@ def _pooling_for(task: str, repo: str) -> str:
 
 def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> StepResult:
     ov_id = self._resolve_ov_id(request.device)
+    if (parse_model_ref(request.model)[0], ov_id) in self._poisoned:
+        raise AdapterError(
+            f"{request.model} on {ov_id} hung earlier in this run; the device pair is poisoned for the run"
+        )
     static = parse_static_shape(s.get("static_shape"))
     if ov_id == "NPU" and static is None:
         raise AdapterError("the NPU needs a static_shape BxL; dynamic shapes are not supported there")
@@ -339,7 +382,19 @@ def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> Step
     entry = self._embedder(repo, ref, ov_id, static, _compile_config(s))
     compiled_now = not entry["warmed"]
     t0 = self.clock()
-    matrix = self._infer_embed(entry, ids, mask, batch_rows if static is None else static[0])
+    status, matrix = _timed_call(
+        lambda: self._infer_embed(entry, ids, mask, batch_rows if static is None else static[0]),
+        self.call_timeout_s,
+    )
+    if status == "hang":
+        self._compiled = {k: v for k, v in self._compiled.items() if not (k[0] == repo and k[2] == ov_id)}
+        self._poisoned.add((repo, ov_id))
+        return StepResult(
+            ok=False,
+            error=f"hang: no result within {self.call_timeout_s:g} s; arm inconclusive, device pair poisoned for the run",
+            resolved=resolved or None,
+            sensors=None,
+        )
     call_s = self.clock() - t0
     vec = normalize(pool(matrix, mask, pooling))
     resolved.update(
@@ -363,12 +418,18 @@ def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> Step
     if compiled_now:
         kwargs["compile_ms"] = entry["compile_s"] * 1000
         kwargs["first_call_ms"] = call_s * 1000
+        if entry.get("warm_reload_s") is not None:
+            resolved["compile_warm_reload_ms"] = entry["warm_reload_s"] * 1000
         entry["warmed"] = True
     return StepResult(**kwargs)
 
 
 def _run_generate(self, request: StepRequest, s: _Settings, resolved: dict) -> StepResult:
     ov_id = self._resolve_ov_id(request.device)
+    if (request.model, ov_id) in self._poisoned:
+        raise AdapterError(
+            f"{request.model} on {ov_id} hung earlier in this run; the device pair is poisoned for the run"
+        )
     pipe, compile_s = self._pipeline(request.model, ov_id, _compile_config(s))
     key = (request.model, ov_id)
     genai = self._genai_module or _real_genai_module()
@@ -378,7 +439,16 @@ def _run_generate(self, request: StepRequest, s: _Settings, resolved: dict) -> S
         config.do_sample = True
         config.temperature = float(s.get("temperature"))
     t0 = self.clock()
-    out = pipe.generate(str(s.get("prompt") or "hello"), config)
+    status, out = _timed_call(lambda: pipe.generate(str(s.get("prompt") or "hello"), config), self.call_timeout_s)
+    if status == "hang":
+        self._pipelines.pop((request.model, ov_id), None)
+        self._poisoned.add((request.model, ov_id))
+        return StepResult(
+            ok=False,
+            error=f"hang: no result within {self.call_timeout_s:g} s; arm inconclusive, device pair poisoned for the run",
+            resolved=resolved or None,
+            sensors=None,
+        )
     call_s = self.clock() - t0
     perf = out.perf_metrics
     text = out.texts[0] if getattr(out, "texts", None) else str(out)
@@ -514,7 +584,10 @@ def _start_session(self, request: StepRequest) -> None:
                 config.max_new_tokens = _SESSION_NEW_TOKENS
                 while not stop.is_set():
                     t0 = self.clock()
-                    pipe.generate(str(s.get("prompt") or "hello"), config)
+                    status, _ = _timed_call(lambda: pipe.generate(str(s.get("prompt") or "hello"), config), self.call_timeout_s)
+                    if status == "hang":
+                        box["fault"] = AdapterError(f"hang: companion call exceeded {self.call_timeout_s:g} s")
+                        return
                     box["call_s"] = self.clock() - t0
             else:
                 repo, ref = parse_model_ref(request.model)
@@ -529,7 +602,10 @@ def _start_session(self, request: StepRequest) -> None:
                 rows = static[0] if static else int(s.get("batch", 1))
                 while not stop.is_set():
                     t0 = self.clock()
-                    self._infer_embed(entry, ids, mask, rows)
+                    status, _ = _timed_call(lambda: self._infer_embed(entry, ids, mask, rows), self.call_timeout_s)
+                    if status == "hang":
+                        box["fault"] = AdapterError(f"hang: companion call exceeded {self.call_timeout_s:g} s")
+                        return
                     box["call_s"] = self.clock() - t0
         except Exception as exc:  # surfaced as a refusal on start, or on stop mid-run
             box["fault"] = exc
@@ -563,7 +639,9 @@ def _stop_session(self, request: StepRequest) -> None:
         warnings.warn("an OpenVINO session thread did not stop within 10 s; it exits with the process", RuntimeWarning)
     self._session = None
     fault = sess["box"]["fault"]
-    if fault is not None and not isinstance(fault, AdapterError):
+    if isinstance(fault, AdapterError):
+        raise fault
+    if fault is not None:
         raise AdapterError(f"the companion session failed mid-run: {fault}")
 
 

@@ -393,3 +393,94 @@ def test_pooling_table_matches_the_measured_recipes():
     assert ovm._POOLING["BAAI/bge-small-en-v1.5"] == "cls"
     assert ovm._POOLING["nomic-ai/nomic-embed-text-v1.5"] == "mean"
     assert ovm._pooling_for("nli", "cross-encoder/nli-deberta-v3-base") == "none"
+
+
+# --- per-call timeout and warm-reload colds (E1 review) --------------------
+
+
+class SlowCompiled(FakeCompiled):
+    def infer_lists(self, inputs, batch_rows: int):
+        import time as _t
+
+        _t.sleep(1.0)
+        return super().infer_lists(inputs, batch_rows)
+
+
+class SlowCore(FakeCore):
+    def compile_model(self, graph, device, config):
+        self.compiled.append((device, dict(config)))
+        return SlowCompiled()
+
+
+def test_hang_marks_inconclusive_and_poisons(tmp_path, monkeypatch):
+    m = local_model(tmp_path)
+    monkeypatch.setitem(ovm._POOLING, m, "cls")
+    a = make_adapter(core=SlowCore(), call_timeout_s=0.05)
+    r = a.run(req(model=m, device="NPU", static_shape="1x16"))
+    assert r.ok is False and r.error.startswith("hang:")
+    assert "inconclusive" in r.error
+    with pytest.raises(AdapterError, match="poisoned"):
+        a.run(req(model=m, device="NPU", static_shape="1x16"))
+
+
+def test_hang_drops_nothing_for_other_devices(tmp_path, monkeypatch):
+    m = local_model(tmp_path)
+    monkeypatch.setitem(ovm._POOLING, m, "cls")
+    core = FakeCore()
+    a = make_adapter(core=core)
+    ok = a.run(req(model=m, device="CPU", static_shape="1x16"))
+    assert ok.ok
+    a._poisoned.add((m, "NPU"))  # an NPU hang must not evict the CPU entry
+    again = a.run(req(model=m, device="CPU", static_shape="1x16"))
+    assert again.ok and again.compile_ms is None
+
+
+def test_warm_reload_compile_recorded_on_fresh_cache(tmp_path, monkeypatch):
+    m = local_model(tmp_path)
+    monkeypatch.setitem(ovm._POOLING, m, "cls")
+    a = make_adapter()
+    r = a.run(req(model=m, device="NPU", static_shape="1x16",
+                  compile_cache="fresh", compile_cache_dir="D:/cache/e1-x"))
+    assert r.ok and r.compile_ms is not None
+    assert r.resolved["compile_warm_reload_ms"] is not None
+    assert a._injected_core.compiled  # first compile
+    assert len([c for c in a._injected_core.compiled if c[1].get("CACHE_DIR")]) == 2  # fresh + reload
+    r2 = a.run(req(model=m, device="NPU", static_shape="1x16",
+                   compile_cache="fresh", compile_cache_dir="D:/cache/e1-x"))
+    assert "compile_warm_reload_ms" not in (r2.resolved or {})  # only the cold row carries it
+
+
+def test_no_warm_reload_without_cache_dir(tmp_path, monkeypatch):
+    m = local_model(tmp_path)
+    monkeypatch.setitem(ovm._POOLING, m, "cls")
+    a = make_adapter()
+    r = a.run(req(model=m, device="CPU", static_shape="1x16"))
+    assert r.ok and "compile_warm_reload_ms" not in r.resolved
+
+
+def test_generate_hang_poisons_pipeline(tmp_path):
+    class SlowGenai(FakeGenai):
+        class LLMPipeline(FakePipeline):
+            def generate(self, prompt, config=None):
+                import time as _t
+
+                _t.sleep(1.0)
+                return super().generate(prompt, config)
+
+    a = make_adapter(genai_module=SlowGenai, call_timeout_s=0.05)
+    r = a.run(req(task="generate", model=str(tmp_path), device="CPU"))
+    assert r.ok is False and r.error.startswith("hang:")
+
+
+def test_session_companion_hang_surfaces_at_stop(tmp_path, monkeypatch):
+    import time as _time
+
+    m = local_model(tmp_path)
+    monkeypatch.setitem(ovm._POOLING, m, "cls")
+    a = make_adapter(core=SlowCore(), call_timeout_s=0.05)
+    r = req(model=m, device="CPU", static_shape="1x16")
+    a.start_session(r)
+    _time.sleep(0.2)
+    with pytest.raises(AdapterError, match="hang"):
+        a.stop_session(r)
+    assert a._session is None
