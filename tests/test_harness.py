@@ -228,13 +228,21 @@ def test_a_failed_step_stops_and_writes_nothing(tmp_path: Path):
 def test_a_hang_is_not_a_device_loss():
     assert hang_error("hang: no result within 60 s") is True
     assert device_lost_error("hang: no result within 60 s") is False
-    assert device_lost_error("device hung") is True
     assert device_lost_error("ZE_RESULT_ERROR_DEVICE_LOST") is True
+    assert device_lost_error("device_lost") is True
+    assert device_lost_error("device lost: NPU disappeared") is True
+    sentence = (
+        "L0 zeFenceHostSynchronize result: ZE_RESULT_ERROR_DEVICE_LOST, "
+        "code 0x70000001 - device hung, reset, was removed, or driver update occurred"
+    )
+    assert device_lost_error(sentence) is True
+    assert device_lost_error("device hung") is False
+    assert device_lost_error("device hung, reset, was removed") is False
     assert device_lost_error("") is False
     assert device_lost_error(None) is False
 
 
-def test_a_hang_keeps_finished_arms_and_stops_without_retry(tmp_path: Path):
+def test_a_hang_keeps_finished_arms_and_stops_without_retry(tmp_path: Path, capsys):
     repo = tmp_path / "repo"
     spec = _spec()
     spec["warmups"] = 0
@@ -280,9 +288,10 @@ def test_a_hang_keeps_finished_arms_and_stops_without_retry(tmp_path: Path):
     assert table["T/B/run-1"]["latency"]["cold_ms"] is None
     assert table["T/B/run-1"]["notes"] == "this device can't do this setting"
     assert script.unloaded == [("qwen3:8b", "5090"), ("qwen3:8b", "NPU"), ("qwen3:8b", "iGPU")]
+    assert capsys.readouterr().out == "B NPU hang\n"
 
 
-def test_a_device_loss_keeps_a_finished_arm_and_the_other_device_goes_on(tmp_path: Path):
+def test_a_device_loss_keeps_a_finished_arm_and_the_other_device_goes_on(tmp_path: Path, capsys):
     repo = tmp_path / "repo"
     spec = _spec()
     spec["warmups"] = 0
@@ -314,6 +323,7 @@ def test_a_device_loss_keeps_a_finished_arm_and_the_other_device_goes_on(tmp_pat
     table = {row["id"]: row for row in load_jsonl(repo / "table" / "routing.jsonl")}
     assert table["T/D/run-1"]["latency"]["cold_ms"] is None
     assert table["T/D/run-1"]["notes"] == "this device can't do this setting"
+    assert capsys.readouterr().out == "D NPU device_lost\ndone\n"
 
 
 def test_a_not_run_step_writes_no_row_and_is_listed_in_the_notes(tmp_path: Path):
@@ -540,7 +550,7 @@ def test_a_later_failure_keeps_a_finished_arm_without_calling_it_device_lost(tmp
     assert "outcome" not in stored[0]
 
 
-def test_repeats_build_a_receipt_and_keep_cold_separate(tmp_path: Path):
+def test_repeats_build_a_receipt_and_keep_cold_separate(tmp_path: Path, capsys):
     repo = tmp_path / "repo"
     spec_path = _bind(repo, _spec())
     script = Scripted(
@@ -551,6 +561,7 @@ def test_repeats_build_a_receipt_and_keep_cold_separate(tmp_path: Path):
     )
     (repo / "table").mkdir()
     rows = _invoke(repo, spec_path, {"fake": script})
+    assert capsys.readouterr().out == "done\n"
     by_id = {row["id"]: row for row in rows}
     arm_a = by_id["T/A/run-1"]
     assert arm_a["latency"]["cold_ms"] == 100

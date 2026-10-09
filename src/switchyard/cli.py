@@ -98,6 +98,41 @@ def _cmd_import(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_report(rows: list[dict], *, finished: bool) -> str:
+    """What a run prints when it ends.
+
+    Each hang or device_lost arm is one line, before ``done``. A run that
+    returns cleanly still shows the loss.
+    """
+
+    lines = []
+    for row in rows:
+        outcome = row.get("outcome")
+        if outcome not in ("device_lost", "hang"):
+            continue
+        lines.append(f"{_arm_id(row)} {row['device']} {outcome}")
+    if finished:
+        lines.append("done")
+    if not lines:
+        return ""
+    return "\n".join(lines) + "\n"
+
+
+def announce_run(rows: list[dict], *, finished: bool) -> None:
+    """Print :func:`run_report`. The run command's end is this text."""
+
+    text = run_report(rows, finished=finished)
+    if text:
+        print(text, end="")
+
+
+def _arm_id(row: dict) -> str:
+    parts = str(row.get("id", "")).split("/")
+    if len(parts) >= 3:
+        return parts[-2]
+    return parts[-1]
+
+
 def _cmd_run(args: argparse.Namespace) -> int:
     from switchyard.guards import GuardError
     from switchyard.harness.runner import check_flags, devices_not_started, dry_run
