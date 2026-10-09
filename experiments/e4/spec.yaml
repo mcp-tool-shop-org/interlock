@@ -1,0 +1,164 @@
+# Standards compliance
+#
+# PIN_PER_STEP: 2. The models, the digest that the table already recorded, the
+#   devices, the batch, the prompt rule and the 10 percent band are in this file.
+# ANDON_AUTHORITY: 2. A non-zero step stops the sequence. Batch 8 NLI is refused.
+# NAMED_COMPENSATORS: 2. Unload is keep_alive 0. No publish, no rental, no spend.
+# DECOMPOSE_BY_SECRETS: 2. This file is the pre-registration. The harness runs it.
+# UNCERTAINTY_GATED_HUMANS: 2. One grant and one NPU session, booked together,
+#   come from the Publisher. This spec does not start a device.
+# EXTERNAL_VERIFIER: n/a. R&D reviews this spec before any device time.
+
+id: E4
+procedure: interleaved
+question: >
+  While qwen3:8b decodes on the 5090, does a sustained NPU embedding load or a
+  sustained iGPU NLI load change that decode rate, and does the 5090 change
+  the NPU or iGPU latency?
+decision: >
+  The router may schedule the Intel devices freely beside 5090 decode only when
+  every paired measurement stays within the band of that device's alone median.
+  The 5090 comparison is decode tokens per second. The NPU and iGPU comparison
+  is warm latency. The band is 0.10, fixed here before any run. A difference
+  either faster or slower than the band is not free. A failed step is
+  inconclusive, not a pass.
+band: 0.10
+warmups: 1
+repeats: 5
+rest_s: 900
+needs:
+  grant: true
+  npu_session: true
+  cpu_window: false
+  booked_together: true
+dataset:
+  name: e4-fixed-prompt
+  seed: "The switchyard counts the same cars on every pass. "
+  target_tokens: 256
+  rule: >
+    Repeat the seed until the model tokenizer counts at least 256 tokens, then
+    keep the shortest prefix of that repetition that still counts as 256. Use
+    that same prefix for every arm and every repeat.
+metrics:
+  - decode_tok_s
+  - latency_ms
+  - package_power_w
+stop_rules:
+  - A non-zero step stops the sequence. Later arms do not run.
+  - Book one grant and one NPU session together. Do not place this block beside a timed calibration or a ladder run.
+  - Rest 900 seconds before the block. Inside the block the same models stay loaded. The rest is not taken between arms.
+  - DeBERTa NLI runs at batch 1. Batch 8 is refused.
+  - The NPU load is bge-base, so this experiment does not wait on E2.
+  - Thinking is off. This spec does not grade thinking quality.
+  - Record package power when a probe returns it. A missing power reading is null, not a failure.
+  - The OpenVINO adapter belongs to the Intel lane. This spec names it. Phase 2 does not load it.
+arms:
+  - id: 5090-alone
+    task: generate
+    device: "5090"
+    engine: ollama
+    model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "0.35.1"
+    thinking_level: "off"
+    num_predict: 128
+    num_ctx: null
+    batch: null
+    measure: decode_tok_s
+  - id: npu-alone
+    task: embed
+    device: NPU
+    engine: openvino
+    model: BAAI/bge-base-en-v1.5
+    revision_or_digest: unrecorded
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    measure: latency_ms
+    revision_note: >
+      The probe receipt does not record a revision. The run records the revision
+      it loads. Do not copy in a revision from memory to fill this field.
+  - id: igpu-alone
+    task: nli
+    device: iGPU
+    engine: openvino
+    model: cross-encoder/nli-deberta-v3-base
+    revision_or_digest: 6c749ce3425cd33b46d187e45b92bbf96ee12ec7
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    measure: latency_ms
+  - id: 5090-with-npu
+    task: generate
+    device: "5090"
+    engine: ollama
+    model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "0.35.1"
+    thinking_level: "off"
+    num_predict: 128
+    num_ctx: null
+    batch: null
+    companion_device: NPU
+    compare_to: 5090-alone
+    measure: decode_tok_s
+  - id: npu-with-5090
+    task: embed
+    device: NPU
+    engine: openvino
+    model: BAAI/bge-base-en-v1.5
+    revision_or_digest: unrecorded
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    companion_device: "5090"
+    compare_to: npu-alone
+    measure: latency_ms
+  - id: 5090-with-igpu
+    task: generate
+    device: "5090"
+    engine: ollama
+    model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "0.35.1"
+    thinking_level: "off"
+    num_predict: 128
+    num_ctx: null
+    batch: null
+    companion_device: iGPU
+    compare_to: 5090-alone
+    measure: decode_tok_s
+  - id: igpu-with-5090
+    task: nli
+    device: iGPU
+    engine: openvino
+    model: cross-encoder/nli-deberta-v3-base
+    revision_or_digest: 6c749ce3425cd33b46d187e45b92bbf96ee12ec7
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    companion_device: "5090"
+    compare_to: igpu-alone
+    measure: latency_ms

@@ -1,0 +1,105 @@
+# Standards compliance
+#
+# PIN_PER_STEP: 2. The roster digests, the 2048 grid, 30500 MiB and 31200 MiB,
+#   and the spill ratios are in this file.
+# ANDON_AUTHORITY: 2. The sampler aborts at 30500 MiB and unloads. It does not
+#   wait for the watchdog, and it never loads up to 31200 MiB.
+# NAMED_COMPENSATORS: 2. Unload is keep_alive 0. No publish and no rental.
+# DECOMPOSE_BY_SECRETS: 2. This file is the pre-registration. The search is code.
+# UNCERTAINTY_GATED_HUMANS: 2. One grant per model, from the Publisher, with the
+#   900 second rest between models. This spec does not start a device.
+# EXTERNAL_VERIFIER: n/a. R&D reviews this spec before any device time.
+
+id: E5
+procedure: fill-card
+question: >
+  For each named local 5090 model, what is the largest num_ctx that stays fully
+  resident and at or under 30500 MiB, including the peak while a long prompt
+  is processed?
+decision: >
+  The row is that num_ctx and the VRAM at the confirmed peak. offrig may later
+  read it as the ceiling for num_ctx auto. A window that fails residency, exceeds
+  30500 MiB, or is resident but slow, steps back one 2048 notch. No confirmed
+  window means the model has no fill-the-card row. Do not invent one.
+abort_mib: 30500
+ceiling_mib: 31200
+grain: 2048
+confirm_prompt_fraction: 0.9
+confirm_num_predict: 1
+sample_ms: 200
+spill_tok_ratio: 0.5
+spill_ttft_ratio: 2.0
+max_ctx: 1048576
+shift: false
+truncate: false
+rest_s: 900
+needs:
+  grant: true
+  npu_session: false
+  cpu_window: false
+dataset:
+  name: e5-confirm-prompt
+  seed: "The switchyard fills the card with the same sentence. "
+  rule: >
+    The load uses num_predict 1. Confirmation uses a prompt of about 90 percent
+    of the candidate window, built by repeating the seed until the tokenizer
+    reaches that count, then keeping the shortest such prefix. shift and
+    truncate are both false, so a full window is an error and not a silent shift.
+metrics:
+  - max_resident_ctx
+  - peak_mib
+  - ttft_ms
+  - decode_tok_s
+  - idle_baseline_mib
+stop_rules:
+  - Abort and unload the moment card VRAM reaches 30500 MiB. Do not test 31200 MiB. Do not rely on the watchdog. Ollama's runner is not on the watchdog's kill list.
+  - Fully resident means the loaded model reports size_vram equal to size, and the server log for that load shows every layer on the GPU.
+  - Double from the model's own default context, read at run time and written on the receipt. Do not invent a default in this file. Then bisect on a 2048-token grid between the last pass and the first fail.
+  - Confirmation samples nvidia-smi about every 200 ms through the long prompt. The reported VRAM is that peak.
+  - A window is resident but slow when its decode tokens per second fall below half the default-context reference, or its time to first token rises above twice that reference. Those factors are pre-registered. The 0.7 GB margin is an assumption. The first run logs desktop VRAM variance. Amend the margin only in a committed spec change before a later run.
+  - One grant per model. Rest 900 seconds between models, with the card empty.
+  - A row is stale when the Ollama version, the CUDA backend, the ggml-cuda sha, the digest, the quantization, flash attention, the KV cache type, the idle baseline, or the NVIDIA driver version changes.
+  - Continue-at-a-bigger-window stays escalate-only and is not part of this experiment. Paged KV is not measured. 8-bit KV is not a silent setting.
+models:
+  - model: gemma4:31b
+    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    quant: unrecorded
+    licence: unrecorded
+    engine: ollama
+    engine_version: "0.35.1"
+    device: "5090"
+  - model: granite4.1:30b
+    revision_or_digest: 3f3e5df8a021439fd6f867a0e526bdc303cac79c811201cb6bac193298cb9fcd
+    quant: unrecorded
+    licence: unrecorded
+    engine: ollama
+    engine_version: "0.35.1"
+    device: "5090"
+  - model: llama3.1:8b
+    revision_or_digest: 46e0c10c039e019119339687c3c1757cc81b9da49709a3b3924863ba87ca666e
+    quant: unrecorded
+    licence: unrecorded
+    engine: ollama
+    engine_version: "0.35.1"
+    device: "5090"
+  - model: mistral-small:24b
+    revision_or_digest: 8039dd90c1138d772437a0779a33b7349efd5d9cca71edcd26e4dd463f90439d
+    quant: unrecorded
+    licence: unrecorded
+    engine: ollama
+    engine_version: "0.35.1"
+    device: "5090"
+  - model: qwen3:14b
+    revision_or_digest: bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8
+    quant: unrecorded
+    licence: unrecorded
+    engine: ollama
+    engine_version: "0.35.1"
+    device: "5090"
+  - model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: unrecorded
+    licence: unrecorded
+    engine: ollama
+    engine_version: "0.35.1"
+    device: "5090"

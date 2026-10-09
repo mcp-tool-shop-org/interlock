@@ -412,7 +412,10 @@ before.
   - provenance (source receipt path + commit sha, or experiment spec + run id).
 - **CI**, Atlas, the 90% coverage floor and Codecov config, and a README with the threat model (what switchyard touches: local devices and
   local HTTP; never the network beyond the HF download).
-- **The logo (the Director's, 2026-10-09):** copy it into the repo in this PR. The Downloads folder isn't
+- **The logo (the Director's, 2026-10-09):** copy it into the repo in this PR. **Superseded by a regeneration:**
+  Mike is having it redone (a transparent background, a separate wordmark version, "Cloud" replacing the
+  duplicate GPU chip). When the new files land, replace `assets/logo/`, and open the brand-repo PR **with the
+  new version**, not the first draft. The Downloads folder isn't
   durable.
   - Master: the Downloads master PNG (1328×1328, on a white margin) →
     `assets/logo/switchyard-master.png`.
@@ -465,11 +468,14 @@ before.
   - An `offrig verify calibrate` adapter (scratch projects, guards apply).
 - **Environment capture** in every receipt: driver and NPU firmware versions, OpenVINO and package versions,
   power plan, and what else was loaded (Ollama `/api/ps`).
-- **Write and commit the pre-registered specs for E1–E4 in this phase.** Experiment design is part of Phase 2,
-  not Phase 3: the specs are the pre-registrations, and R&D reviews them in the Phase 2 PR before any device
-  time is asked for.
+- **Write and commit the pre-registered specs for E4 and E5 in this phase.** Experiment design is part of Phase
+  2, not Phase 3: the specs are the pre-registrations, and R&D reviews them in the Phase 2 PR before any device
+  time is asked for. **E1–E3 specs are Kimi's** (`kimi-switchyard-intel-lane-handoff.md`), written after this
+  phase's adapter interface merges.
+- **The adapter interface** is defined here, so Kimi's OpenVINO adapter plugs in without touching the harness
+  core.
 - **Accept:**
-  - a `--dry-run` of each Phase 3 spec passes;
+  - a `--dry-run` of the E4 and E5 specs passes (E1–E3 follow in Kimi's PRs);
   - fake-adapter tests cover the timing math, repeat interleaving and the receipt shape;
   - a test proves a spec edited after commit is refused.
 
@@ -608,7 +614,8 @@ The Director's plan: build it, hold coverage at 90%, release it as a **prototype
 switchyard goes public at that point. The gate, all checked in one PR before anything is released:
 - **Phases 0–4 merged,** CI green on main, coverage ≥ 90% enforced (floor and Codecov), and the Atlas check
   passing.
-- **README:**
+- **README (a public surface, written by the Publisher, not Grok;** Grok's README is fine while the repo is
+  internal):
   - a **Prototype** status line saying it's advisory only, never serves traffic, and has a single-rig scope;
   - what it does, and the routing table's provenance rules;
   - the threat model;
@@ -732,3 +739,11 @@ R&D reviews every PR:
   validate, the driver version as a staleness key, and token-exact equivalence for "continue at a bigger
   window". Throughput rows claim measured values, never spec (the NPU's advertised 13.1 int8 TOPS vs 2.38
   measured).
+- 2026-10-09 (afternoon), Grok: PR #1 (Phase 0) is fixed and R&D-approved. PR #2 (Phase 1, routing table, 408
+  rows, rnd pinned at 08ca419, quote rule 1 by inference) is R&D-approved with notes. Grok flagged the brief's
+  Phase 2 contradiction (E1–E3 specs listed under Grok's phase but given to Kimi), fixed: Phase 2 is the
+  harness, the adapter interface, and the E4 and E5 specs; E1–E3 specs are Kimi's. The brand-repo logo PR is
+  still open as an item.
+- 2026-10-09 (afternoon), the Publisher merged switchyard #1 (860dbd9, a merge commit) and #2 (d86e63b, a squash).
+  CI was green and both identity scans clean. Notes: the logo is being regenerated (replace the files, and send
+  the brand PR with the new version), and the public README is the Publisher's to write before going public.

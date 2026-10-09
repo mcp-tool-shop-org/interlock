@@ -29,6 +29,15 @@ def main(argv: list[str] | None = None) -> int:
     importer.add_argument("--offers", type=Path, default=None)
     importer.set_defaults(func=_cmd_import)
 
+    run = sub.add_parser("run", help="dry-run a committed experiment spec")
+    run.add_argument("spec", type=Path)
+    run.add_argument("--root", type=Path, default=Path("."))
+    run.add_argument("--grant")
+    run.add_argument("--npu-session")
+    run.add_argument("--cpu-window")
+    run.add_argument("--dry-run", action="store_true")
+    run.set_defaults(func=_cmd_run)
+
     args = parser.parse_args(argv)
     return args.func(args)
 
@@ -84,6 +93,23 @@ def _cmd_import(args: argparse.Namespace) -> int:
     )
     print(f"switchyard import: {len(rows)} row(s), {len(skipped)} skipped")
     return 0
+
+
+def _cmd_run(args: argparse.Namespace) -> int:
+    from switchyard.guards import GuardError
+    from switchyard.harness.runner import check_flags, devices_not_started, dry_run
+    from switchyard.harness.spec import SpecError, load_spec
+
+    try:
+        if args.dry_run:
+            print(dry_run(args.spec, args.root.resolve()), end="")
+            return 0
+        check_flags(load_spec(args.spec), args.grant, args.npu_session, args.cpu_window)
+    except (SpecError, GuardError, OSError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    print(devices_not_started(), file=sys.stderr)
+    return 1
 
 
 def _count_rows(root: Path) -> int:

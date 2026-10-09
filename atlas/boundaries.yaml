@@ -12,6 +12,10 @@ boundaries:
     globs:
       - docs/**
     role: docs
+  - name: experiments
+    globs:
+      - experiments/**
+    role: data
   - name: src
     globs:
       - src/**
