@@ -484,3 +484,10 @@ def test_session_companion_hang_surfaces_at_stop(tmp_path, monkeypatch):
     with pytest.raises(AdapterError, match="hang"):
         a.stop_session(r)
     assert a._session is None
+def test_pool_last_token():
+    matrix = [[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]]
+    assert ovm.pool(matrix, [1, 1, 0], "last") == [2.0, 2.0]
+    assert ovm.pool(matrix, [1, 1, 1], "last") == [3.0, 3.0]
+    with pytest.raises(AdapterError):
+        ovm.pool(matrix, [0, 0, 0], "last")
+    assert ovm._POOLING["OpenVINO/Qwen3-Embedding-0.6B-fp16-ov"] == "last"

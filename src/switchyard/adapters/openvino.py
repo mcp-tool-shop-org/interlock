@@ -10,7 +10,8 @@ Measurement policy, fixed by the adapter and recorded in ``resolved``:
 
 ``embed`` steps pool per model from the committed ``_POOLING`` table (cls
 for the bge family, mean for nomic — the recipes the npu-probe rows were
-measured with), then L2-normalise. An embed arm on a repo with no recipe is
+measured with — and last-token for Qwen3-Embedding, its documented
+recipe), then L2-normalise. An embed arm on a repo with no recipe is
 refused rather than pooled silently. ``nli`` and ``rerank`` steps return the
 single-row logits un-pooled. Batch rows above the first repeat the same
 input (``batch_fill: repeat``) because a step carries one prompt; the NLI
@@ -128,6 +129,11 @@ def pool(matrix, mask, how: str) -> list[float]:
         raise AdapterError("the model returned no rows")
     if how in ("cls", "none"):
         return rows[0]
+    if how == "last":  # Qwen3-Embedding's recipe: the last unmasked row
+        keep = [i for i, m in enumerate(mask) if m]
+        if not keep:
+            raise AdapterError("the attention mask is all zeros")
+        return rows[keep[-1]]
     total = float(sum(mask))
     if total <= 0:
         raise AdapterError("the attention mask is all zeros")
@@ -346,6 +352,7 @@ _POOLING = {
     "BAAI/bge-base-en-v1.5": "cls",
     "BAAI/bge-small-en-v1.5": "cls",
     "nomic-ai/nomic-embed-text-v1.5": "mean",
+    "OpenVINO/Qwen3-Embedding-0.6B-fp16-ov": "last",
 }
 
 
