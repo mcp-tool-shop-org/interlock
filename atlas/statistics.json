@@ -7,7 +7,7 @@
     {
       "breakage": {
         "coChangesOnly": [],
-        "collapsed": true,
+        "collapsed": false,
         "confidence": "low",
         "importsAndCoChanges": [],
         "importsOnly": []
@@ -23,7 +23,7 @@
     {
       "breakage": {
         "coChangesOnly": [],
-        "collapsed": true,
+        "collapsed": false,
         "confidence": "low",
         "importsAndCoChanges": [],
         "importsOnly": []
@@ -39,7 +39,7 @@
     {
       "breakage": {
         "coChangesOnly": [],
-        "collapsed": true,
+        "collapsed": false,
         "confidence": "low",
         "importsAndCoChanges": [],
         "importsOnly": []
@@ -55,7 +55,7 @@
     {
       "breakage": {
         "coChangesOnly": [],
-        "collapsed": true,
+        "collapsed": false,
         "confidence": "low",
         "importsAndCoChanges": [],
         "importsOnly": []
@@ -71,10 +71,12 @@
     {
       "breakage": {
         "coChangesOnly": [],
-        "collapsed": true,
+        "collapsed": false,
         "confidence": "low",
         "importsAndCoChanges": [],
-        "importsOnly": []
+        "importsOnly": [
+          "tests"
+        ]
       },
       "cohesion": null,
       "cohesionDropped": false,
@@ -87,7 +89,7 @@
     {
       "breakage": {
         "coChangesOnly": [],
-        "collapsed": true,
+        "collapsed": false,
         "confidence": "low",
         "importsAndCoChanges": [],
         "importsOnly": []
@@ -106,22 +108,207 @@
     "files": [
       {
         "commits": 1,
+        "lines": 3,
+        "path": ".gitattributes"
+      },
+      {
+        "commits": 1,
+        "lines": 60,
+        "path": ".github/workflows/ci.yml"
+      },
+      {
+        "commits": 1,
+        "lines": 9,
+        "path": ".gitignore"
+      },
+      {
+        "commits": 1,
+        "lines": 1,
+        "path": ".python-version"
+      },
+      {
+        "commits": 1,
         "lines": 21,
         "path": "LICENSE"
+      },
+      {
+        "commits": 1,
+        "lines": 65,
+        "path": "README.md"
+      },
+      {
+        "commits": 1,
+        "lines": 0,
+        "path": "assets/logo/switchyard-master.png"
+      },
+      {
+        "commits": 1,
+        "lines": 0,
+        "path": "assets/logo/switchyard_128.png"
+      },
+      {
+        "commits": 1,
+        "lines": 0,
+        "path": "assets/logo/switchyard_16.png"
+      },
+      {
+        "commits": 1,
+        "lines": 0,
+        "path": "assets/logo/switchyard_256.png"
+      },
+      {
+        "commits": 1,
+        "lines": 0,
+        "path": "assets/logo/switchyard_32.png"
+      },
+      {
+        "commits": 1,
+        "lines": 0,
+        "path": "assets/logo/switchyard_512.png"
+      },
+      {
+        "commits": 1,
+        "lines": 0,
+        "path": "assets/logo/switchyard_64.png"
+      },
+      {
+        "commits": 1,
+        "lines": 53,
+        "path": "atlas/README.md"
+      },
+      {
+        "commits": 1,
+        "lines": 26,
+        "path": "atlas/boundaries.yaml"
+      },
+      {
+        "commits": 1,
+        "lines": 59,
+        "path": "atlas/page.json"
+      },
+      {
+        "commits": 1,
+        "lines": 163,
+        "path": "atlas/statistics.json"
+      },
+      {
+        "commits": 1,
+        "lines": 130,
+        "path": "atlas/structure.json"
+      },
+      {
+        "commits": 1,
+        "lines": 9,
+        "path": "docs/handoff/README.md"
+      },
+      {
+        "commits": 1,
+        "lines": 27,
+        "path": "docs/handoff/feedback_check_ci_after_every_push.md"
+      },
+      {
+        "commits": 1,
+        "lines": 27,
+        "path": "docs/handoff/feedback_git_add_explicit_paths.md"
+      },
+      {
+        "commits": 1,
+        "lines": 29,
+        "path": "docs/handoff/feedback_gpu_use_through_the_publisher.md"
+      },
+      {
+        "commits": 1,
+        "lines": 22,
+        "path": "docs/handoff/feedback_read_exit_before_next_gpu_step.md"
+      },
+      {
+        "commits": 1,
+        "lines": 369,
+        "path": "docs/handoff/switchyard-router-buildout-handoff.md"
+      },
+      {
+        "commits": 1,
+        "lines": 42,
+        "path": "pyproject.toml"
+      },
+      {
+        "commits": 1,
+        "lines": 3,
+        "path": "src/switchyard/__init__.py"
+      },
+      {
+        "commits": 1,
+        "lines": 4,
+        "path": "src/switchyard/__main__.py"
+      },
+      {
+        "commits": 1,
+        "lines": 46,
+        "path": "src/switchyard/cli.py"
+      },
+      {
+        "commits": 1,
+        "lines": 125,
+        "path": "src/switchyard/devices.py"
+      },
+      {
+        "commits": 1,
+        "lines": 104,
+        "path": "src/switchyard/guards.py"
+      },
+      {
+        "commits": 1,
+        "lines": 127,
+        "path": "src/switchyard/receipt.py"
+      },
+      {
+        "commits": 1,
+        "lines": 126,
+        "path": "src/switchyard/schema/routing-row.schema.json"
+      },
+      {
+        "commits": 1,
+        "lines": 50,
+        "path": "tests/support.py"
+      },
+      {
+        "commits": 1,
+        "lines": 30,
+        "path": "tests/test_cli.py"
+      },
+      {
+        "commits": 1,
+        "lines": 80,
+        "path": "tests/test_devices.py"
+      },
+      {
+        "commits": 1,
+        "lines": 80,
+        "path": "tests/test_guards.py"
+      },
+      {
+        "commits": 1,
+        "lines": 68,
+        "path": "tests/test_receipt.py"
+      },
+      {
+        "commits": 1,
+        "lines": 307,
+        "path": "uv.lock"
       }
     ]
   },
   "confidence": {
     "level": "low",
-    "reason": "fewer than 30 qualifying commits in the window, and fewer than 20 source files reach 10 revisions"
+    "reason": "fewer than 30 qualifying commits in the window, and fewer than 25 source files reach 10 revisions"
   },
-  "generatedAt": "2026-10-09T17:59:23.950Z",
+  "generatedAt": "2026-10-09T18:00:42.461Z",
   "generatedFrom": {
-    "commit": "a65b12ffd16a6f6b5f08019f07ac74c75baa0961"
+    "commit": "f4f2b4b7ae43f003e772bcfe3145e7e340dd36a6"
   },
   "pairs": [],
   "parameters": {
-    "appliedChangesetLimit": 0.25,
+    "appliedChangesetLimit": 9.5,
     "changeset": 50,
     "changesetFraction": 0.25,
     "cohesionDrop": 0.2,
@@ -130,16 +317,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "both",
-    "headDate": "2026-10-09T05:18:44-04:00",
-    "inScopeFiles": 1,
+    "headDate": "2026-10-09T14:00:29-04:00",
+    "inScopeFiles": 38,
     "pinnedStart": null,
-    "priorFloor": null,
-    "qualifyingCommits": 0,
+    "priorFloor": "fallen",
+    "qualifyingCommits": 1,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-04-12T09:18:44.000Z",
+    "since": "2026-04-12T18:00:29.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",
