@@ -14,7 +14,8 @@ Two receipts from the aspire-si Auditor run (its plan, addendum 5, amendments 1 
 
 The counts are recomputed from the verdict files, not copied from the readout, and the readout is
 checked against them. A field the run did not record is left out or marked unrecorded, never filled.
-The run directory is not a git repository, so provenance is a path label and a content sha256.
+``assemble`` reads the files with ``git show`` of the aspire-si pin and passes that sha. A caller
+that has only the bytes leaves ``commit_sha`` null. Either way the readout's content sha256 is recorded.
 """
 
 from __future__ import annotations
@@ -68,6 +69,7 @@ def b_rows(
     selection: bytes,
     source_dir: str,
     date: str,
+    commit_sha: str | None = None,
 ) -> list[dict]:
     """One judge:planted-error row for B's third judge."""
 
@@ -123,7 +125,7 @@ def b_rows(
         "date": date,
         "repeats": 1,
         "provisional": True,
-        "provenance": source_provenance(f"{source_dir}/B-readout.json", None, readout),
+        "provenance": source_provenance(f"{source_dir}/B-readout.json", commit_sha, readout),
         "notes": (
             "Single run, provisional. Agreement is with a two-judge consensus (gemma4:31b and muse-glimmer), "
             "not with gold, so no false-reject or false-accept rate is recorded. "

@@ -348,6 +348,105 @@ def _commit(repo: Path) -> str:
     return subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
 
 
+def _b_receipts(*, written: str | None = "2026-10-09T03:57:28") -> dict[str, bytes]:
+    selection = {
+        "seed": 0,
+        "splits": ["s1"],
+        "control_both_not_wrong": ["n1"],
+        "control_both_wrong": ["w1"],
+        "order": ["n1", "s1", "w1"],
+    }
+    if written is not None:
+        selection["written"] = written
+    verdicts = {
+        "s1": {"outcome": "unsure", "seconds": 1.0},
+        "n1": {"outcome": "not wrong", "seconds": 1.0},
+        "w1": {"outcome": "wrong", "grammatical": True, "seconds": 1.0},
+    }
+    manifest = {
+        "judge": "mistral-small:24b",
+        "digest": "8039dd90c1138d772437a0779a33b7349efd5d9cca71edcd26e4dd463f90439d",
+        "prompt_sha256": "p" * 64,
+        "schema_sha256": "s" * 64,
+        "options": {"num_predict": 2048, "num_ctx": 8192},
+        "think": False,
+        "splits": ["s1"],
+        "control": ["n1", "w1"],
+        "order": ["n1", "s1", "w1"],
+    }
+    readout = {
+        "control": {"both wrong": {"agrees": 1}, "both not wrong": {"agrees": 1}},
+        "reading": {"control_passed": False},
+    }
+    return {
+        "B-selection.json": json.dumps(selection).encode("utf-8"),
+        "B-manifest.json": json.dumps(manifest).encode("utf-8"),
+        "B-readout.json": json.dumps(readout).encode("utf-8"),
+        "verdicts-error-B-mistral-small_24b.json": json.dumps(verdicts).encode("utf-8"),
+    }
+
+
+def _commit_auditor(repo: Path, files: dict[str, bytes], *, extra: dict[str, bytes] | None = None) -> str:
+    base = repo / "docs/runs/receipts/2026-10-08-auditor"
+    base.mkdir(parents=True)
+    for name, data in {**files, **(extra or {})}.items():
+        (base / name).write_bytes(data)
+    return _commit(repo)
+
+
+def test_aspire_import_records_the_pin_path_and_content_sha256(tmp_path: Path):
+    from switchyard.importers.assemble import _aspire_b
+    from switchyard.importers.common import sha256_bytes
+
+    repo = tmp_path / "aspire"
+    files = _b_receipts()
+    pin = _commit_auditor(
+        repo,
+        files,
+        extra={
+            "judge-control-selection.json": b'{"items":[],"order":[]}',
+            "judge-control-readout.json": b'{"scores":{}}',
+        },
+    )
+    readout = repo / "docs/runs/receipts/2026-10-08-auditor/B-readout.json"
+    committed = readout.read_bytes()
+    readout.write_bytes(b'{"control":{}}')
+    (row,) = _aspire_b(repo, pin)
+    assert row["task"] == "judge:planted-error"
+    assert row["date"] == "2026-10-09"
+    assert row["provenance"]["commit_sha"] == pin
+    assert row["provenance"]["source_receipt_path"] == "docs/runs/receipts/2026-10-08-auditor/B-readout.json"
+    assert row["provenance"]["content_sha256"] == sha256_bytes(committed)
+    assert row["provenance"]["content_sha256"] != sha256_bytes(readout.read_bytes())
+
+
+def test_aspire_import_refuses_a_missing_readout_and_an_undated_selection(tmp_path: Path):
+    from switchyard.importers.assemble import _aspire_b
+
+    missing = tmp_path / "missing"
+    files = _b_receipts()
+    del files["B-readout.json"]
+    pin = _commit_auditor(missing, files)
+    with pytest.raises(ImportError_, match="B-readout.json"):
+        _aspire_b(missing, pin)
+    undated = tmp_path / "undated"
+    pin = _commit_auditor(undated, _b_receipts(written=None))
+    with pytest.raises(ImportError_, match="written date"):
+        _aspire_b(undated, pin)
+    short = tmp_path / "short"
+    pin = _commit_auditor(short, _b_receipts(written="yesterday"))
+    with pytest.raises(ImportError_, match="written date"):
+        _aspire_b(short, pin)
+    malformed = tmp_path / "malformed"
+    pin = _commit_auditor(malformed, _b_receipts(written="not-a-date"))
+    with pytest.raises(ImportError_, match="written date"):
+        _aspire_b(malformed, pin)
+    nodash = tmp_path / "nodash"
+    pin = _commit_auditor(nodash, _b_receipts(written="abcdefghij"))
+    with pytest.raises(ImportError_, match="written date"):
+        _aspire_b(nodash, pin)
+
+
 def test_import_reads_a_pinned_tree_and_refuses_a_missing_ladder(tmp_path: Path):
     from switchyard.importers.assemble import import_receipts
     from switchyard.importers.common import sha256_bytes
@@ -409,8 +508,21 @@ def test_import_reads_a_pinned_tree_and_refuses_a_missing_ladder(tmp_path: Path)
     (nli_dir / "results/2026-10-09-nli-floor.json").write_text(json.dumps(nli), encoding="utf-8", newline="\n")
     rnd_pin = _commit(rnd)
     npu_pin = _commit(npu)
+    aspire = tmp_path / "aspire"
+    aspire_pin = _commit_auditor(
+        aspire,
+        _b_receipts(),
+        extra={"judge-control-readout.json": b'{"scores":{}}'},
+    )
     with pytest.raises(ImportError_, match="missing ladder"):
-        import_receipts(rnd_repo=rnd, npu_repo=npu, rnd_pin=rnd_pin, npu_pin=npu_pin)
+        import_receipts(
+            rnd_repo=rnd,
+            npu_repo=npu,
+            aspire_repo=aspire,
+            rnd_pin=rnd_pin,
+            npu_pin=npu_pin,
+            aspire_pin=aspire_pin,
+        )
     digest = sha256_bytes(gold)
     ladder_root = rnd / "experiments/verifier-gold/math-ladder/results/2026-10-09-ladder"
     for index, name in enumerate(LADDER_RUNS):
@@ -432,8 +544,18 @@ def test_import_reads_a_pinned_tree_and_refuses_a_missing_ladder(tmp_path: Path)
         encoding="utf-8",
     )
     rows, skipped = import_receipts(
-        rnd_repo=rnd, npu_repo=npu, offers_path=offers, rnd_pin=rnd_pin, npu_pin=npu_pin
+        rnd_repo=rnd,
+        npu_repo=npu,
+        aspire_repo=aspire,
+        offers_path=offers,
+        rnd_pin=rnd_pin,
+        npu_pin=npu_pin,
+        aspire_pin=aspire_pin,
     )
+    planted = [row for row in rows if row["task"] == "judge:planted-error"]
+    assert len(planted) == 1
+    assert planted[0]["provenance"]["commit_sha"] == aspire_pin
+    assert not any(row["task"] == "judge:same-meaning-rewrite" for row in rows)
     assert any(row["task"] == "offer" for row in rows)
     assert any(row["task"] == "nli" for row in rows)
     assert any(row["settings"].get("quote_rule") == 1 and "8114f07" in row["settings"].get("quote_rule_source", "") for row in rows)

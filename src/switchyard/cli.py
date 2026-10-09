@@ -74,6 +74,7 @@ def _cmd_table(args: argparse.Namespace) -> int:
 def _cmd_import(args: argparse.Namespace) -> int:
     from switchyard.importers.assemble import import_receipts
     from switchyard.importers.gaps import load_candidates, render_gaps
+    from switchyard.importers.pins import ASPIRE_COMMIT
 
     root = args.root.resolve()
     rows, skipped = import_receipts(offers_path=args.offers)
@@ -85,7 +86,9 @@ def _cmd_import(args: argparse.Namespace) -> int:
     note = (
         "Ladder rows are imported from rnd at 08ca419f647a3ed69ee645610eaa1c7f35f40f91. "
         "Difficulty length quartiles are not imported. Tier rows are. "
-        "Chain and ladder rows with no pins.quote_rule are quote rule 1 by the pre-#47 inference."
+        "Chain and ladder rows with no pins.quote_rule are quote rule 1 by the pre-#47 inference. "
+        f"B's planted-error judge row is imported from aspire-si at {ASPIRE_COMMIT}. "
+        "That commit has B's receipts only. The 3b judge-control receipts are a later pin."
     )
     (table / "gaps.md").write_text(
         render_gaps(rows, candidates, ladder_note=note, skipped=skipped),

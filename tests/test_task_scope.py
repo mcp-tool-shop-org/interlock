@@ -321,7 +321,17 @@ def test_the_committed_table_is_rekeyed_and_does_not_invent_judge_rates():
         tag = item["model"]["repo_or_tag"]
         names = {metric["name"] for metric in item["quality"]}
         assert "false_reject_rate" not in names
-        assert "gpu_resident" not in item and "cost" not in item and "per_type" not in item
+        assert "false_accept_rate" not in names
+        if item["id"].startswith("aspire/B/"):
+            assert names == {"consensus_agreement", "abstain_rate"}
+            assert "per_type" in item and "cost" in item
+            assert "gpu_resident" not in item
+            provenance = item["provenance"]
+            assert provenance["commit_sha"] == "3b05eab928894311993ffa3af2075fef39cccce6"
+            assert provenance["source_receipt_path"] == "docs/runs/receipts/2026-10-08-auditor/B-readout.json"
+            assert provenance["content_sha256"] == "d61915ebf4106c3067b6ea08d83c3aace9555113afb8193fe480c7013cb47eb5"
+        else:
+            assert "gpu_resident" not in item and "cost" not in item and "per_type" not in item
         if tag in families:
             assert item["model_family"] == families[tag]
         else:
@@ -330,6 +340,8 @@ def test_the_committed_table_is_rekeyed_and_does_not_invent_judge_rates():
     assert counts["verify:reasoning"] == 30
     assert counts["verify:math-ladder"] == 312
     assert "verify" not in counts
-    assert len(rows) == 408
+    assert counts["judge:planted-error"] == 1
+    assert "judge:same-meaning-rewrite" not in counts
+    assert len(rows) == 409
     assert sum(1 for item in rows if item["id"].startswith("ladder/")) == 312
     assert sum(1 for item in rows if item["id"].startswith("verify/")) == 54
