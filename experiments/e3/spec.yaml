@@ -1,0 +1,538 @@
+# Standards compliance
+#
+# PIN_PER_STEP: 2. Models, revisions, licences, devices, prompt lengths,
+#   the thinking switch, the viability floor and the expectation check are
+#   in this file before any run.
+# ANDON_AUTHORITY: 2. A non-zero step stops the sequence. A hang is the
+#   adapter's automatic 60 second per-call bound — arm inconclusive, pair
+#   poisoned, sequence stopped, session ends.
+# NAMED_COMPENSATORS: 2. Unload drops the pipelines. No publish, no rental,
+#   no spend. Outputs are captured for eyeballing only.
+# DECOMPOSE_BY_SECRETS: 2. This file is the pre-registration. The harness
+#   runs it. The verdict is computed from the receipt after the run.
+# UNCERTAINTY_GATED_HUMANS: 2. An NPU/iGPU session and a separate 5090
+#   grant for the qwen3:8b reference, booked with the Publisher. This spec
+#   starts no device.
+# EXTERNAL_VERIFIER: n/a. R&D reviews this spec before any device time.
+
+id: E3
+procedure: interleaved
+compile_cache: reuse
+question: >
+  Can the Intel side host an always-on small generator, and at what
+  latency? Two channel-wise int4 models (group-quant IRs reportedly crash
+  the NPU compiler, so cw builds only) through openvino-genai on NPU, iGPU
+  and CPU — compile, time to first token and decode tokens per second at
+  prompts of about 256, 1024 and 4096 tokens, thinking off and on where
+  the model has it. Outputs are captured. No quality claim.
+decision: >
+  Viability — an always-on small generator is viable on the Intel side
+  when at least one of the two models, on at least one Intel device,
+  reaches decode throughput of 15 tokens per second or more at the
+  1024-token prompt with thinking off; 15 tok/s is the fixed floor for
+  assistant-grade background work, chosen before any run. TTFT, the other
+  lengths and the thinking-on rows accompany the verdict. The expectation
+  check is recorded separately — whether NPU decode is slower than iGPU
+  and CPU decode for each model, the community finding to confirm or
+  refute; a recorded hypothesis, not the viability gate. The 5090
+  reference (qwen3:8b via Ollama at the 1024 prompt) is for speed only,
+  runs inside its own grant, and is compared as descriptive ratios.
+band: 1.0
+warmups: 1
+repeats: 5
+rest_s: 900
+needs:
+  grant: true
+  npu_session: true
+  cpu_window: true
+  booked_together: false
+dataset:
+  name: e3-fixed-prompts
+  seed: "The switchyard counts the same cars on every pass. "
+  target_prompts: [256, 1024, 4096]
+  rule: >
+    The prompt texts are the YAML anchors below, built from the seed
+    repeated 22, 86 and 342 times (about 12 tokens per repetition, so
+    about 256, 1024 and 4096 tokens — the tokenizer's exact count is
+    recorded, not assumed). Qwen3 thinking-off arms use the NT anchors,
+    which append the model card's "/no_think" switch; thinking-on and Phi
+    arms use the plain anchors. num_predict caps every generation at 128
+    tokens so a thinking-on row stays bounded; the cap is recorded, never
+    retried longer.
+prompts:
+  P256: &P256 "The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass."
+  P256NT: &P256NT "The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. /no_think"
+  P1024: &P1024 "The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass."
+  P1024NT: &P1024NT "The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. /no_think"
+  P4096: &P4096 "The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass."
+  P4096NT: &P4096NT "The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. /no_think"
+metrics:
+  - compile_ms
+  - first_call_ms
+  - latency_ms
+  - throughput
+stop_rules:
+  - A non-zero step stops the sequence. Later arms do not run.
+  - The pins are official OpenVINO exports, channel-wise int4 only —
+    OpenVINO/Qwen3-8B-int4-cw-ov at 27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7 (apache-2.0) and OpenVINO/Phi-3.5-mini-instruct-int4-cw-ov at
+    dc27b4e451118b1e82c159a839476df02797837a (mit). Licences verified on the hub this week. The gemma
+    alternative was rejected in this spec — its export has no root
+    openvino_model.xml and its licence is the Gemma terms of use.
+  - Thinking levels name the prompt switch, recorded per row; Qwen3 has
+    it, Phi does not and runs thinking-off rows only.
+  - Decode throughput and TTFT come from openvino-genai's own performance
+    counters, echoed raw under resolved.genai; latency_ms is the whole
+    call. With 5 repeats the p95 is the top sample; that is known and
+    accepted rather than a longer run.
+  - The NPU/iGPU/CPU arms are one block in a quiet CPU window with the
+    900 second rest before it. The 5090 reference arms are a separate
+    grant, rested separately, never beside this block.
+  - compile_cache is reuse — generation IRs are too large to pay a fresh
+    compile per arm. Compile time is recorded per first load; a
+    warm-reload row is not part of E3's decision. If a later E3 follow-up
+    needs reload cost it will say so, pre-registered.
+  - Every measured call carries the adapter's automatic 60 second
+    per-call bound. A hang marks the arm inconclusive, poisons the pair,
+    stops the sequence and ends the session; the process ends, the done
+    line says so, and the NPU gets a health check before its next
+    session.
+  - Booked through the Publisher; never beside a timed calibration or the
+    math ladder on the 5090.
+  - Outputs are captured for eyeballing; no quality claim is made from
+    them.
+arms:
+  - id: qwen3-8b-cpu-l256
+    task: generate
+    device: CPU
+    engine: openvino
+    model: OpenVINO/Qwen3-8B-int4-cw-ov@27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    revision_or_digest: 27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    quant: int4
+    licence: apache-2.0
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P256NT
+    measure: latency_ms
+  - id: qwen3-8b-cpu-l256-think
+    task: generate
+    device: CPU
+    engine: openvino
+    model: OpenVINO/Qwen3-8B-int4-cw-ov@27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    revision_or_digest: 27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    quant: int4
+    licence: apache-2.0
+    engine_version: "2026.4.1"
+    thinking_level: "low"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P256
+    measure: latency_ms
+  - id: qwen3-8b-cpu-l1024
+    task: generate
+    device: CPU
+    engine: openvino
+    model: OpenVINO/Qwen3-8B-int4-cw-ov@27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    revision_or_digest: 27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    quant: int4
+    licence: apache-2.0
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P1024NT
+    measure: latency_ms
+  - id: qwen3-8b-cpu-l1024-think
+    task: generate
+    device: CPU
+    engine: openvino
+    model: OpenVINO/Qwen3-8B-int4-cw-ov@27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    revision_or_digest: 27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    quant: int4
+    licence: apache-2.0
+    engine_version: "2026.4.1"
+    thinking_level: "low"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P1024
+    measure: latency_ms
+  - id: qwen3-8b-cpu-l4096
+    task: generate
+    device: CPU
+    engine: openvino
+    model: OpenVINO/Qwen3-8B-int4-cw-ov@27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    revision_or_digest: 27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    quant: int4
+    licence: apache-2.0
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P4096NT
+    measure: latency_ms
+  - id: qwen3-8b-cpu-l4096-think
+    task: generate
+    device: CPU
+    engine: openvino
+    model: OpenVINO/Qwen3-8B-int4-cw-ov@27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    revision_or_digest: 27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    quant: int4
+    licence: apache-2.0
+    engine_version: "2026.4.1"
+    thinking_level: "low"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P4096
+    measure: latency_ms
+  - id: qwen3-8b-igpu-l256
+    task: generate
+    device: iGPU
+    engine: openvino
+    model: OpenVINO/Qwen3-8B-int4-cw-ov@27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    revision_or_digest: 27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    quant: int4
+    licence: apache-2.0
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P256NT
+    measure: latency_ms
+  - id: qwen3-8b-igpu-l256-think
+    task: generate
+    device: iGPU
+    engine: openvino
+    model: OpenVINO/Qwen3-8B-int4-cw-ov@27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    revision_or_digest: 27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    quant: int4
+    licence: apache-2.0
+    engine_version: "2026.4.1"
+    thinking_level: "low"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P256
+    measure: latency_ms
+  - id: qwen3-8b-igpu-l1024
+    task: generate
+    device: iGPU
+    engine: openvino
+    model: OpenVINO/Qwen3-8B-int4-cw-ov@27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    revision_or_digest: 27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    quant: int4
+    licence: apache-2.0
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P1024NT
+    measure: latency_ms
+  - id: qwen3-8b-igpu-l1024-think
+    task: generate
+    device: iGPU
+    engine: openvino
+    model: OpenVINO/Qwen3-8B-int4-cw-ov@27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    revision_or_digest: 27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    quant: int4
+    licence: apache-2.0
+    engine_version: "2026.4.1"
+    thinking_level: "low"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P1024
+    measure: latency_ms
+  - id: qwen3-8b-igpu-l4096
+    task: generate
+    device: iGPU
+    engine: openvino
+    model: OpenVINO/Qwen3-8B-int4-cw-ov@27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    revision_or_digest: 27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    quant: int4
+    licence: apache-2.0
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P4096NT
+    measure: latency_ms
+  - id: qwen3-8b-igpu-l4096-think
+    task: generate
+    device: iGPU
+    engine: openvino
+    model: OpenVINO/Qwen3-8B-int4-cw-ov@27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    revision_or_digest: 27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    quant: int4
+    licence: apache-2.0
+    engine_version: "2026.4.1"
+    thinking_level: "low"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P4096
+    measure: latency_ms
+  - id: qwen3-8b-npu-l256
+    task: generate
+    device: NPU
+    engine: openvino
+    model: OpenVINO/Qwen3-8B-int4-cw-ov@27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    revision_or_digest: 27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    quant: int4
+    licence: apache-2.0
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P256NT
+    measure: latency_ms
+  - id: qwen3-8b-npu-l256-think
+    task: generate
+    device: NPU
+    engine: openvino
+    model: OpenVINO/Qwen3-8B-int4-cw-ov@27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    revision_or_digest: 27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    quant: int4
+    licence: apache-2.0
+    engine_version: "2026.4.1"
+    thinking_level: "low"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P256
+    measure: latency_ms
+  - id: qwen3-8b-npu-l1024
+    task: generate
+    device: NPU
+    engine: openvino
+    model: OpenVINO/Qwen3-8B-int4-cw-ov@27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    revision_or_digest: 27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    quant: int4
+    licence: apache-2.0
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P1024NT
+    measure: latency_ms
+  - id: qwen3-8b-npu-l1024-think
+    task: generate
+    device: NPU
+    engine: openvino
+    model: OpenVINO/Qwen3-8B-int4-cw-ov@27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    revision_or_digest: 27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    quant: int4
+    licence: apache-2.0
+    engine_version: "2026.4.1"
+    thinking_level: "low"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P1024
+    measure: latency_ms
+  - id: qwen3-8b-npu-l4096
+    task: generate
+    device: NPU
+    engine: openvino
+    model: OpenVINO/Qwen3-8B-int4-cw-ov@27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    revision_or_digest: 27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    quant: int4
+    licence: apache-2.0
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P4096NT
+    measure: latency_ms
+  - id: qwen3-8b-npu-l4096-think
+    task: generate
+    device: NPU
+    engine: openvino
+    model: OpenVINO/Qwen3-8B-int4-cw-ov@27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    revision_or_digest: 27ae5b116eb7e6df79bac2ca7b7c0c9f63f79cb7
+    quant: int4
+    licence: apache-2.0
+    engine_version: "2026.4.1"
+    thinking_level: "low"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P4096
+    measure: latency_ms
+  - id: phi-35-mini-cpu-l256
+    task: generate
+    device: CPU
+    engine: openvino
+    model: OpenVINO/Phi-3.5-mini-instruct-int4-cw-ov@dc27b4e451118b1e82c159a839476df02797837a
+    revision_or_digest: dc27b4e451118b1e82c159a839476df02797837a
+    quant: int4
+    licence: mit
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P256
+    measure: latency_ms
+  - id: phi-35-mini-cpu-l1024
+    task: generate
+    device: CPU
+    engine: openvino
+    model: OpenVINO/Phi-3.5-mini-instruct-int4-cw-ov@dc27b4e451118b1e82c159a839476df02797837a
+    revision_or_digest: dc27b4e451118b1e82c159a839476df02797837a
+    quant: int4
+    licence: mit
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P1024
+    measure: latency_ms
+  - id: phi-35-mini-cpu-l4096
+    task: generate
+    device: CPU
+    engine: openvino
+    model: OpenVINO/Phi-3.5-mini-instruct-int4-cw-ov@dc27b4e451118b1e82c159a839476df02797837a
+    revision_or_digest: dc27b4e451118b1e82c159a839476df02797837a
+    quant: int4
+    licence: mit
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P4096
+    measure: latency_ms
+  - id: phi-35-mini-igpu-l256
+    task: generate
+    device: iGPU
+    engine: openvino
+    model: OpenVINO/Phi-3.5-mini-instruct-int4-cw-ov@dc27b4e451118b1e82c159a839476df02797837a
+    revision_or_digest: dc27b4e451118b1e82c159a839476df02797837a
+    quant: int4
+    licence: mit
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P256
+    measure: latency_ms
+  - id: phi-35-mini-igpu-l1024
+    task: generate
+    device: iGPU
+    engine: openvino
+    model: OpenVINO/Phi-3.5-mini-instruct-int4-cw-ov@dc27b4e451118b1e82c159a839476df02797837a
+    revision_or_digest: dc27b4e451118b1e82c159a839476df02797837a
+    quant: int4
+    licence: mit
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P1024
+    measure: latency_ms
+  - id: phi-35-mini-igpu-l4096
+    task: generate
+    device: iGPU
+    engine: openvino
+    model: OpenVINO/Phi-3.5-mini-instruct-int4-cw-ov@dc27b4e451118b1e82c159a839476df02797837a
+    revision_or_digest: dc27b4e451118b1e82c159a839476df02797837a
+    quant: int4
+    licence: mit
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P4096
+    measure: latency_ms
+  - id: phi-35-mini-npu-l256
+    task: generate
+    device: NPU
+    engine: openvino
+    model: OpenVINO/Phi-3.5-mini-instruct-int4-cw-ov@dc27b4e451118b1e82c159a839476df02797837a
+    revision_or_digest: dc27b4e451118b1e82c159a839476df02797837a
+    quant: int4
+    licence: mit
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P256
+    measure: latency_ms
+  - id: phi-35-mini-npu-l1024
+    task: generate
+    device: NPU
+    engine: openvino
+    model: OpenVINO/Phi-3.5-mini-instruct-int4-cw-ov@dc27b4e451118b1e82c159a839476df02797837a
+    revision_or_digest: dc27b4e451118b1e82c159a839476df02797837a
+    quant: int4
+    licence: mit
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P1024
+    measure: latency_ms
+  - id: phi-35-mini-npu-l4096
+    task: generate
+    device: NPU
+    engine: openvino
+    model: OpenVINO/Phi-3.5-mini-instruct-int4-cw-ov@dc27b4e451118b1e82c159a839476df02797837a
+    revision_or_digest: dc27b4e451118b1e82c159a839476df02797837a
+    quant: int4
+    licence: mit
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: 128
+    num_ctx: null
+    batch: 1
+    prompt: *P4096
+    measure: latency_ms
+  - id: ref-5090-qwen3-8b-thinkoff
+    task: generate
+    device: "5090"
+    engine: ollama
+    model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "0.35.1"
+    thinking_level: "off"
+    num_predict: 128
+    num_ctx: null
+    batch: null
+    prompt: *P1024NT
+    measure: throughput
+  - id: ref-5090-qwen3-8b-thinkon
+    task: generate
+    device: "5090"
+    engine: ollama
+    model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "0.35.1"
+    thinking_level: "low"
+    num_predict: 128
+    num_ctx: null
+    batch: null
+    prompt: *P1024
+    measure: throughput
