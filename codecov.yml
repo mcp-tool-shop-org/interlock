@@ -1,0 +1,13 @@
+# Coverage bar: 90%, for the project and for every change.
+coverage:
+  status:
+    project:
+      default:
+        target: 90%
+        threshold: 1%
+    patch:
+      default:
+        target: 90%
+        threshold: 1%
+comment:
+  layout: "diff, files"
