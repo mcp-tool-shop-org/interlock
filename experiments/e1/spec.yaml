@@ -1,0 +1,895 @@
+# Standards compliance
+#
+# PIN_PER_STEP: 2. Model, revision, device, static shape, batch, the prompt
+#   rule, the break-even formula and its threshold, and the parity guard are
+#   in this file before any run.
+# ANDON_AUTHORITY: 2. A non-zero step stops the sequence. A parity miss marks
+#   the arm invalid; it does not fail the run.
+# NAMED_COMPENSATORS: 2. Unload drops the compiled cache. A fresh compile
+#   cache is deleted after unload. No publish, no rental, no spend.
+# DECOMPOSE_BY_SECRETS: 2. This file is the pre-registration. The harness
+#   runs it. The verdict is computed from the receipt after the run.
+# UNCERTAINTY_GATED_HUMANS: 2. One NPU/iGPU session in a quiet CPU window,
+#   booked through the Publisher. This spec does not start a device.
+# EXTERNAL_VERIFIER: n/a. R&D reviews this spec before any device time.
+
+id: E1
+procedure: interleaved
+compile_cache: fresh
+question: >
+  For each embed model on each Intel device, what does a cold load cost in
+  units of that arm's own warm median call? E1 asks whether the router may
+  treat a device, the NPU in particular, as warm-only: keep the model
+  resident because loading it on demand costs more warm calls than a
+  pre-registered threshold allows.
+decision: >
+  Per arm, the break-even count B = compile_ms / warm p50 latency_ms at
+  batch 1, with compile measured on a fresh driver cache and the percentiles
+  over the repeat rows only (the cold row and warmup stay out). The
+  keep-resident threshold is T = 100 warm calls, fixed here before any run.
+  An arm with B > T supports warm-only treatment for that device: the router
+  keeps the model resident. An arm with B <= T tolerates cold loads. An arm
+  is valid only if its parity guard passes: the first repeat row's output
+  vector must reach cosine >= 0.999 against the same model's CPU batch-1 arm
+  at the same length. A parity miss marks the arm invalid, not failed, and
+  an invalid arm never becomes a routing row however fast it is. Warm
+  throughput versus CPU is recorded as descriptive and is not a pass rule;
+  the band below is the validator formality, not the decision.
+band: 1.0
+warmups: 1
+repeats: 19
+rest_s: 900
+needs:
+  grant: false
+  npu_session: true
+  cpu_window: true
+  booked_together: true
+dataset:
+  name: e1-fixed-prompt
+  seed: "The switchyard counts the same cars on every pass. "
+  target_tokens: 2048
+  rule: >
+    Repeat the seed until the model tokenizer counts at least 2048 tokens,
+    then keep the shortest prefix of that repetition that still counts as
+    2048. Every arm gets the same prefix; the adapter right-truncates to the
+    arm's static length, so every device for a model sees byte-identical
+    tokens at each length. The dropped count is recorded as
+    truncated_tokens and is expected above zero on every arm.
+metrics:
+  - compile_ms
+  - first_call_ms
+  - latency_ms
+  - throughput
+  - truncated_tokens
+stop_rules:
+  - A non-zero step stops the sequence. Later arms do not run.
+  - Every arm is static-shaped, every device included, so all devices see
+    identical tokens and identical shapes per model and length.
+  - Cold is once per arm on its fresh compile cache and stays out of the
+    percentiles. First-call time is recorded with it, separate from latency.
+  - Repeats are deterministic — the same artifact and the same tokens give
+    the same vector, so the parity guard reads the first repeat row.
+  - Revisions are pinned in the model string and the revision field, taken
+    from the measured rows in npu_serve.py on npu-buildout (the MODELS map),
+    not from memory.
+  - Pooling is per model from the adapter table — cls for the bge family,
+    mean for nomic. It is recorded per row.
+  - No NPU batch 8 for cross-encoders does not bind here — E1 arms are all
+    embedding models. If any single call exceeds 60 seconds, that is the
+    hang signature; stop the run manually and mark the arm inconclusive.
+  - The NPU, iGPU and CPU arms run in one booked block inside a quiet CPU
+    window. The 900 second rest is taken before the block, not between arms.
+  - Booked through the Publisher; never beside a timed calibration or the
+    math ladder on the 5090.
+  - Warm throughput versus CPU is descriptive in the report, not a gate.
+arms:
+  - id: bge-base-cpu-l128-b1
+    task: embed
+    device: CPU
+    engine: openvino
+    model: BAAI/bge-base-en-v1.5@a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x128"
+    measure: latency_ms
+  - id: bge-base-cpu-l128-b8
+    task: embed
+    device: CPU
+    engine: openvino
+    model: BAAI/bge-base-en-v1.5@a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x128"
+    measure: latency_ms
+  - id: bge-base-cpu-l256-b1
+    task: embed
+    device: CPU
+    engine: openvino
+    model: BAAI/bge-base-en-v1.5@a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x256"
+    measure: latency_ms
+  - id: bge-base-cpu-l256-b8
+    task: embed
+    device: CPU
+    engine: openvino
+    model: BAAI/bge-base-en-v1.5@a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x256"
+    measure: latency_ms
+  - id: bge-base-cpu-l512-b1
+    task: embed
+    device: CPU
+    engine: openvino
+    model: BAAI/bge-base-en-v1.5@a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x512"
+    measure: latency_ms
+  - id: bge-base-cpu-l512-b8
+    task: embed
+    device: CPU
+    engine: openvino
+    model: BAAI/bge-base-en-v1.5@a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x512"
+    measure: latency_ms
+  - id: bge-base-igpu-l128-b1
+    task: embed
+    device: iGPU
+    engine: openvino
+    model: BAAI/bge-base-en-v1.5@a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x128"
+    measure: latency_ms
+  - id: bge-base-igpu-l128-b8
+    task: embed
+    device: iGPU
+    engine: openvino
+    model: BAAI/bge-base-en-v1.5@a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x128"
+    measure: latency_ms
+  - id: bge-base-igpu-l256-b1
+    task: embed
+    device: iGPU
+    engine: openvino
+    model: BAAI/bge-base-en-v1.5@a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x256"
+    measure: latency_ms
+  - id: bge-base-igpu-l256-b8
+    task: embed
+    device: iGPU
+    engine: openvino
+    model: BAAI/bge-base-en-v1.5@a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x256"
+    measure: latency_ms
+  - id: bge-base-igpu-l512-b1
+    task: embed
+    device: iGPU
+    engine: openvino
+    model: BAAI/bge-base-en-v1.5@a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x512"
+    measure: latency_ms
+  - id: bge-base-igpu-l512-b8
+    task: embed
+    device: iGPU
+    engine: openvino
+    model: BAAI/bge-base-en-v1.5@a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x512"
+    measure: latency_ms
+  - id: bge-base-npu-l128-b1
+    task: embed
+    device: NPU
+    engine: openvino
+    model: BAAI/bge-base-en-v1.5@a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x128"
+    measure: latency_ms
+  - id: bge-base-npu-l128-b8
+    task: embed
+    device: NPU
+    engine: openvino
+    model: BAAI/bge-base-en-v1.5@a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x128"
+    measure: latency_ms
+  - id: bge-base-npu-l256-b1
+    task: embed
+    device: NPU
+    engine: openvino
+    model: BAAI/bge-base-en-v1.5@a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x256"
+    measure: latency_ms
+  - id: bge-base-npu-l256-b8
+    task: embed
+    device: NPU
+    engine: openvino
+    model: BAAI/bge-base-en-v1.5@a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x256"
+    measure: latency_ms
+  - id: bge-base-npu-l512-b1
+    task: embed
+    device: NPU
+    engine: openvino
+    model: BAAI/bge-base-en-v1.5@a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x512"
+    measure: latency_ms
+  - id: bge-base-npu-l512-b8
+    task: embed
+    device: NPU
+    engine: openvino
+    model: BAAI/bge-base-en-v1.5@a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x512"
+    measure: latency_ms
+  - id: bge-small-cpu-l128-b1
+    task: embed
+    device: CPU
+    engine: openvino
+    model: BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    revision_or_digest: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x128"
+    measure: latency_ms
+  - id: bge-small-cpu-l128-b8
+    task: embed
+    device: CPU
+    engine: openvino
+    model: BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    revision_or_digest: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x128"
+    measure: latency_ms
+  - id: bge-small-cpu-l256-b1
+    task: embed
+    device: CPU
+    engine: openvino
+    model: BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    revision_or_digest: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x256"
+    measure: latency_ms
+  - id: bge-small-cpu-l256-b8
+    task: embed
+    device: CPU
+    engine: openvino
+    model: BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    revision_or_digest: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x256"
+    measure: latency_ms
+  - id: bge-small-cpu-l512-b1
+    task: embed
+    device: CPU
+    engine: openvino
+    model: BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    revision_or_digest: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x512"
+    measure: latency_ms
+  - id: bge-small-cpu-l512-b8
+    task: embed
+    device: CPU
+    engine: openvino
+    model: BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    revision_or_digest: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x512"
+    measure: latency_ms
+  - id: bge-small-igpu-l128-b1
+    task: embed
+    device: iGPU
+    engine: openvino
+    model: BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    revision_or_digest: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x128"
+    measure: latency_ms
+  - id: bge-small-igpu-l128-b8
+    task: embed
+    device: iGPU
+    engine: openvino
+    model: BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    revision_or_digest: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x128"
+    measure: latency_ms
+  - id: bge-small-igpu-l256-b1
+    task: embed
+    device: iGPU
+    engine: openvino
+    model: BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    revision_or_digest: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x256"
+    measure: latency_ms
+  - id: bge-small-igpu-l256-b8
+    task: embed
+    device: iGPU
+    engine: openvino
+    model: BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    revision_or_digest: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x256"
+    measure: latency_ms
+  - id: bge-small-igpu-l512-b1
+    task: embed
+    device: iGPU
+    engine: openvino
+    model: BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    revision_or_digest: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x512"
+    measure: latency_ms
+  - id: bge-small-igpu-l512-b8
+    task: embed
+    device: iGPU
+    engine: openvino
+    model: BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    revision_or_digest: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x512"
+    measure: latency_ms
+  - id: bge-small-npu-l128-b1
+    task: embed
+    device: NPU
+    engine: openvino
+    model: BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    revision_or_digest: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x128"
+    measure: latency_ms
+  - id: bge-small-npu-l128-b8
+    task: embed
+    device: NPU
+    engine: openvino
+    model: BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    revision_or_digest: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x128"
+    measure: latency_ms
+  - id: bge-small-npu-l256-b1
+    task: embed
+    device: NPU
+    engine: openvino
+    model: BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    revision_or_digest: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x256"
+    measure: latency_ms
+  - id: bge-small-npu-l256-b8
+    task: embed
+    device: NPU
+    engine: openvino
+    model: BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    revision_or_digest: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x256"
+    measure: latency_ms
+  - id: bge-small-npu-l512-b1
+    task: embed
+    device: NPU
+    engine: openvino
+    model: BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    revision_or_digest: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x512"
+    measure: latency_ms
+  - id: bge-small-npu-l512-b8
+    task: embed
+    device: NPU
+    engine: openvino
+    model: BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    revision_or_digest: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x512"
+    measure: latency_ms
+  - id: nomic-cpu-l512-b1
+    task: embed
+    device: CPU
+    engine: openvino
+    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x512"
+    measure: latency_ms
+  - id: nomic-cpu-l512-b8
+    task: embed
+    device: CPU
+    engine: openvino
+    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x512"
+    measure: latency_ms
+  - id: nomic-cpu-l1024-b1
+    task: embed
+    device: CPU
+    engine: openvino
+    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x1024"
+    measure: latency_ms
+  - id: nomic-cpu-l1024-b8
+    task: embed
+    device: CPU
+    engine: openvino
+    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x1024"
+    measure: latency_ms
+  - id: nomic-cpu-l2048-b1
+    task: embed
+    device: CPU
+    engine: openvino
+    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x2048"
+    measure: latency_ms
+  - id: nomic-cpu-l2048-b8
+    task: embed
+    device: CPU
+    engine: openvino
+    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x2048"
+    measure: latency_ms
+  - id: nomic-igpu-l512-b1
+    task: embed
+    device: iGPU
+    engine: openvino
+    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x512"
+    measure: latency_ms
+  - id: nomic-igpu-l512-b8
+    task: embed
+    device: iGPU
+    engine: openvino
+    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x512"
+    measure: latency_ms
+  - id: nomic-igpu-l1024-b1
+    task: embed
+    device: iGPU
+    engine: openvino
+    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x1024"
+    measure: latency_ms
+  - id: nomic-igpu-l1024-b8
+    task: embed
+    device: iGPU
+    engine: openvino
+    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x1024"
+    measure: latency_ms
+  - id: nomic-igpu-l2048-b1
+    task: embed
+    device: iGPU
+    engine: openvino
+    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x2048"
+    measure: latency_ms
+  - id: nomic-igpu-l2048-b8
+    task: embed
+    device: iGPU
+    engine: openvino
+    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x2048"
+    measure: latency_ms
+  - id: nomic-npu-l512-b1
+    task: embed
+    device: NPU
+    engine: openvino
+    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x512"
+    measure: latency_ms
+  - id: nomic-npu-l512-b8
+    task: embed
+    device: NPU
+    engine: openvino
+    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x512"
+    measure: latency_ms
+  - id: nomic-npu-l1024-b1
+    task: embed
+    device: NPU
+    engine: openvino
+    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x1024"
+    measure: latency_ms
+  - id: nomic-npu-l1024-b8
+    task: embed
+    device: NPU
+    engine: openvino
+    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x1024"
+    measure: latency_ms
+  - id: nomic-npu-l2048-b1
+    task: embed
+    device: NPU
+    engine: openvino
+    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x2048"
+    measure: latency_ms
+  - id: nomic-npu-l2048-b8
+    task: embed
+    device: NPU
+    engine: openvino
+    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x2048"
+    measure: latency_ms
