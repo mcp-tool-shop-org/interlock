@@ -109,9 +109,11 @@ def run_interleaved(
     """Run a committed spec.
 
     Each arm is written into the receipt when its slots finish. The receipt
-    stays partial until every arm finishes. A hang or a device loss becomes
-    one ``device_lost`` row, with no timing, and the run stops. It does not
-    retry.
+    stays partial until the run ends. A 60 s hang becomes one ``hang`` row
+    and stops the run. A device loss becomes one ``device_lost`` row, that
+    device is marked off, and the other devices carry on. A step reported as
+    not run writes no row; it is listed in the receipt notes. Neither outcome
+    is retried.
     """
 
     _check_run_id(run_id)
@@ -129,11 +131,19 @@ def run_interleaved(
     records: list[dict] = []
     seen: dict[str, int] = {}
     finished: list[str] = []
+    capability: dict[str, str] = {}
+    off_devices: set[str] = set()
+    skipped: list[str] = []
     captured = env if env is not None else environment()
     cache_dirs = _cache_dirs(spec, root, run_id, arms)
     removed: set[str] = set()
     imported = False
-    lost_arm: dict | None = None
+
+    def _run_notes() -> str:
+        extra = "not run: " + ", ".join(skipped) if skipped else ""
+        if notes and extra:
+            return f"{notes}. {extra}"
+        return notes or extra
 
     def _finished_row(arm_id: str, *, partial: bool, gone: set[str]) -> dict:
         row = measured_row(
@@ -146,7 +156,7 @@ def run_interleaved(
             run_id=run_id,
             grant=grant,
             env=captured,
-            notes=notes,
+            notes=_run_notes(),
             resolved=_resolved(records, arm_id),
             artifacts=_artifacts(records, arm_id),
             extra_settings=_extra_settings(spec, arms[arm_id], records, run_id, gone),
@@ -156,86 +166,155 @@ def run_interleaved(
             validate_row(row)
         return row
 
-    def flush(lost: dict | None = None, *, gone: set[str] | None = None) -> None:
+    def _capability_row(arm_id: str, *, partial: bool, gone: set[str]) -> dict:
+        return device_lost_row(
+            spec_id=spec["id"],
+            arm=arms[arm_id],
+            repeats=spec["repeats"],
+            date=date,
+            spec_rel=spec_rel,
+            run_id=run_id,
+            grant=grant,
+            env=captured,
+            notes=_run_notes(),
+            extra_settings=_extra_settings(spec, arms[arm_id], [], run_id, gone),
+            outcome=capability[arm_id],
+            partial=partial,
+        )
+
+    def _rows(*, partial: bool, gone: set[str]) -> list[dict]:
+        rows = [_finished_row(arm_id, partial=partial, gone=gone) for arm_id in finished]
+        rows.extend(_capability_row(arm_id, partial=partial, gone=gone) for arm_id in capability)
+        return rows
+
+    def flush(*, gone: set[str] | None = None) -> None:
         used = removed if gone is None else gone
-        rows = [_finished_row(arm_id, partial=True, gone=used) for arm_id in finished]
-        if lost is not None:
-            rows.append(
-                device_lost_row(
-                    spec_id=spec["id"],
-                    arm=lost,
-                    repeats=spec["repeats"],
-                    date=date,
-                    spec_rel=spec_rel,
-                    run_id=run_id,
-                    grant=grant,
-                    env=captured,
-                    notes=notes,
-                    extra_settings=_extra_settings(spec, lost, [], run_id, used),
-                )
-            )
+        rows = _rows(partial=True, gone=used)
         if rows:
             write_receipt(root, run_id, rows)
+
+    def _remember(arm: dict, outcome: str) -> None:
+        """Record a hang or a device loss. Partial samples from this arm are discarded."""
+
+        arm_id = arm["id"]
+        records[:] = [row for row in records if row["step_id"] != arm_id]
+        capability[arm_id] = outcome
+        if outcome == "device_lost":
+            off_devices.add(arm["device"])
+
+    def _note(slot: Slot) -> None:
+        if slot.phase == "cold":
+            label = f"{slot.step_id} cold"
+        else:
+            label = f"{slot.step_id} {slot.phase} {slot.round_index}"
+        skipped.append(label)
 
     try:
         try:
             for slot in slots:
                 arm = arms[slot.step_id]
                 companion = _companion(arm, arms, slot)
+                if arm["device"] in off_devices or (
+                    companion is not None and companion["device"] in off_devices
+                ):
+                    _note(slot)
+                    continue
                 started = False
                 if companion is not None:
                     _session(adapters, companion, "start", spec, spec_rel, cache_dirs.get(companion["id"]))
                     started = True
                 try:
+                    kind = "ok"
+                    error = ""
                     try:
                         result = adapters[arm["engine"]].run(
                             _request(arm, spec, spec_rel, cache_dirs.get(arm["id"]))
                         )
                     except AdapterError as exc:
-                        if not device_lost_error(str(exc)):
-                            flush()
-                            raise
-                        result = None
-                        lost_error = str(exc)
-                    else:
-                        lost_error = None
-                    if result is None or not result.ok:
-                        error = lost_error if result is None else result.error
-                        if device_lost_error(error):
-                            lost_arm = arm
-                            flush(arm)
+                        error = str(exc)
+                        if hang_error(error):
+                            kind = "hang"
+                        elif device_lost_error(error):
+                            kind = "device_lost"
                         else:
                             flush()
-                        raise RunnerError(f"step {slot.step_id} failed: {error}")
-                    records.append(_record(slot, result))
-                    seen[slot.step_id] = seen.get(slot.step_id, 0) + 1
-                    if seen[slot.step_id] == needed[slot.step_id]:
-                        finished.append(slot.step_id)
+                            raise
+                    else:
+                        reported = _reported_outcome(result)
+                        if reported == "device_lost":
+                            kind = "device_lost"
+                        elif reported == "not run":
+                            kind = "not run"
+                        elif not result.ok:
+                            error = result.error or ""
+                            if hang_error(error):
+                                kind = "hang"
+                            elif device_lost_error(error):
+                                kind = "device_lost"
+                            else:
+                                kind = "fail"
+                    if kind == "hang":
+                        _remember(arm, "hang")
                         flush()
+                        raise RunnerError(f"step {slot.step_id} failed: {error}")
+                    if kind == "device_lost":
+                        _remember(arm, "device_lost")
+                        flush()
+                    elif kind == "not run":
+                        off_devices.add(arm["device"])
+                        _note(slot)
+                    elif kind == "fail":
+                        flush()
+                        raise RunnerError(f"step {slot.step_id} failed: {error}")
+                    else:
+                        records.append(_record(slot, result))
+                        seen[slot.step_id] = seen.get(slot.step_id, 0) + 1
+                        if seen[slot.step_id] == needed[slot.step_id]:
+                            finished.append(slot.step_id)
+                            flush()
                 finally:
                     if started and companion is not None:
                         _session(adapters, companion, "stop", spec, spec_rel, cache_dirs.get(companion["id"]))
         finally:
             _unload(adapters, arms)
             removed.update(_drop_caches(cache_dirs))
-        rows = [_finished_row(arm_id, partial=False, gone=removed) for arm_id in arms]
-        write_run(root, run_id, rows)
+        rows = _rows(partial=False, gone=removed)
+        if rows:
+            write_run(root, run_id, rows)
         imported = True
         return rows
     finally:
         receipt = root / "receipts" / f"{run_id}.jsonl"
         if not imported and receipt.is_file():
-            flush(lost_arm, gone=removed)
+            flush(gone=removed)
             import_receipt(root, run_id)
 
 
-def device_lost_error(error: str | None) -> bool:
-    """True for a hang or a lost device. Anything else is a different failure."""
+def hang_error(error: str | None) -> bool:
+    """A 60 s hang. The call was stuck and the run stopped watching."""
 
-    if not isinstance(error, str) or not error:
+    return isinstance(error, str) and error.lower().startswith("hang:")
+
+
+def device_lost_error(error: str | None) -> bool:
+    """A driver reset. A hang is not a device loss."""
+
+    if not isinstance(error, str) or not error or hang_error(error):
         return False
     text = error.lower()
-    return text.startswith("hang:") or text.startswith("device_lost") or "device lost" in text
+    return "device lost" in text or "device_lost" in text or "device hung" in text
+
+
+def _reported_outcome(result) -> str | None:
+    """The adapter's own outcome, when it finished the step instead of failing it."""
+
+    resolved = result.resolved
+    if not isinstance(resolved, dict):
+        return None
+    outcome = resolved.get("outcome")
+    if outcome in ("device_lost", "not run"):
+        return outcome
+    return None
 
 
 def _slots(spec: dict) -> list[Slot]:

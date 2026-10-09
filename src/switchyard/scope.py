@@ -37,11 +37,11 @@ def select(rows: list[dict], task: str, *, allow_proxy: bool = False, exclude_fa
     if isinstance(exclude_families, str):
         raise ScopeError("exclude_families names lineages, it is not itself a family")
     excluded = frozenset(exclude_families)
-    # device_lost is a capability fact. It is not a speed the router can pick.
+    # device_lost and hang are capability facts. Neither is a speed the router can pick.
     kept = [
         row
         for row in rows
-        if row.get("model_family") not in excluded and row.get("outcome") != "device_lost"
+        if row.get("model_family") not in excluded and row.get("outcome") not in ("device_lost", "hang")
     ]
     direct = tuple(row for row in kept if row.get("task") == task)
     if direct:

@@ -55,6 +55,11 @@ def test_device_lost_cannot_carry_timing():
     lost["artifacts"] = {"slots": [{"latency_ms": 12}]}
     with pytest.raises(ReceiptError, match="no timing"):
         validate_row(lost)
+    hung = row()
+    hung["outcome"] = "hang"
+    hung["latency"]["cold_ms"] = 60_000
+    with pytest.raises(ReceiptError, match="a hang row has no timing"):
+        validate_row(hung)
 
 
 def test_experiment_provenance_is_the_other_legal_shape():

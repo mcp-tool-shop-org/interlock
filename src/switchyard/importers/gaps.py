@@ -21,7 +21,7 @@ def open_gaps(rows: list[dict], candidates: list[dict]) -> list[dict]:
         partial = []
         filled = False
         for row in rows:
-            if row.get("outcome") == "device_lost":
+            if row.get("outcome") in ("device_lost", "hang"):
                 continue
             if not _matches(row, candidate["match"]):
                 continue

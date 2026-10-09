@@ -122,8 +122,15 @@ def device_lost_row(
     env: dict,
     notes: str = "",
     extra_settings: dict | None = None,
+    outcome: str = "device_lost",
+    partial: bool = True,
 ) -> dict:
-    """One arm the device did not finish. No timing, and no retry."""
+    """A hang or a device loss. No timing, and no retry.
+
+    ``outcome`` is ``device_lost`` or ``hang``. Both tell the table that this
+    device cannot do the setting. ``partial`` stays on while the run is still
+    open.
+    """
 
     text = DEVICE_LOST_NOTE if not notes else f"{DEVICE_LOST_NOTE}. {notes}"
     row = measured_row(
@@ -139,8 +146,9 @@ def device_lost_row(
         notes=text,
         extra_settings=extra_settings,
     )
-    row["outcome"] = "device_lost"
-    row["partial"] = True
+    row["outcome"] = outcome
+    if partial:
+        row["partial"] = True
     row["provisional"] = True
     row["latency"] = _blank_latency()
     row.pop("artifacts", None)
@@ -149,15 +157,18 @@ def device_lost_row(
 
 
 def for_table(row: dict) -> dict:
-    """The table copy of a receipt row. A device_lost row cannot carry a speed."""
+    """The table copy of a receipt row.
 
-    if row.get("outcome") != "device_lost":
+    A ``device_lost`` or ``hang`` row cannot carry a speed. Timing and
+    artifacts are stripped, and the note says the device cannot do the setting.
+    """
+
+    if row.get("outcome") not in ("device_lost", "hang"):
         validate_row(row)
         return row
     cleaned = dict(row)
     cleaned.pop("artifacts", None)
     cleaned["latency"] = _blank_latency()
-    cleaned["outcome"] = "device_lost"
     notes = cleaned.get("notes") or ""
     if DEVICE_LOST_NOTE not in notes:
         cleaned["notes"] = DEVICE_LOST_NOTE if not notes else f"{DEVICE_LOST_NOTE}. {notes}"
@@ -180,8 +191,8 @@ def write_receipt(root: Path, run_id: str, rows: list[dict]) -> Path:
 def import_receipt(root: Path, run_id: str) -> list[dict]:
     """Bring a run receipt into the routing table.
 
-    ``device_lost`` lands as "this device can't do this setting", with the
-    timing removed. It is not a speed figure.
+    ``device_lost`` and ``hang`` land as "this device can't do this setting",
+    with the timing removed. Neither is a speed figure.
     """
 
     path = root / "receipts" / f"{run_id}.jsonl"

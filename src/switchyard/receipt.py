@@ -114,18 +114,20 @@ def load_jsonl(path: Path) -> list[dict]:
 
 
 _TIMING = ("cold_ms", "warm_p50_ms", "warm_p95_ms", "throughput", "compile_ms", "first_call_ms")
+_UNTIMED = frozenset({"device_lost", "hang"})
 
 
 def _check_device_lost(row: dict) -> None:
-    """A device_lost row says the device cannot do the setting. It is not a speed."""
+    """A device_lost or hang row says the device cannot do the setting. It is not a speed."""
 
-    if row.get("outcome") != "device_lost":
+    outcome = row.get("outcome")
+    if outcome not in _UNTIMED:
         return
     latency = row.get("latency") or {}
     if any(latency.get(key) is not None for key in _TIMING) or latency.get("throughput_unit"):
-        raise ReceiptError(f"{row['id']}: a device_lost row has no timing")
+        raise ReceiptError(f"{row['id']}: a {outcome} row has no timing")
     if row.get("artifacts"):
-        raise ReceiptError(f"{row['id']}: a device_lost row has no timing")
+        raise ReceiptError(f"{row['id']}: a {outcome} row has no timing")
 
 
 def _reject_home_paths(value: object, where: str = "$") -> None:

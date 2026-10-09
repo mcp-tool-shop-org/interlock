@@ -106,11 +106,12 @@ def test_a_task_is_not_answered_from_another_task():
 
 def test_device_lost_is_not_a_speed_answer():
     lost = {"id": "e", "task": "embed", "outcome": "device_lost", "model_family": "qwen"}
+    hung = {"id": "h", "task": "embed", "outcome": "hang", "model_family": "qwen"}
     real = {"id": "r", "task": "embed", "model_family": "qwen"}
-    answer = select([lost, real], "embed")
+    answer = select([lost, hung, real], "embed")
     assert answer.rows == (real,)
     assert answer.satisfies_hard_constraint is True
-    only = select([lost], "embed", allow_proxy=True)
+    only = select([lost, hung], "embed", allow_proxy=True)
     assert only.evidence == "none"
     assert only.rows == ()
 
