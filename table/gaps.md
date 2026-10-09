@@ -1,9 +1,9 @@
 # Gap report
 
 This is the experiment backlog. A cell is open when the table has no row that fills it.
-Imported rows: 408.
+Imported rows: 409.
 
-Ladder rows are imported from rnd at 08ca419f647a3ed69ee645610eaa1c7f35f40f91. Difficulty length quartiles are not imported. Tier rows are. Chain and ladder rows with no pins.quote_rule are quote rule 1 by the pre-#47 inference.
+Ladder rows are imported from rnd at 08ca419f647a3ed69ee645610eaa1c7f35f40f91. Difficulty length quartiles are not imported. Tier rows are. Chain and ladder rows with no pins.quote_rule are quote rule 1 by the pre-#47 inference. B's planted-error judge row is imported from aspire-si at 3b05eab928894311993ffa3af2075fef39cccce6. That commit has B's receipts only. The 3b judge-control receipts are a later pin.
 
 ## Why E1–E4 are open
 
@@ -65,6 +65,7 @@ Ladder rows are imported from rnd at 08ca419f647a3ed69ee645610eaa1c7f35f40f91. D
 - engine / CPU: 8
 - engine / NPU: 11
 - engine / iGPU: 8
+- judge:planted-error / 5090: 1
 - nli / CPU: 2
 - nli / NPU: 1
 - nli / iGPU: 4

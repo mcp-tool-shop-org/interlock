@@ -1,8 +1,10 @@
 """Build the routing table from pinned receipts.
 
-Reads rnd and npu-buildout with `git show <pin>:<path>`. The pin must be a
-commit in that repo. The worktree is not read. Ladder runs are in the rnd
-pin. Offer rows are optional and come only from a version-1 snapshot file.
+Reads rnd, npu-buildout and aspire-si with `git show <pin>:<path>`. The pin
+must be a commit in that repo. The worktree is not read. Ladder runs are in
+the rnd pin. Offer rows are optional and come only from a version-1 snapshot
+file. aspire-si is read at the B pin only: the 3b judge-control receipts are
+a later commit, and this assembler does not import them.
 """
 
 from __future__ import annotations
@@ -11,12 +13,15 @@ import json
 import subprocess
 from pathlib import Path
 
+from switchyard.importers.aspire_judges import b_rows
 from switchyard.importers.calibration import calibration_rows
 from switchyard.importers.common import ImportError_, sha256_bytes
 from switchyard.importers.ladder import ladder_rows
 from switchyard.importers.nli import nli_rows, prereg_names_intel_igpu
 from switchyard.importers.offers import offer_rows
 from switchyard.importers.pins import (
+    ASPIRE_COMMIT,
+    ASPIRE_REPO,
     LADDER_RUNS,
     NPU_BUILDOUT_COMMIT,
     NPU_REPO,
@@ -36,20 +41,31 @@ _PROBES = (
 )
 _NLI = "experiments/verifier-gold/calibration/results/2026-10-09-nli-floor.json"
 _PREREG = "experiments/verifier-gold/calibration/nli-floor.md"
+# B's four files at aspire-si #78. judge-control-selection.json is in the same
+# tree and is not a receipt. Do not call judge_control_rows from this pin.
+_AUDITOR = "docs/runs/receipts/2026-10-08-auditor"
+_B_READOUT = f"{_AUDITOR}/B-readout.json"
+_B_MANIFEST = f"{_AUDITOR}/B-manifest.json"
+_B_VERDICTS = f"{_AUDITOR}/verdicts-error-B-mistral-small_24b.json"
+_B_SELECTION = f"{_AUDITOR}/B-selection.json"
 
 
 def import_receipts(
     *,
     rnd_repo: Path | None = None,
     npu_repo: Path | None = None,
+    aspire_repo: Path | None = None,
     offers_path: Path | None = None,
     rnd_pin: str = RND_COMMIT,
     npu_pin: str = NPU_BUILDOUT_COMMIT,
+    aspire_pin: str = ASPIRE_COMMIT,
 ) -> tuple[list[dict], list[str]]:
     rnd = Path(rnd_repo or RND_REPO)
     npu = Path(npu_repo or NPU_REPO)
+    aspire = Path(aspire_repo or ASPIRE_REPO)
     require_pin(rnd, rnd_pin)
     require_pin(npu, npu_pin)
+    require_pin(aspire, aspire_pin)
     rows: list[dict] = []
     skipped: list[str] = []
     rows.extend(_calibration(rnd, rnd_pin))
@@ -65,6 +81,7 @@ def import_receipts(
         rows.extend(probe)
         skipped.extend(skipped_here)
     rows.extend(_nli(npu, npu_pin))
+    rows.extend(_aspire_b(aspire, aspire_pin))
     if offers_path is not None:
         content = offers_path.read_bytes()
         rows.extend(offer_rows(_json(content), source_path=_offer_source(offers_path), content=content))
@@ -155,6 +172,43 @@ def _check_gold(manifest: dict, gold_bytes: bytes, name: str) -> None:
     digest = sha256_bytes(gold_bytes)
     if wanted != [digest]:
         raise ImportError_(f"{name} gold sha does not match ladder.jsonl at the rnd pin")
+
+
+def _aspire_b(repo: Path, pin: str) -> list[dict]:
+    readout = show(repo, pin, _B_READOUT)
+    manifest = show(repo, pin, _B_MANIFEST)
+    verdicts = show(repo, pin, _B_VERDICTS)
+    selection = show(repo, pin, _B_SELECTION)
+    return b_rows(
+        readout=readout,
+        manifest=manifest,
+        verdicts=verdicts,
+        selection=selection,
+        source_dir=_AUDITOR,
+        date=_written_date(selection),
+        commit_sha=pin,
+    )
+
+
+def _written_date(selection: bytes) -> str:
+    written = _json(selection).get("written")
+    if not isinstance(written, str) or len(written) < 10:
+        raise ImportError_("B's selection has no written date")
+    parts = written[:10].split("-")
+    if len(parts) != 3:
+        raise ImportError_("B's selection has no written date")
+    year, month, day = parts
+    dated = (
+        len(year) == 4
+        and len(month) == 2
+        and len(day) == 2
+        and year.isdigit()
+        and month.isdigit()
+        and day.isdigit()
+    )
+    if not dated:
+        raise ImportError_("B's selection has no written date")
+    return written[:10]
 
 
 def _nli(npu: Path, pin: str) -> list[dict]:
