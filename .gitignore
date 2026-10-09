@@ -8,3 +8,6 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+
+# experiment harness compile caches (created under the repo root)
+compile-cache/
