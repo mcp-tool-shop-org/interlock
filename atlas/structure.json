@@ -9,7 +9,7 @@
       "externals": 0,
       "files": [
         {
-          "hash": "5a4106ac9663b18604d3e1db72377978463c016d3e537d8aeb2ff262b37b40d1",
+          "hash": "789c637f3d752cb58b803e9549b313d6fa2c73902c6f401835991e5c5cad8297",
           "path": ".github/workflows/ci.yml"
         }
       ],
@@ -79,7 +79,7 @@
       "externals": 0,
       "files": [
         {
-          "hash": "32c446a961d684b1f0ff950e30416673f935a312ecdb7c9a68085d8b25319e80",
+          "hash": "435ef40b23d47eda4c439cb069cfafa57172ff65ef2124e48b89be0003c2ab8d",
           "path": "docs/handoff/README.md"
         },
         {
@@ -91,7 +91,7 @@
           "path": "docs/handoff/feedback_git_add_explicit_paths.md"
         },
         {
-          "hash": "fd875575165fe20f5fc07a39049dc3d01766aa2c231ac677a7f883cced2b0603",
+          "hash": "4208dab2aa124b78258fb657dfe0e2ec7291553c6fb9f31f30213d4d14d03f3d",
           "path": "docs/handoff/feedback_gpu_use_through_the_publisher.md"
         },
         {
@@ -99,7 +99,7 @@
           "path": "docs/handoff/feedback_read_exit_before_next_gpu_step.md"
         },
         {
-          "hash": "5974789f649de8dec1503192cf26944265b52a34bde3a6ad43efeea2a6c43b23",
+          "hash": "dc4b33faa26be90d6b543209bf437dd05301a627ae66060650bb14c6fd80a971",
           "path": "docs/handoff/switchyard-router-buildout-handoff.md"
         }
       ],
@@ -126,7 +126,7 @@
           "path": ".gitattributes"
         },
         {
-          "hash": "d76885d4cec940ebc8b9ea32ab4dc6311a34f35dc1f17f6644edc4076df8c225",
+          "hash": "7072e46ce1d6cab32216fec6440904ecaf70be7014ba938bee8f54bc529ed6f0",
           "path": ".gitignore"
         },
         {
@@ -138,8 +138,12 @@
           "path": "LICENSE"
         },
         {
-          "hash": "c08a7ba6cd83a008c91466b7fe9e7a0b47b48bfaf288a3ed673a19bd5753d5d0",
+          "hash": "16d39e94e9e921a06c56c9887847f0e0a82604c241a0945283da55cb407674eb",
           "path": "README.md"
+        },
+        {
+          "hash": "8355bbf8be42ff1c5c8bf7dd2e4e1ca4b7db1440c92e15daaf5856558e7301c1",
+          "path": "codecov.yml"
         },
         {
           "hash": "28ab2ef733689a95d419ddcf8bc45a861f67a08a250e489bebe5082ff93af92c",
@@ -194,8 +198,15 @@
           "exports": [
             "main"
           ],
-          "hash": "2eaaa515a9fe0d81348a52830629490640955874119ef1a5b18be1e7c75b484b",
+          "hash": "97771965fd2924dc3426033a3615197112906e0c4c545d807317c548e44202a0",
+          "importOrder": [
+            "src/switchyard/receipt.py",
+            "src/switchyard/importers/assemble.py",
+            "src/switchyard/importers/gaps.py"
+          ],
           "importsFiles": [
+            "src/switchyard/importers/assemble.py",
+            "src/switchyard/importers/gaps.py",
             "src/switchyard/receipt.py"
           ],
           "path": "src/switchyard/cli.py",
@@ -203,14 +214,14 @@
             {
               "calls": [
                 {
-                  "line": 26,
+                  "line": 38,
                   "name": "check_tree",
                   "target": {
                     "file": "src/switchyard/receipt.py"
                   }
                 },
                 {
-                  "line": 41,
+                  "line": 93,
                   "name": "receipt_paths",
                   "target": {
                     "file": "src/switchyard/receipt.py"
@@ -218,7 +229,7 @@
                   "via": "_count_rows"
                 },
                 {
-                  "line": 43,
+                  "line": 95,
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/switchyard/receipt.py"
@@ -234,14 +245,58 @@
             {
               "calls": [
                 {
-                  "line": 41,
+                  "line": 53,
+                  "name": "load_jsonl",
+                  "target": {
+                    "file": "src/switchyard/receipt.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_cmd_table"
+            },
+            {
+              "calls": [
+                {
+                  "line": 70,
+                  "name": "import_receipts",
+                  "target": {
+                    "file": "src/switchyard/importers/assemble.py"
+                  }
+                },
+                {
+                  "line": 75,
+                  "name": "load_candidates",
+                  "target": {
+                    "file": "src/switchyard/importers/gaps.py"
+                  }
+                },
+                {
+                  "line": 82,
+                  "name": "render_gaps",
+                  "target": {
+                    "file": "src/switchyard/importers/gaps.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_cmd_import"
+            },
+            {
+              "calls": [
+                {
+                  "line": 93,
                   "name": "receipt_paths",
                   "target": {
                     "file": "src/switchyard/receipt.py"
                   }
                 },
                 {
-                  "line": 43,
+                  "line": 95,
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/switchyard/receipt.py"
@@ -263,70 +318,80 @@
             {
               "in": "_as_text",
               "kind": "raise",
-              "line": 35
+              "line": 58
             },
             {
               "in": "resolve_device",
               "kind": "raise",
-              "line": 51
+              "line": 78
             },
             {
               "in": "resolve_device",
               "kind": "raise",
-              "line": 53
+              "line": 80
             },
             {
               "in": "resolve_device",
               "kind": "raise",
-              "line": 63
+              "line": 90
+            },
+            {
+              "in": "_optional",
+              "kind": "raise",
+              "line": 101
             },
             {
               "in": "_catalog",
               "kind": "raise",
-              "line": 70
+              "line": 110
             },
             {
               "in": "_catalog",
               "kind": "raise",
-              "line": 75
+              "line": 120
             },
             {
               "in": "_require_id",
               "kind": "raise",
-              "line": 83
+              "line": 128
             },
             {
               "in": "_resolve_gpu_id",
               "kind": "raise",
-              "line": 96
+              "line": 141
             },
             {
               "in": "_resolve_gpu_id",
               "kind": "raise",
-              "line": 98
+              "line": 143
             },
             {
               "in": "_resolve_gpu_id",
               "kind": "raise",
-              "line": 102
-            },
-            {
-              "in": "_resolve_gpu_id",
-              "kind": "raise",
-              "line": 104
+              "line": 150
             },
             {
               "in": "_intel_igpu",
               "kind": "raise",
-              "line": 117
+              "line": 166
             },
             {
               "in": "_intel_igpu",
               "kind": "raise",
-              "line": 120
+              "line": 169
+            },
+            {
+              "in": "_require_igpu",
+              "kind": "raise",
+              "line": 176
+            },
+            {
+              "in": "_require_igpu",
+              "kind": "raise",
+              "line": 178
             }
           ],
-          "hash": "5010bf29babb1e761e6c0445fa654dc5913db5b1047aeb93cd3301691fc5a5d3",
+          "hash": "92dc54efe29f127d0432f770b8f388d7624c357c7f4528766c527a8c5a58dcd3",
           "path": "src/switchyard/devices.py"
         },
         {
@@ -387,6 +452,674 @@
             "src/switchyard/devices.py"
           ],
           "path": "src/switchyard/guards.py"
+        },
+        {
+          "hash": "a80241985f5ce658bc6ed7967d97e3d27379e734165863530139acae88fc833b",
+          "noStatements": true,
+          "path": "src/switchyard/importers/__init__.py"
+        },
+        {
+          "entry": "import_receipts",
+          "entryRule": 4,
+          "exports": [
+            "import_receipts",
+            "require_pin",
+            "show"
+          ],
+          "failurePaths": [
+            {
+              "in": "_offer_source",
+              "kind": "except",
+              "line": 81
+            },
+            {
+              "in": "require_pin",
+              "kind": "raise",
+              "line": 88
+            },
+            {
+              "in": "show",
+              "kind": "except",
+              "line": 94
+            },
+            {
+              "in": "show",
+              "kind": "raise",
+              "line": 95
+            },
+            {
+              "in": "_calibration",
+              "kind": "raise",
+              "line": 107
+            },
+            {
+              "in": "_ladder",
+              "kind": "except",
+              "line": 135
+            },
+            {
+              "in": "_ladder",
+              "kind": "raise",
+              "line": 136
+            },
+            {
+              "in": "_check_gold",
+              "kind": "raise",
+              "line": 157
+            },
+            {
+              "in": "_unique",
+              "kind": "raise",
+              "line": 175
+            },
+            {
+              "in": "_git",
+              "kind": "except",
+              "line": 185
+            },
+            {
+              "in": "_git",
+              "kind": "raise",
+              "line": 187
+            }
+          ],
+          "hash": "8c8480940a4ec8ab3a9cfc07956e1429f835cc4cfb88eb1d52837009572f0513",
+          "importsFiles": [
+            "src/switchyard/importers/calibration.py",
+            "src/switchyard/importers/common.py",
+            "src/switchyard/importers/ladder.py",
+            "src/switchyard/importers/nli.py",
+            "src/switchyard/importers/offers.py",
+            "src/switchyard/importers/pins.py",
+            "src/switchyard/importers/probe.py"
+          ],
+          "path": "src/switchyard/importers/assemble.py",
+          "sequences": [
+            {
+              "calls": [
+                {
+                  "line": 187,
+                  "name": "as_posix",
+                  "target": null,
+                  "via": "_git"
+                },
+                {
+                  "line": 187,
+                  "name": "ImportError_",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  },
+                  "via": "_git"
+                },
+                {
+                  "branch": "kind != \"commit\"",
+                  "line": 88,
+                  "name": "as_posix",
+                  "target": null,
+                  "via": "require_pin"
+                },
+                {
+                  "branch": "kind != \"commit\"",
+                  "line": 88,
+                  "name": "ImportError_",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  },
+                  "via": "require_pin"
+                },
+                {
+                  "line": 95,
+                  "name": "ImportError_",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  },
+                  "via": "show"
+                },
+                {
+                  "branch": "len(runs) != 12",
+                  "line": 107,
+                  "name": "ImportError_",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  },
+                  "via": "_calibration"
+                },
+                {
+                  "line": 114,
+                  "name": "calibration_rows",
+                  "target": {
+                    "file": "src/switchyard/importers/calibration.py"
+                  },
+                  "via": "_calibration"
+                },
+                {
+                  "line": 136,
+                  "name": "ImportError_",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  },
+                  "via": "_ladder"
+                },
+                {
+                  "line": 155,
+                  "name": "sha256_bytes",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  },
+                  "via": "_check_gold"
+                },
+                {
+                  "branch": "wanted != [digest]",
+                  "line": 157,
+                  "name": "ImportError_",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  },
+                  "via": "_check_gold"
+                },
+                {
+                  "line": 140,
+                  "name": "ladder_rows",
+                  "target": {
+                    "file": "src/switchyard/importers/ladder.py"
+                  },
+                  "via": "_ladder"
+                },
+                {
+                  "line": 59,
+                  "name": "probe_rows",
+                  "target": {
+                    "file": "src/switchyard/importers/probe.py"
+                  }
+                },
+                {
+                  "line": 167,
+                  "name": "prereg_names_intel_igpu",
+                  "target": {
+                    "file": "src/switchyard/importers/nli.py"
+                  },
+                  "via": "_nli"
+                },
+                {
+                  "line": 163,
+                  "name": "nli_rows",
+                  "target": {
+                    "file": "src/switchyard/importers/nli.py"
+                  },
+                  "via": "_nli"
+                },
+                {
+                  "line": 69,
+                  "name": "read_bytes",
+                  "target": null
+                },
+                {
+                  "line": 80,
+                  "name": "resolve",
+                  "target": null,
+                  "via": "_offer_source"
+                },
+                {
+                  "line": 70,
+                  "name": "offer_rows",
+                  "target": {
+                    "file": "src/switchyard/importers/offers.py"
+                  }
+                },
+                {
+                  "branch": "row[\"id\"] in seen",
+                  "line": 175,
+                  "name": "ImportError_",
+                  "over": "rows",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  },
+                  "via": "_unique"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "import_receipts"
+            },
+            {
+              "calls": [
+                {
+                  "line": 80,
+                  "name": "resolve",
+                  "target": null
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_offer_source"
+            },
+            {
+              "calls": [
+                {
+                  "line": 187,
+                  "name": "as_posix",
+                  "target": null,
+                  "via": "_git"
+                },
+                {
+                  "line": 187,
+                  "name": "ImportError_",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  },
+                  "via": "_git"
+                },
+                {
+                  "branch": "kind != \"commit\"",
+                  "line": 88,
+                  "name": "as_posix",
+                  "target": null
+                },
+                {
+                  "branch": "kind != \"commit\"",
+                  "line": 88,
+                  "name": "ImportError_",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  }
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "require_pin"
+            },
+            {
+              "calls": [
+                {
+                  "line": 187,
+                  "name": "as_posix",
+                  "target": null,
+                  "via": "_git"
+                },
+                {
+                  "line": 187,
+                  "name": "ImportError_",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  },
+                  "via": "_git"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "show"
+            },
+            {
+              "calls": [
+                {
+                  "line": 187,
+                  "name": "as_posix",
+                  "target": null,
+                  "via": "_git"
+                },
+                {
+                  "line": 187,
+                  "name": "ImportError_",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  },
+                  "via": "_git"
+                },
+                {
+                  "branch": "len(runs) != 12",
+                  "line": 107,
+                  "name": "ImportError_",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  }
+                },
+                {
+                  "line": 114,
+                  "name": "calibration_rows",
+                  "target": {
+                    "file": "src/switchyard/importers/calibration.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_calibration"
+            },
+            {
+              "calls": [
+                {
+                  "line": 187,
+                  "name": "as_posix",
+                  "target": null,
+                  "via": "_git"
+                },
+                {
+                  "line": 187,
+                  "name": "ImportError_",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  },
+                  "via": "_git"
+                },
+                {
+                  "line": 155,
+                  "name": "sha256_bytes",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  },
+                  "via": "_check_gold"
+                },
+                {
+                  "branch": "wanted != [digest]",
+                  "line": 157,
+                  "name": "ImportError_",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  },
+                  "via": "_check_gold"
+                },
+                {
+                  "line": 140,
+                  "name": "ladder_rows",
+                  "target": {
+                    "file": "src/switchyard/importers/ladder.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_ladder"
+            },
+            {
+              "calls": [
+                {
+                  "line": 155,
+                  "name": "sha256_bytes",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  }
+                },
+                {
+                  "branch": "wanted != [digest]",
+                  "line": 157,
+                  "name": "ImportError_",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_check_gold"
+            },
+            {
+              "calls": [
+                {
+                  "line": 187,
+                  "name": "as_posix",
+                  "target": null,
+                  "via": "_git"
+                },
+                {
+                  "line": 187,
+                  "name": "ImportError_",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  },
+                  "via": "_git"
+                },
+                {
+                  "line": 167,
+                  "name": "prereg_names_intel_igpu",
+                  "target": {
+                    "file": "src/switchyard/importers/nli.py"
+                  }
+                },
+                {
+                  "line": 163,
+                  "name": "nli_rows",
+                  "target": {
+                    "file": "src/switchyard/importers/nli.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_nli"
+            },
+            {
+              "calls": [
+                {
+                  "branch": "row[\"id\"] in seen",
+                  "line": 175,
+                  "name": "ImportError_",
+                  "over": "rows",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_unique"
+            },
+            {
+              "calls": [
+                {
+                  "line": 187,
+                  "name": "as_posix",
+                  "target": null
+                },
+                {
+                  "line": 187,
+                  "name": "ImportError_",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_git"
+            }
+          ]
+        },
+        {
+          "exports": [
+            "calibration_rows",
+            "quote_rule_of"
+          ],
+          "failurePaths": [
+            {
+              "in": "quote_rule_of",
+              "kind": "raise",
+              "line": 175
+            },
+            {
+              "in": "_as_rule",
+              "kind": "raise",
+              "line": 181
+            },
+            {
+              "in": "_as_rule",
+              "kind": "raise",
+              "line": 183
+            }
+          ],
+          "hash": "ceab533ffe7a0c58c152f6d051d628e2c4158feee776d3205dc55c0902c79e28",
+          "importsFiles": [
+            "src/switchyard/importers/common.py",
+            "src/switchyard/receipt.py"
+          ],
+          "path": "src/switchyard/importers/calibration.py"
+        },
+        {
+          "exports": [
+            "blank_latency",
+            "blank_settings",
+            "counted_metric",
+            "date_from_unix",
+            "device_for_ollama",
+            "gold_fingerprint",
+            "interval_metric",
+            "point_metric",
+            "sha256_bytes",
+            "sha256_text",
+            "source_provenance",
+            "spread",
+            "wilson"
+          ],
+          "failurePaths": [
+            {
+              "in": "device_for_ollama",
+              "kind": "raise",
+              "line": 53
+            },
+            {
+              "in": "source_provenance",
+              "kind": "raise",
+              "line": 141
+            }
+          ],
+          "hash": "93691cf13ffade7b34b4c917d6d35947aa4f9a8ef4230fc25ee41d650edc6294",
+          "path": "src/switchyard/importers/common.py"
+        },
+        {
+          "entry": "load_candidates",
+          "entryRule": 4,
+          "exports": [
+            "load_candidates",
+            "open_gaps",
+            "render_gaps"
+          ],
+          "hash": "410b54e7c387d4cf6940789a40ce519b61cce3aa940d57ff22c5104cda9f88b6",
+          "path": "src/switchyard/importers/gaps.py",
+          "sequences": [
+            {
+              "calls": [
+                {
+                  "line": 15,
+                  "name": "read_text",
+                  "target": null
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "load_candidates"
+            }
+          ]
+        },
+        {
+          "exports": [
+            "ladder_rows"
+          ],
+          "hash": "ba46282a582fa83a60b748552d4a0635a254c6a4f5420a79035a888adef4067a",
+          "importsFiles": [
+            "src/switchyard/importers/calibration.py",
+            "src/switchyard/importers/common.py",
+            "src/switchyard/receipt.py"
+          ],
+          "path": "src/switchyard/importers/ladder.py"
+        },
+        {
+          "exports": [
+            "nli_rows",
+            "prereg_names_intel_igpu"
+          ],
+          "failurePaths": [
+            {
+              "in": "nli_rows",
+              "kind": "raise",
+              "line": 27
+            },
+            {
+              "in": "nli_rows",
+              "kind": "raise",
+              "line": 30
+            }
+          ],
+          "hash": "20a0b81fd44f0a0b17f015cf60b2189fa128a0db7accadd5ada1ec674471f152",
+          "importsFiles": [
+            "src/switchyard/importers/common.py",
+            "src/switchyard/receipt.py"
+          ],
+          "path": "src/switchyard/importers/nli.py"
+        },
+        {
+          "exports": [
+            "offer_rows",
+            "remote_option_allowed"
+          ],
+          "failurePaths": [
+            {
+              "in": "offer_rows",
+              "kind": "raise",
+              "line": 23
+            },
+            {
+              "in": "offer_rows",
+              "kind": "raise",
+              "line": 26
+            },
+            {
+              "in": "offer_rows",
+              "kind": "raise",
+              "line": 32
+            },
+            {
+              "in": "_gpu_row",
+              "kind": "raise",
+              "line": 54
+            },
+            {
+              "in": "_budget_rows",
+              "kind": "raise",
+              "line": 91
+            },
+            {
+              "in": "_budget_rows",
+              "kind": "raise",
+              "line": 94
+            },
+            {
+              "in": "_budget_rows",
+              "kind": "raise",
+              "line": 98
+            }
+          ],
+          "hash": "6389024d54c2d813c950a27d9bff2e00ed44c744324dcabc29ab2fbae301902e",
+          "importsFiles": [
+            "src/switchyard/importers/common.py",
+            "src/switchyard/receipt.py"
+          ],
+          "path": "src/switchyard/importers/offers.py"
+        },
+        {
+          "constantOnly": true,
+          "hash": "1807fd9c4f8ff099b29fea75b9d9860f12ec5595bdc70a9a5198da640a646754",
+          "path": "src/switchyard/importers/pins.py"
+        },
+        {
+          "exports": [
+            "probe_rows"
+          ],
+          "hash": "9e257dbf9516b68b0a8cfba072597868ad27dc98e9547f53e4b08accd7e267b0",
+          "importsFiles": [
+            "src/switchyard/importers/common.py",
+            "src/switchyard/receipt.py"
+          ],
+          "path": "src/switchyard/importers/probe.py"
         },
         {
           "entry": "check_tree",
@@ -490,7 +1223,7 @@
           ]
         },
         {
-          "hash": "f4a0be134c6487cca77fada3137944d6d9838f11e4ceca56d1d8e6c6a725c647",
+          "hash": "3d2ba4c7e06cebe98ea673b451a9e620b8409ec253fe96fc105d06ac9fe970b8",
           "path": "src/switchyard/schema/routing-row.schema.json"
         }
       ],
@@ -502,19 +1235,20 @@
       "origin": "authored",
       "outsidePlaces": [
         {
-          "reads": 2,
+          "reads": 5,
           "where": [
             "caller"
           ],
-          "writes": 0
+          "writes": 2
         }
       ],
-      "outsideReads": 2,
+      "outsideReads": 5,
+      "outsideWrites": 2,
       "role": "code",
       "testRunners": [
         "pytest"
       ],
-      "testedBy": 4,
+      "testedBy": 5,
       "unresolvedSites": 0
     },
     {
@@ -548,15 +1282,23 @@
         },
         {
           "exports": [
+            "test_a_null_property_is_treated_as_absent",
+            "test_a_nvidia_gpu_0_is_not_chosen_as_the_igpu",
+            "test_a_partial_property_set_is_refused",
+            "test_a_renamed_igpu_still_resolves_from_vendor_and_type",
+            "test_an_intel_name_is_not_enough_when_type_or_vendor_disagree",
             "test_gpu_0_intel_is_the_igpu",
             "test_gpu_1_is_never_the_igpu_even_if_the_name_says_intel",
+            "test_gpu_1_stays_refused_when_its_vendor_says_intel",
+            "test_live_enumeration_picks_the_vendor_igpu_and_keeps_the_name",
             "test_malformed_entries_and_unknown_names_are_refused",
             "test_missing_device_does_not_fall_back",
             "test_named_devices_resolve",
             "test_resolver_refuses",
-            "test_two_intel_gpus_are_not_guessed"
+            "test_two_intel_gpus_are_not_guessed",
+            "test_two_vendor_igpus_are_not_guessed"
           ],
-          "hash": "21aef31f865b9cc8bd5ee98bebb6b17b90758fce8e78222ede5d5c3d2b4b93d7",
+          "hash": "28961d2f04bf2d24a5228e523ed380f92eb78b0745305962d67ceba5805c73a9",
           "importsFiles": [
             "src/switchyard/devices.py"
           ],
@@ -577,6 +1319,55 @@
             "src/switchyard/guards.py"
           ],
           "path": "tests/test_guards.py",
+          "testFramework": "pytest"
+        },
+        {
+          "exports": [
+            "test_a_missing_pin_is_refused",
+            "test_a_tier_row_is_recounted_from_the_verdict_lines",
+            "test_calibration_copies_the_published_interval_and_infers_quote_rule_1",
+            "test_gap_report_names_the_missing_field_on_a_partial_row",
+            "test_import_command_writes_jsonl_and_the_gap_report",
+            "test_import_reads_a_pinned_tree_and_refuses_a_missing_ladder",
+            "test_ladder_cell_is_tallied_on_both_views",
+            "test_nli_row_uses_the_prereg_name_and_copies_the_interval",
+            "test_offer_snapshot_is_version_locked_and_does_not_invent_a_budget_pass",
+            "test_probe_keeps_a_named_intel_gpu_and_skips_an_unnamed_one",
+            "test_probe_skips_error_rows_and_gpu_1",
+            "test_quote_rule_1_and_rule_2_are_different_rows",
+            "test_quote_rules_that_disagree_are_refused",
+            "test_table_filters_by_task"
+          ],
+          "hash": "03813ee65e115b7b5435436df916c90186dbf15f23b8368426bca9f26451b18a",
+          "importOrder": [
+            "src/switchyard/importers/calibration.py",
+            "src/switchyard/importers/common.py",
+            "src/switchyard/importers/ladder.py",
+            "src/switchyard/importers/nli.py",
+            "src/switchyard/importers/offers.py",
+            "src/switchyard/importers/probe.py",
+            "src/switchyard/receipt.py",
+            "src/switchyard/importers/gaps.py",
+            "src/switchyard/cli.py",
+            "tests/support.py",
+            "src/switchyard/importers/assemble.py",
+            "src/switchyard/importers/pins.py"
+          ],
+          "importsFiles": [
+            "src/switchyard/cli.py",
+            "src/switchyard/importers/assemble.py",
+            "src/switchyard/importers/calibration.py",
+            "src/switchyard/importers/common.py",
+            "src/switchyard/importers/gaps.py",
+            "src/switchyard/importers/ladder.py",
+            "src/switchyard/importers/nli.py",
+            "src/switchyard/importers/offers.py",
+            "src/switchyard/importers/pins.py",
+            "src/switchyard/importers/probe.py",
+            "src/switchyard/receipt.py",
+            "tests/support.py"
+          ],
+          "path": "tests/test_importers.py",
           "testFramework": "pytest"
         },
         {
@@ -672,13 +1463,16 @@
       "landings": [],
       "mentions": [],
       "name": "CI",
-      "permissions": [],
+      "permissions": [
+        "contents:read",
+        "id-token:write"
+      ],
       "pushes": false,
       "reach": [
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 5
+          "files": 6
         },
         {
           "boundary": "src",
@@ -687,7 +1481,7 @@
             "file": "src/switchyard/cli.py",
             "from": "tests/test_cli.py"
           },
-          "files": 4
+          "files": 13
         }
       ],
       "readers": [],
@@ -718,7 +1512,7 @@
         {
           "config": "pyproject.toml",
           "coverage": true,
-          "files": 5,
+          "files": 6,
           "job": "test",
           "runner": "pytest",
           "step": "Test"
@@ -726,13 +1520,20 @@
       ],
       "triggers": [
         {
+          "branches": [
+            "main"
+          ],
           "event": "pull_request"
         },
         {
+          "branches": [
+            "main"
+          ],
           "event": "push",
           "paths": [
             ".github/workflows/**",
             "atlas/**",
+            "codecov.yml",
             "docs/**",
             "experiments/**",
             "pyproject.toml",
@@ -760,7 +1561,8 @@
       ],
       "uses": [
         "actions/checkout",
-        "astral-sh/setup-uv"
+        "astral-sh/setup-uv",
+        "codecov/codecov-action"
       ],
       "usesWorkflowToken": false
     },
@@ -779,7 +1581,7 @@
         {
           "boundary": "src",
           "depth": 0,
-          "files": 2
+          "files": 11
         }
       ],
       "readers": [],
@@ -817,8 +1619,8 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "f4f2b4b7ae43f003e772bcfe3145e7e340dd36a6",
-    "tracked": 33
+    "commit": "a4c84a3764e96b1f2d415e7244bb02edfe3627fa",
+    "tracked": 48
   },
   "landings": [
     {
@@ -847,6 +1649,19 @@
   "overlaps": [],
   "submodules": [],
   "symlinks": [],
-  "testFiles": 5,
-  "unassigned": []
+  "testFiles": 6,
+  "unassigned": [
+    {
+      "hash": "58e9cda6a10a6f409c86f15c61845a82d66dd31bbf284c86d4436dcf42955060",
+      "path": "table/candidates.json"
+    },
+    {
+      "hash": "0deb47011a402825bbf0b2a6919e0f679d6c985e596620576ba8acfdde195c5e",
+      "path": "table/gaps.md"
+    },
+    {
+      "hash": "f9471dc8dd82bad2241fe042d1c24617b808a138b9c7c5fbb59dee00d389747c",
+      "path": "table/routing.jsonl"
+    }
+  ]
 }

@@ -1,31 +1,32 @@
 # switchyard: how it works
 
-Mapped at 2026-10-09 from commit f4f2b4b by Atlas 1.24.0.
+Mapped at 2026-10-09 from commit a4c84a3 by Atlas 1.24.0.
 
 ## What this is
 
 switchyard routes each job to a model, engine and device from a receipt-backed table. (written by a person)
 
-6 parts, mostly Python (11 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.
+6 parts, mostly Python (22 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.
 
-## What changed since 2026-10-09 (a65b12f)
+## What changed since 2026-10-09 (f4f2b4b)
 
-- tests now imports src.
-- CI (.github/workflows/ci.yml) is a new door. It starts on a pull request; on a push touching 10 paths; or by hand. It runs tests/.
-- switchyard (pyproject.toml) is a new command. It runs src/switchyard/cli.py.
-- README.md is now read by pyproject.toml.
-- src/switchyard/schema/routing-row.schema.json is now read by src/switchyard/receipt.py.
-- 32 files added, across 6 parts.
+- CI's pull request trigger now also names `main`.
+- CI's push trigger now also names `codecov.yml` and `main`.
+- table/candidates.json is new and belongs to no part, so atlas check fails on it against the previous map.
+- table/gaps.md is new and belongs to no part, so atlas check fails on it against the previous map.
+- table/routing.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
+- 15 files added and 10 changed content, across 5 parts.
 
 ## What comes in
 
-1. **CI.** On a pull request; on a push touching 10 paths; or by hand. Runs tests/.
+1. **CI.** On a pull request to main; on a push to main touching 11 paths; or by hand. Runs tests/.
 2. **switchyard** (a command people run). Runs src/switchyard/cli.py.
 
 ## What happens through CI
 
 1. The workflow runs tests/ in tests.
-2. That reaches src (4 files).
+2. That reaches src (13 files).
+3. It uploads coverage to Codecov.
 
 ## Who reads the results
 
@@ -67,14 +68,15 @@ People write .github/, assets/, docs/ and the repository root. Nothing in this r
 
 ## Where to start
 
-src/switchyard/cli.py → src/switchyard/receipt.py
+src/switchyard/cli.py → src/switchyard/importers/assemble.py → src/switchyard/importers/calibration.py → src/switchyard/importers/common.py
 
 Read those in order to follow one run of switchyard end to end. This path follows switchyard (a command people run) from its entry, since CI runs only tests.
 
 ## What this map cannot see
 
 - 1 read uses a path built at run time and is not named here.
-- 2 reads go to a path their caller passes, not to this repository.
+- 2 writes and 5 reads go to a path their caller passes, not to this repository.
+- 3 files belong to no part: table/candidates.json, table/gaps.md and table/routing.jsonl.
 - Statistics confidence is low: fewer than 30 qualifying commits in the window, and fewer than 25 source files reach 10 revisions.
 
 Regenerate with `npx --yes @dogfood-lab/atlas map`.

@@ -1,0 +1,163 @@
+[
+  {
+    "id": "E1-nomic-NPU",
+    "experiment": "E1",
+    "match": {"task": "embed", "model": "nomic-ai/nomic-embed-text-v1.5", "device": "NPU"},
+    "needs": ["cold_ms", "warm_p50_ms"],
+    "why": "No cold-versus-warm split for nomic-embed-text v1.5 on the NPU. A speed row that lacks cold_ms and warm_p50_ms does not answer whether the NPU may be treated as warm-only."
+  },
+  {
+    "id": "E1-nomic-iGPU",
+    "experiment": "E1",
+    "match": {"task": "embed", "model": "nomic-ai/nomic-embed-text-v1.5", "device": "iGPU"},
+    "needs": ["cold_ms", "warm_p50_ms"],
+    "why": "Same cold-versus-warm question for nomic-embed-text v1.5 on the iGPU, at batch 1 and 8 and three lengths."
+  },
+  {
+    "id": "E1-nomic-CPU",
+    "experiment": "E1",
+    "match": {"task": "embed", "model": "nomic-ai/nomic-embed-text-v1.5", "device": "CPU"},
+    "needs": ["cold_ms", "warm_p50_ms"],
+    "why": "Same cold-versus-warm question for nomic-embed-text v1.5 on the CPU."
+  },
+  {
+    "id": "E1-bge-NPU",
+    "experiment": "E1",
+    "match": {"task": "embed", "model": "BAAI/bge-base-en-v1.5", "device": "NPU"},
+    "needs": ["cold_ms", "warm_p50_ms"],
+    "why": "bge-base may already have a probe speed row. It still has no cold_ms or warm_p50_ms, so E1 stays open."
+  },
+  {
+    "id": "E1-bge-iGPU",
+    "experiment": "E1",
+    "match": {"task": "embed", "model": "BAAI/bge-base-en-v1.5", "device": "iGPU"},
+    "needs": ["cold_ms", "warm_p50_ms"],
+    "why": "bge-base on the iGPU has no cold-versus-warm split."
+  },
+  {
+    "id": "E1-bge-CPU",
+    "experiment": "E1",
+    "match": {"task": "embed", "model": "BAAI/bge-base-en-v1.5", "device": "CPU"},
+    "needs": ["cold_ms", "warm_p50_ms"],
+    "why": "bge-base on the CPU has no cold-versus-warm split."
+  },
+  {
+    "id": "E2-qwen3-embed-NPU",
+    "experiment": "E2",
+    "match": {"task": "embed", "model": "Qwen/Qwen3-Embedding-0.6B", "device": "NPU"},
+    "needs": ["min_cosine_vs_cpu"],
+    "why": "No speed or CPU-parity row for Qwen3-Embedding-0.6B on the NPU. This is not a retrieval-quality claim."
+  },
+  {
+    "id": "E2-qwen3-embed-iGPU",
+    "experiment": "E2",
+    "match": {"task": "embed", "model": "Qwen/Qwen3-Embedding-0.6B", "device": "iGPU"},
+    "needs": ["min_cosine_vs_cpu"],
+    "why": "No speed or CPU-parity row for Qwen3-Embedding-0.6B on the iGPU."
+  },
+  {
+    "id": "E2-qwen3-embed-CPU",
+    "experiment": "E2",
+    "match": {"task": "embed", "model": "Qwen/Qwen3-Embedding-0.6B", "device": "CPU"},
+    "needs": ["min_cosine_vs_cpu"],
+    "why": "No CPU reference row for Qwen3-Embedding-0.6B. Parity is measured against this device."
+  },
+  {
+    "id": "E3-qwen3-8b-ov-NPU",
+    "experiment": "E3",
+    "match": {"task": "generate", "model": "OpenVINO/Qwen3-8B-int4-cw-ov", "device": "NPU"},
+    "needs": ["compile_ms"],
+    "why": "No OpenVINO generation receipt for Qwen3-8B-int4-cw-ov on the NPU. Verify rows do not fill a generate cell."
+  },
+  {
+    "id": "E3-qwen3-8b-ov-iGPU",
+    "experiment": "E3",
+    "match": {"task": "generate", "model": "OpenVINO/Qwen3-8B-int4-cw-ov", "device": "iGPU"},
+    "needs": ["compile_ms"],
+    "why": "No OpenVINO generation receipt for Qwen3-8B-int4-cw-ov on the iGPU."
+  },
+  {
+    "id": "E3-qwen3-8b-ov-CPU",
+    "experiment": "E3",
+    "match": {"task": "generate", "model": "OpenVINO/Qwen3-8B-int4-cw-ov", "device": "CPU"},
+    "needs": ["compile_ms"],
+    "why": "No OpenVINO generation receipt for Qwen3-8B-int4-cw-ov on the CPU."
+  },
+  {
+    "id": "E3-phi-NPU",
+    "experiment": "E3",
+    "match": {"task": "generate", "model": "OpenVINO/Phi-3.5-mini-instruct-int4-cw-ov", "device": "NPU"},
+    "needs": ["compile_ms"],
+    "why": "The smaller channel-wise model chosen for E3 is Phi-3.5-mini-instruct-int4-cw-ov (MIT, text). No generation receipt on the NPU."
+  },
+  {
+    "id": "E3-phi-iGPU",
+    "experiment": "E3",
+    "match": {"task": "generate", "model": "OpenVINO/Phi-3.5-mini-instruct-int4-cw-ov", "device": "iGPU"},
+    "needs": ["compile_ms"],
+    "why": "No generation receipt for Phi-3.5-mini-instruct-int4-cw-ov on the iGPU."
+  },
+  {
+    "id": "E3-phi-CPU",
+    "experiment": "E3",
+    "match": {"task": "generate", "model": "OpenVINO/Phi-3.5-mini-instruct-int4-cw-ov", "device": "CPU"},
+    "needs": ["compile_ms"],
+    "why": "No generation receipt for Phi-3.5-mini-instruct-int4-cw-ov on the CPU."
+  },
+  {
+    "id": "E3-qwen3-8b-5090",
+    "experiment": "E3",
+    "match": {"task": "generate", "model": "qwen3:8b", "device": "5090"},
+    "needs": ["warm_p50_ms"],
+    "why": "qwen3:8b has verify rows on the 5090. Those are not a generation speed reference. E3's 5090 leg is speed only, inside a grant."
+  },
+  {
+    "id": "E4-5090-alone",
+    "experiment": "E4",
+    "match": {"task": "generate", "model": "qwen3:8b", "device": "5090"},
+    "needs": ["contention"],
+    "why": "No contention measurement: 5090 decode alone versus with an NPU embed load and versus with an iGPU NLI load."
+  },
+  {
+    "id": "E4-npu-embed",
+    "experiment": "E4",
+    "match": {"task": "embed", "model": "BAAI/bge-base-en-v1.5", "device": "NPU"},
+    "needs": ["contention"],
+    "why": "No measurement of NPU embed latency with and without the 5090 busy. E4 uses bge-base so it does not depend on E2."
+  },
+  {
+    "id": "E4-igpu-nli",
+    "experiment": "E4",
+    "match": {"task": "nli", "model": "cross-encoder/nli-deberta-v3-base", "device": "iGPU"},
+    "needs": ["contention"],
+    "why": "No measurement of iGPU NLI latency with and without the 5090 busy. Batch 8 on the NPU is not this cell."
+  },
+  {
+    "id": "quote-rule-2",
+    "experiment": "other",
+    "match": {"task": "verify", "quote_rule": 2},
+    "needs": ["quote_rule"],
+    "why": "No verify row is pinned to quote rule 2. Chain and ladder rows whose verdicts omit pins.quote_rule are quote rule 1 by the pre-#47 inference, and that source is on the row. They are not merged with rule 2."
+  },
+  {
+    "id": "runpod-snapshot",
+    "experiment": "other",
+    "match": {"task": "offer"},
+    "needs": ["price_snapshot"],
+    "why": "No dated RunPod offer or budget snapshot is in the table. offrig gpus and offrig budget --show print text today. switchyard does not parse that text and does not open offrig's database. A version-1 snapshot file can be imported when one is recorded."
+  },
+  {
+    "id": "rerank-any",
+    "experiment": "other",
+    "match": {"task": "rerank"},
+    "needs": ["warm_p50_ms"],
+    "why": "The table has no rerank row."
+  },
+  {
+    "id": "qwen3-8b-heldout",
+    "experiment": "other",
+    "match": {"task": "verify", "model": "qwen3:8b", "split": "heldout"},
+    "needs": ["quote_rule"],
+    "why": "qwen3:8b verify rows in this import are the tune chain. Held-out is not in the table."
+  }
+]
