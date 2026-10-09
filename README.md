@@ -6,6 +6,8 @@ A rail switchyard sends each car onto the right track. This one sends each job t
 
 You give it a task (embed, rerank, NLI, verify, generate) and the constraints that matter (quality, latency, context, thinking level). It answers with a model, an engine, a device and the settings, and it shows the receipt behind every number. OpenVINO's AUTO and HETERO plugins can pick a device once you have already picked the model. Nothing in that stack picks the model. That gap is the product.
 
+What this program is allowed to touch is in the [threat model](#threat-model).
+
 The router itself comes last. The work before it is a receipt schema, a routing table built from receipts the studio already has, and a harness that pre-registers an experiment before any device time is spent.
 
 ## What it will not do
@@ -19,11 +21,11 @@ Every device is named.
 | Name | What it is |
 |---|---|
 | `NPU` | Intel AI Boost on the Core Ultra 9 285K |
-| `iGPU` | The Intel GPU, found by its full device name containing "Intel" |
+| `iGPU` | The Intel GPU. A live enumeration must say vendor `0x8086` and device type `INTEGRATED`. The full name is recorded, not the decision |
 | `CPU` | The same processor's CPU |
 | `5090` | The RTX 5090, reached only through Ollama at `127.0.0.1:11434` |
 
-`GPU.1` is the 5090 as OpenVINO sees it. The resolver refuses it, refuses a bare `GPU`, refuses `AUTO`, and refuses any GPU whose name is not Intel. A missing device is an error. switchyard does not fall off onto a weaker one.
+`GPU.1` is the 5090 as OpenVINO sees it on this rig. The resolver refuses that index even if the name or the vendor changes, refuses a bare `GPU`, refuses `AUTO`, `HETERO` and `MULTI`, and refuses a GPU that is not vendor `0x8086` and `INTEGRATED`. A list with neither device property still requires the full name to contain "Intel". A missing device is an error. switchyard does not fall off onto a weaker one.
 
 The NPU is exclusive. A 5090 step runs only inside a Publisher grant. The runner records that grant. CPU-heavy legs wait for a window the Publisher announces.
 
@@ -43,7 +45,7 @@ switchyard touches local devices and local HTTP, and the network only to downloa
 
 - Receipts and the routing table are local files.
 - Ollama calls, when a run is actually started, go to `127.0.0.1:11434` (the 5090) or `127.0.0.1:11490` (CPU). Cloud model tags are refused.
-- OpenVINO runs, when a run is actually started, use `NPU`, `CPU`, or the Intel iGPU. They never select `GPU.1`.
+- OpenVINO runs, when a run is actually started, use `NPU`, `CPU`, or the Intel iGPU (vendor `0x8086` and `INTEGRATED`). They never select `GPU.1`.
 - A 5090 step without `--grant` does not start. An NPU or iGPU step without `--npu-session` does not start.
 - The 5090 path checks that the VRAM watchdog heartbeat is at most 60 seconds old, that no model is loaded, and that the card has rested 15 minutes since the previous model. The heartbeat file is not opened. Only its modified time is read.
 - Nothing here listens on a port.
