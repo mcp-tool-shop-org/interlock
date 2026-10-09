@@ -20,48 +20,33 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 7,
-      "changed": 23,
+      "added": 4,
+      "changed": 4,
       "moved": 0,
-      "parts": 4,
+      "parts": 3,
       "removed": 0
     },
     "items": [
       {
-        "kind": "landing",
-        "sentence": "table/model-families.json is now read by src/switchyard/families.py.",
-        "subjects": [
-          "table/model-families.json",
-          "src/switchyard/families.py"
-        ]
-      },
-      {
-        "kind": "unassigned",
-        "sentence": "table/model-families.json is new and belongs to no part, so atlas check fails on it against the previous map.",
-        "subjects": [
-          "table/model-families.json"
-        ]
-      },
-      {
         "kind": "counts",
-        "sentence": "7 files added and 23 changed content, across 4 parts.",
+        "sentence": "Nothing structural changed since 2026-10-09; 4 files added and 4 changed content.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "0e19c5c9636b1312757c7e1e9f444e7fb5fe8f6d",
-      "generatedAt": "2026-10-09T19:57:08.512Z"
+      "commit": "82e20592727e96ffea4cb094f597be21c333f7c5",
+      "generatedAt": "2026-10-09T20:22:46.087Z"
     },
-    "unchanged": false
+    "unchanged": true
   },
   "changesTogether": [],
   "changesTogetherNote": [
     "Window: 180 days; a pair counts from 3 shared commits, since the window holds fewer than 30 qualifying commits."
   ],
   "changesTogetherWithTests": 0,
-  "commit": "82e20592727e96ffea4cb094f597be21c333f7c5",
+  "commit": "fbbbe9ca6fce7a69b771dcc7e87275c77515c7a5",
   "defaultBranch": "main",
-  "derived": "7 parts, mostly Python (40 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.",
+  "derived": "7 parts, mostly Python (44 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.",
   "doors": [
     {
       "checks": [],
@@ -76,12 +61,12 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 8
+          "files": 10
         },
         {
           "boundary": "src",
           "depth": 1,
-          "files": 27
+          "files": 30
         }
       ],
       "runs": [
@@ -132,11 +117,11 @@
   "edges": [],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-09T20:22:46.087Z",
+  "generatedAt": "2026-10-09T20:38:09.210Z",
   "limits": [
-    "1 import could not be resolved: `src/switchyard/adapters/registry.py` imports `switchyard.adapters.openvino`, which is no module on its import path and no declared dependency.",
+    "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "1 read uses a path built at run time and is not named here.",
-    "3 writes and 7 reads go to a path their caller passes, not to this repository.",
+    "3 writes and 9 reads go to a path their caller passes, not to this repository.",
     "4 files belong to no part: table/candidates.json, table/gaps.md, table/model-families.json and 1 more.",
     "Statistics confidence is low: fewer than 30 qualifying commits in the window, and fewer than 25 source files reach 10 revisions."
   ],
@@ -163,9 +148,9 @@
   "startReason": "This path follows switchyard (a command people run) from its entry, since CI runs only tests.",
   "summary": "switchyard routes each job to a model, engine and device from a receipt-backed table.",
   "summaryFrom": "person",
-  "testFiles": 8,
+  "testFiles": 10,
   "testedBy": {
-    "src": 7
+    "src": 9
   },
   "unnamedWrites": 0,
   "unread": [],

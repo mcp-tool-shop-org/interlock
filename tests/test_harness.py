@@ -408,8 +408,10 @@ def test_offrig_calibrate_is_planned_and_not_launched():
 
 
 def test_openvino_is_a_plug_in_and_not_a_fallback():
-    with pytest.raises(AdapterError, match="Intel lane"):
-        for_engine("openvino")
+    # The plug-in landed with PR #5 (Intel lane). The no-fallback half is unchanged.
+    from switchyard.adapters.openvino import adapter as ov_adapter
+
+    assert isinstance(for_engine("openvino"), type(ov_adapter()))
     with pytest.raises(AdapterError, match="unknown engine"):
         for_engine("cuda")
 
