@@ -23,18 +23,25 @@ question: >
   resident because loading it on demand costs more warm calls than a
   pre-registered threshold allows.
 decision: >
-  Per arm, the break-even count B = compile_ms / warm p50 latency_ms at
-  batch 1, with compile measured on a fresh driver cache and the percentiles
-  over the repeat rows only (the cold row and warmup stay out). The
-  keep-resident threshold is T = 100 warm calls, fixed here before any run.
-  An arm with B > T supports warm-only treatment for that device: the router
-  keeps the model resident. An arm with B <= T tolerates cold loads. An arm
-  is valid only if its parity guard passes: the first repeat row's output
-  vector must reach cosine >= 0.999 against the same model's CPU batch-1 arm
-  at the same length. A parity miss marks the arm invalid, not failed, and
-  an invalid arm never becomes a routing row however fast it is. Warm
-  throughput versus CPU is recorded as descriptive and is not a pass rule;
-  the band below is the validator formality, not the decision.
+  Per arm, the break-even count B_reuse = compile_warm_reload_ms / warm p50
+  latency_ms at batch 1. compile_warm_reload_ms is the adapter's second
+  compile into the now-populated fresh cache dir, recorded on the cold row
+  (the realistic reload with the driver cache warm). B_fresh, computed the
+  same way from the first compile (compile_ms), is reported as the
+  first-run cost, not gated. The percentiles use the repeat rows only (the
+  cold row and warmup stay out). The keep-resident threshold is T = 100
+  warm calls, fixed here before any run. An arm with B_reuse > T supports
+  warm-only treatment for that device — the router keeps the model
+  resident. An arm with B_reuse <= T tolerates reloads. An arm is valid
+  only if its parity guard passes: the first repeat row's output vector
+  must reach cosine >= 0.999 against the same model's CPU batch-1 arm at
+  the same length. A parity miss marks the arm invalid, not failed, and an
+  invalid arm never becomes a routing row however fast it is. If parity
+  misses only at the model's longest bucket, that is recorded as a length
+  finding: the miss invalidates that length's arms only, and the shorter
+  lengths of the same device and model stay valid. Warm throughput versus
+  CPU is recorded as descriptive and is not a pass rule; the band below is
+  the validator formality, not the decision.
 band: 1.0
 warmups: 1
 repeats: 19
@@ -57,6 +64,7 @@ dataset:
     truncated_tokens and is expected above zero on every arm.
 metrics:
   - compile_ms
+  - compile_warm_reload_ms
   - first_call_ms
   - latency_ms
   - throughput
@@ -67,6 +75,8 @@ stop_rules:
     identical tokens and identical shapes per model and length.
   - Cold is once per arm on its fresh compile cache and stays out of the
     percentiles. First-call time is recorded with it, separate from latency.
+    The cold row carries both colds — compile_ms (fresh) and
+    compile_warm_reload_ms (the second compile into the now-populated dir).
   - Repeats are deterministic — the same artifact and the same tokens give
     the same vector, so the parity guard reads the first repeat row.
   - Revisions are pinned in the model string and the revision field, taken
@@ -75,8 +85,12 @@ stop_rules:
   - Pooling is per model from the adapter table — cls for the bge family,
     mean for nomic. It is recorded per row.
   - No NPU batch 8 for cross-encoders does not bind here — E1 arms are all
-    embedding models. If any single call exceeds 60 seconds, that is the
-    hang signature; stop the run manually and mark the arm inconclusive.
+    embedding models, so the batch-8 cross-encoder refusal does not apply.
+    Every measured call carries the adapter's automatic 60 second per-call
+    bound — a hang returns ok=False, marks the arm inconclusive, poisons the
+    model+device pair for the rest of the run, and the runner's
+    non-zero-step stop ends the sequence, which ends the NPU session. No
+    manual watch is part of this spec.
   - The NPU, iGPU and CPU arms run in one booked block inside a quiet CPU
     window. The 900 second rest is taken before the block, not between arms.
   - Booked through the Publisher; never beside a timed calibration or the
