@@ -19,62 +19,57 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 32,
-      "changed": 0,
+      "added": 15,
+      "changed": 10,
       "moved": 0,
-      "parts": 6,
+      "parts": 5,
       "removed": 0
     },
     "items": [
       {
-        "kind": "import-added",
-        "sentence": "tests now imports src.",
+        "kind": "door",
+        "sentence": "CI's pull request trigger now also names `main`.",
         "subjects": [
-          "tests",
-          "src"
+          ".github/workflows/ci.yml"
         ]
       },
       {
         "kind": "door",
-        "sentence": "CI (.github/workflows/ci.yml) is a new door. It starts on a pull request; on a push touching 10 paths; or by hand. It runs tests/.",
+        "sentence": "CI's push trigger now also names `codecov.yml` and `main`.",
         "subjects": [
-          ".github/workflows/ci.yml",
-          "tests/"
+          ".github/workflows/ci.yml"
         ]
       },
       {
-        "kind": "door",
-        "sentence": "switchyard (pyproject.toml) is a new command. It runs src/switchyard/cli.py.",
+        "kind": "unassigned",
+        "sentence": "table/candidates.json is new and belongs to no part, so atlas check fails on it against the previous map.",
         "subjects": [
-          "pyproject.toml",
-          "src/switchyard/cli.py"
+          "table/candidates.json"
         ]
       },
       {
-        "kind": "landing",
-        "sentence": "README.md is now read by pyproject.toml.",
+        "kind": "unassigned",
+        "sentence": "table/gaps.md is new and belongs to no part, so atlas check fails on it against the previous map.",
         "subjects": [
-          "README.md",
-          "pyproject.toml"
+          "table/gaps.md"
         ]
       },
       {
-        "kind": "landing",
-        "sentence": "src/switchyard/schema/routing-row.schema.json is now read by src/switchyard/receipt.py.",
+        "kind": "unassigned",
+        "sentence": "table/routing.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.",
         "subjects": [
-          "src/switchyard/schema/routing-row.schema.json",
-          "src/switchyard/receipt.py"
+          "table/routing.jsonl"
         ]
       },
       {
         "kind": "counts",
-        "sentence": "32 files added, across 6 parts.",
+        "sentence": "15 files added and 10 changed content, across 5 parts.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "a65b12ffd16a6f6b5f08019f07ac74c75baa0961",
-      "generatedAt": "2026-10-09T17:59:23.950Z"
+      "commit": "f4f2b4b7ae43f003e772bcfe3145e7e340dd36a6",
+      "generatedAt": "2026-10-09T18:00:42.461Z"
     },
     "unchanged": false
   },
@@ -83,9 +78,9 @@
     "Window: 180 days; a pair counts from 3 shared commits, since the window holds fewer than 30 qualifying commits."
   ],
   "changesTogetherWithTests": 0,
-  "commit": "f4f2b4b7ae43f003e772bcfe3145e7e340dd36a6",
+  "commit": "a4c84a3764e96b1f2d415e7244bb02edfe3627fa",
   "defaultBranch": "main",
-  "derived": "6 parts, mostly Python (11 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.",
+  "derived": "6 parts, mostly Python (22 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.",
   "doors": [
     {
       "checks": [],
@@ -100,12 +95,12 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 5
+          "files": 6
         },
         {
           "boundary": "src",
           "depth": 1,
-          "files": 4
+          "files": 13
         }
       ],
       "runs": [
@@ -113,11 +108,13 @@
       ],
       "runsCount": 1,
       "runsMore": 0,
-      "sends": [],
+      "sends": [
+        "uploads coverage to Codecov"
+      ],
       "stages": [],
       "triggers": [
-        "on a pull request",
-        "on a push touching 10 paths",
+        "on a pull request to main",
+        "on a push to main touching 11 paths",
         "or by hand"
       ]
     },
@@ -135,7 +132,7 @@
         {
           "boundary": "src",
           "depth": 0,
-          "files": 2
+          "files": 11
         }
       ],
       "runs": [
@@ -154,10 +151,11 @@
   "edges": [],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-09T18:00:42.461Z",
+  "generatedAt": "2026-10-09T18:51:14.118Z",
   "limits": [
     "1 read uses a path built at run time and is not named here.",
-    "2 reads go to a path their caller passes, not to this repository.",
+    "2 writes and 5 reads go to a path their caller passes, not to this repository.",
+    "3 files belong to no part: table/candidates.json, table/gaps.md and table/routing.jsonl.",
     "Statistics confidence is low: fewer than 30 qualifying commits in the window, and fewer than 25 source files reach 10 revisions."
   ],
   "mainDoor": ".github/workflows/ci.yml",
@@ -176,14 +174,16 @@
   "startDoor": "pyproject.toml#switchyard",
   "startHere": [
     "src/switchyard/cli.py",
-    "src/switchyard/receipt.py"
+    "src/switchyard/importers/assemble.py",
+    "src/switchyard/importers/calibration.py",
+    "src/switchyard/importers/common.py"
   ],
   "startReason": "This path follows switchyard (a command people run) from its entry, since CI runs only tests.",
   "summary": "switchyard routes each job to a model, engine and device from a receipt-backed table.",
   "summaryFrom": "person",
-  "testFiles": 5,
+  "testFiles": 6,
   "testedBy": {
-    "src": 4
+    "src": 5
   },
   "unnamedWrites": 0,
   "unread": [],
