@@ -14,6 +14,19 @@ from switchyard.families import stamp_family
 from switchyard.receipt import load_jsonl, validate_row
 
 UNRECORDED = "unrecorded"
+DEVICE_LOST_NOTE = "this device can't do this setting"
+
+
+def _blank_latency() -> dict:
+    return {
+        "cold_ms": None,
+        "warm_p50_ms": None,
+        "warm_p95_ms": None,
+        "throughput": None,
+        "throughput_unit": None,
+        "compile_ms": None,
+        "first_call_ms": None,
+    }
 
 
 def environment(**overrides) -> dict:
@@ -97,8 +110,63 @@ def measured_row(
     return row
 
 
-def write_run(root: Path, run_id: str, rows: list[dict]) -> Path:
-    """Write ``receipts/<run_id>.jsonl`` and append the rows to the table."""
+def device_lost_row(
+    *,
+    spec_id: str,
+    arm: dict,
+    repeats: int,
+    date: str,
+    spec_rel: str,
+    run_id: str,
+    grant: str | None,
+    env: dict,
+    notes: str = "",
+    extra_settings: dict | None = None,
+) -> dict:
+    """One arm the device did not finish. No timing, and no retry."""
+
+    text = DEVICE_LOST_NOTE if not notes else f"{DEVICE_LOST_NOTE}. {notes}"
+    row = measured_row(
+        spec_id=spec_id,
+        arm=arm,
+        summary=Summary(None, None, None, None, None),
+        repeats=repeats,
+        date=date,
+        spec_rel=spec_rel,
+        run_id=run_id,
+        grant=grant,
+        env=env,
+        notes=text,
+        extra_settings=extra_settings,
+    )
+    row["outcome"] = "device_lost"
+    row["partial"] = True
+    row["provisional"] = True
+    row["latency"] = _blank_latency()
+    row.pop("artifacts", None)
+    validate_row(row)
+    return row
+
+
+def for_table(row: dict) -> dict:
+    """The table copy of a receipt row. A device_lost row cannot carry a speed."""
+
+    if row.get("outcome") != "device_lost":
+        validate_row(row)
+        return row
+    cleaned = dict(row)
+    cleaned.pop("artifacts", None)
+    cleaned["latency"] = _blank_latency()
+    cleaned["outcome"] = "device_lost"
+    notes = cleaned.get("notes") or ""
+    if DEVICE_LOST_NOTE not in notes:
+        cleaned["notes"] = DEVICE_LOST_NOTE if not notes else f"{DEVICE_LOST_NOTE}. {notes}"
+    validate_row(cleaned)
+    return cleaned
+
+
+def write_receipt(root: Path, run_id: str, rows: list[dict]) -> Path:
+    """Write ``receipts/<run_id>.jsonl`` without touching the table."""
 
     for row in rows:
         validate_row(row)
@@ -106,17 +174,43 @@ def write_run(root: Path, run_id: str, rows: list[dict]) -> Path:
     receipts.mkdir(exist_ok=True)
     path = receipts / f"{run_id}.jsonl"
     _dump(path, rows)
-    table = root / "table" / "routing.jsonl"
-    if table.is_file() or (root / "table").is_dir():
-        table.parent.mkdir(exist_ok=True)
-        existing = load_jsonl(table) if table.is_file() else []
-        ids = {row["id"] for row in existing}
-        for row in rows:
-            if row["id"] in ids:
-                raise ValueError(f"duplicate receipt id {row['id']}")
-        merged = sorted(existing + rows, key=lambda item: item["id"])
-        _dump(table, merged)
     return path
+
+
+def import_receipt(root: Path, run_id: str) -> list[dict]:
+    """Bring a run receipt into the routing table.
+
+    ``device_lost`` lands as "this device can't do this setting", with the
+    timing removed. It is not a speed figure.
+    """
+
+    path = root / "receipts" / f"{run_id}.jsonl"
+    rows = [for_table(row) for row in load_jsonl(path)]
+    _dump(path, rows)
+    _append_table(root, rows)
+    return rows
+
+
+def write_run(root: Path, run_id: str, rows: list[dict]) -> Path:
+    """Write ``receipts/<run_id>.jsonl`` and append the rows to the table."""
+
+    path = write_receipt(root, run_id, [for_table(row) for row in rows])
+    _append_table(root, load_jsonl(path))
+    return path
+
+
+def _append_table(root: Path, rows: list[dict]) -> None:
+    table = root / "table" / "routing.jsonl"
+    if not (table.is_file() or (root / "table").is_dir()):
+        return
+    table.parent.mkdir(exist_ok=True)
+    existing = load_jsonl(table) if table.is_file() else []
+    ids = {row["id"] for row in existing}
+    for row in rows:
+        if row["id"] in ids:
+            raise ValueError(f"duplicate receipt id {row['id']}")
+    merged = sorted(existing + rows, key=lambda item: item["id"])
+    _dump(table, merged)
 
 
 def _dump(path: Path, rows: list[dict]) -> None:

@@ -21,6 +21,8 @@ def open_gaps(rows: list[dict], candidates: list[dict]) -> list[dict]:
         partial = []
         filled = False
         for row in rows:
+            if row.get("outcome") == "device_lost":
+                continue
             if not _matches(row, candidate["match"]):
                 continue
             missing = [field for field in candidate.get("needs", []) if not _has_need(row, field)]

@@ -106,6 +106,8 @@
     "repeats": {"type": "integer", "minimum": 1},
     "provisional": {"type": "boolean"},
     "provenance": {"$ref": "#/$defs/provenance"},
+    "outcome": {"type": "string", "enum": ["device_lost"]},
+    "partial": {"type": "boolean"},
     "model_family": {"type": ["string", "null"]},
     "gpu_resident": {"type": ["boolean", "null"]},
     "cost": {
