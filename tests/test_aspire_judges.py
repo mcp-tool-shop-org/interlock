@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from switchyard.importers.aspire_judges import b_rows, judge_control_rows
+from switchyard.importers.aspire_judges import AspireImportError, b_rows, judge_control_rows
 from switchyard.importers.common import ImportError_, sha256_bytes, wilson
 from switchyard.receipt import validate_row
 
@@ -86,18 +86,18 @@ def test_b_row_counts_consensus_per_side_and_never_claims_gold_rates():
 def test_b_refuses_a_readout_that_disagrees_with_its_verdicts():
     bad = json.loads(_b_fixture()["readout"])
     bad["control"]["both wrong"]["agrees"] = 3  # the ungrammatical "wrong" must not count
-    with pytest.raises(ImportError_, match="both wrong"):
+    with pytest.raises(AspireImportError, match="both wrong"):
         _b(readout=json.dumps(bad).encode("utf-8"))
 
 
 def test_b_refuses_missing_verdicts_and_a_mismatched_selection():
     verdicts = json.loads(_b_fixture()["verdicts"])
     del verdicts["n4"]
-    with pytest.raises(ImportError_, match="lack 1"):
+    with pytest.raises(AspireImportError, match="lack 1"):
         _b(verdicts=json.dumps(verdicts).encode("utf-8"))
     manifest = json.loads(_b_fixture()["manifest"])
     manifest["control"] = manifest["control"][:-1]
-    with pytest.raises(ImportError_, match="different items"):
+    with pytest.raises(AspireImportError, match="different items"):
         _b(manifest=json.dumps(manifest).encode("utf-8"))
 
 
@@ -182,11 +182,15 @@ def test_control_records_an_offloaded_model_as_not_resident():
 def test_control_refuses_a_readout_that_disagrees_with_its_verdicts_or_a_foreign_selection():
     readout = json.loads(_control_fixture()["readout"])
     readout["scores"]["qwen3:14b"]["harmless_agree"] = 2  # "same" with claim_changed true isn't agreement
-    with pytest.raises(ImportError_, match="agreement counts"):
+    with pytest.raises(AspireImportError, match="agreement counts"):
         _control(readout=json.dumps(readout).encode("utf-8"))
     selection = json.loads(_control_fixture()["selection"])
     selection["order"] = selection["order"][::-1]
-    with pytest.raises(ImportError_, match="different selection"):
+    with pytest.raises(AspireImportError, match="different selection"):
         _control(selection=json.dumps(selection).encode("utf-8"))
-    with pytest.raises(ImportError_, match="no verdict file"):
+    with pytest.raises(AspireImportError, match="no verdict file"):
         _control(verdicts={})
+
+
+def test_the_refusal_is_still_an_importer_error():
+    assert issubclass(AspireImportError, ImportError_)

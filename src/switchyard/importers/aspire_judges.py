@@ -39,6 +39,11 @@ from switchyard.receipt import validate_row
 # recording the URL.
 B_OLLAMA_URL = "http://127.0.0.1:11434"
 _USABLE_PLANTED = {"wrong", "not wrong", "unsure"}
+
+
+class AspireImportError(ImportError_):
+    """An ASPIRE judge receipt that doesn't agree with itself; the import refuses rather than guesses."""
+
 _USABLE_REWRITE = {"same", "changed", "unsure"}
 
 
@@ -70,16 +75,16 @@ def b_rows(
     dataset = sha256_bytes(selection)
     both_wrong, both_not = sel["control_both_wrong"], sel["control_both_not_wrong"]
     if sorted(man["control"]) != sorted(both_wrong + both_not) or man["splits"] != sel["splits"]:
-        raise ImportError_("B's manifest and its frozen selection name different items")
+        raise AspireImportError("B's manifest and its frozen selection name different items")
     missing = [cid for cid in sel["order"] if cid not in judged]
     if missing:
-        raise ImportError_(f"B's verdicts lack {len(missing)} of the selected items")
+        raise AspireImportError(f"B's verdicts lack {len(missing)} of the selected items")
 
     agree_wrong = sum(_admits(judged[c]) for c in both_wrong)
     agree_not = sum(judged[c].get("outcome") == "not wrong" for c in both_not)
     for side, k in (("both wrong", agree_wrong), ("both not wrong", agree_not)):
         if report["control"][side]["agrees"] != k:
-            raise ImportError_(f"B's readout says {report['control'][side]['agrees']} for {side}; the verdicts give {k}")
+            raise AspireImportError(f"B's readout says {report['control'][side]['agrees']} for {side}; the verdicts give {k}")
     every = [judged[c] for c in sel["order"]]
     unsure = sum(v.get("outcome") == "unsure" for v in every)
     unusable = sum(v.get("outcome") not in _USABLE_PLANTED for v in every)
@@ -147,7 +152,7 @@ def judge_control_rows(
     report, man, sel = (json.loads(x.decode("utf-8")) for x in (readout, manifest, selection))
     dataset = sha256_bytes(selection)
     if man["selection_sha256"] != dataset:
-        raise ImportError_("the control's manifest names a different selection")
+        raise AspireImportError("the control's manifest names a different selection")
     items = {r["id"]: r for r in sel["items"]}
     device = device_for_ollama(man["ollama_url"])
     rows = []
@@ -155,11 +160,11 @@ def judge_control_rows(
         tag = judge["model"]
         key = tag.replace(":", "_")
         if key not in verdicts:
-            raise ImportError_(f"no verdict file for {tag}")
+            raise AspireImportError(f"no verdict file for {tag}")
         judged = json.loads(verdicts[key].decode("utf-8"))
         missing = [cid for cid in sel["order"] if cid not in judged]
         if missing:
-            raise ImportError_(f"{tag}'s verdicts lack {len(missing)} items")
+            raise AspireImportError(f"{tag}'s verdicts lack {len(missing)} items")
         by_side = {side: [c for c in sel["order"] if items[c]["side"] == side] for side in ("harmless", "harmful", "identity")}
         harmless = [judged[c] for c in by_side["harmless"]]
         harmful = [judged[c] for c in by_side["harmful"]]
@@ -168,7 +173,7 @@ def judge_control_rows(
         caught = sum(v.get("outcome") == "changed" for v in harmful)
         scores = report["scores"][tag]
         if (scores["harmless_agree"], scores["harmful_agree"]) != (same_strict, caught):
-            raise ImportError_(f"{tag}: the readout's agreement counts differ from its verdicts")
+            raise AspireImportError(f"{tag}: the readout's agreement counts differ from its verdicts")
         decided = harmless + harmful
         per_type = {}
         for kind in sorted({items[c]["kind"] for c in by_side["harmless"]}):
