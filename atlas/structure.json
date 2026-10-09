@@ -177,11 +177,11 @@
           "path": "codecov.yml"
         },
         {
-          "hash": "28ab2ef733689a95d419ddcf8bc45a861f67a08a250e489bebe5082ff93af92c",
+          "hash": "d03987e136428632d527cfc8bcca5d000afefe9321cc2f02747ae88cd87a4a44",
           "path": "pyproject.toml"
         },
         {
-          "hash": "6ea89c55c654c99de27cec986c20edeba79d85810cf5bd19140b05fd1d1b5f75",
+          "hash": "a67e4371de4404dd6b54d2a49141acaa840f37e379adbf8e234e26247af394d4",
           "path": "uv.lock"
         }
       ],
@@ -203,7 +203,10 @@
       "entryPoints": [
         "src/switchyard/cli.py"
       ],
-      "externals": 0,
+      "externalNames": [
+        "openvino"
+      ],
+      "externals": 1,
       "files": [
         {
           "constantOnly": true,
@@ -345,6 +348,244 @@
         },
         {
           "exports": [
+            "adapter",
+            "normalize",
+            "pad_truncate",
+            "parse_model_ref",
+            "parse_static_shape",
+            "pool",
+            "quant_of"
+          ],
+          "failurePaths": [
+            {
+              "kind": "except",
+              "line": 47
+            },
+            {
+              "in": "_need_openvino",
+              "kind": "raise",
+              "line": 59
+            },
+            {
+              "in": "parse_static_shape",
+              "kind": "raise",
+              "line": 80
+            },
+            {
+              "in": "parse_static_shape",
+              "kind": "except",
+              "line": 83
+            },
+            {
+              "in": "parse_static_shape",
+              "kind": "raise",
+              "line": 84
+            },
+            {
+              "in": "parse_static_shape",
+              "kind": "raise",
+              "line": 86
+            },
+            {
+              "in": "pad_truncate",
+              "kind": "raise",
+              "line": 103
+            },
+            {
+              "in": "pool",
+              "kind": "raise",
+              "line": 122
+            },
+            {
+              "in": "pool",
+              "kind": "raise",
+              "line": 127
+            },
+            {
+              "in": "enumerate_devices",
+              "kind": "except",
+              "line": 169
+            },
+            {
+              "in": "_resolve_ov_id",
+              "kind": "except",
+              "line": 185
+            },
+            {
+              "in": "_resolve_ov_id",
+              "kind": "raise",
+              "line": 186
+            },
+            {
+              "in": "_model_path",
+              "kind": "raise",
+              "line": 203
+            },
+            {
+              "in": "_model_path",
+              "kind": "except",
+              "line": 206
+            },
+            {
+              "in": "_model_path",
+              "kind": "raise",
+              "line": 207
+            },
+            {
+              "in": "_model_path",
+              "kind": "except",
+              "line": 212
+            },
+            {
+              "in": "_model_path",
+              "kind": "raise",
+              "line": 214
+            },
+            {
+              "in": "_load_compiled",
+              "kind": "except",
+              "line": 225
+            },
+            {
+              "in": "_load_compiled",
+              "kind": "raise",
+              "line": 226
+            },
+            {
+              "in": "_default_tokenizer_loader",
+              "kind": "except",
+              "line": 272
+            },
+            {
+              "in": "_default_tokenizer_loader",
+              "kind": "raise",
+              "line": 273
+            },
+            {
+              "in": "_pooling_for",
+              "kind": "raise",
+              "line": 318
+            },
+            {
+              "in": "_run_embed",
+              "kind": "raise",
+              "line": 329
+            },
+            {
+              "in": "_run_generate",
+              "kind": "except",
+              "line": 393
+            },
+            {
+              "in": "_run_generate",
+              "kind": "except",
+              "line": 401
+            },
+            {
+              "in": "_real_genai_module",
+              "kind": "except",
+              "line": 426
+            },
+            {
+              "in": "_real_genai_module",
+              "kind": "raise",
+              "line": 427
+            },
+            {
+              "in": "_model_dir",
+              "kind": "except",
+              "line": 442
+            },
+            {
+              "in": "_model_dir",
+              "kind": "raise",
+              "line": 443
+            },
+            {
+              "in": "_model_dir",
+              "kind": "except",
+              "line": 446
+            },
+            {
+              "in": "_model_dir",
+              "kind": "raise",
+              "line": 447
+            },
+            {
+              "in": "_run",
+              "kind": "raise",
+              "line": 467
+            },
+            {
+              "in": "_run",
+              "kind": "raise",
+              "line": 475
+            },
+            {
+              "in": "_run",
+              "kind": "except",
+              "line": 478
+            },
+            {
+              "in": "_run",
+              "kind": "raise",
+              "line": 479
+            },
+            {
+              "in": "_run",
+              "kind": "except",
+              "line": 480
+            },
+            {
+              "in": "_start_session",
+              "kind": "raise",
+              "line": 502
+            },
+            {
+              "in": "loop",
+              "kind": "raise",
+              "line": 523
+            },
+            {
+              "in": "loop",
+              "kind": "except",
+              "line": 534
+            },
+            {
+              "in": "_start_session",
+              "kind": "raise",
+              "line": 547
+            },
+            {
+              "in": "_start_session",
+              "kind": "raise",
+              "line": 548
+            },
+            {
+              "in": "_stop_session",
+              "kind": "raise",
+              "line": 557
+            },
+            {
+              "in": "_stop_session",
+              "kind": "raise",
+              "line": 567
+            },
+            {
+              "in": "_guarded_unload",
+              "kind": "raise",
+              "line": 572
+            }
+          ],
+          "hash": "25b4027aa04341a17deeba67f5e90b6bfa9c53473977132ee88af33d9ad35472",
+          "importsFiles": [
+            "src/switchyard/adapters/base.py",
+            "src/switchyard/devices.py"
+          ],
+          "path": "src/switchyard/adapters/openvino.py"
+        },
+        {
+          "exports": [
             "for_engine"
           ],
           "failurePaths": [
@@ -373,7 +614,8 @@
           "importsFiles": [
             "src/switchyard/adapters/base.py",
             "src/switchyard/adapters/offrig_calibrate.py",
-            "src/switchyard/adapters/ollama.py"
+            "src/switchyard/adapters/ollama.py",
+            "src/switchyard/adapters/openvino.py"
           ],
           "path": "src/switchyard/adapters/registry.py"
         },
@@ -1527,6 +1769,56 @@
           "path": "src/switchyard/importers/__init__.py"
         },
         {
+          "exports": [
+            "b_rows",
+            "judge_control_rows"
+          ],
+          "failurePaths": [
+            {
+              "in": "b_rows",
+              "kind": "raise",
+              "line": 78
+            },
+            {
+              "in": "b_rows",
+              "kind": "raise",
+              "line": 81
+            },
+            {
+              "in": "b_rows",
+              "kind": "raise",
+              "line": 87
+            },
+            {
+              "in": "judge_control_rows",
+              "kind": "raise",
+              "line": 155
+            },
+            {
+              "in": "judge_control_rows",
+              "kind": "raise",
+              "line": 163
+            },
+            {
+              "in": "judge_control_rows",
+              "kind": "raise",
+              "line": 167
+            },
+            {
+              "in": "judge_control_rows",
+              "kind": "raise",
+              "line": 176
+            }
+          ],
+          "hash": "29a9de0b5671ab24a046187aaba91eca4ceb2f1fd624fb9fcd4d5cd3c0849544",
+          "importsFiles": [
+            "src/switchyard/families.py",
+            "src/switchyard/importers/common.py",
+            "src/switchyard/receipt.py"
+          ],
+          "path": "src/switchyard/importers/aspire_judges.py"
+        },
+        {
           "entry": "import_receipts",
           "entryRule": 4,
           "exports": [
@@ -2452,28 +2744,21 @@
       "origin": "authored",
       "outsidePlaces": [
         {
-          "reads": 7,
+          "reads": 9,
           "where": [
             "caller"
           ],
           "writes": 3
         }
       ],
-      "outsideReads": 7,
+      "outsideReads": 9,
       "outsideWrites": 3,
       "role": "code",
       "testRunners": [
         "pytest"
       ],
-      "testedBy": 7,
-      "unresolvedNamed": [
-        {
-          "path": "src/switchyard/adapters/registry.py",
-          "specifier": "switchyard.adapters.openvino",
-          "why": "unplaced"
-        }
-      ],
-      "unresolvedSites": 1
+      "testedBy": 9,
+      "unresolvedSites": 0
     },
     {
       "dynamicReads": 0,
@@ -2489,6 +2774,25 @@
           ],
           "hash": "e3fe1b27867749f41a532e0e64336e1d78c51c0505dc673aebb215331f0c3e75",
           "path": "tests/support.py"
+        },
+        {
+          "exports": [
+            "test_b_refuses_a_readout_that_disagrees_with_its_verdicts",
+            "test_b_refuses_missing_verdicts_and_a_mismatched_selection",
+            "test_b_row_counts_consensus_per_side_and_never_claims_gold_rates",
+            "test_control_records_an_offloaded_model_as_not_resident",
+            "test_control_refuses_a_readout_that_disagrees_with_its_verdicts_or_a_foreign_selection",
+            "test_control_row_carries_true_rates_per_type_residency_and_cost",
+            "test_the_refusal_is_still_an_importer_error"
+          ],
+          "hash": "89221903299d6e2d9bb701a4d96e873a5a59c15eb362fc00c7056511e03b64c5",
+          "importsFiles": [
+            "src/switchyard/importers/aspire_judges.py",
+            "src/switchyard/importers/common.py",
+            "src/switchyard/receipt.py"
+          ],
+          "path": "tests/test_aspire_judges.py",
+          "testFramework": "pytest"
         },
         {
           "exports": [
@@ -2569,7 +2873,7 @@
             "test_the_command_dry_runs_and_refuses_to_start_a_device",
             "test_the_run_path_refuses_an_edited_spec_before_any_adapter_call"
           ],
-          "hash": "789be8753dfbe0034080808e7b4d771f8e9577cab6bdd8027219e4522ca06e59",
+          "hash": "be231caa3b3dab863d23f7242c8d9781b1c33a52a431fb9a4835d890550a1931",
           "importOrder": [
             "src/switchyard/adapters/base.py",
             "src/switchyard/adapters/offrig_calibrate.py",
@@ -2583,12 +2887,14 @@
             "src/switchyard/harness/spec.py",
             "src/switchyard/harness/timing.py",
             "src/switchyard/receipt.py",
-            "src/switchyard/cli.py"
+            "src/switchyard/cli.py",
+            "src/switchyard/adapters/openvino.py"
           ],
           "importsFiles": [
             "src/switchyard/adapters/base.py",
             "src/switchyard/adapters/offrig_calibrate.py",
             "src/switchyard/adapters/ollama.py",
+            "src/switchyard/adapters/openvino.py",
             "src/switchyard/adapters/registry.py",
             "src/switchyard/cli.py",
             "src/switchyard/guards.py",
@@ -2621,7 +2927,7 @@
             "test_quote_rules_that_disagree_are_refused",
             "test_table_filters_by_task"
           ],
-          "hash": "02af0cbefec2a0333167b4d7180f2a06120e9836b8fae479e8894cffb85393fa",
+          "hash": "2fa12bbdcc52d2db16efb8be31556808c21aa1b1b02ea78a5607bf932648f2ff",
           "importOrder": [
             "src/switchyard/importers/calibration.py",
             "src/switchyard/importers/common.py",
@@ -2651,6 +2957,53 @@
             "tests/support.py"
           ],
           "path": "tests/test_importers.py",
+          "testFramework": "pytest"
+        },
+        {
+          "exports": [
+            "local_model",
+            "make_adapter",
+            "req",
+            "test_compile_cache_and_precision_config",
+            "test_embed_refusals",
+            "test_embed_revision_pinned",
+            "test_embed_step_ok_and_compile_once",
+            "test_embed_truncate_false_refuses",
+            "test_embed_unknown_repo_refused",
+            "test_enumerate_devices_shape",
+            "test_generate_records_thinking_and_temperature",
+            "test_generate_refusals_and_missing_genai",
+            "test_generate_step",
+            "test_measurement_failure_is_ok_false",
+            "test_nli_pooling_none",
+            "test_pad_truncate",
+            "test_parse_model_ref",
+            "test_parse_model_ref_existing_path",
+            "test_parse_static_shape",
+            "test_pool_and_normalize",
+            "test_pooling_table_matches_the_measured_recipes",
+            "test_quant_of",
+            "test_real_core_enumerates_this_rig",
+            "test_registry_finds_the_adapter",
+            "test_session_double_start_and_wrong_stop",
+            "test_session_lifecycle_embed",
+            "test_session_start_fault_raises",
+            "test_unload_drops_compiled_and_tokenizer"
+          ],
+          "hash": "568e6b70d906d5aed0a9183a3b5e973c298168964c640c7a818785a45a1694ab",
+          "importOrder": [
+            "src/switchyard/adapters/__init__.py",
+            "src/switchyard/adapters/registry.py",
+            "src/switchyard/adapters/base.py",
+            "src/switchyard/adapters/openvino.py"
+          ],
+          "importsFiles": [
+            "src/switchyard/adapters/__init__.py",
+            "src/switchyard/adapters/base.py",
+            "src/switchyard/adapters/openvino.py",
+            "src/switchyard/adapters/registry.py"
+          ],
+          "path": "tests/test_openvino_adapter.py",
           "testFramework": "pytest"
         },
         {
@@ -2784,16 +3137,16 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 8
+          "files": 10
         },
         {
           "boundary": "src",
           "depth": 1,
           "enters": {
-            "file": "src/switchyard/cli.py",
-            "from": "tests/test_cli.py"
+            "file": "src/switchyard/importers/aspire_judges.py",
+            "from": "tests/test_aspire_judges.py"
           },
-          "files": 27
+          "files": 30
         }
       ],
       "readers": [],
@@ -2824,7 +3177,7 @@
         {
           "config": "pyproject.toml",
           "coverage": true,
-          "files": 8,
+          "files": 10,
           "job": "test",
           "runner": "pytest",
           "step": "Test"
@@ -2931,8 +3284,8 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "82e20592727e96ffea4cb094f597be21c333f7c5",
-    "tracked": 70
+    "commit": "fbbbe9ca6fce7a69b771dcc7e87275c77515c7a5",
+    "tracked": 74
   },
   "landings": [
     {
@@ -2972,7 +3325,7 @@
   "overlaps": [],
   "submodules": [],
   "symlinks": [],
-  "testFiles": 8,
+  "testFiles": 10,
   "unassigned": [
     {
       "hash": "ec72d834ffb89f9e672da48ac0e21d48c1854a5764cca1975a04b856ab2e65a6",

@@ -1,18 +1,16 @@
 # switchyard: how it works
 
-Mapped at 2026-10-09 from commit 82e2059 by Atlas 1.24.0.
+Mapped at 2026-10-09 from commit fbbbe9c by Atlas 1.24.0.
 
 ## What this is
 
 switchyard routes each job to a model, engine and device from a receipt-backed table. (written by a person)
 
-7 parts, mostly Python (40 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.
+7 parts, mostly Python (44 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.
 
-## What changed since 2026-10-09 (0e19c5c)
+## What changed since 2026-10-09 (82e2059)
 
-- table/model-families.json is now read by src/switchyard/families.py.
-- table/model-families.json is new and belongs to no part, so atlas check fails on it against the previous map.
-- 7 files added and 23 changed content, across 4 parts.
+Nothing structural changed since 2026-10-09; 4 files added and 4 changed content.
 
 ## What comes in
 
@@ -22,7 +20,7 @@ switchyard routes each job to a model, engine and device from a receipt-backed t
 ## What happens through CI
 
 1. The workflow runs tests/ in tests.
-2. That reaches src (27 files).
+2. That reaches src (30 files).
 3. It uploads coverage to Codecov.
 
 ## Who reads the results
@@ -71,9 +69,9 @@ Read those in order to follow one run of switchyard end to end. This path follow
 
 ## What this map cannot see
 
-- 1 import could not be resolved: `src/switchyard/adapters/registry.py` imports `switchyard.adapters.openvino`, which is no module on its import path and no declared dependency.
+- 1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.
 - 1 read uses a path built at run time and is not named here.
-- 3 writes and 7 reads go to a path their caller passes, not to this repository.
+- 3 writes and 9 reads go to a path their caller passes, not to this repository.
 - 4 files belong to no part: table/candidates.json, table/gaps.md, table/model-families.json and 1 more.
 - Statistics confidence is low: fewer than 30 qualifying commits in the window, and fewer than 25 source files reach 10 revisions.
 
