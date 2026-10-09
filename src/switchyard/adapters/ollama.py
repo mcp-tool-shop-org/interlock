@@ -3,6 +3,14 @@
 The 5090 is ``127.0.0.1:11434``. CPU-only Ollama is ``127.0.0.1:11490``.
 Cloud tags are refused. This module does not open a socket unless a transport
 is given, or the default transport is actually called.
+
+Decode tokens per second are ``eval_count / eval_duration`` from the server.
+Prompt-processing tokens per second are ``prompt_eval_count / prompt_eval_duration``.
+Neither one is wall clock. ``think`` keeps the level string when it is not
+``off`` or ``on``, so a later model can use low, medium, or high.
+
+The default transport sets no timeout. A caller that wants one passes
+``timeout`` on the adapter.
 """
 
 from __future__ import annotations
@@ -30,21 +38,42 @@ def refuse_cloud(model: str) -> None:
         raise AdapterError(f"cloud model tags are refused ({model})")
 
 
+def think_value(level: object) -> object:
+    """Map a thinking level onto Ollama's ``think`` field.
+
+    ``off`` is false and ``on`` is true. Any other string is passed through,
+    which is the seam for low, medium, and high.
+    """
+
+    if level == "off":
+        return False
+    if level == "on":
+        return True
+    return level
+
+
+def _given(settings: dict, key: str, default: object) -> object:
+    """A missing key and an explicit null both mean the adapter default."""
+
+    value = settings.get(key)
+    return default if value is None else value
+
+
 def generate_body(request: StepRequest) -> dict:
     refuse_cloud(request.model)
     settings = request.settings
     options = {
         "num_predict": settings.get("num_predict"),
-        "temperature": settings.get("temperature", 0),
+        "temperature": _given(settings, "temperature", 0),
     }
     if settings.get("num_ctx") is not None:
         options["num_ctx"] = settings["num_ctx"]
     body = {
         "model": request.model,
-        "prompt": settings.get("prompt", ""),
+        "prompt": _given(settings, "prompt", ""),
         "stream": False,
         "options": options,
-        "keep_alive": settings.get("keep_alive", "5m"),
+        "keep_alive": _given(settings, "keep_alive", "5m"),
     }
     if settings.get("shift") is False:
         body["shift"] = False
@@ -52,48 +81,158 @@ def generate_body(request: StepRequest) -> dict:
         body["truncate"] = False
     think = settings.get("thinking_level")
     if think is not None:
-        body["think"] = think != "off"
+        body["think"] = think_value(think)
     return body
 
 
-def default_transport(method: str, url: str, body: dict | None) -> dict:
+def context_length(payload: dict) -> int:
+    """The one ``*.context_length`` value in ``/api/show`` ``model_info``."""
+
+    info = payload.get("model_info")
+    if not isinstance(info, dict):
+        raise AdapterError("Ollama show has no model_info")
+    found = [
+        value
+        for key, value in info.items()
+        if isinstance(key, str) and key.endswith(".context_length") and isinstance(value, int) and value > 0
+    ]
+    if len(found) != 1:
+        raise AdapterError("Ollama show did not name one context length")
+    return found[0]
+
+
+def quantization_level(payload: dict) -> str:
+    """``details.quantization_level`` from ``/api/show``, or ``unrecorded``."""
+
+    details = payload.get("details")
+    if not isinstance(details, dict):
+        return "unrecorded"
+    level = details.get("quantization_level")
+    if not isinstance(level, str) or not level:
+        return "unrecorded"
+    return level
+
+
+def default_transport(method: str, url: str, body: dict | None, timeout: float | None = None) -> dict:
     data = None if body is None else json.dumps(body).encode("utf-8")
     request = Request(url, data=data, method=method)
     if data is not None:
         request.add_header("Content-Type", "application/json")
-    with urlopen(request, timeout=30) as response:
+    if timeout is None:
+        with urlopen(request) as response:
+            return json.loads(response.read().decode("utf-8"))
+    with urlopen(request, timeout=timeout) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
+def _rate(count: object, duration_ns: object) -> float | None:
+    if isinstance(count, int) and isinstance(duration_ns, int) and duration_ns > 0:
+        return count / (duration_ns / 1_000_000_000)
+    return None
+
+
 class OllamaAdapter:
-    def __init__(self, *, transport=None, device: str = "5090"):
-        self.transport = transport or default_transport
+    def __init__(self, *, transport=None, device: str = "5090", timeout: float | None = None):
+        self.timeout = timeout
+        if transport is None:
+            def bound(method: str, url: str, body: dict | None) -> dict:
+                return default_transport(method, url, body, timeout=timeout)
+
+            self.transport = bound
+        else:
+            self.transport = transport
         self.device = device
+
+    def show(self, model: str, device: str | None = None) -> dict:
+        refuse_cloud(model)
+        url = url_for(device or self.device)
+        payload = self.transport("POST", f"{url}/api/show", {"model": model})
+        if not isinstance(payload, dict):
+            raise AdapterError("Ollama show returned a non-object")
+        if payload.get("error"):
+            raise AdapterError(str(payload["error"]))
+        return payload
+
+    def _resolve(self, request: StepRequest) -> tuple[StepRequest, dict]:
+        settings = dict(request.settings)
+        need_ctx = "num_ctx" in settings and settings["num_ctx"] is None
+        need_quant = "quant" in settings and settings.get("quant") in (None, "unrecorded")
+        if not need_ctx and not need_quant:
+            return request, {}
+        shown = self.show(request.model, request.device)
+        resolved: dict = {}
+        if need_ctx:
+            settings["num_ctx"] = context_length(shown)
+            resolved["num_ctx"] = settings["num_ctx"]
+        if need_ctx or need_quant:
+            resolved["quant"] = quantization_level(shown)
+        return (
+            StepRequest(
+                step_id=request.step_id,
+                task=request.task,
+                model=request.model,
+                device=request.device,
+                engine=request.engine,
+                settings=settings,
+            ),
+            resolved,
+        )
 
     def run(self, request: StepRequest) -> StepResult:
         refuse_cloud(request.model)
+        request, resolved = self._resolve(request)
         url = url_for(request.device)
         payload = self.transport("POST", f"{url}/api/generate", generate_body(request))
         if not isinstance(payload, dict):
             return StepResult(ok=False, error="Ollama returned a non-object")
         if payload.get("error"):
             return StepResult(ok=False, error=str(payload["error"]))
-        eval_count = payload.get("eval_count")
-        eval_ns = payload.get("eval_duration")
-        throughput = None
-        if isinstance(eval_count, int) and isinstance(eval_ns, int) and eval_ns > 0:
-            throughput = eval_count / (eval_ns / 1_000_000_000)
         total_ns = payload.get("total_duration")
         latency = (total_ns / 1_000_000) if isinstance(total_ns, int) else None
-        return StepResult(ok=True, latency_ms=latency, throughput=throughput, throughput_unit="tok/s")
+        return StepResult(
+            ok=True,
+            latency_ms=latency,
+            throughput=_rate(payload.get("eval_count"), payload.get("eval_duration")),
+            throughput_unit="tok/s",
+            prompt_tok_s=_rate(payload.get("prompt_eval_count"), payload.get("prompt_eval_duration")),
+            output=payload.get("response"),
+            resolved=resolved or None,
+        )
 
-    def unload(self, model: str) -> None:
+    def unload(self, model: str, device: str | None = None) -> None:
         refuse_cloud(model)
-        url = url_for(self.device)
+        url = url_for(device or self.device)
         self.transport(
             "POST",
             f"{url}/api/generate",
             {"model": model, "prompt": "", "stream": False, "keep_alive": 0},
+        )
+
+    def start_session(self, request: StepRequest) -> None:
+        """Begin a companion load.
+
+        The transport must return while that load is still running. This method
+        does not wait out the paired measurement, and it does not unload.
+        ``num_ctx`` null is resolved here the same way ``run`` resolves it, so
+        the companion load and the measured step name the same context.
+        """
+
+        refuse_cloud(request.model)
+        request, _resolved = self._resolve(request)
+        url = url_for(request.device)
+        body = generate_body(request)
+        body["companion"] = "start"
+        self.transport("POST", f"{url}/api/generate", body)
+
+    def stop_session(self, request: StepRequest) -> None:
+        """End the companion load without unloading the model."""
+
+        refuse_cloud(request.model)
+        url = url_for(request.device)
+        self.transport(
+            "POST",
+            f"{url}/api/generate",
+            {"model": request.model, "prompt": "", "stream": False, "companion": "stop"},
         )
 
     def loaded_models(self) -> list:

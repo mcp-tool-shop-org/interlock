@@ -12,9 +12,12 @@ from pathlib import Path
 
 import yaml
 
+from switchyard.harness.e5 import PROMPT_RATIO, SHARED_GROWTH_MIB
+
 PROCEDURES = frozenset({"interleaved", "fill-card", "offrig-calibrate"})
 ABORT_MIB = 30500
 CEILING_MIB = 31200
+DEVICES = frozenset({"NPU", "CPU", "iGPU", "5090"})
 REQUIRED = ("id", "question", "decision", "procedure", "needs", "stop_rules", "dataset", "metrics")
 
 
@@ -78,11 +81,27 @@ def _interleaved(data: dict) -> None:
         for key in ("task", "device", "engine", "model", "revision_or_digest", "licence"):
             if not arm.get(key):
                 raise SpecError(f"arm {arm['id']} is missing {key}")
-        if arm["device"] not in {"NPU", "CPU", "iGPU", "5090"}:
+        if arm["device"] not in DEVICES:
             raise SpecError(f"arm {arm['id']} names a device the resolver does not allow")
         batch = arm.get("batch")
         if arm["task"] == "nli" and batch != 1:
             raise SpecError(f"arm {arm['id']} NLI batch must be 1")
+        companion_device = arm.get("companion_device")
+        if companion_device is not None and companion_device not in DEVICES:
+            raise SpecError(f"arm {arm['id']} names a companion device the resolver does not allow")
+    for arm in arms:
+        companion = arm.get("companion")
+        if companion is not None and companion not in seen:
+            raise SpecError(f"arm {arm['id']} companion is not an arm")
+    _rest(data)
+    cache = data.get("compile_cache")
+    if cache not in {"fresh", "reuse"}:
+        raise SpecError("compile_cache must be fresh or reuse")
+    order = data.get("order", "interleaved")
+    if order not in {"interleaved", "aba"}:
+        raise SpecError(f"unknown order {order!r}")
+    if order == "aba":
+        _pairs(data, seen)
 
 
 def _fill_card(data: dict) -> None:
@@ -93,13 +112,11 @@ def _fill_card(data: dict) -> None:
     fraction = data.get("confirm_prompt_fraction")
     if not isinstance(fraction, (int, float)) or isinstance(fraction, bool) or not 0 < float(fraction) < 1:
         raise SpecError("confirm_prompt_fraction must be between 0 and 1")
-    for key in ("spill_tok_ratio", "spill_ttft_ratio"):
-        if not isinstance(data.get(key), (int, float)) or isinstance(data.get(key), bool):
-            raise SpecError(f"{key} must be a number")
-    if not 0 < float(data["spill_tok_ratio"]) <= 1:
-        raise SpecError("spill_tok_ratio must be in (0, 1]")
-    if float(data["spill_ttft_ratio"]) < 1:
-        raise SpecError("spill_ttft_ratio must be >= 1")
+    if data.get("spill_shared_mib") != SHARED_GROWTH_MIB:
+        raise SpecError(f"spill_shared_mib is {SHARED_GROWTH_MIB} MiB over the post-load shared usage")
+    if data.get("spill_prompt_ratio") != PROMPT_RATIO:
+        raise SpecError(f"spill_prompt_ratio is {PROMPT_RATIO}")
+    _rest(data)
     models = data.get("models")
     if not isinstance(models, list) or not models:
         raise SpecError("fill-card names the model roster")
@@ -111,6 +128,39 @@ def _fill_card(data: dict) -> None:
             raise SpecError("fill-card measures local 5090 Ollama models")
     if data["needs"]["grant"] is not True:
         raise SpecError("fill-card requires a grant")
+
+
+def _rest(data: dict) -> None:
+    rest = data.get("rest_s")
+    if isinstance(rest, bool) or not isinstance(rest, int) or rest < 900:
+        raise SpecError("rest_s must be an integer >= 900")
+
+
+def _pairs(data: dict, arm_ids: set) -> None:
+    pairs = data.get("pairs")
+    if not isinstance(pairs, list) or not pairs:
+        raise SpecError("aba order needs pairs")
+    arms = {arm["id"]: arm for arm in data["arms"]}
+    seen = set()
+    for pair in pairs:
+        if not isinstance(pair, dict) or not pair.get("id"):
+            raise SpecError("every pair needs an id")
+        if pair["id"] in seen:
+            raise SpecError(f"duplicate pair {pair['id']}")
+        seen.add(pair["id"])
+        alone = pair.get("alone")
+        paired_id = pair.get("paired")
+        if alone not in arm_ids or paired_id not in arm_ids:
+            raise SpecError("a pair names an arm that is not in the spec")
+        paired = arms[paired_id]
+        companion = paired.get("companion")
+        if companion not in arm_ids:
+            raise SpecError(f"paired arm {paired_id} needs a companion arm")
+        expected = paired.get("companion_device")
+        if expected is None:
+            raise SpecError(f"paired arm {paired_id} needs companion_device")
+        if arms[companion]["device"] != expected:
+            raise SpecError(f"arm {paired_id} companion_device does not match the companion arm")
 
 
 def _offrig(data: dict) -> None:

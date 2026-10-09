@@ -41,24 +41,33 @@ def measured_row(
     grant: str | None,
     env: dict,
     notes: str,
+    resolved: dict | None = None,
+    artifacts: dict | None = None,
+    extra_settings: dict | None = None,
 ) -> dict:
+    learned = resolved or {}
+    quant = learned.get("quant") or arm.get("quant") or UNRECORDED
     settings = {
         "thinking_level": arm.get("thinking_level"),
         "num_predict": arm.get("num_predict"),
-        "num_ctx": arm.get("num_ctx"),
+        "num_ctx": learned.get("num_ctx", arm.get("num_ctx")),
         "batch": arm.get("batch"),
         "static_shape": arm.get("static_shape"),
         "precision": arm.get("precision"),
         "grant": grant,
         "environment": env,
     }
+    if arm.get("keep_alive") is not None:
+        settings["keep_alive"] = arm["keep_alive"]
+    if extra_settings:
+        settings.update(extra_settings)
     row = {
         "id": f"{spec_id}/{arm['id']}/{run_id}",
         "task": arm["task"],
         "model": {
             "repo_or_tag": arm["model"],
             "revision_or_digest": arm["revision_or_digest"],
-            "quant": arm.get("quant") or UNRECORDED,
+            "quant": quant,
             "licence": arm["licence"],
         },
         "engine": {"name": arm["engine"], "version": arm.get("engine_version") or UNRECORDED},
@@ -71,7 +80,8 @@ def measured_row(
             "warm_p95_ms": summary.warm_p95_ms,
             "throughput": summary.throughput,
             "throughput_unit": summary.throughput_unit,
-            "compile_ms": None,
+            "compile_ms": summary.compile_ms,
+            "first_call_ms": summary.first_call_ms,
         },
         "date": date,
         "repeats": repeats,
@@ -79,6 +89,8 @@ def measured_row(
         "provenance": {"experiment_spec": spec_rel, "run_id": run_id},
         "notes": notes,
     }
+    if artifacts:
+        row["artifacts"] = artifacts
     validate_row(row)
     return row
 

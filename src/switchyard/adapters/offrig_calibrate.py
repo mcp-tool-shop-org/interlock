@@ -87,5 +87,5 @@ class OffrigCalibrateAdapter:
             return StepResult(ok=False, error=f"offrig exited {code}")
         return StepResult(ok=True)
 
-    def unload(self, model: str) -> None:
+    def unload(self, model: str, device: str | None = None) -> None:
         return None

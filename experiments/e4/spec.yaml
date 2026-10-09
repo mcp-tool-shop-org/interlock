@@ -1,9 +1,11 @@
 # Standards compliance
 #
 # PIN_PER_STEP: 2. The models, the digest that the table already recorded, the
-#   devices, the batch, the prompt rule and the 10 percent band are in this file.
+#   devices, the batch, the prompt rule, the 10 percent band, the half-band
+#   noise check, and the A-B-A order are in this file.
 # ANDON_AUTHORITY: 2. A non-zero step stops the sequence. Batch 8 NLI is refused.
-# NAMED_COMPENSATORS: 2. Unload is keep_alive 0. No publish, no rental, no spend.
+# NAMED_COMPENSATORS: 2. Unload is keep_alive 0. A fresh compile cache is
+#   deleted after unload. No publish, no rental, no spend.
 # DECOMPOSE_BY_SECRETS: 2. This file is the pre-registration. The harness runs it.
 # UNCERTAINTY_GATED_HUMANS: 2. One grant and one NPU session, booked together,
 #   come from the Publisher. This spec does not start a device.
@@ -11,17 +13,23 @@
 
 id: E4
 procedure: interleaved
+compile_cache: fresh
+order: aba
 question: >
   While qwen3:8b decodes on the 5090, does a sustained NPU embedding load or a
   sustained iGPU NLI load change that decode rate, and does the 5090 change
   the NPU or iGPU latency?
 decision: >
   The router may schedule the Intel devices freely beside 5090 decode only when
-  every paired measurement stays within the band of that device's alone median.
-  The 5090 comparison is decode tokens per second. The NPU and iGPU comparison
-  is warm latency. The band is 0.10, fixed here before any run. A difference
-  either faster or slower than the band is not free. A failed step is
-  inconclusive, not a pass.
+  every A-B-A paired median stays within the band of the mean of its
+  neighbouring alone medians. The 5090 comparison is server-reported decode
+  tokens per second (eval_count / eval_duration), not wall clock. The NPU and
+  iGPU comparison is warm latency. The band is 0.10, fixed here before any run.
+  That comparison is valid only when the alone samples' own spread, max minus
+  min relative to their median, is at most half the band. A wider alone spread
+  is inconclusive. A difference either faster or slower than the band is not
+  free. A failed step is inconclusive, not a pass. Each slot records GPU
+  temperature, SM clock, and power when the probe returns them.
 band: 0.10
 warmups: 1
 repeats: 5
@@ -42,16 +50,37 @@ dataset:
 metrics:
   - decode_tok_s
   - latency_ms
-  - package_power_w
+  - prompt_tok_s
+  - gpu_temp_c
+  - sm_clock_mhz
+  - power_w
 stop_rules:
-  - A non-zero step stops the sequence. Later arms do not run.
+  - A non-zero step stops the sequence. Later arms do not run. A failed step is inconclusive, not a pass.
+  - Order is A-B-A. Each pair is alone, then the paired arm with its companion session, then alone again. Cold is once per arm and stays out of the percentiles.
+  - The harness owns the companion session. It starts the companion arm, runs the paired slot, then stops the session. Stop is not unload.
+  - compile_cache is fresh. Each arm gets its own cache directory for the run. The harness deletes it after unload, including when a step fails. The receipt records the relative path.
+  - The noise check is half of the 0.10 band and is not a second knob. Alone spread above that half makes the pair inconclusive.
+  - Decode rate is the server's eval_count / eval_duration. Prompt rate is prompt_eval_count / prompt_eval_duration and is recorded, not the gate for this experiment.
+  - Record gpu_temp_c, sm_clock_mhz, and power_w on every slot. A missing reading is null, not a failure.
   - Book one grant and one NPU session together. Do not place this block beside a timed calibration or a ladder run.
   - Rest 900 seconds before the block. Inside the block the same models stay loaded. The rest is not taken between arms.
   - DeBERTa NLI runs at batch 1. Batch 8 is refused.
   - The NPU load is bge-base, so this experiment does not wait on E2.
   - Thinking is off. This spec does not grade thinking quality.
-  - Record package power when a probe returns it. A missing power reading is null, not a failure.
   - The OpenVINO adapter belongs to the Intel lane. This spec names it. Phase 2 does not load it.
+pairs:
+  - id: 5090-npu
+    alone: 5090-alone
+    paired: 5090-with-npu
+  - id: 5090-igpu
+    alone: 5090-alone
+    paired: 5090-with-igpu
+  - id: npu-5090
+    alone: npu-alone
+    paired: npu-with-5090
+  - id: igpu-5090
+    alone: igpu-alone
+    paired: igpu-with-5090
 arms:
   - id: 5090-alone
     task: generate
@@ -111,6 +140,7 @@ arms:
     num_predict: 128
     num_ctx: null
     batch: null
+    companion: npu-alone
     companion_device: NPU
     compare_to: 5090-alone
     measure: decode_tok_s
@@ -127,6 +157,7 @@ arms:
     num_predict: null
     num_ctx: null
     batch: 1
+    companion: 5090-alone
     companion_device: "5090"
     compare_to: npu-alone
     measure: latency_ms
@@ -143,6 +174,7 @@ arms:
     num_predict: 128
     num_ctx: null
     batch: null
+    companion: igpu-alone
     companion_device: iGPU
     compare_to: 5090-alone
     measure: decode_tok_s
@@ -159,6 +191,7 @@ arms:
     num_predict: null
     num_ctx: null
     batch: 1
+    companion: 5090-alone
     companion_device: "5090"
     compare_to: igpu-alone
     measure: latency_ms

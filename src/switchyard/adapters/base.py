@@ -8,6 +8,11 @@ when a step names the OpenVINO engine. It does not fall back to another device.
 
 ``run`` returns a result. A failed step has ``ok`` false and does not raise,
 so the harness can stop the sequence and still unload.
+
+A paired arm names a companion. The harness calls ``start_session`` on that
+companion's adapter, runs the measured step, then calls ``stop_session``.
+The companion keeps running between those two calls. ``stop_session`` ends
+that load. It is not ``unload``.
 """
 
 from __future__ import annotations
@@ -32,16 +37,38 @@ class StepRequest:
 
 @dataclass(frozen=True)
 class StepResult:
+    """One measured step.
+
+    ``latency_ms`` is the step latency and does not include compile time.
+    ``compile_ms`` and ``first_call_ms`` are reported on a cold step, separate
+    from ``latency_ms``. ``throughput`` for a generate step is server-reported
+    decode (``eval_count / eval_duration``), not wall clock. ``prompt_tok_s``
+    is ``prompt_eval_count / prompt_eval_duration``. ``output`` is the measured
+    vectors or the generation. ``resolved`` carries values learned at run time,
+    such as ``num_ctx`` and ``quant``. ``sensors`` may include ``gpu_temp_c``,
+    ``sm_clock_mhz``, ``power_w``, ``shared_mib`` and ``dedicated_mib``.
+    """
+
     ok: bool
     latency_ms: float | None = None
     throughput: float | None = None
     throughput_unit: str | None = None
     error: str | None = None
+    compile_ms: float | None = None
+    first_call_ms: float | None = None
+    prompt_tok_s: float | None = None
+    resolved: dict | None = None
+    output: object | None = None
+    sensors: dict | None = None
 
 
 class Adapter(Protocol):
     def run(self, request: StepRequest) -> StepResult:
         """Measure one step. A failed measurement returns ``ok`` false."""
 
-    def unload(self, model: str) -> None:
-        """Drop the model. A real Ollama unload uses keep_alive 0."""
+    def unload(self, model: str, device: str | None = None) -> None:
+        """Drop the model. A real Ollama unload uses keep_alive 0.
+
+        ``device`` selects the endpoint. An adapter that serves more than one
+        device must not unload through a stored default.
+        """
