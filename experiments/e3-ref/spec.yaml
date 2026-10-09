@@ -1,0 +1,61 @@
+# Standards compliance (headers per house style; the full text of the shared
+# sections is carried by the twin block, experiments/e3/spec.yaml).
+
+id: E3-REF
+procedure: interleaved
+compile_cache: reuse
+question: >
+  How fast is qwen3:8b on the 5090 through Ollama at the 1024-token prompt,
+  thinking off and on — the speed reference for E3's descriptive ratio?
+decision: >
+  None. This spec is a descriptive reference only. E3's ratio is
+  R_speed = E3 warm decode tok/s at 1024 / this run's warm decode tok/s at
+  1024, per thinking mode, read across the two receipts.
+band: 1.0
+warmups: 1
+repeats: 5
+rest_s: 900
+needs:
+  grant: true
+  npu_session: false
+  cpu_window: false
+  booked_together: false
+dataset:
+  name: e3-fixed-prompts
+  rule: The same seed and the 1024-token anchor as experiments/e3/spec.yaml.
+metrics:
+  - latency_ms
+  - throughput
+stop_rules:
+  - A non-zero step stops the sequence.
+  - Runs by R&D or Grok's hand inside a grant, rested, never beside the E3
+    Intel block or a timed calibration.
+arms:
+  - id: ref-5090-qwen3-8b-thinkoff
+    task: generate
+    device: "5090"
+    engine: ollama
+    model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "0.35.1"
+    thinking_level: "off"
+    num_predict: 128
+    num_ctx: null
+    batch: null
+    measure: throughput
+  - id: ref-5090-qwen3-8b-thinkon
+    task: generate
+    device: "5090"
+    engine: ollama
+    model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "0.35.1"
+    thinking_level: "low"
+    num_predict: 128
+    num_ctx: null
+    batch: null
+    measure: throughput

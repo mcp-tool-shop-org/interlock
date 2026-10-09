@@ -10,9 +10,9 @@
 #   no spend. Outputs are captured for eyeballing only.
 # DECOMPOSE_BY_SECRETS: 2. This file is the pre-registration. The harness
 #   runs it. The verdict is computed from the receipt after the run.
-# UNCERTAINTY_GATED_HUMANS: 2. An NPU/iGPU session and a separate 5090
-#   grant for the qwen3:8b reference, booked with the Publisher. This spec
-#   starts no device.
+# UNCERTAINTY_GATED_HUMANS: 2. An NPU/iGPU session, booked with the
+#   Publisher. The 5090 reference moved to experiments/e3-ref and runs by
+#   R&D or Grok's hand. This spec starts no device.
 # EXTERNAL_VERIFIER: n/a. R&D reviews this spec before any device time.
 
 id: E3
@@ -35,17 +35,20 @@ decision: >
   check is recorded separately — whether NPU decode is slower than iGPU
   and CPU decode for each model, the community finding to confirm or
   refute; a recorded hypothesis, not the viability gate. The 5090
-  reference (qwen3:8b via Ollama at the 1024 prompt) is for speed only,
-  runs inside its own grant, and is compared as descriptive ratios.
+  reference is spec e3-ref (qwen3:8b via Ollama at the 1024 prompt,
+  thinking off and on), run by R&D or Grok inside their own grant. When
+  both receipts exist, the descriptive ratio per thinking mode is
+  R_speed = this run's warm decode tok/s at 1024 / e3-ref's warm decode
+  tok/s at 1024, read across the two receipts — context, not a gate.
 band: 1.0
 warmups: 1
 repeats: 5
 rest_s: 900
 needs:
-  grant: true
+  grant: false
   npu_session: true
   cpu_window: true
-  booked_together: false
+  booked_together: true
 dataset:
   name: e3-fixed-prompts
   seed: "The switchyard counts the same cars on every pass. "
@@ -85,12 +88,19 @@ stop_rules:
     call. With 5 repeats the p95 is the top sample; that is known and
     accepted rather than a longer run.
   - The NPU/iGPU/CPU arms are one block in a quiet CPU window with the
-    900 second rest before it. The 5090 reference arms are a separate
-    grant, rested separately, never beside this block.
+    900 second rest before it. No 5090 grant belongs to this spec — the
+    reference arms moved to experiments/e3-ref, run by R&D or Grok.
+  - NPU arms size the genai pipeline per arm — MAX_PROMPT_LEN (prompt
+    tokens + 64) and MIN_RESPONSE_LEN (num_predict + 32), recorded under
+    resolved.genai_config. If the pipeline still cannot cover an arm's
+    prompt, the arm ends with ok true and outcome "unsupported length" —
+    recorded, not retried; the sequence continues past it.
   - compile_cache is reuse — generation IRs are too large to pay a fresh
     compile per arm. Compile time is recorded per first load; a
     warm-reload row is not part of E3's decision. If a later E3 follow-up
-    needs reload cost it will say so, pre-registered.
+    needs reload cost it will say so, pre-registered. NPU first-load cost
+    is re-priced with the static sizing; expect minutes per model load on
+    the NPU, and the estimate carries it.
   - Every measured call carries the adapter's automatic 60 second
     per-call bound. A hang marks the arm inconclusive, poisons the pair,
     stops the sequence and ends the session; the process ends, the done
@@ -506,33 +516,3 @@ arms:
     batch: 1
     prompt: *P4096
     measure: latency_ms
-  - id: ref-5090-qwen3-8b-thinkoff
-    task: generate
-    device: "5090"
-    engine: ollama
-    model: qwen3:8b
-    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
-    quant: unrecorded
-    licence: unrecorded
-    engine_version: "0.35.1"
-    thinking_level: "off"
-    num_predict: 128
-    num_ctx: null
-    batch: null
-    prompt: *P1024NT
-    measure: throughput
-  - id: ref-5090-qwen3-8b-thinkon
-    task: generate
-    device: "5090"
-    engine: ollama
-    model: qwen3:8b
-    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
-    quant: unrecorded
-    licence: unrecorded
-    engine_version: "0.35.1"
-    thinking_level: "low"
-    num_predict: 128
-    num_ctx: null
-    batch: null
-    prompt: *P1024
-    measure: throughput
