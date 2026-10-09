@@ -78,8 +78,13 @@
         "warm_p95_ms": {"type": ["number", "null"], "minimum": 0},
         "throughput": {"type": ["number", "null"]},
         "throughput_unit": {"type": ["string", "null"]},
-        "compile_ms": {"type": ["number", "null"], "minimum": 0}
+        "compile_ms": {"type": ["number", "null"], "minimum": 0},
+        "first_call_ms": {"type": ["number", "null"], "minimum": 0}
       }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": true
     },
     "date": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
     "repeats": {"type": "integer", "minimum": 1},
