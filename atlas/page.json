@@ -3,6 +3,7 @@
     ".github/",
     "assets/",
     "docs/",
+    "experiments/",
     "root"
   ],
   "breaks": [
@@ -20,56 +21,28 @@
   "changes": {
     "fileCounts": {
       "added": 15,
-      "changed": 10,
+      "changed": 3,
       "moved": 0,
-      "parts": 5,
+      "parts": 4,
       "removed": 0
     },
     "items": [
       {
-        "kind": "door",
-        "sentence": "CI's pull request trigger now also names `main`.",
+        "kind": "part",
+        "sentence": "experiments is a new part, drawn from `experiments/**`.",
         "subjects": [
-          ".github/workflows/ci.yml"
-        ]
-      },
-      {
-        "kind": "door",
-        "sentence": "CI's push trigger now also names `codecov.yml` and `main`.",
-        "subjects": [
-          ".github/workflows/ci.yml"
-        ]
-      },
-      {
-        "kind": "unassigned",
-        "sentence": "table/candidates.json is new and belongs to no part, so atlas check fails on it against the previous map.",
-        "subjects": [
-          "table/candidates.json"
-        ]
-      },
-      {
-        "kind": "unassigned",
-        "sentence": "table/gaps.md is new and belongs to no part, so atlas check fails on it against the previous map.",
-        "subjects": [
-          "table/gaps.md"
-        ]
-      },
-      {
-        "kind": "unassigned",
-        "sentence": "table/routing.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.",
-        "subjects": [
-          "table/routing.jsonl"
+          "experiments"
         ]
       },
       {
         "kind": "counts",
-        "sentence": "15 files added and 10 changed content, across 5 parts.",
+        "sentence": "15 files added and 3 changed content, across 4 parts.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "f4f2b4b7ae43f003e772bcfe3145e7e340dd36a6",
-      "generatedAt": "2026-10-09T18:00:42.461Z"
+      "commit": "a4c84a3764e96b1f2d415e7244bb02edfe3627fa",
+      "generatedAt": "2026-10-09T18:51:14.118Z"
     },
     "unchanged": false
   },
@@ -78,9 +51,9 @@
     "Window: 180 days; a pair counts from 3 shared commits, since the window holds fewer than 30 qualifying commits."
   ],
   "changesTogetherWithTests": 0,
-  "commit": "a4c84a3764e96b1f2d415e7244bb02edfe3627fa",
+  "commit": "29c57fb264a30a90f3c9bb386339664353c5c8d7",
   "defaultBranch": "main",
-  "derived": "6 parts, mostly Python (22 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.",
+  "derived": "7 parts, mostly Python (35 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.",
   "doors": [
     {
       "checks": [],
@@ -95,12 +68,12 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 6
+          "files": 7
         },
         {
           "boundary": "src",
           "depth": 1,
-          "files": 13
+          "files": 23
         }
       ],
       "runs": [
@@ -132,7 +105,7 @@
         {
           "boundary": "src",
           "depth": 0,
-          "files": 11
+          "files": 20
         }
       ],
       "runs": [
@@ -151,10 +124,11 @@
   "edges": [],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-09T18:51:14.118Z",
+  "generatedAt": "2026-10-09T19:24:04.613Z",
   "limits": [
+    "1 import could not be resolved: `src/switchyard/adapters/registry.py` imports `switchyard.adapters.openvino`, which is no module on its import path and no declared dependency.",
     "1 read uses a path built at run time and is not named here.",
-    "2 writes and 5 reads go to a path their caller passes, not to this repository.",
+    "3 writes and 7 reads go to a path their caller passes, not to this repository.",
     "3 files belong to no part: table/candidates.json, table/gaps.md and table/routing.jsonl.",
     "Statistics confidence is low: fewer than 30 qualifying commits in the window, and fewer than 25 source files reach 10 revisions."
   ],
@@ -163,11 +137,12 @@
     ".github": ".github",
     "assets": "assets",
     "docs": "docs",
+    "experiments": "experiments",
     "root": "the repository root",
     "src": "src",
     "tests": "tests"
   },
-  "parts": 6,
+  "parts": 7,
   "readers": [],
   "repo": "mcp-tool-shop-org/switchyard",
   "sequences": [],
@@ -181,9 +156,9 @@
   "startReason": "This path follows switchyard (a command people run) from its entry, since CI runs only tests.",
   "summary": "switchyard routes each job to a model, engine and device from a receipt-backed table.",
   "summaryFrom": "person",
-  "testFiles": 6,
+  "testFiles": 7,
   "testedBy": {
-    "src": 5
+    "src": 6
   },
   "unnamedWrites": 0,
   "unread": [],

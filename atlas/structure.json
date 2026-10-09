@@ -79,7 +79,7 @@
       "externals": 0,
       "files": [
         {
-          "hash": "435ef40b23d47eda4c439cb069cfafa57172ff65ef2124e48b89be0003c2ab8d",
+          "hash": "6f81284201b8b6b11ad396155c187f110265544e4024ef6c81f37ef9aa6c068e",
           "path": "docs/handoff/README.md"
         },
         {
@@ -99,7 +99,7 @@
           "path": "docs/handoff/feedback_read_exit_before_next_gpu_step.md"
         },
         {
-          "hash": "dc4b33faa26be90d6b543209bf437dd05301a627ae66060650bb14c6fd80a971",
+          "hash": "256842b46e6e60f8232cf23167957b6ab0c419578c5b6ca1eec6cd3b5e8f5a7a",
           "path": "docs/handoff/switchyard-router-buildout-handoff.md"
         }
       ],
@@ -110,6 +110,33 @@
       "name": "docs",
       "origin": "authored",
       "role": "docs",
+      "testedBy": 0,
+      "unresolvedSites": 0
+    },
+    {
+      "dynamicReads": 0,
+      "dynamicSpawns": 0,
+      "dynamicSpawnsInTests": 0,
+      "dynamicWrites": 0,
+      "entryPoints": [],
+      "externals": 0,
+      "files": [
+        {
+          "hash": "5d03a45141a98dd76acb8aec09ff468c217769f8491c73ff3aaae89df7347d9c",
+          "path": "experiments/e4/spec.yaml"
+        },
+        {
+          "hash": "afb8238483ac083b287cc1825dc48a928553b3bba15024a350c364cb5a4e7fdd",
+          "path": "experiments/e5/spec.yaml"
+        }
+      ],
+      "globs": [
+        "experiments/**"
+      ],
+      "importConfidence": "full",
+      "name": "experiments",
+      "origin": "authored",
+      "role": "data",
       "testedBy": 0,
       "unresolvedSites": 0
     },
@@ -193,18 +220,162 @@
           "path": "src/switchyard/__main__.py"
         },
         {
+          "hash": "da1195ecf4c1999cd3ac499bf5bfab6e17209c870882e83e0a79f8d19fbd01d1",
+          "noStatements": true,
+          "path": "src/switchyard/adapters/__init__.py"
+        },
+        {
+          "hash": "2b156b7dba2e7929d592d15a880e1d71f72fcea6a26bf49d453b90a0b55182f4",
+          "path": "src/switchyard/adapters/base.py"
+        },
+        {
+          "exports": [
+            "plan_argv",
+            "scratch_project"
+          ],
+          "failurePaths": [
+            {
+              "in": "scratch_project",
+              "kind": "raise",
+              "line": 22
+            },
+            {
+              "in": "scratch_project",
+              "kind": "raise",
+              "line": 25
+            },
+            {
+              "in": "plan_argv",
+              "kind": "raise",
+              "line": 34
+            },
+            {
+              "in": "plan_argv",
+              "kind": "raise",
+              "line": 37
+            },
+            {
+              "in": "plan_argv",
+              "kind": "raise",
+              "line": 40
+            },
+            {
+              "in": "plan_argv",
+              "kind": "raise",
+              "line": 42
+            },
+            {
+              "in": "plan_argv",
+              "kind": "raise",
+              "line": 45
+            },
+            {
+              "in": "plan_argv",
+              "kind": "raise",
+              "line": 48
+            },
+            {
+              "in": "plan_argv",
+              "kind": "raise",
+              "line": 51
+            },
+            {
+              "in": "run",
+              "kind": "raise",
+              "line": 84
+            }
+          ],
+          "hash": "b4bdeac13c45dce57874dbd79782ec41c1d6f2065d023d8d0f3a8f3b761f4b94",
+          "importsFiles": [
+            "src/switchyard/adapters/base.py"
+          ],
+          "path": "src/switchyard/adapters/offrig_calibrate.py"
+        },
+        {
+          "exports": [
+            "default_transport",
+            "generate_body",
+            "refuse_cloud",
+            "url_for"
+          ],
+          "failurePaths": [
+            {
+              "in": "url_for",
+              "kind": "raise",
+              "line": 24
+            },
+            {
+              "in": "refuse_cloud",
+              "kind": "raise",
+              "line": 30
+            }
+          ],
+          "hash": "013fe697d8829ec505d3909e85de3740cbcd89467c94e3d01c9706f37e389cb2",
+          "importsFiles": [
+            "src/switchyard/adapters/base.py"
+          ],
+          "path": "src/switchyard/adapters/ollama.py"
+        },
+        {
+          "exports": [
+            "for_engine"
+          ],
+          "failurePaths": [
+            {
+              "in": "for_engine",
+              "kind": "raise",
+              "line": 23
+            },
+            {
+              "in": "_openvino",
+              "kind": "except",
+              "line": 29
+            },
+            {
+              "in": "_openvino",
+              "kind": "raise",
+              "line": 30
+            },
+            {
+              "in": "_openvino",
+              "kind": "raise",
+              "line": 36
+            }
+          ],
+          "hash": "aab3181298280a20fd46450bddeb18b2d4e565e1539edb82022545bed94f8e60",
+          "importsFiles": [
+            "src/switchyard/adapters/base.py",
+            "src/switchyard/adapters/offrig_calibrate.py",
+            "src/switchyard/adapters/ollama.py"
+          ],
+          "path": "src/switchyard/adapters/registry.py"
+        },
+        {
           "entry": "main",
           "entryRule": 0,
           "exports": [
             "main"
           ],
-          "hash": "97771965fd2924dc3426033a3615197112906e0c4c545d807317c548e44202a0",
+          "failurePaths": [
+            {
+              "in": "_cmd_run",
+              "kind": "except",
+              "line": 108
+            }
+          ],
+          "hash": "c28c51a0914029cb867aac33940361a2eb15128f55c8d00ba2e33dbd05546302",
           "importOrder": [
             "src/switchyard/receipt.py",
             "src/switchyard/importers/assemble.py",
-            "src/switchyard/importers/gaps.py"
+            "src/switchyard/importers/gaps.py",
+            "src/switchyard/guards.py",
+            "src/switchyard/harness/runner.py",
+            "src/switchyard/harness/spec.py"
           ],
           "importsFiles": [
+            "src/switchyard/guards.py",
+            "src/switchyard/harness/runner.py",
+            "src/switchyard/harness/spec.py",
             "src/switchyard/importers/assemble.py",
             "src/switchyard/importers/gaps.py",
             "src/switchyard/receipt.py"
@@ -214,14 +385,14 @@
             {
               "calls": [
                 {
-                  "line": 38,
+                  "line": 47,
                   "name": "check_tree",
                   "target": {
                     "file": "src/switchyard/receipt.py"
                   }
                 },
                 {
-                  "line": 93,
+                  "line": 119,
                   "name": "receipt_paths",
                   "target": {
                     "file": "src/switchyard/receipt.py"
@@ -229,7 +400,7 @@
                   "via": "_count_rows"
                 },
                 {
-                  "line": 95,
+                  "line": 121,
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/switchyard/receipt.py"
@@ -245,7 +416,7 @@
             {
               "calls": [
                 {
-                  "line": 53,
+                  "line": 62,
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/switchyard/receipt.py"
@@ -260,21 +431,21 @@
             {
               "calls": [
                 {
-                  "line": 70,
+                  "line": 79,
                   "name": "import_receipts",
                   "target": {
                     "file": "src/switchyard/importers/assemble.py"
                   }
                 },
                 {
-                  "line": 75,
+                  "line": 84,
                   "name": "load_candidates",
                   "target": {
                     "file": "src/switchyard/importers/gaps.py"
                   }
                 },
                 {
-                  "line": 82,
+                  "line": 91,
                   "name": "render_gaps",
                   "target": {
                     "file": "src/switchyard/importers/gaps.py"
@@ -289,14 +460,51 @@
             {
               "calls": [
                 {
-                  "line": 93,
+                  "branch": "args.dry_run",
+                  "line": 105,
+                  "name": "dry_run",
+                  "target": {
+                    "file": "src/switchyard/harness/runner.py"
+                  }
+                },
+                {
+                  "line": 107,
+                  "name": "load_spec",
+                  "target": {
+                    "file": "src/switchyard/harness/spec.py"
+                  }
+                },
+                {
+                  "line": 107,
+                  "name": "check_flags",
+                  "target": {
+                    "file": "src/switchyard/harness/runner.py"
+                  }
+                },
+                {
+                  "line": 111,
+                  "name": "devices_not_started",
+                  "target": {
+                    "file": "src/switchyard/harness/runner.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_cmd_run"
+            },
+            {
+              "calls": [
+                {
+                  "line": 119,
                   "name": "receipt_paths",
                   "target": {
                     "file": "src/switchyard/receipt.py"
                   }
                 },
                 {
-                  "line": 95,
+                  "line": 121,
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/switchyard/receipt.py"
@@ -452,6 +660,488 @@
             "src/switchyard/devices.py"
           ],
           "path": "src/switchyard/guards.py"
+        },
+        {
+          "hash": "1b8016c359c0f38f77602e1abfb41b11fb1c6e93fda453a8bc24975726efab1c",
+          "noStatements": true,
+          "path": "src/switchyard/harness/__init__.py"
+        },
+        {
+          "exports": [
+            "fit_prompt",
+            "is_slow",
+            "over_margin",
+            "search"
+          ],
+          "failurePaths": [
+            {
+              "in": "fit_prompt",
+              "kind": "raise",
+              "line": 61
+            },
+            {
+              "in": "fit_prompt",
+              "kind": "raise",
+              "line": 63
+            },
+            {
+              "in": "fit_prompt",
+              "kind": "raise",
+              "line": 68
+            },
+            {
+              "in": "search",
+              "kind": "raise",
+              "line": 91
+            },
+            {
+              "in": "search",
+              "kind": "raise",
+              "line": 93
+            },
+            {
+              "in": "measure",
+              "kind": "raise",
+              "line": 99
+            }
+          ],
+          "hash": "5918f25bc8491d71b516594a061d3f4ca4bb72d98c464610f4371e8f9143d0fd",
+          "path": "src/switchyard/harness/e5.py"
+        },
+        {
+          "exports": [
+            "require_unmodified"
+          ],
+          "failurePaths": [
+            {
+              "in": "require_unmodified",
+              "kind": "raise",
+              "line": 20
+            },
+            {
+              "in": "_relative",
+              "kind": "except",
+              "line": 27
+            },
+            {
+              "in": "_relative",
+              "kind": "raise",
+              "line": 28
+            },
+            {
+              "in": "_git",
+              "kind": "except",
+              "line": 38
+            },
+            {
+              "in": "_git",
+              "kind": "raise",
+              "line": 40
+            }
+          ],
+          "hash": "2cf4b48636b66ec5f155a7a4ec9c4d51150b9488eec207084c9cf0474b0ef61b",
+          "importsFiles": [
+            "src/switchyard/harness/spec.py"
+          ],
+          "path": "src/switchyard/harness/lock.py"
+        },
+        {
+          "exports": [
+            "environment",
+            "measured_row",
+            "write_run"
+          ],
+          "failurePaths": [
+            {
+              "in": "write_run",
+              "kind": "raise",
+              "line": 102
+            }
+          ],
+          "hash": "886b9762c775dbab57dbcbc81d6140de370ec0824e05c7f2eb6649659a97e5d3",
+          "importsFiles": [
+            "src/switchyard/harness/timing.py",
+            "src/switchyard/receipt.py"
+          ],
+          "path": "src/switchyard/harness/receipts.py"
+        },
+        {
+          "entry": "run_interleaved",
+          "entryRule": 4,
+          "exports": [
+            "check_flags",
+            "devices_not_started",
+            "dry_run",
+            "run_interleaved"
+          ],
+          "failurePaths": [
+            {
+              "in": "run_interleaved",
+              "kind": "raise",
+              "line": 89
+            }
+          ],
+          "hash": "9da33e3582e19b5a48b6e5864d95f56db98a1d6f19330f16848ae493c59c9a1b",
+          "importsFiles": [
+            "src/switchyard/adapters/base.py",
+            "src/switchyard/adapters/offrig_calibrate.py",
+            "src/switchyard/guards.py",
+            "src/switchyard/harness/lock.py",
+            "src/switchyard/harness/receipts.py",
+            "src/switchyard/harness/spec.py",
+            "src/switchyard/harness/timing.py"
+          ],
+          "path": "src/switchyard/harness/runner.py",
+          "sequences": [
+            {
+              "calls": [
+                {
+                  "line": 29,
+                  "name": "load_spec",
+                  "target": {
+                    "file": "src/switchyard/harness/spec.py"
+                  }
+                },
+                {
+                  "line": 30,
+                  "name": "require_unmodified",
+                  "target": {
+                    "file": "src/switchyard/harness/lock.py"
+                  }
+                },
+                {
+                  "line": 37,
+                  "name": "schedule",
+                  "target": {
+                    "file": "src/switchyard/harness/timing.py"
+                  }
+                },
+                {
+                  "line": 47,
+                  "name": "plan_argv",
+                  "target": {
+                    "file": "src/switchyard/adapters/offrig_calibrate.py"
+                  }
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "dry_run"
+            },
+            {
+              "calls": [
+                {
+                  "line": 160,
+                  "name": "assess_step",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  },
+                  "via": "_guard_flags"
+                },
+                {
+                  "line": 80,
+                  "name": "schedule",
+                  "target": {
+                    "file": "src/switchyard/harness/timing.py"
+                  }
+                },
+                {
+                  "line": 124,
+                  "name": "StepRequest",
+                  "target": {
+                    "file": "src/switchyard/adapters/base.py"
+                  },
+                  "via": "_request"
+                },
+                {
+                  "line": 94,
+                  "name": "environment",
+                  "target": {
+                    "file": "src/switchyard/harness/receipts.py"
+                  }
+                },
+                {
+                  "line": 96,
+                  "name": "summarize",
+                  "target": {
+                    "file": "src/switchyard/harness/timing.py"
+                  }
+                },
+                {
+                  "line": 98,
+                  "name": "measured_row",
+                  "target": {
+                    "file": "src/switchyard/harness/receipts.py"
+                  }
+                },
+                {
+                  "line": 111,
+                  "name": "write_run",
+                  "target": {
+                    "file": "src/switchyard/harness/receipts.py"
+                  }
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "run_interleaved"
+            },
+            {
+              "calls": [
+                {
+                  "line": 124,
+                  "name": "StepRequest",
+                  "target": {
+                    "file": "src/switchyard/adapters/base.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_request"
+            },
+            {
+              "calls": [
+                {
+                  "line": 160,
+                  "name": "assess_step",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_guard_flags"
+            },
+            {
+              "calls": [
+                {
+                  "branch": "spec[\"procedure\"] == \"interleaved\"",
+                  "line": 160,
+                  "name": "assess_step",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  },
+                  "via": "_guard_flags"
+                },
+                {
+                  "line": 181,
+                  "name": "assess_step",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  }
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "check_flags"
+            }
+          ]
+        },
+        {
+          "entry": "load_spec",
+          "entryRule": 4,
+          "exports": [
+            "load_spec",
+            "validate_spec"
+          ],
+          "failurePaths": [
+            {
+              "in": "validate_spec",
+              "kind": "raise",
+              "line": 36
+            },
+            {
+              "in": "validate_spec",
+              "kind": "raise",
+              "line": 39
+            },
+            {
+              "in": "validate_spec",
+              "kind": "raise",
+              "line": 41
+            },
+            {
+              "in": "validate_spec",
+              "kind": "raise",
+              "line": 44
+            },
+            {
+              "in": "validate_spec",
+              "kind": "raise",
+              "line": 47
+            },
+            {
+              "in": "validate_spec",
+              "kind": "raise",
+              "line": 49
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 62
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 64
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 67
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 70
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 74
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 76
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 80
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 82
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 85
+            },
+            {
+              "in": "_fill_card",
+              "kind": "raise",
+              "line": 90
+            },
+            {
+              "in": "_fill_card",
+              "kind": "raise",
+              "line": 92
+            },
+            {
+              "in": "_fill_card",
+              "kind": "raise",
+              "line": 95
+            },
+            {
+              "in": "_fill_card",
+              "kind": "raise",
+              "line": 98
+            },
+            {
+              "in": "_fill_card",
+              "kind": "raise",
+              "line": 100
+            },
+            {
+              "in": "_fill_card",
+              "kind": "raise",
+              "line": 102
+            },
+            {
+              "in": "_fill_card",
+              "kind": "raise",
+              "line": 105
+            },
+            {
+              "in": "_fill_card",
+              "kind": "raise",
+              "line": 109
+            },
+            {
+              "in": "_fill_card",
+              "kind": "raise",
+              "line": 111
+            },
+            {
+              "in": "_fill_card",
+              "kind": "raise",
+              "line": 113
+            },
+            {
+              "in": "_offrig",
+              "kind": "raise",
+              "line": 119
+            },
+            {
+              "in": "_offrig",
+              "kind": "raise",
+              "line": 121
+            }
+          ],
+          "hash": "99beb6b26cd27f23ae62ea34929d32ad85bf2a3090eb2bacbe0062e59b3ca5ae",
+          "path": "src/switchyard/harness/spec.py",
+          "sequences": [
+            {
+              "calls": [
+                {
+                  "line": 26,
+                  "name": "read_text",
+                  "target": null
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "load_spec"
+            }
+          ]
+        },
+        {
+          "exports": [
+            "percentile",
+            "schedule",
+            "summarize",
+            "within_band"
+          ],
+          "failurePaths": [
+            {
+              "in": "schedule",
+              "kind": "raise",
+              "line": 26
+            },
+            {
+              "in": "schedule",
+              "kind": "raise",
+              "line": 28
+            },
+            {
+              "in": "percentile",
+              "kind": "raise",
+              "line": 45
+            },
+            {
+              "in": "percentile",
+              "kind": "raise",
+              "line": 47
+            },
+            {
+              "in": "within_band",
+              "kind": "raise",
+              "line": 62
+            }
+          ],
+          "hash": "8654ef89fd617fc5ca907d5245a1d7efa9b9d5a6631b1eb44e810927846350b9",
+          "path": "src/switchyard/harness/timing.py"
         },
         {
           "hash": "a80241985f5ce658bc6ed7967d97e3d27379e734165863530139acae88fc833b",
@@ -1235,21 +1925,28 @@
       "origin": "authored",
       "outsidePlaces": [
         {
-          "reads": 5,
+          "reads": 7,
           "where": [
             "caller"
           ],
-          "writes": 2
+          "writes": 3
         }
       ],
-      "outsideReads": 5,
-      "outsideWrites": 2,
+      "outsideReads": 7,
+      "outsideWrites": 3,
       "role": "code",
       "testRunners": [
         "pytest"
       ],
-      "testedBy": 5,
-      "unresolvedSites": 0
+      "testedBy": 6,
+      "unresolvedNamed": [
+        {
+          "path": "src/switchyard/adapters/registry.py",
+          "specifier": "switchyard.adapters.openvino",
+          "why": "unplaced"
+        }
+      ],
+      "unresolvedSites": 1
     },
     {
       "dynamicReads": 0,
@@ -1319,6 +2016,58 @@
             "src/switchyard/guards.py"
           ],
           "path": "tests/test_guards.py",
+          "testFramework": "pytest"
+        },
+        {
+          "exports": [
+            "test_a_failed_step_stops_and_writes_nothing",
+            "test_adapter_edges_stay_local",
+            "test_an_edited_spec_is_refused_and_dry_run_does_not_touch_devices",
+            "test_dry_run_plans_calibrate_and_names_the_cpu_window",
+            "test_duplicate_receipt_ids_are_refused",
+            "test_e4_and_e5_specs_pin_the_rules",
+            "test_fill_card_doubles_bisects_and_steps_back",
+            "test_offrig_calibrate_is_planned_and_not_launched",
+            "test_ollama_stays_on_loopback_and_refuses_cloud",
+            "test_openvino_is_a_plug_in_and_not_a_fallback",
+            "test_repeats_build_a_receipt_and_keep_cold_separate",
+            "test_schedule_interleaves_and_percentiles_ignore_warmups",
+            "test_search_spill_and_schedule_refuse_bad_inputs",
+            "test_spec_rejects_a_contract_that_is_not_pre_registered",
+            "test_the_command_dry_runs_and_refuses_to_start_a_device"
+          ],
+          "hash": "8750818550bfcd4ed2ef5967ec9dd1a758c0b8e83df2ce5627c3b75823a493f1",
+          "importOrder": [
+            "src/switchyard/adapters/base.py",
+            "src/switchyard/adapters/offrig_calibrate.py",
+            "src/switchyard/adapters/ollama.py",
+            "src/switchyard/adapters/registry.py",
+            "src/switchyard/guards.py",
+            "src/switchyard/harness/e5.py",
+            "src/switchyard/harness/lock.py",
+            "src/switchyard/harness/receipts.py",
+            "src/switchyard/harness/runner.py",
+            "src/switchyard/harness/spec.py",
+            "src/switchyard/harness/timing.py",
+            "src/switchyard/receipt.py",
+            "src/switchyard/cli.py"
+          ],
+          "importsFiles": [
+            "src/switchyard/adapters/base.py",
+            "src/switchyard/adapters/offrig_calibrate.py",
+            "src/switchyard/adapters/ollama.py",
+            "src/switchyard/adapters/registry.py",
+            "src/switchyard/cli.py",
+            "src/switchyard/guards.py",
+            "src/switchyard/harness/e5.py",
+            "src/switchyard/harness/lock.py",
+            "src/switchyard/harness/receipts.py",
+            "src/switchyard/harness/runner.py",
+            "src/switchyard/harness/spec.py",
+            "src/switchyard/harness/timing.py",
+            "src/switchyard/receipt.py"
+          ],
+          "path": "tests/test_harness.py",
           "testFramework": "pytest"
         },
         {
@@ -1472,7 +2221,7 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 6
+          "files": 7
         },
         {
           "boundary": "src",
@@ -1481,7 +2230,7 @@
             "file": "src/switchyard/cli.py",
             "from": "tests/test_cli.py"
           },
-          "files": 13
+          "files": 23
         }
       ],
       "readers": [],
@@ -1512,7 +2261,7 @@
         {
           "config": "pyproject.toml",
           "coverage": true,
-          "files": 6,
+          "files": 7,
           "job": "test",
           "runner": "pytest",
           "step": "Test"
@@ -1581,7 +2330,7 @@
         {
           "boundary": "src",
           "depth": 0,
-          "files": 11
+          "files": 20
         }
       ],
       "readers": [],
@@ -1619,8 +2368,8 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "a4c84a3764e96b1f2d415e7244bb02edfe3627fa",
-    "tracked": 48
+    "commit": "29c57fb264a30a90f3c9bb386339664353c5c8d7",
+    "tracked": 63
   },
   "landings": [
     {
@@ -1649,7 +2398,7 @@
   "overlaps": [],
   "submodules": [],
   "symlinks": [],
-  "testFiles": 6,
+  "testFiles": 7,
   "unassigned": [
     {
       "hash": "58e9cda6a10a6f409c86f15c61845a82d66dd31bbf284c86d4436dcf42955060",
