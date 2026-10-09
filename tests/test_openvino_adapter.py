@@ -481,10 +481,13 @@ def test_session_companion_hang_surfaces_at_stop(tmp_path, monkeypatch):
     monkeypatch.setitem(ovm._POOLING, m, "cls")
     a = make_adapter(core=SlowCore(), call_timeout_s=0.05)
     r = req(model=m, device="CPU", static_shape="1x16")
-    a.start_session(r)
-    _time.sleep(0.2)
+    # the hang surfaces at start on a fast machine (fault seen during the
+    # settle window), at stop on a slower one — both are correct
     with pytest.raises(AdapterError, match="hang"):
-        a.stop_session(r)
+        a.start_session(r)
+        _time.sleep(0.2)
+        if a._session is not None:
+            a.stop_session(r)
     assert a._session is None
 def test_pool_last_token():
     matrix = [[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]]
