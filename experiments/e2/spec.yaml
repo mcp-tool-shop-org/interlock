@@ -57,7 +57,8 @@ dataset:
     the arm's static length, so every device sees byte-identical tokens at
     each length. The dropped count is recorded as truncated_tokens. No
     instruction prefix is prepended — E2 measures identical generic tokens
-    for speed and parity, not the retrieval recipe.
+    for speed and parity, not the retrieval recipe. Every E2 row carries
+    the label "speed and parity only; not the retrieval recipe".
 metrics:
   - compile_ms
   - compile_warm_reload_ms
@@ -90,7 +91,9 @@ stop_rules:
   - Booked through the Publisher; never beside a timed calibration or the
     math ladder on the 5090.
   - Retrieval quality, calibration and any benchmark placement belong to
-    the later retrieval benchmark, not this run.
+    the later retrieval benchmark, not this run. Every row this run writes
+    is labelled "speed and parity only; not the retrieval recipe", and that
+    label travels into the report.
 arms:
   - id: qwen3emb-cpu-l128-b1
     task: embed
