@@ -194,26 +194,31 @@ def local_model(tmp_path):
     return str(tmp_path)
 
 
-def test_embed_step_ok_and_compile_once(tmp_path):
+def test_embed_step_ok_and_compile_once(tmp_path, monkeypatch):
     a = make_adapter()
     core = a._injected_core
-    r1 = a.run(req(model=local_model(tmp_path), device="NPU", static_shape="1x128"))
+    m = local_model(tmp_path)
+    monkeypatch.setitem(ovm._POOLING, m, "cls")
+    r1 = a.run(req(model=m, device="NPU", static_shape="1x128"))
     assert r1.ok and r1.latency_ms is not None
     assert r1.throughput_unit == "items/s" and r1.throughput and r1.throughput > 0
     assert r1.compile_ms is not None and r1.first_call_ms is not None
-    assert r1.resolved["pooling"] == "mean" and r1.resolved["num_ctx"] == 512
+    assert r1.resolved["pooling"] == "cls" and r1.resolved["num_ctx"] == 512
     assert len(r1.output) == 3
     assert core.graphs[-1].reshape_args  # static reshape happened
-    r2 = a.run(req(model=local_model(tmp_path), device="NPU", static_shape="1x128"))
+    r2 = a.run(req(model=m, device="NPU", static_shape="1x128"))
     assert r2.compile_ms is None and r2.first_call_ms is None  # cached entry
 
 
-def test_embed_revision_pinned(tmp_path):
+def test_embed_revision_pinned(tmp_path, monkeypatch):
     a = make_adapter()
+    monkeypatch.setitem(ovm._POOLING, "acme/missing-embed", "mean")
     # hub ids without network are refused before measuring
     with pytest.raises(AdapterError):
         a.run(req(model="acme/missing-embed@abc", device="CPU"))
-    r = a.run(req(model=local_model(tmp_path), device="CPU"))
+    m = local_model(tmp_path)
+    monkeypatch.setitem(ovm._POOLING, m, "mean")
+    r = a.run(req(model=m, device="CPU"))
     assert r.resolved["revision"] == "unrecorded"
 
 
@@ -231,19 +236,23 @@ def test_embed_refusals(tmp_path):
         a.run(req(model=local_model(tmp_path), engine="ollama"))
 
 
-def test_embed_truncate_false_refuses(tmp_path):
+def test_embed_truncate_false_refuses(tmp_path, monkeypatch):
     a = make_adapter()
+    m = local_model(tmp_path)
+    monkeypatch.setitem(ovm._POOLING, m, "cls")
     long_prompt = " ".join(f"w{i}" for i in range(600))
     with pytest.raises(AdapterError):
         a.run(req(model=local_model(tmp_path), device="NPU", static_shape="1x8",
                   prompt=long_prompt, truncate=False))
-    r = a.run(req(model=local_model(tmp_path), device="NPU", static_shape="1x8", prompt=long_prompt))
+    r = a.run(req(model=m, device="NPU", static_shape="1x8", prompt=long_prompt))
     assert r.ok and r.resolved["truncated_tokens"] > 0
 
 
-def test_compile_cache_and_precision_config(tmp_path):
+def test_compile_cache_and_precision_config(tmp_path, monkeypatch):
     a = make_adapter()
-    a.run(req(model=local_model(tmp_path), device="CPU", static_shape="1x16",
+    m = local_model(tmp_path)
+    monkeypatch.setitem(ovm._POOLING, m, "mean")
+    a.run(req(model=m, device="CPU", static_shape="1x16",
               precision="fp16", compile_cache="fresh", compile_cache_dir="D:/cache/x"))
     _dev, config = a._injected_core.compiled[-1]
     assert config["CACHE_DIR"] == "D:/cache/x"
@@ -256,9 +265,11 @@ def test_nli_pooling_none(tmp_path):
     assert r.ok and r.resolved["pooling"] == "none"
 
 
-def test_measurement_failure_is_ok_false(tmp_path):
+def test_measurement_failure_is_ok_false(tmp_path, monkeypatch):
+    m = local_model(tmp_path)
+    monkeypatch.setitem(ovm._POOLING, m, "cls")
     a = make_adapter(core=FakeCore(fail_compile=True))
-    r = a.run(req(model=local_model(tmp_path), device="CPU"))
+    r = a.run(req(model=m, device="CPU"))
     assert r.ok is False and "compile blew up" in r.error
 
 
@@ -330,9 +341,10 @@ def test_session_start_fault_raises():
         a.start_session(req(model="/nonexistent/dir/xyz", device="CPU"))
 
 
-def test_unload_drops_compiled_and_tokenizer(tmp_path):
+def test_unload_drops_compiled_and_tokenizer(tmp_path, monkeypatch):
     a = make_adapter()
     m = local_model(tmp_path)
+    monkeypatch.setitem(ovm._POOLING, m, "cls")
     a.run(req(model=m, device="CPU", static_shape="1x16"))
     assert a._compiled and a._tokenizers
     a.unload(m)
@@ -366,3 +378,18 @@ def test_real_core_enumerates_this_rig():
     a = ovm.adapter()
     ids = [d["id"] for d in ovm.OpenvinoAdapter.enumerate_devices(a._core())]
     assert "CPU" in ids and "NPU" in ids
+
+
+def test_embed_unknown_repo_refused(tmp_path, monkeypatch):
+    a = make_adapter()
+    monkeypatch.setitem(ovm._POOLING, "acme/known", "cls")
+    m = local_model(tmp_path)  # a local dir with no recipe on record
+    with pytest.raises(AdapterError, match="pooling recipe"):
+        a.run(req(model=m, device="CPU", static_shape="1x16"))
+
+
+def test_pooling_table_matches_the_measured_recipes():
+    assert ovm._POOLING["BAAI/bge-base-en-v1.5"] == "cls"
+    assert ovm._POOLING["BAAI/bge-small-en-v1.5"] == "cls"
+    assert ovm._POOLING["nomic-ai/nomic-embed-text-v1.5"] == "mean"
+    assert ovm._pooling_for("nli", "cross-encoder/nli-deberta-v3-base") == "none"

@@ -8,8 +8,10 @@ actually requested.
 
 Measurement policy, fixed by the adapter and recorded in ``resolved``:
 
-``embed`` steps pool with the mean over unmasked rows and L2-normalise the
-vector (the bge/nomic convention). ``nli`` and ``rerank`` steps return the
+``embed`` steps pool per model from the committed ``_POOLING`` table (cls
+for the bge family, mean for nomic — the recipes the npu-probe rows were
+measured with), then L2-normalise. An embed arm on a repo with no recipe is
+refused rather than pooled silently. ``nli`` and ``rerank`` steps return the
 single-row logits un-pooled. Batch rows above the first repeat the same
 input (``batch_fill: repeat``) because a step carries one prompt; the NLI
 batch is pinned to 1 by the spec validator. Inputs longer than the static
@@ -297,8 +299,27 @@ def _compile_config(s: _Settings) -> dict:
     return config
 
 
-def _pooling_for(task: str) -> str:
-    return "mean" if task == "embed" else "none"
+# Pooling belongs to the model, not the task. The recipes below are the ones
+# the npu-probe/npu-serve rows on rnd's npu-buildout were measured with
+# (bge-base a5beb1e, bge-small 5c38ec7, nomic e9b6763 — every arm still pins
+# its own revision). An embed arm on a repo not listed here is refused.
+_POOLING = {
+    "BAAI/bge-base-en-v1.5": "cls",
+    "BAAI/bge-small-en-v1.5": "cls",
+    "nomic-ai/nomic-embed-text-v1.5": "mean",
+}
+
+
+def _pooling_for(task: str, repo: str) -> str:
+    if task != "embed":
+        return "none"
+    recipe = _POOLING.get(repo)
+    if recipe is None:
+        raise AdapterError(
+            f"no pooling recipe on record for {repo!r}; pooling is per model, "
+            "so the recipe (cls|mean) belongs in _POOLING before that arm runs"
+        )
+    return recipe
 
 
 def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> StepResult:
@@ -307,6 +328,7 @@ def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> Step
     if ov_id == "NPU" and static is None:
         raise AdapterError("the NPU needs a static_shape BxL; dynamic shapes are not supported there")
     repo, ref = parse_model_ref(request.model)
+    pooling = _pooling_for(request.task, repo)  # refused before anything loads
     tokenizer = self._load_tokenizer(repo, ref)
     ids, mask = self._encode(tokenizer, str(s.get("prompt") or "hello"))
     dropped = 0
@@ -319,10 +341,10 @@ def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> Step
     t0 = self.clock()
     matrix = self._infer_embed(entry, ids, mask, batch_rows if static is None else static[0])
     call_s = self.clock() - t0
-    vec = normalize(pool(matrix, mask, _pooling_for(request.task)))
+    vec = normalize(pool(matrix, mask, pooling))
     resolved.update(
         revision=ref or "unrecorded",
-        pooling=_pooling_for(request.task),
+        pooling=pooling,
         num_ctx=getattr(tokenizer, "model_max_length", None) or "unrecorded",
     )
     if dropped:
