@@ -94,8 +94,21 @@ stop_rules:
     model+device pair for the rest of the run, and the runner's
     non-zero-step stop ends the sequence, which ends the NPU session. No
     manual watch is part of this spec.
-  - The NPU, iGPU and CPU arms run in one booked block inside a quiet CPU
-    window. The 900 second rest is taken before the block, not between arms.
+  - Every NPU arm with batch > 1 runs in the tail spec
+    experiments/e1/spec-b8tail.yaml — one final block after this run's
+    receipts are written, inside the same booked session. This run's batch-1,
+    iGPU and CPU measurements are on disk before the first batch-8 NPU call.
+  - A Level Zero device loss (ZE_RESULT_ERROR_DEVICE_LOST) is a measurement
+    event, not a hang — the adapter records outcome device_lost for the arm
+    that lost the device — no timing fields, like an unsupported-length row —
+    and outcome "not run" for that device's remaining steps, without touching
+    the hardware. It is never retried. The sequence continues past it. The
+    incident record for the loss this rule answers is
+    experiments/e1/incident-2026-10-09.md (driver 32.0.100.5540; an L0 reset
+    leaves no Windows event-log entry, so the ZE result code is the witness).
+  - The NPU, iGPU and CPU batch-1 arms run in one booked block inside a
+    quiet CPU window. The 900 second rest is taken before the block, not
+    between arms. The batch-8 tail follows in the same session.
   - Booked through the Publisher; never beside a timed calibration or the
     math ladder on the 5090.
   - Warm throughput versus CPU is descriptive in the report, not a gate.
@@ -295,21 +308,6 @@ arms:
     batch: 1
     static_shape: "1x128"
     measure: latency_ms
-  - id: bge-base-npu-l128-b8
-    task: embed
-    device: NPU
-    engine: openvino
-    model: BAAI/bge-base-en-v1.5@a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
-    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
-    quant: unrecorded
-    licence: unrecorded
-    engine_version: "2026.4.1"
-    thinking_level: "off"
-    num_predict: null
-    num_ctx: null
-    batch: 8
-    static_shape: "8x128"
-    measure: latency_ms
   - id: bge-base-npu-l256-b1
     task: embed
     device: NPU
@@ -325,21 +323,6 @@ arms:
     batch: 1
     static_shape: "1x256"
     measure: latency_ms
-  - id: bge-base-npu-l256-b8
-    task: embed
-    device: NPU
-    engine: openvino
-    model: BAAI/bge-base-en-v1.5@a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
-    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
-    quant: unrecorded
-    licence: unrecorded
-    engine_version: "2026.4.1"
-    thinking_level: "off"
-    num_predict: null
-    num_ctx: null
-    batch: 8
-    static_shape: "8x256"
-    measure: latency_ms
   - id: bge-base-npu-l512-b1
     task: embed
     device: NPU
@@ -354,21 +337,6 @@ arms:
     num_ctx: null
     batch: 1
     static_shape: "1x512"
-    measure: latency_ms
-  - id: bge-base-npu-l512-b8
-    task: embed
-    device: NPU
-    engine: openvino
-    model: BAAI/bge-base-en-v1.5@a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
-    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
-    quant: unrecorded
-    licence: unrecorded
-    engine_version: "2026.4.1"
-    thinking_level: "off"
-    num_predict: null
-    num_ctx: null
-    batch: 8
-    static_shape: "8x512"
     measure: latency_ms
   - id: bge-small-cpu-l128-b1
     task: embed
@@ -565,21 +533,6 @@ arms:
     batch: 1
     static_shape: "1x128"
     measure: latency_ms
-  - id: bge-small-npu-l128-b8
-    task: embed
-    device: NPU
-    engine: openvino
-    model: BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
-    revision_or_digest: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
-    quant: unrecorded
-    licence: unrecorded
-    engine_version: "2026.4.1"
-    thinking_level: "off"
-    num_predict: null
-    num_ctx: null
-    batch: 8
-    static_shape: "8x128"
-    measure: latency_ms
   - id: bge-small-npu-l256-b1
     task: embed
     device: NPU
@@ -595,21 +548,6 @@ arms:
     batch: 1
     static_shape: "1x256"
     measure: latency_ms
-  - id: bge-small-npu-l256-b8
-    task: embed
-    device: NPU
-    engine: openvino
-    model: BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
-    revision_or_digest: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
-    quant: unrecorded
-    licence: unrecorded
-    engine_version: "2026.4.1"
-    thinking_level: "off"
-    num_predict: null
-    num_ctx: null
-    batch: 8
-    static_shape: "8x256"
-    measure: latency_ms
   - id: bge-small-npu-l512-b1
     task: embed
     device: NPU
@@ -624,21 +562,6 @@ arms:
     num_ctx: null
     batch: 1
     static_shape: "1x512"
-    measure: latency_ms
-  - id: bge-small-npu-l512-b8
-    task: embed
-    device: NPU
-    engine: openvino
-    model: BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
-    revision_or_digest: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
-    quant: unrecorded
-    licence: unrecorded
-    engine_version: "2026.4.1"
-    thinking_level: "off"
-    num_predict: null
-    num_ctx: null
-    batch: 8
-    static_shape: "8x512"
     measure: latency_ms
   - id: nomic-cpu-l512-b1
     task: embed
@@ -835,21 +758,6 @@ arms:
     batch: 1
     static_shape: "1x512"
     measure: latency_ms
-  - id: nomic-npu-l512-b8
-    task: embed
-    device: NPU
-    engine: openvino
-    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
-    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
-    quant: unrecorded
-    licence: unrecorded
-    engine_version: "2026.4.1"
-    thinking_level: "off"
-    num_predict: null
-    num_ctx: null
-    batch: 8
-    static_shape: "8x512"
-    measure: latency_ms
   - id: nomic-npu-l1024-b1
     task: embed
     device: NPU
@@ -865,21 +773,6 @@ arms:
     batch: 1
     static_shape: "1x1024"
     measure: latency_ms
-  - id: nomic-npu-l1024-b8
-    task: embed
-    device: NPU
-    engine: openvino
-    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
-    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
-    quant: unrecorded
-    licence: unrecorded
-    engine_version: "2026.4.1"
-    thinking_level: "off"
-    num_predict: null
-    num_ctx: null
-    batch: 8
-    static_shape: "8x1024"
-    measure: latency_ms
   - id: nomic-npu-l2048-b1
     task: embed
     device: NPU
@@ -894,19 +787,4 @@ arms:
     num_ctx: null
     batch: 1
     static_shape: "1x2048"
-    measure: latency_ms
-  - id: nomic-npu-l2048-b8
-    task: embed
-    device: NPU
-    engine: openvino
-    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
-    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
-    quant: unrecorded
-    licence: unrecorded
-    engine_version: "2026.4.1"
-    thinking_level: "off"
-    num_predict: null
-    num_ctx: null
-    batch: 8
-    static_shape: "8x2048"
     measure: latency_ms
