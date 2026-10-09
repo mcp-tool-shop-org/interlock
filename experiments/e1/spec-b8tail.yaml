@@ -1,0 +1,234 @@
+# Standards compliance
+#
+# PIN_PER_STEP: 2. Model, revision, device, static shape, batch, the prompt
+#   rule and the parity guard are in this file before any run; the decision is
+#   in experiments/e1/spec.yaml and is evaluated over both runs' receipts.
+# ANDON_AUTHORITY: 2. A non-zero step stops the sequence. A parity miss marks
+#   the arm invalid; it does not fail the run. A device loss is a recorded
+#   result and is never retried.
+# NAMED_COMPENSATORS: 2. Unload drops the compiled cache. A fresh compile
+#   cache is deleted after unload. No publish, no rental, no spend.
+# DECOMPOSE_BY_SECRETS: 2. This file and experiments/e1/spec.yaml are the
+#   pre-registration. The harness runs them. The verdict is computed from the
+#   receipts after the runs.
+# UNCERTAINTY_GATED_HUMANS: 2. One NPU session in a quiet CPU window, booked
+#   through the Publisher, shared with the main run immediately before it.
+#   This spec does not start a device.
+# EXTERNAL_VERIFIER: n/a. R&D reviews this spec before any device time.
+
+id: E1
+procedure: interleaved
+compile_cache: fresh
+question: >
+  The batch-8 tail of E1. Every NPU arm with batch > 1 runs here, in one
+  final block after the main run of experiments/e1/spec.yaml, in the same
+  booked session. It exists because a Level Zero device loss at
+  nomic-npu-l1024-b8 ended the 2026-10-09 run before any receipt was written
+  (experiments/e1/incident-2026-10-09.md): the batch-8 arms are where a
+  device reset is most likely, so they run last, alone, after every
+  batch-1, iGPU and CPU measurement is on disk.
+decision: >
+  This tail contributes the batch-8 arms of the E1 decision in
+  experiments/e1/spec.yaml, evaluated once over both runs' receipts: the
+  parity guard (first repeat row's vector, cosine >= 0.999 against the
+  same model's CPU batch-1 arm at the same length — the reference rows
+  come from the main run, same pinned revisions, deterministic CPU), the
+  longest-bucket length finding, and the descriptive batch-8 warm
+  statistics. The keep-resident comparison B_reuse vs T = 100 is a
+  batch-1 decision and reads the main run's rows only. An arm is valid
+  only if its parity guard passes; a miss marks the arm invalid, not
+  failed. A device loss is recorded, not retried, and is reported in the
+  incident line of the report with the driver version.
+band: 1.0
+warmups: 1
+repeats: 19
+rest_s: 900
+needs:
+  grant: false
+  npu_session: true
+  cpu_window: true
+  booked_together: true
+dataset:
+  name: e1-fixed-prompt
+  seed: "The switchyard counts the same cars on every pass. "
+  target_tokens: 2048
+  rule: >
+    Repeat the seed until the model tokenizer counts at least 2048 tokens,
+    then keep the shortest prefix of that repetition that still counts as
+    2048. Every arm gets the same prefix; the adapter right-truncates to the
+    arm's static length, so every device for a model sees byte-identical
+    tokens at each length. The dropped count is recorded as
+    truncated_tokens and is expected above zero on every arm.
+metrics:
+  - compile_ms
+  - compile_warm_reload_ms
+  - first_call_ms
+  - latency_ms
+  - throughput
+  - truncated_tokens
+stop_rules:
+  - A non-zero step stops the sequence. Later arms do not run; a device
+    loss is not a non-zero step.
+  - Each batch-8 arm gets one try. A Level Zero device loss is never
+    retried — the adapter records outcome device_lost for the arm that lost
+    the device — no timing fields, like an unsupported-length row — and
+    outcome "not run" for the NPU's remaining steps, without touching the
+    hardware. Every arm after it in this block is therefore marked not run.
+  - The scheduler interleaves this block's nine arms round-robin (cold
+    slots first, then warmup and repeat rounds), so an early loss leaves a
+    later arm without any measurement and leaves an earlier arm with only
+    the samples already taken. Batch-8 warm statistics are descriptive;
+    the decision reads batch-1 rows, which the main run completes first. A
+    sequential per-arm order in the harness would match the block ruling
+    literally and is flagged to Grok as a follow-up; it changes no
+    per-arm statistic.
+  - Arm order is cheapest first (smallest model and length first), so a
+    loss forfeits the least remaining measurement. Order changes no
+    per-arm statistic.
+  - The runs share one booked NPU session in a quiet CPU window — the main
+    run completes and its receipts are written, then this tail starts.
+  - Every measured call carries the adapter's automatic 60 second per-call
+    bound — a hang (not a device loss) returns ok=False, marks the arm
+    inconclusive, poisons the model+device pair for the rest of the run,
+    and the runner's non-zero-step stop ends the sequence, which ends the
+    NPU session. No manual watch is part of this spec.
+  - Booked through the Publisher; never beside a timed calibration or the
+    math ladder on the 5090.
+  - Pooling is per model from the adapter table — cls for the bge family,
+    mean for nomic. It is recorded per row.
+arms:
+  - id: bge-base-npu-l128-b8
+    task: embed
+    device: NPU
+    engine: openvino
+    model: BAAI/bge-base-en-v1.5@a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x128"
+    measure: latency_ms
+  - id: bge-base-npu-l256-b8
+    task: embed
+    device: NPU
+    engine: openvino
+    model: BAAI/bge-base-en-v1.5@a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x256"
+    measure: latency_ms
+  - id: bge-base-npu-l512-b8
+    task: embed
+    device: NPU
+    engine: openvino
+    model: BAAI/bge-base-en-v1.5@a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x512"
+    measure: latency_ms
+  - id: bge-small-npu-l128-b8
+    task: embed
+    device: NPU
+    engine: openvino
+    model: BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    revision_or_digest: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x128"
+    measure: latency_ms
+  - id: bge-small-npu-l256-b8
+    task: embed
+    device: NPU
+    engine: openvino
+    model: BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    revision_or_digest: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x256"
+    measure: latency_ms
+  - id: bge-small-npu-l512-b8
+    task: embed
+    device: NPU
+    engine: openvino
+    model: BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    revision_or_digest: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x512"
+    measure: latency_ms
+  - id: nomic-npu-l512-b8
+    task: embed
+    device: NPU
+    engine: openvino
+    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x512"
+    measure: latency_ms
+  - id: nomic-npu-l1024-b8
+    task: embed
+    device: NPU
+    engine: openvino
+    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x1024"
+    measure: latency_ms
+  - id: nomic-npu-l2048-b8
+    task: embed
+    device: NPU
+    engine: openvino
+    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x2048"
+    measure: latency_ms
