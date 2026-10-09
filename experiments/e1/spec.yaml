@@ -23,12 +23,15 @@ question: >
   resident because loading it on demand costs more warm calls than a
   pre-registered threshold allows.
 decision: >
-  Per arm, the break-even count B_reuse = compile_warm_reload_ms / warm p50
-  latency_ms at batch 1. compile_warm_reload_ms is the adapter's second
-  compile into the now-populated fresh cache dir, recorded on the cold row
-  (the realistic reload with the driver cache warm). B_fresh, computed the
-  same way from the first compile (compile_ms), is reported as the
-  first-run cost, not gated. The percentiles use the repeat rows only (the
+  Per arm, the break-even count B_reuse = (compile_warm_reload_ms +
+  max(0, first_call_ms − warm p50)) / warm p50, all at batch 1. A reload
+  pays the compile and the first call's extra over steady state; the
+  clamp keeps a fast first call from shrinking the numerator below the
+  compile alone. compile_warm_reload_ms is the adapter's second compile
+  into the now-populated fresh cache dir, recorded on the cold row (the
+  realistic reload with the driver cache warm). B_fresh, computed the same
+  way from the first compile (compile_ms plus its clamped first-call
+  extra), is reported as the first-run cost, not gated. The percentiles use the repeat rows only (the
   cold row and warmup stay out). The keep-resident threshold is T = 100
   warm calls, fixed here before any run. An arm with B_reuse > T supports
   warm-only treatment for that device — the router keeps the model
