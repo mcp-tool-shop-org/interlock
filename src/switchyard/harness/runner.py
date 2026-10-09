@@ -16,6 +16,7 @@ from pathlib import Path
 
 from switchyard.adapters.base import AdapterError, StepRequest
 from switchyard.adapters.offrig_calibrate import plan_argv
+from switchyard.cli import announce_run
 from switchyard.guards import assess_step
 from switchyard.harness.lock import require_unmodified
 from switchyard.harness.receipts import (
@@ -282,12 +283,14 @@ def run_interleaved(
         if rows:
             write_run(root, run_id, rows)
         imported = True
+        announce_run(rows, finished=True)
         return rows
     finally:
         receipt = root / "receipts" / f"{run_id}.jsonl"
         if not imported and receipt.is_file():
             flush(gone=removed)
-            import_receipt(root, run_id)
+            written = import_receipt(root, run_id)
+            announce_run(written, finished=False)
 
 
 def hang_error(error: str | None) -> bool:
@@ -297,12 +300,17 @@ def hang_error(error: str | None) -> bool:
 
 
 def device_lost_error(error: str | None) -> bool:
-    """A driver reset. A hang is not a device loss."""
+    """A driver reset. A hang is not a device loss.
+
+    The match is the Level Zero code, ``ZE_RESULT_ERROR_DEVICE_LOST`` or
+    ``device_lost``. The driver's own sentence also says "device hung"; that
+    phrase has not been seen without the code, so it is not a match.
+    """
 
     if not isinstance(error, str) or not error or hang_error(error):
         return False
     text = error.lower()
-    return "device lost" in text or "device_lost" in text or "device hung" in text
+    return "ze_result_error_device_lost" in text or "device_lost" in text or "device lost" in text
 
 
 def _reported_outcome(result) -> str | None:
