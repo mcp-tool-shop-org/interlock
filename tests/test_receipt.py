@@ -60,6 +60,20 @@ def test_device_lost_cannot_carry_timing():
     hung["latency"]["cold_ms"] = 60_000
     with pytest.raises(ReceiptError, match="a hang row has no timing"):
         validate_row(hung)
+    lost.pop("artifacts", None)
+    lost["latency"]["cold_ms"] = None
+    lost["latency"]["compile_warm_reload_ms"] = 12
+    with pytest.raises(ReceiptError, match="no timing"):
+        validate_row(lost)
+
+
+def test_a_failed_parity_guard_keeps_its_timing():
+    kept = row()
+    kept["parity_valid"] = False
+    kept["latency"]["compile_warm_reload_ms"] = 12
+    kept["settings"]["prompt_tokens"] = 2048
+    kept["settings"]["truncated_tokens"] = 1920
+    validate_row(kept)
 
 
 def test_experiment_provenance_is_the_other_legal_shape():

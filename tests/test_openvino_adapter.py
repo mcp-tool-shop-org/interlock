@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib.util
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -238,6 +239,38 @@ def test_embed_refusals(tmp_path):
         a.run(req(task="sculpt", model=local_model(tmp_path)))
     with pytest.raises(AdapterError):
         a.run(req(model=local_model(tmp_path), engine="ollama"))
+
+
+def test_count_tokens_is_the_encode_and_a_short_prompt_records_zero_dropped(tmp_path, monkeypatch):
+    a = make_adapter()
+    m = local_model(tmp_path)
+    monkeypatch.setitem(ovm._POOLING, m, "cls")
+    assert a.count_tokens(m, "one two") == 4
+    short = a.run(req(model=m, device="CPU", static_shape="1x8", prompt="one two"))
+    assert short.resolved["prompt_tokens"] == 4
+    assert short.resolved["truncated_tokens"] == 0
+    long_prompt = " ".join(f"w{i}" for i in range(20))
+    long = a.run(req(model=m, device="NPU", static_shape="1x8", prompt=long_prompt))
+    assert long.resolved["prompt_tokens"] == a.count_tokens(m, long_prompt)
+    assert long.resolved["truncated_tokens"] == long.resolved["prompt_tokens"] - 8
+
+
+def test_count_tokens_reads_the_three_value_encode(tmp_path):
+    """count_tokens uses _encode's (ids, mask, token_type_ids) and counts the ids."""
+
+    class TTTokenizer(FakeTokenizer):
+        def __call__(self, text, return_attention_mask=True):
+            enc = dict(super().__call__(text, return_attention_mask))
+            enc["token_type_ids"] = [7] * len(enc["input_ids"])
+            return enc
+
+    a = make_adapter(tokenizer_loader=lambda _model, _ref: TTTokenizer())
+    m = local_model(tmp_path)
+    repo, ref = ovm.parse_model_ref(m)
+    ids, mask, token_types = a._encode(a._load_tokenizer(repo, ref), "one two")
+    assert len(ids) == len(mask) == len(token_types) == 4
+    assert token_types == [7, 7, 7, 7]
+    assert a.count_tokens(m, "one two") == len(ids)
 
 
 def test_embed_truncate_false_refuses(tmp_path, monkeypatch):
@@ -714,10 +747,30 @@ def _run_harness(tmp_path, adapter, arms, notes=""):
     return {row["id"]: row for row in rows}, {row["id"]: row for row in table}
 
 
+def _row_model() -> Path:
+    """A model directory whose path is allowed on a routing row.
+
+    pytest's tmp_path on Windows sits under the user profile, and a receipt
+    refuses a home-directory path. The system temp directory does not.
+    """
+
+    import os
+    import tempfile
+
+    base = Path(tempfile.gettempdir())
+    home = Path.home()
+    if base == home or home in base.parents:
+        windir = os.environ.get("WINDIR")
+        if windir:
+            base = Path(windir) / "Temp"
+    directory = Path(tempfile.mkdtemp(prefix="sy-model-", dir=base))
+    (directory / "openvino_model.xml").write_text("<xml/>", encoding="utf-8")
+    return directory
+
+
 def test_runner_makes_a_capability_row_of_the_adapters_device_loss(tmp_path, monkeypatch):
-    model_dir = tmp_path / "model"
-    model_dir.mkdir()
-    m = local_model(model_dir)
+    model_dir = _row_model()
+    m = str(model_dir)
     monkeypatch.setitem(ovm._POOLING, m, "cls")
     adapter = make_adapter(core=LostInferCore())
     arms = [_harness_arm("A", "NPU", m, "1x16"),
@@ -734,12 +787,13 @@ def test_runner_makes_a_capability_row_of_the_adapters_device_loss(tmp_path, mon
     notes = rows["T/C/run-1"]["notes"]
     assert "not run:" in notes and "B cold" in notes  # the skipped arm is listed in the run notes
     assert set(table) == set(rows)
+    import shutil
+    shutil.rmtree(model_dir, ignore_errors=True)
 
 
 def test_runner_writes_no_row_for_the_adapters_not_run(tmp_path, monkeypatch):
-    model_dir = tmp_path / "model"
-    model_dir.mkdir()
-    m = local_model(model_dir)
+    model_dir = _row_model()
+    m = str(model_dir)
     monkeypatch.setitem(ovm._POOLING, m, "cls")
     adapter = make_adapter()
     adapter._lost_devices.add("NPU")  # the device was already lost earlier in the run
@@ -751,6 +805,8 @@ def test_runner_writes_no_row_for_the_adapters_not_run(tmp_path, monkeypatch):
     notes = rows["T/A/run-1"]["notes"]
     assert notes.startswith("kept. not run: B cold") and "B repeat 0" in notes
     assert set(table) == set(rows)
+    import shutil
+    shutil.rmtree(model_dir, ignore_errors=True)
 
 
 # --- token_type_ids: an omitted declared input infers garbage (E1 rerun, 2026-10-09) ---

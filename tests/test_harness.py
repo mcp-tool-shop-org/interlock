@@ -35,7 +35,7 @@ from switchyard.harness.e5 import (
     search,
 )
 from switchyard.harness.lock import require_unmodified
-from switchyard.harness.receipts import device_lost_row, import_receipt, write_run
+from switchyard.harness.receipts import apply_parity, device_lost_row, import_receipt, write_run
 from switchyard.harness.runner import (
     RunnerError,
     check_flags,
@@ -495,6 +495,304 @@ def test_the_importer_drops_a_speed_figure_from_device_lost(tmp_path: Path):
     assert hung[0]["outcome"] == "hang"
     assert hung[0]["latency"]["cold_ms"] is None
     assert hung[0]["notes"] == "this device can't do this setting. arm B"
+
+
+class _Counting:
+    def __init__(self, samples):
+        self.script = Scripted(samples)
+        self.counts = 0
+
+    def count_tokens(self, model, text):
+        self.counts += 1
+        return len(text)
+
+    def run(self, request):
+        return self.script.run(request)
+
+    def unload(self, model, device=None):
+        self.script.unload(model, device)
+
+
+def test_a_dataset_target_is_one_prefix_per_model_and_the_counts_land_on_the_row(tmp_path: Path):
+    repo = tmp_path / "repo"
+    spec = _spec()
+    spec["warmups"] = 0
+    spec["repeats"] = 1
+    arm_a = _arm("A", "CPU")
+    arm_b = _arm("B", "NPU")
+    arm_a["static_shape"] = "1x4"
+    arm_a["batch"] = 1
+    arm_b["static_shape"] = "1x2"
+    arm_b["batch"] = 1
+    arm_b["model"] = "other-model"
+    arm_c = _arm("C", "iGPU")
+    arm_c["static_shape"] = "1x?"
+    arm_c["batch"] = 1
+    arm_d = _arm("D", "CPU")
+    arm_d["static_shape"] = None
+    arm_d["batch"] = 1
+    spec["arms"] = [arm_a, arm_b, arm_c, arm_d]
+    spec["dataset"] = {"name": "e1-fixed-prompt", "seed": "ab", "target_tokens": 4}
+    counter = _Counting(
+        {
+            "A": [_result(10, 1), _result(8, 1)],
+            "B": [_result(9, 1), _result(7, 1)],
+            "C": [_result(6, 1), _result(5, 1)],
+            "D": [_result(4, 1), _result(3, 1)],
+        }
+    )
+    rows = _invoke(repo, _bind(repo, spec), {"fake": counter})
+    assert counter.counts == 10
+    assert [request.settings["prompt"] for request in counter.script.requests] == ["abab"] * 8
+    by_id = {row["id"]: row for row in rows}
+    assert by_id["T/A/run-1"]["settings"]["prompt_tokens"] == 4
+    assert by_id["T/A/run-1"]["settings"]["truncated_tokens"] == 0
+    assert by_id["T/B/run-1"]["settings"]["prompt_tokens"] == 4
+    assert by_id["T/B/run-1"]["settings"]["truncated_tokens"] == 2
+    assert by_id["T/C/run-1"]["settings"]["prompt_tokens"] == 4
+    assert "truncated_tokens" not in by_id["T/C/run-1"]["settings"]
+    assert "compile_warm_reload_ms" not in by_id["T/A/run-1"]["latency"]
+
+
+def test_the_adapter_token_counts_and_warm_reload_overwrite_the_prefix_estimate(tmp_path: Path):
+    repo = tmp_path / "repo"
+    spec = _spec()
+    spec["warmups"] = 0
+    spec["repeats"] = 1
+    arm = _arm("A", "NPU")
+    arm["static_shape"] = "1x4"
+    arm["batch"] = 1
+    spec["arms"] = [arm]
+    spec["dataset"] = {"name": "e1-fixed-prompt", "seed": "ab", "target_tokens": 4}
+    counter = _Counting(
+        {
+            "A": [
+                _result(
+                    10,
+                    1,
+                    compile_ms=4,
+                    first_call_ms=3,
+                    resolved={"compile_warm_reload_ms": 80.5, "prompt_tokens": 2048, "truncated_tokens": 1920},
+                ),
+                _result(8, 1),
+            ]
+        }
+    )
+    rows = _invoke(repo, _bind(repo, spec), {"fake": counter})
+    assert rows[0]["latency"]["compile_warm_reload_ms"] == 80.5
+    assert rows[0]["latency"]["compile_ms"] == 4
+    assert rows[0]["settings"]["prompt_tokens"] == 2048
+    assert rows[0]["settings"]["truncated_tokens"] == 1920
+
+
+def test_a_target_without_a_tokenizer_is_refused_before_a_step(tmp_path: Path):
+    repo = tmp_path / "repo"
+    spec = _spec()
+    spec["warmups"] = 0
+    spec["repeats"] = 1
+    spec["arms"] = [_arm("A", "NPU")]
+    spec["dataset"] = {"name": "e1-fixed-prompt", "seed": "ab", "target_tokens": 4}
+    script = Scripted({"A": [_result(1, 1)]})
+    with pytest.raises(RunnerError, match="cannot count tokens"):
+        _invoke(repo, _bind(repo, spec), {"fake": script})
+    assert script.calls == []
+
+
+def test_an_empty_seed_and_a_dataset_that_is_not_a_map_are_refused_or_skipped(tmp_path: Path):
+    repo = tmp_path / "repo"
+    spec = _spec()
+    spec["warmups"] = 0
+    spec["repeats"] = 1
+    arm = _arm("A", "CPU")
+    arm["static_shape"] = "1x?"
+    spec["arms"] = [arm]
+    spec["dataset"] = {"name": "e1-fixed-prompt", "seed": "", "target_tokens": 4}
+    counter = _Counting({"A": [_result(1, 1)]})
+    with pytest.raises(RunnerError, match="prompt seed"):
+        _invoke(repo, _bind(repo, spec), {"fake": counter})
+    assert counter.script.calls == []
+
+    repo2 = tmp_path / "plain"
+    plain = _spec()
+    plain["warmups"] = 0
+    plain["repeats"] = 1
+    plain["arms"] = [_arm("A", "CPU")]
+    plain["dataset"] = "fixture"
+    script = Scripted({"A": [_result(10, 1), _result(8, 1)]})
+    rows = _invoke(repo2, _bind(repo2, plain), {"fake": script})
+    assert "prompt" not in script.requests[0].settings or script.requests[0].settings["prompt"] in (None, "")
+    assert "prompt_tokens" not in rows[0]["settings"]
+
+
+def test_a_seed_without_a_target_is_passed_through(tmp_path: Path):
+    repo = tmp_path / "repo"
+    spec = _spec()
+    spec["warmups"] = 0
+    spec["repeats"] = 1
+    spec["arms"] = [_arm("A", "CPU")]
+    spec["dataset"] = {"name": "fixture", "seed": "hello"}
+    script = Scripted({"A": [_result(10, 1), _result(8, 1)]})
+    rows = _invoke(repo, _bind(repo, spec), {"fake": script})
+    assert script.requests[0].settings["prompt"] == "hello"
+    assert "prompt_tokens" not in rows[0]["settings"]
+    assert "truncated_tokens" not in rows[0]["settings"]
+
+
+def _guard_row(device, shape, vector, **extra):
+    batch, _length = shape.split("x")
+    row = {
+        "id": extra.pop("id", f"{device}-{shape}"),
+        "device": device,
+        "model": {"repo_or_tag": "BAAI/bge-base-en-v1.5", "revision_or_digest": "rev"},
+        "settings": {"batch": int(batch), "static_shape": shape},
+        "artifacts": {"slots": [{"phase": "repeat", "output": vector}]},
+        "latency": {"warm_p50_ms": 5, "compile_warm_reload_ms": 10},
+    }
+    row.update(extra)
+    return row
+
+
+def test_parity_marks_the_arm_that_missed_and_leaves_the_other_lengths():
+    rows = [
+        _guard_row("CPU", "1x128", [1.0, 0.0], id="cpu-128"),
+        _guard_row("CPU", "1x512", [1.0, 0.0], id="cpu-512"),
+        _guard_row("NPU", "1x128", [1.0, 0.0], id="npu-128"),
+        _guard_row("NPU", "1x512", [0.0, 1.0], id="npu-512"),
+        _guard_row("CPU", "8x512", [0.0, 1.0], id="cpu-b8"),
+        _guard_row("NPU", "1x512", [1.0, 0.0, 0.0], id="dim"),
+        _guard_row("CPU", "1x32", [0.0, 0.0], id="cpu-zero"),
+        _guard_row("NPU", "1x32", [0.0, 0.0], id="zero"),
+        _guard_row("NPU", "1x8", [1.0, 0.0], id="bad-shape", settings={"static_shape": "1xno"}),
+        _guard_row("NPU", "1x8", [1.0, 0.0], id="bad-batch", settings={"static_shape": "nx8"}),
+        _guard_row("NPU", "1x8", [1.0, 0.0], id="zero-len", settings={"batch": 1, "static_shape": "1x0"}),
+        _guard_row("NPU", "1x8", [1.0, 0.0], id="from-shape", settings={"static_shape": "2x128"}),
+        _guard_row("NPU", "1x8", [1.0, 0.0], id="cold-only", artifacts={"slots": [{"phase": "cold", "output": [1.0, 0.0]}]}),
+        _guard_row("NPU", "1x8", "nope", id="text-out"),
+        _guard_row("NPU", "1x512", [1.0, True], id="bool-out"),
+        _guard_row("NPU", "1x64", [1.0, 0.0], id="no-ref"),
+    ]
+    rows.append({"id": "lost", "outcome": "device_lost", "device": "NPU", "parity_valid": True})
+    rows.append({"id": "preset", "device": "iGPU", "settings": {}, "parity_valid": False})
+    apply_parity(rows)
+    by_id = {row["id"]: row for row in rows}
+    assert by_id["cpu-128"]["parity_valid"] is True
+    assert by_id["npu-128"]["parity_valid"] is True
+    assert by_id["npu-512"]["parity_valid"] is False
+    assert by_id["npu-512"]["latency"]["compile_warm_reload_ms"] == 10
+    assert by_id["cpu-b8"]["parity_valid"] is False
+    assert "parity_valid" not in by_id["dim"]
+    assert "parity_valid" not in by_id["zero"]
+    assert "parity_valid" not in by_id["bad-shape"]
+    assert "parity_valid" not in by_id["bad-batch"]
+    assert "parity_valid" not in by_id["zero-len"]
+    assert "parity_valid" not in by_id["cold-only"]
+    assert "parity_valid" not in by_id["text-out"]
+    assert "parity_valid" not in by_id["bool-out"]
+    assert "parity_valid" not in by_id["no-ref"]
+    assert by_id["from-shape"]["parity_valid"] is True
+    assert by_id["lost"]["parity_valid"] is True
+    assert by_id["preset"]["parity_valid"] is False
+    shorter_miss = [
+        _guard_row("CPU", "1x128", [1.0, 0.0], id="cpu-128"),
+        _guard_row("CPU", "1x512", [1.0, 0.0], id="cpu-512"),
+        _guard_row("NPU", "1x128", [0.0, 1.0], id="npu-128"),
+        _guard_row("NPU", "1x512", [1.0, 0.0], id="npu-512"),
+    ]
+    apply_parity(shorter_miss)
+    marked = {row["id"]: row["parity_valid"] for row in shorter_miss}
+    assert marked == {"cpu-128": True, "cpu-512": True, "npu-128": False, "npu-512": True}
+
+
+def test_import_judges_a_later_receipt_against_the_table_and_keeps_the_timing(tmp_path: Path):
+    from tests.support import row
+
+    repo = tmp_path / "repo"
+    (repo / "table").mkdir(parents=True)
+    (repo / "receipts").mkdir(parents=True)
+    settings = {
+        "thinking_level": "off",
+        "num_predict": None,
+        "num_ctx": None,
+        "batch": 1,
+        "static_shape": "1x128",
+        "precision": None,
+    }
+    cpu = row(
+        id="E1/cpu/main",
+        device="CPU",
+        quality=[],
+        settings=settings,
+        provenance={"experiment_spec": "experiments/e1/spec.yaml", "run_id": "main"},
+        artifacts={"slots": [{"phase": "repeat", "output": [1.0, 0.0]}]},
+    )
+    (repo / "table" / "routing.jsonl").write_text(json.dumps(cpu) + "\n", encoding="utf-8")
+    npu = row(
+        id="E1/npu/tail",
+        device="NPU",
+        quality=[],
+        settings=settings,
+        provenance={"experiment_spec": "experiments/e1/spec.yaml", "run_id": "tail"},
+        artifacts={"slots": [{"phase": "cold", "output": [1.0, 0.0]}, {"phase": "repeat", "output": [0.0, 1.0]}]},
+    )
+    npu["latency"]["warm_p50_ms"] = 14
+    npu["latency"]["compile_warm_reload_ms"] = 40
+    (repo / "receipts" / "tail.jsonl").write_text(json.dumps(npu) + "\n", encoding="utf-8")
+    imported = import_receipt(repo, "tail")
+    assert imported[0]["parity_valid"] is False
+    assert imported[0]["latency"]["warm_p50_ms"] == 14
+    assert imported[0]["latency"]["compile_warm_reload_ms"] == 40
+    stored = load_jsonl(repo / "table" / "routing.jsonl")
+    assert [row["id"] for row in stored] == ["E1/cpu/main", "E1/npu/tail"]
+    assert "parity_valid" not in stored[0]
+    assert stored[1]["parity_valid"] is False
+    assert stored[1]["latency"]["compile_warm_reload_ms"] == 40
+
+
+def test_a_failed_parity_guard_is_recorded_on_the_run_and_not_served(tmp_path: Path):
+    from switchyard.scope import select
+
+    repo = tmp_path / "repo"
+    spec = _spec()
+    spec["warmups"] = 0
+    spec["repeats"] = 1
+    cpu = _arm("CPU", "CPU")
+    npu = _arm("NPU", "NPU")
+    for arm in (cpu, npu):
+        arm["batch"] = 1
+        arm["static_shape"] = "1x8"
+        arm["model"] = "BAAI/bge-base-en-v1.5"
+    spec["arms"] = [cpu, npu]
+    script = Scripted(
+        {
+            "CPU": [_result(10, 1, output=[9.0, 0.0]), _result(4, 1, output=[1.0, 0.0])],
+            "NPU": [
+                _result(
+                    12,
+                    1,
+                    compile_ms=3,
+                    first_call_ms=2,
+                    resolved={"compile_warm_reload_ms": 30.0},
+                    output=[0.0, 1.0],
+                ),
+                _result(5, 1, output=[0.0, 1.0]),
+            ],
+        }
+    )
+    spec_path = _bind(repo, spec)
+    (repo / "table").mkdir()
+    rows = _invoke(repo, spec_path, {"fake": script})
+    by_id = {row["id"]: row for row in rows}
+    assert by_id["T/CPU/run-1"]["parity_valid"] is True
+    assert by_id["T/NPU/run-1"]["parity_valid"] is False
+    assert by_id["T/NPU/run-1"]["latency"]["warm_p50_ms"] == 5
+    assert by_id["T/NPU/run-1"]["latency"]["compile_warm_reload_ms"] == 30.0
+    assert "compile_warm_reload_ms" not in by_id["T/CPU/run-1"]["latency"]
+    answer = select(rows, "generate")
+    assert [row["id"] for row in answer.rows] == ["T/CPU/run-1"]
+    stored = load_jsonl(repo / "table" / "routing.jsonl")
+    npu_row = next(row for row in stored if row["id"] == "T/NPU/run-1")
+    assert npu_row["parity_valid"] is False
+    assert npu_row["latency"]["compile_warm_reload_ms"] == 30.0
 
 
 def test_a_raised_spec_error_keeps_a_finished_arm(tmp_path: Path):

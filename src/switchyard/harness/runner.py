@@ -18,6 +18,7 @@ from switchyard.adapters.base import AdapterError, StepRequest
 from switchyard.adapters.offrig_calibrate import plan_argv
 from switchyard.cli import announce_run
 from switchyard.guards import assess_step
+from switchyard.harness.e5 import SearchError, fit_prompt
 from switchyard.harness.lock import require_unmodified
 from switchyard.harness.receipts import (
     device_lost_row,
@@ -137,6 +138,7 @@ def run_interleaved(
     skipped: list[str] = []
     captured = env if env is not None else environment()
     cache_dirs = _cache_dirs(spec, root, run_id, arms)
+    prompt_cache: dict[str, tuple[str, int]] = {}
     removed: set[str] = set()
     imported = False
 
@@ -147,6 +149,8 @@ def run_interleaved(
         return notes or extra
 
     def _finished_row(arm_id: str, *, partial: bool, gone: set[str]) -> dict:
+        extra = _extra_settings(spec, arms[arm_id], records, run_id, gone)
+        extra.update(_prompt_counts(arms[arm_id], prompt_cache))
         row = measured_row(
             spec_id=spec["id"],
             arm=arms[arm_id],
@@ -160,7 +164,7 @@ def run_interleaved(
             notes=_run_notes(),
             resolved=_resolved(records, arm_id),
             artifacts=_artifacts(records, arm_id),
-            extra_settings=_extra_settings(spec, arms[arm_id], records, run_id, gone),
+            extra_settings=extra,
         )
         if partial:
             row["partial"] = True
@@ -168,6 +172,8 @@ def run_interleaved(
         return row
 
     def _capability_row(arm_id: str, *, partial: bool, gone: set[str]) -> dict:
+        extra = _extra_settings(spec, arms[arm_id], [], run_id, gone)
+        extra.update(_prompt_counts(arms[arm_id], prompt_cache))
         return device_lost_row(
             spec_id=spec["id"],
             arm=arms[arm_id],
@@ -178,7 +184,7 @@ def run_interleaved(
             grant=grant,
             env=captured,
             notes=_run_notes(),
-            extra_settings=_extra_settings(spec, arms[arm_id], [], run_id, gone),
+            extra_settings=extra,
             outcome=capability[arm_id],
             partial=partial,
         )
@@ -222,14 +228,29 @@ def run_interleaved(
                     continue
                 started = False
                 if companion is not None:
-                    _session(adapters, companion, "start", spec, spec_rel, cache_dirs.get(companion["id"]))
+                    _session(
+                        adapters,
+                        companion,
+                        "start",
+                        spec,
+                        spec_rel,
+                        cache_dirs.get(companion["id"]),
+                        prompt_cache,
+                    )
                     started = True
                 try:
                     kind = "ok"
                     error = ""
                     try:
                         result = adapters[arm["engine"]].run(
-                            _request(arm, spec, spec_rel, cache_dirs.get(arm["id"]))
+                            _request(
+                                arm,
+                                spec,
+                                spec_rel,
+                                cache_dirs.get(arm["id"]),
+                                adapters[arm["engine"]],
+                                prompt_cache,
+                            )
                         )
                     except AdapterError as exc:
                         error = str(exc)
@@ -275,7 +296,15 @@ def run_interleaved(
                             flush()
                 finally:
                     if started and companion is not None:
-                        _session(adapters, companion, "stop", spec, spec_rel, cache_dirs.get(companion["id"]))
+                        _session(
+                            adapters,
+                            companion,
+                            "stop",
+                            spec,
+                            spec_rel,
+                            cache_dirs.get(companion["id"]),
+                            prompt_cache,
+                        )
         finally:
             _unload(adapters, arms)
             removed.update(_drop_caches(cache_dirs))
@@ -332,12 +361,19 @@ def _slots(spec: dict) -> list[Slot]:
     return schedule([arm["id"] for arm in spec["arms"]], warmups=spec["warmups"], repeats=spec["repeats"])
 
 
-def _request(arm: dict, spec: dict, spec_rel: str, cache_dir: Path | None) -> StepRequest:
+def _request(
+    arm: dict,
+    spec: dict,
+    spec_rel: str,
+    cache_dir: Path | None,
+    adapter,
+    prompt_cache: dict[str, tuple[str, int]],
+) -> StepRequest:
     settings = {key: arm.get(key) for key in PASSTHROUGH}
     if not settings.get("prompt"):
-        seed = spec.get("dataset", {}).get("seed") if isinstance(spec.get("dataset"), dict) else None
-        if isinstance(seed, str):
-            settings["prompt"] = seed
+        prompt = _dataset_prompt(arm, spec, adapter, prompt_cache)
+        if prompt is not None:
+            settings["prompt"] = prompt
     settings["spec"] = spec_rel
     settings["compile_cache"] = spec.get("compile_cache")
     if cache_dir is not None:
@@ -491,7 +527,15 @@ def _companion(arm: dict, arms: dict, slot: Slot) -> dict | None:
     return None
 
 
-def _session(adapters: dict, arm: dict, action: str, spec: dict, spec_rel: str, cache_dir: Path | None) -> None:
+def _session(
+    adapters: dict,
+    arm: dict,
+    action: str,
+    spec: dict,
+    spec_rel: str,
+    cache_dir: Path | None,
+    prompt_cache: dict[str, tuple[str, int]],
+) -> None:
     adapter = adapters[arm["engine"]]
     method = getattr(adapter, f"{action}_session", None)
     if not callable(method):
@@ -499,7 +543,67 @@ def _session(adapters: dict, arm: dict, action: str, spec: dict, spec_rel: str, 
             f"{arm['engine']} has no {action}_session. "
             "The harness owns companion sessions and does not fake one."
         )
-    method(_request(arm, spec, spec_rel, cache_dir))
+    method(_request(arm, spec, spec_rel, cache_dir, adapter, prompt_cache))
+
+
+def _dataset_prompt(arm: dict, spec: dict, adapter, prompt_cache: dict[str, tuple[str, int]]) -> str | None:
+    """The spec's prefix: repeat the seed until the model tokenizer reaches the target.
+
+    One prefix per model, shared by every device of that model. A spec with a
+    seed and no ``target_tokens`` still passes the seed through. A target with
+    no tokenizer count is refused, so the raw seed is not measured by mistake.
+    """
+
+    dataset = spec.get("dataset") if isinstance(spec.get("dataset"), dict) else None
+    if not isinstance(dataset, dict):
+        return None
+    seed = dataset.get("seed")
+    if not isinstance(seed, str):
+        return None
+    target = dataset.get("target_tokens")
+    if isinstance(target, bool) or not isinstance(target, int):
+        return seed
+    model = arm["model"]
+    cached = prompt_cache.get(model)
+    if cached is None:
+        counter = getattr(adapter, "count_tokens", None)
+        if not callable(counter):
+            raise RunnerError(
+                f"{arm['id']}: dataset.target_tokens is {target} and {arm['engine']} cannot count tokens"
+            )
+
+        def count(text: str, model: str = model) -> int:
+            return counter(model, text)
+
+        try:
+            text = fit_prompt(seed, target, count)
+        except SearchError as exc:
+            raise RunnerError(str(exc)) from exc
+        cached = (text, count(text))
+        prompt_cache[model] = cached
+    return cached[0]
+
+
+def _prompt_counts(arm: dict, prompt_cache: dict[str, tuple[str, int]]) -> dict:
+    cached = prompt_cache.get(arm["model"])
+    if cached is None:
+        return {}
+    _text, prompt_tokens = cached
+    counts = {"prompt_tokens": prompt_tokens}
+    length = _static_length(arm.get("static_shape"))
+    if length is not None:
+        counts["truncated_tokens"] = max(0, prompt_tokens - length)
+    return counts
+
+
+def _static_length(shape: object) -> int | None:
+    if not isinstance(shape, str) or "x" not in shape.lower():
+        return None
+    length = shape.lower().split("x", 1)[1]
+    if not length.isdigit():
+        return None
+    value = int(length)
+    return value if value > 0 else None
 
 
 def _cache_dirs(spec: dict, root: Path, run_id: str, arms: dict) -> dict[str, Path]:

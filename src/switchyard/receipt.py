@@ -113,8 +113,25 @@ def load_jsonl(path: Path) -> list[dict]:
     return rows
 
 
-_TIMING = ("cold_ms", "warm_p50_ms", "warm_p95_ms", "throughput", "compile_ms", "first_call_ms")
+_TIMING = (
+    "cold_ms",
+    "warm_p50_ms",
+    "warm_p95_ms",
+    "throughput",
+    "compile_ms",
+    "first_call_ms",
+    "compile_warm_reload_ms",
+)
 _UNTIMED = frozenset({"device_lost", "hang"})
+
+
+def is_speed_row(row: dict) -> bool:
+    """A capability row or a failed parity guard is recorded, and it is not a speed.
+
+    A failed guard keeps its timing. It is not an untimed outcome.
+    """
+
+    return row.get("outcome") not in _UNTIMED and row.get("parity_valid") is not False
 
 
 def _check_device_lost(row: dict) -> None:

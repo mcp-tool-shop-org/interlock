@@ -300,6 +300,15 @@ def test_gap_report_names_the_missing_field_on_a_partial_row():
     assert "e1/npu/lost" not in lost_text
     assert "e1/npu/hung" not in lost_text
     assert "probe/bge/NPU" in lost_text
+    invalid = {
+        **rows[0],
+        "id": "e1/npu/parity",
+        "parity_valid": False,
+        "latency": {"cold_ms": 10, "warm_p50_ms": 10},
+    }
+    parity_text = render_gaps(rows + [invalid], candidates, ladder_note="Ladder note.")
+    assert "e1/npu/parity" not in parity_text
+    assert "probe/bge/NPU" in parity_text
 
 
 def test_import_command_writes_jsonl_and_the_gap_report(tmp_path: Path, monkeypatch, capsys):

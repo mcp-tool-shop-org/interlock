@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from switchyard.receipt import is_speed_row
+
 
 def load_candidates(path: Path) -> list[dict]:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -21,7 +23,7 @@ def open_gaps(rows: list[dict], candidates: list[dict]) -> list[dict]:
         partial = []
         filled = False
         for row in rows:
-            if row.get("outcome") in ("device_lost", "hang"):
+            if not is_speed_row(row):
                 continue
             if not _matches(row, candidate["match"]):
                 continue
