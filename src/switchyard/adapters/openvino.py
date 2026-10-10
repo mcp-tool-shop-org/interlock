@@ -146,6 +146,11 @@ def pad_truncate(ids: list[int], length: int, pad_id: int, *, allow_truncate: bo
     return out, mask, dropped
 
 
+def pad_like(values: list[int], length: int, fill: int = 0) -> list[int]:
+    """Pad/truncate a parallel field in lockstep with :func:`pad_truncate` (token_type_ids)."""
+    return list(values[:length]) + [fill] * max(0, length - len(values))
+
+
 def pool(matrix, mask, how: str) -> list[float]:
     """how cls|mean over unmasked rows; 'none' enforces one logit row.
 
@@ -291,26 +296,40 @@ class OpenvinoAdapter:
         out = tokenizer(text, return_attention_mask=True)
         ids = out["input_ids"]
         mask = out.get("attention_mask") or [1] * len(ids)
+        tt = out.get("token_type_ids")
         if hasattr(ids, "tolist"):
             ids = ids.tolist()
         if hasattr(mask, "tolist"):
             mask = mask.tolist()
+        if hasattr(tt, "tolist"):
+            tt = tt.tolist()
         while ids and isinstance(ids[0], list):
             ids = ids[0]
         while mask and isinstance(mask[0], list):
             mask = mask[0]
-        return [int(i) for i in ids], [int(m) for m in mask]
+        while tt and isinstance(tt[0], list):
+            tt = tt[0]
+        ids_i = [int(i) for i in ids]
+        # token_type_ids default to zeros; an OMITTED input gets garbage, not zeros.
+        tt_i = [int(t) for t in tt] if tt else [0] * len(ids_i)
+        return ids_i, [int(m) for m in mask], tt_i
 
-    def _infer_embed(self, entry: dict, ids: list[int], mask: list[int], batch_rows: int) -> list:
+    def _infer_embed(self, entry: dict, ids: list[int], mask: list[int], tt: list[int], batch_rows: int) -> list:
         model = entry["model"]
         if hasattr(model, "infer_lists"):  # fake seam; not part of OpenVINO's API
-            return model.infer_lists({"input_ids": ids, "attention_mask": mask}, batch_rows)
+            return model.infer_lists({"input_ids": ids, "attention_mask": mask, "token_type_ids": list(tt)}, batch_rows)
         import numpy as np  # real inference implies the intel extra, which ships numpy
 
         arrays = {
             "input_ids": np.asarray([ids] * batch_rows, dtype=np.int64),
             "attention_mask": np.asarray([mask] * batch_rows, dtype=np.int64),
         }
+        # Feed token_type_ids only when the compiled graph declares it. Never omit a
+        # declared input: OpenVINO infers it from an uninitialized buffer, not zeros
+        # (E1 rerun, 2026-10-09: cosine plateaus 0.988/0.93/0.57 on CPU). Models
+        # without the input (Qwen3-Embedding) must not receive it.
+        if any(port.get_any_name() == "token_type_ids" for port in model.inputs):
+            arrays["token_type_ids"] = np.asarray([tt] * batch_rows, dtype=np.int64)
         result = model(arrays)
         return np.asarray(result[model.outputs[0]])[0].tolist()
 
@@ -412,7 +431,7 @@ def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> Step
     repo, ref = parse_model_ref(request.model)
     pooling = _pooling_for(request.task, repo)  # refused before anything loads
     tokenizer = self._load_tokenizer(repo, ref)
-    ids, mask = self._encode(tokenizer, str(s.get("prompt") or "hello"))
+    ids, mask, tt = self._encode(tokenizer, str(s.get("prompt") or "hello"))
     eos_appended = None
     if pooling == "last":
         eos_id = getattr(tokenizer, "eos_token_id", None)
@@ -421,6 +440,7 @@ def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> Step
     if static is not None:
         ids, mask, dropped = pad_truncate(ids, static[1], int(getattr(tokenizer, "pad_token_id", 0) or 0),
                                           allow_truncate=bool(s.get("truncate", True)))
+        tt = pad_like(tt, static[1])
     batch_rows = int(s.get("batch", 1))
     try:
         entry = self._embedder(repo, ref, ov_id, static, _compile_config(s))
@@ -436,7 +456,7 @@ def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> Step
     t0 = self.clock()
     try:
         status, matrix = _timed_call(
-            lambda: self._infer_embed(entry, ids, mask, batch_rows if static is None else static[0]),
+            lambda: self._infer_embed(entry, ids, mask, tt, batch_rows if static is None else static[0]),
             self.call_timeout_s,
         )
     except Exception as exc:
@@ -712,14 +732,15 @@ def _start_session(self, request: StepRequest) -> None:
                 if ov_id == "NPU" and static is None:
                     raise AdapterError("the NPU needs a static_shape BxL; dynamic shapes are not supported there")
                 tokenizer = self._load_tokenizer(repo, ref)
-                ids, mask = self._encode(tokenizer, str(s.get("prompt") or "hello"))
+                ids, mask, tt = self._encode(tokenizer, str(s.get("prompt") or "hello"))
                 if static is not None:
                     ids, mask, _ = pad_truncate(ids, static[1], int(getattr(tokenizer, "pad_token_id", 0) or 0))
+                    tt = pad_like(tt, static[1])
                 entry = self._embedder(repo, ref, ov_id, static, _compile_config(s))
                 rows = static[0] if static else int(s.get("batch", 1))
                 while not stop.is_set():
                     t0 = self.clock()
-                    status, _ = _timed_call(lambda: self._infer_embed(entry, ids, mask, rows), self.call_timeout_s)
+                    status, _ = _timed_call(lambda: self._infer_embed(entry, ids, mask, tt, rows), self.call_timeout_s)
                     if status == "hang":
                         box["fault"] = AdapterError(f"hang: companion call exceeded {self.call_timeout_s:g} s")
                         return
