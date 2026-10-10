@@ -13,6 +13,10 @@ from switchyard.harness.timing import Summary
 from switchyard.families import stamp_family
 from switchyard.receipt import load_jsonl, validate_row
 
+# The pre-registered parity guard. The first repeat must reach this cosine
+# against the same model's CPU batch-1 arm at the same length.
+PARITY_MIN = 0.999
+
 UNRECORDED = "unrecorded"
 DEVICE_LOST_NOTE = "this device can't do this setting"
 
@@ -26,6 +30,7 @@ def _blank_latency() -> dict:
         "throughput_unit": None,
         "compile_ms": None,
         "first_call_ms": None,
+        "compile_warm_reload_ms": None,
     }
 
 
@@ -75,6 +80,21 @@ def measured_row(
         settings["keep_alive"] = arm["keep_alive"]
     if extra_settings:
         settings.update(extra_settings)
+    for key in ("prompt_tokens", "truncated_tokens"):
+        if learned.get(key) is not None:
+            settings[key] = learned[key]
+    latency = {
+        "cold_ms": summary.cold_ms,
+        "warm_p50_ms": summary.warm_p50_ms,
+        "warm_p95_ms": summary.warm_p95_ms,
+        "throughput": summary.throughput,
+        "throughput_unit": summary.throughput_unit,
+        "compile_ms": summary.compile_ms,
+        "first_call_ms": summary.first_call_ms,
+    }
+    reload_ms = learned.get("compile_warm_reload_ms")
+    if reload_ms is not None:
+        latency["compile_warm_reload_ms"] = reload_ms
     row = {
         "id": f"{spec_id}/{arm['id']}/{run_id}",
         "task": arm["task"],
@@ -88,15 +108,7 @@ def measured_row(
         "device": arm["device"],
         "settings": settings,
         "quality": [],
-        "latency": {
-            "cold_ms": summary.cold_ms,
-            "warm_p50_ms": summary.warm_p50_ms,
-            "warm_p95_ms": summary.warm_p95_ms,
-            "throughput": summary.throughput,
-            "throughput_unit": summary.throughput_unit,
-            "compile_ms": summary.compile_ms,
-            "first_call_ms": summary.first_call_ms,
-        },
+        "latency": latency,
         "date": date,
         "repeats": repeats,
         "provisional": repeats < 2,
@@ -192,11 +204,14 @@ def import_receipt(root: Path, run_id: str) -> list[dict]:
     """Bring a run receipt into the routing table.
 
     ``device_lost`` and ``hang`` land as "this device can't do this setting",
-    with the timing removed. Neither is a speed figure.
+    with the timing removed. A failed parity guard is recorded with its timing
+    and is not a speed figure. CPU batch-1 references already in the table
+    count, so a later receipt can be judged against them.
     """
 
     path = root / "receipts" / f"{run_id}.jsonl"
-    rows = [for_table(row) for row in load_jsonl(path)]
+    rows = apply_parity(load_jsonl(path), references=_table_rows(root))
+    rows = [for_table(row) for row in rows]
     _dump(path, rows)
     _append_table(root, rows)
     return rows
@@ -205,9 +220,111 @@ def import_receipt(root: Path, run_id: str) -> list[dict]:
 def write_run(root: Path, run_id: str, rows: list[dict]) -> Path:
     """Write ``receipts/<run_id>.jsonl`` and append the rows to the table."""
 
-    path = write_receipt(root, run_id, [for_table(row) for row in rows])
+    stamped = apply_parity(rows, references=_table_rows(root))
+    path = write_receipt(root, run_id, [for_table(row) for row in stamped])
     _append_table(root, load_jsonl(path))
     return path
+
+
+def apply_parity(rows: list[dict], *, references: list[dict] | None = None) -> list[dict]:
+    """Stamp ``parity_valid`` from the pre-registered guard.
+
+    The first repeat vector is compared with the same model's CPU batch-1 arm
+    at the same length. Cosine below 0.999 marks that arm only. A miss at the
+    model's longest length does not mark a shorter length of the same device
+    and model, and a miss at a shorter length does not mark a longer one that
+    passed. Timing stays on the row. A row the guard cannot judge keeps any
+    mark it already has.
+    """
+
+    pool = list(references or []) + list(rows)
+    cpu: dict[tuple, list[float]] = {}
+    for row in pool:
+        if row.get("outcome") in ("device_lost", "hang") or row.get("device") != "CPU":
+            continue
+        parsed = _length_batch(row)
+        vector = _first_repeat_vector(row)
+        if parsed is None or parsed[0] != 1 or vector is None:
+            continue
+        cpu.setdefault((_model_key(row), parsed[1]), vector)
+    for row in rows:
+        if row.get("outcome") in ("device_lost", "hang"):
+            continue
+        parsed = _length_batch(row)
+        vector = _first_repeat_vector(row)
+        if parsed is None or vector is None:
+            continue
+        reference = cpu.get((_model_key(row), parsed[1]))
+        if reference is None:
+            continue
+        score = _cosine(vector, reference)
+        if score is None:
+            continue
+        row["parity_valid"] = score >= PARITY_MIN
+    return rows
+
+
+def _table_rows(root: Path) -> list[dict]:
+    table = root / "table" / "routing.jsonl"
+    if not table.is_file():
+        return []
+    return load_jsonl(table)
+
+
+def _model_key(row: dict) -> tuple:
+    model = row.get("model") or {}
+    return (model.get("repo_or_tag"), model.get("revision_or_digest"))
+
+
+def _length_batch(row: dict) -> tuple[int, int] | None:
+    settings = row.get("settings") or {}
+    shape = settings.get("static_shape")
+    batch = settings.get("batch")
+    if not isinstance(shape, str) or "x" not in shape.lower():
+        return None
+    left, right = shape.lower().split("x", 1)
+    if not right.isdigit():
+        return None
+    if isinstance(batch, bool) or not isinstance(batch, int):
+        if not left.isdigit():
+            return None
+        batch = int(left)
+    length = int(right)
+    if length < 1 or batch < 1:
+        return None
+    return batch, length
+
+
+def _first_repeat_vector(row: dict) -> list[float] | None:
+    artifacts = row.get("artifacts")
+    slots = artifacts.get("slots") if isinstance(artifacts, dict) else None
+    if not isinstance(slots, list):
+        return None
+    for slot in slots:
+        if isinstance(slot, dict) and slot.get("phase") == "repeat":
+            return _vector(slot.get("output"))
+    return None
+
+
+def _vector(value: object) -> list[float] | None:
+    if not isinstance(value, list) or not value:
+        return None
+    if any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in value):
+        return None
+    return [float(item) for item in value]
+
+
+def _cosine(left: list[float], right: list[float]) -> float | None:
+    if len(left) != len(right):
+        return None
+    dot = left_norm = right_norm = 0.0
+    for one, other in zip(left, right):
+        dot += one * other
+        left_norm += one * one
+        right_norm += other * other
+    if left_norm <= 0.0 or right_norm <= 0.0:
+        return None
+    return dot / ((left_norm ** 0.5) * (right_norm ** 0.5))
 
 
 def _append_table(root: Path, rows: list[dict]) -> None:

@@ -16,9 +16,10 @@ refused rather than pooled silently. ``nli`` and ``rerank`` steps return the
 single-row logits un-pooled. Batch rows above the first repeat the same
 input (``batch_fill: repeat``) because a step carries one prompt; the NLI
 batch is pinned to 1 by the spec validator. Inputs longer than the static
-length are right-truncated and the dropped count is recorded as
-``truncated_tokens``; an arm that sets ``truncate: false`` is refused
-instead of silently measuring something else.
+length are right-truncated. ``prompt_tokens`` is the encoded length and
+``truncated_tokens`` is the dropped count, including zero when the prefix
+fits. An arm that sets ``truncate: false`` is refused instead of silently
+measuring something else.
 
 ``generate`` steps run openvino-genai's LLMPipeline, greedy unless the arm
 sets a temperature. Decode throughput and TTFT come from genai's own
@@ -207,6 +208,16 @@ class OpenvinoAdapter:
         self._poisoned: set = set()  # (model, device) keys that hung once
         self._lost_devices: set = set()  # ov ids that reset this run
 
+    def count_tokens(self, model: str, text: str) -> int:
+        """Tokens of ``text`` on this model's tokenizer, special tokens included.
+
+        This is the encode the embed path uses. It does not compile a device.
+        """
+
+        repo, ref = parse_model_ref(model)
+        ids, _mask, _token_types = self._encode(self._load_tokenizer(repo, ref), text)
+        return len(ids)
+
     @staticmethod
     def enumerate_devices(core) -> list[dict]:
         """[{"id", "full_name"}] from a Core. This is the resolver's only input."""
@@ -292,7 +303,7 @@ class OpenvinoAdapter:
             self._compiled[key] = entry
         return entry
 
-    def _encode(self, tokenizer, text: str) -> tuple[list[int], list[int]]:
+    def _encode(self, tokenizer, text: str) -> tuple[list[int], list[int], list[int]]:
         out = tokenizer(text, return_attention_mask=True)
         ids = out["input_ids"]
         mask = out.get("attention_mask") or [1] * len(ids)
@@ -432,6 +443,7 @@ def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> Step
     pooling = _pooling_for(request.task, repo)  # refused before anything loads
     tokenizer = self._load_tokenizer(repo, ref)
     ids, mask, tt = self._encode(tokenizer, str(s.get("prompt") or "hello"))
+    encoded_len = len(ids)
     eos_appended = None
     if pooling == "last":
         eos_id = getattr(tokenizer, "eos_token_id", None)
@@ -482,8 +494,8 @@ def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> Step
         pooling=pooling,
         num_ctx=getattr(tokenizer, "model_max_length", None) or "unrecorded",
     )
-    if dropped:
-        resolved["truncated_tokens"] = dropped
+    resolved["prompt_tokens"] = encoded_len
+    resolved["truncated_tokens"] = dropped
     if eos_appended is not None:
         # Last-token pooling reads the last unmasked row: correct only when
         # that row is the tokenizer's EOS. Truncation cuts EOS off the kept

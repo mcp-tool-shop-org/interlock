@@ -77,7 +77,9 @@
         "quote_rule": {"type": ["integer", "null"], "minimum": 1},
         "quote_rule_source": {"type": ["string", "null"]},
         "offrig_version": {"type": ["string", "null"]},
-        "price_snapshot": {"type": ["string", "null"], "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"}
+        "price_snapshot": {"type": ["string", "null"], "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+        "prompt_tokens": {"type": ["integer", "null"], "minimum": 0},
+        "truncated_tokens": {"type": ["integer", "null"], "minimum": 0}
       }
     },
     "quality": {
@@ -95,7 +97,8 @@
         "throughput": {"type": ["number", "null"]},
         "throughput_unit": {"type": ["string", "null"]},
         "compile_ms": {"type": ["number", "null"], "minimum": 0},
-        "first_call_ms": {"type": ["number", "null"], "minimum": 0}
+        "first_call_ms": {"type": ["number", "null"], "minimum": 0},
+        "compile_warm_reload_ms": {"type": ["number", "null"], "minimum": 0}
       }
     },
     "artifacts": {
@@ -107,6 +110,7 @@
     "provisional": {"type": "boolean"},
     "provenance": {"$ref": "#/$defs/provenance"},
     "outcome": {"type": "string", "enum": ["device_lost", "hang"]},
+    "parity_valid": {"type": "boolean"},
     "partial": {"type": "boolean"},
     "model_family": {"type": ["string", "null"]},
     "gpu_resident": {"type": ["boolean", "null"]},

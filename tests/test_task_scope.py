@@ -116,6 +116,18 @@ def test_device_lost_is_not_a_speed_answer():
     assert only.rows == ()
 
 
+def test_a_failed_parity_guard_is_not_a_speed_answer():
+    bad = {"id": "b", "task": "embed", "parity_valid": False, "model_family": "qwen"}
+    good = {"id": "g", "task": "embed", "parity_valid": True, "model_family": "qwen"}
+    plain = {"id": "p", "task": "embed", "model_family": "qwen"}
+    answer = select([bad, good, plain], "embed")
+    assert [row["id"] for row in answer.rows] == ["g", "p"]
+    assert answer.satisfies_hard_constraint is True
+    only = select([bad], "embed", allow_proxy=True)
+    assert only.evidence == "none"
+    assert only.rows == ()
+
+
 def test_an_unknown_task_and_a_family_string_are_refused():
     with pytest.raises(ScopeError, match="unknown task"):
         select([], "verify")
