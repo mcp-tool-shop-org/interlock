@@ -1,4 +1,20 @@
 # Standards compliance
+# AMENDMENT 2026-10-09 (post-rerun). The rerun at this spec (blob 5dcb2aa2)
+# completed 45/45 arms and the tail lost the NPU again at nomic 8x1024. Two
+# bugs then found by the CPU parity investigation invalidate the rerun's
+# embedding semantics, not its timings:
+#   1. adapters/openvino.py omitted token_type_ids for graphs declaring it
+#      (fixed in PR #22); every parity cosine in the rerun receipt reflects
+#      an uninitialized token-type buffer, not the devices.
+#   2. harness/runner.py passes dataset.seed verbatim (~13 tokens) as the
+#      prompt; the 2048-token prefix rule below never ran, so warm medians
+#      are costs of a short padded call. Runner-side fix is Grok's.
+# The analysis below is unchanged and now pre-registers the full re-run,
+# which proceeds only after ALL of: (a) PR #22 merged, (b) the runner
+# dataset-expansion fix merged, (c) the compile_warm_reload_ms receipt field
+# merged, (d) the Publisher's NPU health check passed, (e) a new booked NPU
+# session. The rerun receipts stay on the record as evidence, labelled
+# invalid-routing in experiments/e1/receipts-2026-10-09-rerun.md.
 #
 # PIN_PER_STEP: 2. Model, revision, device, static shape, batch, the prompt
 #   rule, the break-even formula and its threshold, and the parity guard are

@@ -1,4 +1,20 @@
 # Standards compliance
+# AMENDMENT 2026-10-09 (post-rerun). The rerun at this spec (blob 5dcb2aa2)
+# completed 45/45 arms and the tail lost the NPU again at nomic 8x1024. Two
+# bugs then found by the CPU parity investigation invalidate the rerun's
+# embedding semantics, not its timings:
+#   1. adapters/openvino.py omitted token_type_ids for graphs declaring it
+#      (fixed in PR #22); every parity cosine in the rerun receipt reflects
+#      an uninitialized token-type buffer, not the devices.
+#   2. harness/runner.py passes dataset.seed verbatim (~13 tokens) as the
+#      prompt; the 2048-token prefix rule below never ran, so warm medians
+#      are costs of a short padded call. Runner-side fix is Grok's.
+# The analysis below is unchanged and now pre-registers the full re-run,
+# which proceeds only after ALL of: (a) PR #22 merged, (b) the runner
+# dataset-expansion fix merged, (c) the compile_warm_reload_ms receipt field
+# merged, (d) the Publisher's NPU health check passed, (e) a new booked NPU
+# session. The rerun receipts stay on the record as evidence, labelled
+# invalid-routing in experiments/e1/receipts-2026-10-09-rerun.md.
 #
 # PIN_PER_STEP: 2. Model, revision, device, static shape, batch, the prompt
 #   rule and the parity guard are in this file before any run; the decision is
@@ -202,21 +218,9 @@ arms:
     batch: 8
     static_shape: "8x512"
     measure: latency_ms
-  - id: nomic-npu-l1024-b8
-    task: embed
-    device: NPU
-    engine: openvino
-    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
-    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
-    quant: unrecorded
-    licence: unrecorded
-    engine_version: "2026.4.1"
-    thinking_level: "off"
-    num_predict: null
-    num_ctx: null
-    batch: 8
-    static_shape: "8x1024"
-    measure: latency_ms
+  # nomic-npu-l1024-b8 REMOVED 2026-10-09: ZE_RESULT_ERROR_DEVICE_LOST at this
+  # exact shape in two consecutive sessions (see incident-2026-10-09.md). Never
+  # re-add; a batch-8 nomic NPU arm needs R&D sign-off on a fixed driver.
   - id: nomic-npu-l2048-b8
     task: embed
     device: NPU
