@@ -612,7 +612,7 @@ def _run_generate(self, request: StepRequest, s: _Settings, resolved: dict) -> S
     t0 = self.clock()
     try:
         bound = _bound(self, s)
-        status, out = _timed_call(lambda: pipe.generate(str(s.get("prompt") or "hello"), config), bound)
+        status, out = _timed_call(lambda: pipe.generate([str(s.get("prompt") or "hello")], config), bound)
     except Exception as exc:
         if _is_device_lost(exc):
             self._lost_devices.add(ov_id)
@@ -632,8 +632,10 @@ def _run_generate(self, request: StepRequest, s: _Settings, resolved: dict) -> S
             sensors=None,
         )
     call_s = self.clock() - t0
+    # A list prompt makes generate return DecodedResults, which carries
+    # perf_metrics; a str prompt would return a bare str with no counters.
     perf = out.perf_metrics
-    text = out.texts[0] if getattr(out, "texts", None) else str(out)
+    text = out.texts[0]
     resolved.update(revision=parse_model_ref(request.model)[1] or "unrecorded")
     try:
         resolved["genai"] = {
