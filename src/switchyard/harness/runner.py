@@ -151,6 +151,9 @@ def run_interleaved(
     def _finished_row(arm_id: str, *, partial: bool, gone: set[str]) -> dict:
         extra = _extra_settings(spec, arms[arm_id], records, run_id, gone)
         extra.update(_prompt_counts(arms[arm_id], prompt_cache))
+        genai = _genai_summary(records, arm_id)
+        if genai:
+            extra["genai"] = genai
         row = measured_row(
             spec_id=spec["id"],
             arm=arms[arm_id],
@@ -467,6 +470,36 @@ def _artifacts(records: list[dict], arm_id: str) -> dict | None:
     if not slots:
         return None
     return {"slots": slots}
+
+
+def _genai_summary(records: list[dict], arm_id: str) -> dict:
+    """Medians of openvino-genai's own counters over an arm's repeat slots.
+
+    A generate step reports ttft_ms, tpot_ms, input_tokens and generated_tokens
+    under resolved["genai"] on every call. Without this they never reach the
+    receipt (E3's TTFT and R_speed read them). Empty for any other task.
+    """
+
+    values: dict[str, list[float]] = {}
+    for row in records:
+        if row["step_id"] != arm_id or row["phase"] != "repeat" or not isinstance(row.get("resolved"), dict):
+            continue
+        genai = row["resolved"].get("genai")
+        if not isinstance(genai, dict):
+            continue
+        for key in ("ttft_ms", "tpot_ms", "input_tokens", "generated_tokens"):
+            value = genai.get(key)
+            if isinstance(value, (int, float)):
+                values.setdefault(key, []).append(float(value))
+    out: dict = {}
+    for key, series in values.items():
+        series.sort()
+        mid = len(series) // 2
+        median = series[mid] if len(series) % 2 else (series[mid - 1] + series[mid]) / 2
+        out[f"{key}_p50" if key.endswith("_ms") else key] = median
+    if out:
+        out["repeats_counted"] = max(len(series) for series in values.values())
+    return out
 
 
 def _extra_settings(spec: dict, arm: dict, records: list[dict], run_id: str, removed: set[str]) -> dict:
