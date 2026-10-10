@@ -64,6 +64,36 @@
 # CPU/iGPU measurements were discarded in memory; the abort flush above is
 # the fix.
 #
+# Amendment, 2026-10-10, after the second run attempt (R&D rulings on issue #36).
+#
+# Per-call bound. The adapter's fixed 60 s per-call bound is replaced by a
+# per-arm bound on every device. A cold call is bounded by the ceiling C,
+# call_ceiling_s below (600 s). Each later call of an arm is bounded by
+# min(C, max(60 s, 3 x that arm's own cold-call time)), with the compile
+# excluded. Exceeding the bound is still a hang: arm inconclusive, pair
+# poisoned, sequence stopped, nothing retried. Every row records bound_s and
+# cold_call_s. The harness applies the same rule to the b8 tail
+# (spec-b8tail.yaml), whose blob is unchanged; its ceiling is the harness
+# default, also 600 s. A "too slow" outcome was considered and rejected: it
+# would discard a real speed measurement.
+#
+# Excluded arm. qwen3emb-npu-l512-b1 is not run. Its native binary was
+# rejected at execute in two separate fresh-cache runs (e2-2026-10-10 and
+# e2-2026-10-10b), same code, same driver 32.0.100.5540, same 1,208,717,446 B
+# blob, so under the #33 replication rule it reads "not supported at NPU 1x512
+# for this model revision on this driver". A driver change reopens it.
+#
+# Run note. The second run, e2-2026-10-10b at main caa4b43 (blob bd88da4b),
+# stopped after about 26 minutes. qwen3emb-npu-l512-b1 was rejected again (the
+# replication above). qwen3emb-cpu-l2048-b8 passed its cold call under 60 s,
+# then exceeded the 60 s bound at its first warmup and was recorded as a hang;
+# ruling #36 found the bound too tight for that slow shape, not a stuck device.
+# The abort flush wrote 13 aborted rows (CPU 5, iGPU 6, NPU 2), kept out of the
+# routing table; the hang row stays in the receipt marked superseded by #36 and
+# is not in the table. The rerun is in full, e2-2026-10-10c, on a commit with
+# the per-arm bound, after the -10b compile caches are cleared, a health check
+# passes and the Publisher opens a quiet CPU window.
+#
 # Amendment, 2026-10-10, before any E2 run (R&D, per the E1 rulings of 2026-10-09):
 # the three NPU batch-8 arms moved to experiments/e2/spec-b8tail.yaml, which runs after this spec in the same
 # booked session and quiet window, cheapest first, one try each. A device loss or hang there is a recorded row,
@@ -97,6 +127,7 @@ band: 1.0
 warmups: 1
 repeats: 19
 rest_s: 900
+call_ceiling_s: 600
 needs:
   grant: false
   npu_session: true
@@ -347,6 +378,7 @@ arms:
     static_shape: "1x128"
     measure: latency_ms
   - id: qwen3emb-npu-l512-b1
+    not_run: native binary rejected at execute in two fresh-cache runs (e2-2026-10-10, e2-2026-10-10b) on driver 32.0.100.5540; not supported at this shape (issue #36)
     task: embed
     device: NPU
     engine: openvino
