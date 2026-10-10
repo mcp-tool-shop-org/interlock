@@ -27,8 +27,10 @@ question: >
   of input correctness.
 decision: >
   The arm is evaluated with every other E1 receipt: parity guard cosine
-  >= 0.999 against nomic-cpu-l1024-b1 from the accompanying main run, warm
-  statistics descriptive. A parity-invalid arm is stored with
+  >= 0.999 against nomic-cpu-l1024-b1 from the accompanying main run. The
+  diagnostic runs inside the same booked quiet window as the re-run (final
+  block, alone), but its warm statistics stay descriptive: one arm, three
+  repeats, is not a routing measurement. A parity-invalid arm is stored with
   parity_valid: false and kept out of select and the gap report. A device
   loss or hang writes its recorded row, ends the run, and the session does
   not continue to anything after it.
@@ -39,7 +41,7 @@ rest_s: 900
 needs:
   grant: false
   npu_session: true
-  cpu_window: false
+  cpu_window: true
   booked_together: false
 dataset:
   name: e1-fixed-prompt
