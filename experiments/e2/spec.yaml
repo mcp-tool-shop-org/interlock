@@ -13,6 +13,57 @@
 #   window, booked through the Publisher. This spec does not start a device.
 # EXTERNAL_VERIFIER: n/a. R&D reviews this spec before any device time.
 
+# Amendment, 2026-10-10, after the first run attempt (R&D ruling on issue #33).
+#
+# Outcome. A NPU refusal of the compiled native binary at execute
+# (ZE_RESULT_ERROR_INVALID_NATIVE_BINARY, code 0x7800000f) is a capability
+# outcome, native_binary_rejected, recorded as a row the way device_lost is,
+# with no retry. It is classified only when all four hold: the device is the
+# NPU; the error carries the signature or the code; the adapter raised it at
+# execute after a compile that succeeded in this run; and the same model,
+# device and static shape (batch x length) has not already executed
+# successfully in this run. If the last condition fails the device changed
+# state, and the run aborts as an unknown error. Any other code, or any
+# other device, aborts as before.
+#
+# Scope. The row and the skip are scoped to model x device x static shape.
+# Only arms with the identical key are marked not run, listed in the notes
+# like the b8-tail rule. Other shapes of this model on the NPU still run;
+# the NPU is not marked off, and the CPU and iGPU arms continue. The row
+# records the error text and code, the NPU driver version, the static shape,
+# the compile-cache path and blob size written, the compile time (the
+# compile finished), and the run id.
+#
+# Abort flush. On any abort the receipt flushes every recorded measurement
+# as a row marked aborted: true, with the slot counts actually completed
+# (cold done or not, warm repeats k of N). The routing-table import refuses
+# aborted rows; they stay in the receipt as the record and never route.
+# gaps.md gets one line per aborted run: the run id, the step that stopped
+# it, and the error. An unknown error still stops the sequence.
+#
+# Replication. One occurrence is a provisional capability result, "rejected
+# at batch x length on driver 32.0.100.5540, n=1". It becomes "not supported
+# at this shape on this driver" only on recurrence in a separate run with a
+# fresh compile cache. The rerun of this spec after the first attempt's
+# compile-cache debris is cleared is that second run, because it compiles
+# fresh. If the rerun passes at l512, both outcomes are reported, the shape
+# is marked flaky, and it does not route on the NPU at that shape.
+#
+# Decision. A native_binary_rejected arm is a result for that arm only. It
+# is not "a failed step is inconclusive" for E2 as a whole. The parity and
+# speed gates above read the remaining arms as written.
+#
+# Run note. The first run, e2-2026-10-10 at main 149be2b, is recorded as
+# aborted, with zero receipt rows. It stopped at the qwen3emb-npu-l512-b1
+# cold execute with ZE_RESULT_ERROR_INVALID_NATIVE_BINARY (code
+# 0x7800000f). Evidence: the l512 compile succeeded with a complete 1.2 GB
+# cache blob; qwen3emb-npu-l128-b1's cold execute passed, so the refusal is
+# length-specific; a health check after the failure passed against the
+# pinned limits. Same NPU driver (32.0.100.5540) as the E1 incident. The
+# harness at 149be2b had no classification for this error, so the completed
+# CPU/iGPU measurements were discarded in memory; the abort flush above is
+# the fix.
+#
 # Amendment, 2026-10-10, before any E2 run (R&D, per the E1 rulings of 2026-10-09):
 # the three NPU batch-8 arms moved to experiments/e2/spec-b8tail.yaml, which runs after this spec in the same
 # booked session and quiet window, cheapest first, one try each. A device loss or hang there is a recorded row,
