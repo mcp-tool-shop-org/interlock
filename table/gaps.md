@@ -81,5 +81,5 @@ No open cell. This experiment's candidates are filled.
 ## Aborted runs
 
 - Aborted run `e2-2026-10-10b` stopped at `qwen3emb-cpu-l2048-b8 warmup 0`: hang: no result within 60 s; arm inconclusive, device pair poisoned for the run
-- Aborted run `e2-b8tail-2026-10-10c` stopped at `qwen3emb-npu-l512-b8 cold`: Exception from src\inference\src\cpp\core.cpp:120:
+- Aborted run `e2-b8tail-2026-10-10c` stopped at `qwen3emb-npu-l512-b8 cold`: Compilation failed. Level0 pfnCreate2 result: ZE_RESULT_ERROR_INVALID_NULL_POINTER, code 0x78000007 - pointer argument may not be nullptr . [NPU_VCL] Compiler returned msg: Target buffer size '2048' … (re-recorded as compile_rejected under ruling #36)
 
