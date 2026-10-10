@@ -1854,3 +1854,32 @@ def _commit(repo: Path) -> None:
     subprocess.run(["git", "config", "core.autocrlf", "false"], cwd=repo, check=True)
     subprocess.run(["git", "add", "."], cwd=repo, check=True)
     subprocess.run(["git", "commit", "-m", "fixture"], cwd=repo, check=True, capture_output=True)
+
+
+def test_a_generate_row_carries_genai_counter_medians_from_repeats(tmp_path: Path):
+    repo = tmp_path / "repo"
+    spec = _spec()
+    spec["warmups"] = 0
+    spec["repeats"] = 3
+    gen = _arm("gen", "NPU")
+    plain = _arm("plain", "CPU")
+    spec["arms"] = [gen, plain]
+
+    def g(ttft, tpot):
+        return {"genai": {"ttft_ms": ttft, "tpot_ms": tpot, "input_tokens": 1024, "generated_tokens": 128}}
+
+    counter = _Counting(
+        {
+            # the cold call's counters must not count; repeats give medians 30 / 5
+            "gen": [_result(9, 1, resolved=g(999, 99)), _result(4, 1, resolved=g(30, 5)),
+                    _result(4, 1, resolved=g(10, 4)), _result(4, 1, resolved=g(50, 6))],
+            "plain": [_result(4, 1), _result(2, 1), _result(2, 1), _result(2, 1)],
+        }
+    )
+    rows = _invoke(repo, _bind(repo, spec), {"fake": counter})
+    by_id = {row["id"]: row for row in rows}
+    genai = by_id["T/gen/run-1"]["settings"]["genai"]
+    assert genai["ttft_ms_p50"] == 30 and genai["tpot_ms_p50"] == 5
+    assert genai["input_tokens"] == 1024 and genai["generated_tokens"] == 128
+    assert genai["repeats_counted"] == 3
+    assert "genai" not in by_id["T/plain/run-1"]["settings"]
