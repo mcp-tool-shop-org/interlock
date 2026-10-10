@@ -21,7 +21,15 @@ import sys
 import time
 from pathlib import Path
 
-from switchyard.adapters.base import AdapterError, NativeBinaryRejected, StepRequest
+from switchyard.adapters.base import (
+    COMPILE_REJECTED_CODE,
+    COMPILER_MESSAGE_MARKER,
+    AdapterError,
+    CompileRejected,
+    NativeBinaryRejected,
+    StepRequest,
+    compile_rejected_error,
+)
 from switchyard.adapters.offrig_calibrate import plan_argv
 from switchyard.adapters.registry import for_engine
 from switchyard.cli import announce_run
@@ -44,7 +52,7 @@ from switchyard.harness.receipts import (
     write_run,
 )
 from switchyard.harness.spec import load_spec
-from switchyard.receipt import validate_row
+from switchyard.receipt import ReceiptError, load_jsonl, validate_row
 from switchyard.harness.timing import Slot, TimingError, aba_call, schedule, schedule_aba, summarize
 
 try:  # the CPU-window evidence of ruling #36's addendum; never a step failure
@@ -69,6 +77,14 @@ PASSTHROUGH = (
 SENSOR_KEYS = ("gpu_temp_c", "sm_clock_mhz", "power_w", "shared_mib", "dedicated_mib")
 
 
+# The rest is conditional (maintainer's rule, R&D approved): it is owed only
+# when the previous run on these devices lasted longer than this.
+REST_FREE_RUN_S = 30 * 60
+REST_CONDITIONAL_NOTE = (
+    f" (conditional: owed only after a prior run on these devices longer than {REST_FREE_RUN_S // 60} min)"
+)
+
+
 class RunnerError(Exception):
     """A step failed. Later steps do not run."""
 
@@ -86,7 +102,7 @@ def dry_run(spec_path: Path, repo: Path) -> str:
         lines.append(f"slots: {len(slots)}")
         lines.append(f"order: {spec.get('order', 'interleaved')}")
         lines.append(f"compile_cache: {spec['compile_cache']}")
-        lines.append(f"rest_s: {spec['rest_s']}")
+        lines.append(f"rest_s: {spec['rest_s']}{REST_CONDITIONAL_NOTE}")
         lines.append("cold is measured once per arm and kept out of the warm percentiles")
         lines.append(f"band: {spec['band']}")
     elif spec["procedure"] == "fill-card":
@@ -95,7 +111,7 @@ def dry_run(spec_path: Path, repo: Path) -> str:
         lines.append(f"models: {len(spec['models'])}")
         lines.append(f"spill_shared_mib: {spec['spill_shared_mib']}")
         lines.append(f"spill_prompt_ratio: {spec['spill_prompt_ratio']}")
-        lines.append(f"rest_s: {spec['rest_s']}")
+        lines.append(f"rest_s: {spec['rest_s']}{REST_CONDITIONAL_NOTE}")
         lines.append("the sampler aborts at abort_mib and does not wait for the watchdog")
         lines.append("quant is read from /api/show at run time")
     else:
@@ -128,6 +144,8 @@ def run_interleaved(
     date: str,
     env: dict | None = None,
     notes: str = "",
+    wall=None,
+    rest: dict | None = None,
 ) -> list[dict]:
     """Run a committed spec.
 
@@ -145,6 +163,13 @@ def run_interleaved(
     abort the slots already measured are flushed as rows marked
     ``aborted: true`` with the counts actually completed; the table import
     refuses them and ``gaps.md`` records the aborted run.
+
+    An NPU compiler that refuses the graph inside ``compile_model`` with
+    ``[NPU_VCL] Compiler returned msg`` and ``0x78000007`` becomes one
+    ``compile_rejected`` row (ruling on #36), scoped the same way and never
+    retried. Every row records ``settings.run_window`` (the run's start and
+    latest end, from ``wall``) so a later run can read how long this one
+    lasted, and ``settings.rest`` (the plan ``rest`` the caller computed).
     """
 
     _check_run_id(run_id)
@@ -178,6 +203,8 @@ def run_interleaved(
     prompt_cache: dict[str, tuple[str, int]] = {}
     removed: set[str] = set()
     imported = False
+    wall = wall or time.time
+    started_at = wall()
 
     def _run_notes() -> str:
         extra = "not run: " + ", ".join(skipped) if skipped else ""
@@ -299,6 +326,11 @@ def run_interleaved(
                 if not any(record["step_id"] == arm_id for record in records):
                     continue
                 rows.append(_aborted_row(arm_id, gone=gone))
+        window = {"start": _iso(started_at), "end": _iso(wall())}
+        for row in rows:
+            row["settings"]["run_window"] = window
+            if rest is not None:
+                row["settings"]["rest"] = rest
         return rows
 
     def flush(*, gone: set[str] | None = None) -> None:
@@ -378,6 +410,9 @@ def run_interleaved(
                             kind = "hang"
                         elif device_lost_error(error):
                             kind = "device_lost"
+                        elif _is_compile_rejection(exc, error, arm):
+                            kind = "compile_rejected"
+                            compile_s = exc.failed_s
                         elif _is_rejection(exc, error, arm, executed_ok):
                             kind = "native_binary_rejected"
                             compile_s = exc.compile_s
@@ -407,6 +442,13 @@ def run_interleaved(
                         raise RunnerError(f"step {slot.step_id} failed: {error}")
                     if kind == "device_lost":
                         _remember(arm, "device_lost")
+                        flush()
+                    elif kind == "compile_rejected":
+                        rejected_keys.add(_shape_key(arm))
+                        rejections[arm["id"]] = _compile_rejection_evidence(
+                            arm, error, compile_s, run_id, captured
+                        )
+                        _remember(arm, "compile_rejected")
                         flush()
                     elif kind == "native_binary_rejected":
                         rejected_keys.add(_shape_key(arm))
@@ -591,6 +633,53 @@ def _is_rejection(exc: BaseException, error: str, arm: dict, executed_ok: set[tu
     if not native_binary_rejected_error(error):
         return False
     return _shape_key(arm) not in executed_ok
+
+
+def _is_compile_rejection(exc: BaseException, error: str, arm: dict) -> bool:
+    """The compile-rejected capability bound (ruling on #36). All three, or the error aborts.
+
+    The device is the NPU; the adapter raised the compile-site subtype (the
+    error came out of ``compile_model``, not out of an execute); and the error
+    carries both the compiler-message marker and ``0x78000007``.
+    """
+
+    if arm["device"] != "NPU":
+        return False
+    if not isinstance(exc, CompileRejected):
+        return False
+    return compile_rejected_error(error)
+
+
+def compiler_message(error: str) -> str | None:
+    """The compiler's own words: the text after ``Compiler returned msg:``, on one line."""
+
+    _, marker, tail = error.partition(COMPILER_MESSAGE_MARKER)
+    if not marker:
+        return None
+    parts = [line.strip() for line in tail.lstrip(": 	").splitlines()]
+    text = " ".join(part for part in parts if part)
+    return text or None
+
+
+def _compile_rejection_evidence(
+    arm: dict,
+    error: str,
+    failed_s: float | None,
+    run_id: str,
+    env: dict,
+) -> dict:
+    """What the compile-rejected row records: the compiler's message and code, the
+    drivers, the time to failure and the run. There is no blob and no compile time."""
+
+    return {
+        "compiler_message": compiler_message(error),
+        "code": COMPILE_REJECTED_CODE,
+        "npu_driver": env.get("npu_firmware") or "unrecorded",
+        "openvino": env.get("openvino") or "unrecorded",
+        "time_to_failure_s": failed_s,
+        "run_id": run_id,
+        "shape": {"batch": arm.get("batch"), "static_shape": arm.get("static_shape")},
+    }
 
 
 def _rejection_evidence(
@@ -1070,10 +1159,140 @@ def _card_guards(probe, path: Path, now: float) -> None:
     require_card_empty(probe())
 
 
-def _rest(spec: dict, sleep, clock) -> None:
-    """Sleep the spec's rest before the block, then prove the rest happened."""
+def _iso(epoch: float) -> str:
+    return datetime.datetime.fromtimestamp(epoch, tz=datetime.timezone.utc).isoformat(timespec="seconds")
 
-    rest_s = spec.get("rest_s") or 0
+
+def _parse_window(window: object) -> tuple[float, float] | None:
+    """A row's ``settings.run_window`` as (start, end) epoch seconds, or None when
+    it is missing, not ISO, naive (no zone) or runs backwards."""
+
+    if not isinstance(window, dict):
+        return None
+    try:
+        start = datetime.datetime.fromisoformat(window["start"])
+        end = datetime.datetime.fromisoformat(window["end"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if start.tzinfo is None or end.tzinfo is None or end < start:
+        return None
+    return start.timestamp(), end.timestamp()
+
+
+def _spec_devices(spec: dict) -> set[str]:
+    devices = {arm["device"] for arm in spec["arms"]}
+    devices.update(arm["companion_device"] for arm in spec["arms"] if arm.get("companion_device"))
+    return devices
+
+
+def _prior_runs(root: Path, devices: set[str]) -> list[dict]:
+    """Every receipt under ``receipts/`` whose rows touch one of ``devices``.
+
+    Aborted runs count: their rows are in the receipt. A receipt whose rows do
+    not all carry a readable ``run_window`` (every receipt before the window was
+    recorded) comes back with ``window`` None.
+    """
+
+    runs = []
+    folder = root / "receipts"
+    for path in sorted(folder.glob("*.jsonl")) if folder.is_dir() else []:
+        written = path.stat().st_mtime
+        try:
+            rows = load_jsonl(path)
+        except ReceiptError:
+            runs.append({"run_id": path.stem, "date": "", "window": None, "written": written})
+            continue
+        touching = [row for row in rows if row.get("device") in devices]
+        if not touching:
+            continue
+        windows = [_parse_window((row.get("settings") or {}).get("run_window")) for row in touching]
+        window = None
+        if all(item is not None for item in windows):
+            window = (min(item[0] for item in windows), max(item[1] for item in windows))
+        run_id = (touching[0].get("provenance") or {}).get("run_id") or path.stem
+        runs.append(
+            {
+                "run_id": run_id,
+                "date": max(str(row.get("date") or "") for row in touching),
+                "window": window,
+                "written": written,
+            }
+        )
+    return runs
+
+
+def plan_rest(spec: dict, root: Path, now: float) -> dict:
+    """What rest this run owes (maintainer's rule, R&D approved).
+
+    Every prior switchyard receipt that touches one of this spec's devices is
+    asked what it is owed, and the largest answer is rested:
+
+    - times readable, run longer than ``REST_FREE_RUN_S``: ``rest_s`` less the
+      time since it ended;
+    - times readable, run that long or shorter: nothing;
+    - times unreadable (receipts before ``run_window``, or a file that does not
+      parse): treated as long, measured from the file time, which is at or after
+      the run's end, so the gap can only be underestimated;
+    - an end in the future: the full ``rest_s``.
+
+    In a real sequence this is "the previous run decides", since a long run is
+    always followed by its rest, but mixed receipts and date strings cannot
+    fool it. Health checks and smokes write no receipt, so they never count.
+
+    A spec that uses the 5090 always rests the full ``rest_s``: the card's own
+    rule. Other jobs on the card leave no switchyard receipt, so the receipts
+    cannot show whether the card has rested.
+    """
+
+    rest_s = float(spec.get("rest_s") or 0)
+    plan = {"ran": False, "reason": "", "prior_run_id": None, "prior_run_min": None, "gap_min": None, "rest_s_applied": 0.0}
+    if _uses_5090(spec):
+        plan.update(
+            ran=rest_s > 0,
+            reason="the card's own rule: a 5090 spec rests in full; card runs outside switchyard leave no receipt",
+            rest_s_applied=rest_s,
+        )
+        return plan
+    runs = _prior_runs(root, _spec_devices(spec))
+    if not runs:
+        plan["reason"] = "no prior run on these devices"
+        return plan
+    best = None
+    for run in runs:
+        if run["window"] is None:
+            gap = now - run["written"]
+            owed = rest_s if gap < 0 else max(0.0, rest_s - gap)
+            why = f"its times are unrecorded; its receipt was last written {gap / 60:.1f} min ago (fail-safe: treated as long)"
+            duration = None
+        else:
+            start, end = run["window"]
+            duration = end - start
+            gap = now - end
+            if gap < 0:
+                owed = rest_s
+                why = "its recorded end is in the future (fail-safe)"
+            elif duration <= REST_FREE_RUN_S:
+                owed = 0.0
+                why = f"it lasted {duration / 60:.1f} min, at most {REST_FREE_RUN_S // 60}"
+            else:
+                owed = max(0.0, rest_s - gap)
+                why = f"it lasted {duration / 60:.1f} min, over {REST_FREE_RUN_S // 60}; it ended {gap / 60:.1f} min ago"
+        candidate = (owed, -gap, run, duration, gap, why)
+        if best is None or candidate[:2] > best[:2]:
+            best = candidate
+    owed, _, run, duration, gap, why = best
+    plan["prior_run_id"] = run["run_id"]
+    plan["prior_run_min"] = None if duration is None else duration / 60
+    plan["gap_min"] = gap / 60
+    plan["rest_s_applied"] = owed
+    plan["ran"] = owed > 0
+    plan["reason"] = f"prior run {run['run_id']}: {why}" + ("" if owed > 0 else "; nothing owed")
+    return plan
+
+
+def _rest(rest_s: float, sleep, clock) -> None:
+    """Sleep the planned rest before the block, then prove the rest happened."""
+
     if rest_s <= 0:
         return
     start = clock()
@@ -1127,7 +1346,9 @@ def run_spec(
         probe = _card_probe(adapters, spec)
         path = heartbeat_path(heartbeat)
         _card_guards(probe, path, (wall or time.time)())
-    _rest(spec, sleep or time.sleep, clock or time.monotonic)
+    wall = wall or time.time
+    rest = plan_rest(spec, root, wall())
+    _rest(rest["rest_s_applied"], sleep or time.sleep, clock or time.monotonic)
     if _uses_5090(spec):
         _card_guards(probe, path, (wall or time.time)())
     return run_interleaved(
@@ -1141,4 +1362,6 @@ def run_spec(
         run_id=name,
         date=stamp,
         notes=notes,
+        wall=wall,
+        rest=rest,
     )

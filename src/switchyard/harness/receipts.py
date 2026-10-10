@@ -146,13 +146,14 @@ def device_lost_row(
     partial: bool = True,
     compile_ms: float | None = None,
 ) -> dict:
-    """A capability row: a hang, a device loss, or a refused native binary.
+    """A capability row: a hang, a device loss, or a refused graph or binary.
 
-    No timing, and no retry. ``outcome`` is ``device_lost``, ``hang`` or
-    ``native_binary_rejected``. All three tell the table that this device
-    cannot do the setting. ``partial`` stays on while the run is still open.
+    No timing, and no retry. ``outcome`` is ``device_lost``, ``hang``,
+    ``native_binary_rejected`` or ``compile_rejected``. All four tell the table
+    that this device cannot do the setting. ``partial`` stays on while the run is still open.
     A rejection carries ``compile_ms``: the compile finished, the execute did
-    not. The other outcomes have no timing.
+    not. The other outcomes have no timing; a ``compile_rejected`` row's time
+    to failure is under ``settings.rejection``.
     """
 
     text = DEVICE_LOST_NOTE if not notes else f"{DEVICE_LOST_NOTE}. {notes}"
@@ -184,8 +185,8 @@ def device_lost_row(
 def for_table(row: dict) -> dict:
     """The table copy of a receipt row.
 
-    A capability row (``device_lost``, ``hang``, ``native_binary_rejected``)
-    cannot carry a speed. Timing and artifacts are stripped, and the note says
+    A capability row (``device_lost``, ``hang``, ``native_binary_rejected``,
+    ``compile_rejected``) cannot carry a speed. Timing and artifacts are stripped, and the note says
     the device cannot do the setting. A refused native binary keeps its
     compile time: the compile is evidence, the execute never happened.
     """
@@ -220,9 +221,9 @@ def write_receipt(root: Path, run_id: str, rows: list[dict]) -> Path:
 def import_receipt(root: Path, run_id: str) -> list[dict]:
     """Bring a run receipt into the routing table.
 
-    ``device_lost``, ``hang`` and ``native_binary_rejected`` land as "this
-    device can't do this setting", with the timing removed (a rejection keeps
-    its compile time). A failed parity guard is recorded with its timing and
+    ``device_lost``, ``hang``, ``native_binary_rejected`` and
+    ``compile_rejected`` land as "this device can't do this setting", with the
+    timing removed (a native-binary rejection keeps its compile time). A failed parity guard is recorded with its timing and
     is not a speed figure. CPU batch-1 references already in the table count,
     so a later receipt can be judged against them.
 

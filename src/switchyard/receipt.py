@@ -122,7 +122,7 @@ _TIMING = (
     "first_call_ms",
     "compile_warm_reload_ms",
 )
-_UNTIMED = frozenset({"device_lost", "hang"})
+_UNTIMED = frozenset({"device_lost", "hang", "compile_rejected"})
 # The compile finished and the device refused the native binary at execute.
 # Such a row keeps the compile time and nothing else.
 _COMPILE_ONLY = frozenset({"native_binary_rejected"})
@@ -141,7 +141,7 @@ def is_speed_row(row: dict) -> bool:
 def _check_device_lost(row: dict) -> None:
     """A capability row says the device cannot do the setting. It is not a speed.
 
-    ``device_lost`` and ``hang`` carry no timing. ``native_binary_rejected``
+    ``device_lost``, ``hang`` and ``compile_rejected`` carry no timing. ``native_binary_rejected``
     keeps the compile time only: the compile finished, the execute did not.
     """
 

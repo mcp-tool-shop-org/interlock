@@ -106,14 +106,14 @@ def _cmd_import(args: argparse.Namespace) -> int:
 def run_report(rows: list[dict], *, finished: bool) -> str:
     """What a run prints when it ends.
 
-    Each hang, device_lost or native_binary_rejected arm is one line, before
+    Each hang, device_lost, native_binary_rejected or compile_rejected arm is one line, before
     ``done``. A run that returns cleanly still shows the loss.
     """
 
     lines = []
     for row in rows:
         outcome = row.get("outcome")
-        if outcome not in ("device_lost", "hang", "native_binary_rejected"):
+        if outcome not in ("device_lost", "hang", "native_binary_rejected", "compile_rejected"):
             continue
         lines.append(f"{_arm_id(row)} {row['device']} {outcome}")
     if finished:
