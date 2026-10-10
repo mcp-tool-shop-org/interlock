@@ -32,12 +32,14 @@ def main(argv: list[str] | None = None) -> int:
     importer.add_argument("--offers", type=Path, default=None)
     importer.set_defaults(func=_cmd_import)
 
-    run = sub.add_parser("run", help="dry-run a committed experiment spec")
+    run = sub.add_parser("run", help="run a committed experiment spec (the plan only with --dry-run)")
     run.add_argument("spec", type=Path)
     run.add_argument("--root", type=Path, default=Path("."))
     run.add_argument("--grant")
     run.add_argument("--npu-session")
     run.add_argument("--cpu-window")
+    run.add_argument("--run-id")
+    run.add_argument("--notes", default="")
     run.add_argument("--dry-run", action="store_true")
     run.set_defaults(func=_cmd_run)
 
@@ -137,20 +139,28 @@ def _arm_id(row: dict) -> str:
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
+    from switchyard.adapters.base import AdapterError
     from switchyard.guards import GuardError
-    from switchyard.harness.runner import check_flags, devices_not_started, dry_run
-    from switchyard.harness.spec import SpecError, load_spec
+    from switchyard.harness.runner import RunnerError, dry_run, run_spec
+    from switchyard.harness.spec import SpecError
 
     try:
         if args.dry_run:
             print(dry_run(args.spec, args.root.resolve()), end="")
             return 0
-        check_flags(load_spec(args.spec), args.grant, args.npu_session, args.cpu_window)
-    except (SpecError, GuardError, OSError) as exc:
+        run_spec(
+            args.spec,
+            root=args.root.resolve(),
+            grant=args.grant,
+            npu_session=args.npu_session,
+            cpu_window=args.cpu_window,
+            run_id=args.run_id,
+            notes=args.notes,
+        )
+    except (AdapterError, GuardError, RunnerError, SpecError, OSError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
-    print(devices_not_started(), file=sys.stderr)
-    return 1
+    return 0
 
 
 def _count_rows(root: Path) -> int:

@@ -2,8 +2,10 @@
 
 The command-line dry-run does not stat the heartbeat, does not call an adapter,
 and does not launch offrig. A library run with fake adapters is how the timing
-math and the receipt shape are tested. Phase 2's command refuses to start a
-device: that waits for a Publisher window in Phase 3.
+math and the receipt shape are tested. The command's real path is run_spec:
+every guard (interpreter, procedure, flag, committed blob, card state and
+rest) refuses before an adapter is built or called; then run_interleaved
+measures.
 
 The library run loads the spec only after the committed blob matches the
 working tree. That is the same lock the dry-run uses, on the path Phase 3 runs.
@@ -11,13 +13,25 @@ working tree. That is the same lock the dry-run uses, on the path Phase 3 runs.
 
 from __future__ import annotations
 
+import datetime
+import os
 import shutil
+import sys
+import time
 from pathlib import Path
 
 from switchyard.adapters.base import AdapterError, StepRequest
 from switchyard.adapters.offrig_calibrate import plan_argv
+from switchyard.adapters.registry import for_engine
 from switchyard.cli import announce_run
-from switchyard.guards import assess_step
+from switchyard.devices import CARD_5090
+from switchyard.guards import (
+    GuardError,
+    assess_step,
+    require_card_empty,
+    require_heartbeat,
+    require_rest,
+)
 from switchyard.harness.e5 import SearchError, fit_prompt
 from switchyard.harness.lock import require_unmodified
 from switchyard.harness.receipts import (
@@ -91,6 +105,7 @@ def dry_run(spec_path: Path, repo: Path) -> str:
         flags.append("--cpu-window")
     lines.append("a device run would require: " + (", ".join(flags) if flags else "no extra flag"))
     lines.append("heartbeat not read; adapters not called")
+    lines.append(devices_not_started())
     return "\n".join(lines) + "\n"
 
 
@@ -692,7 +707,9 @@ def _guard_flags(spec: dict, grant: str | None, npu_session: str | None, cpu_win
 
 
 def devices_not_started() -> str:
-    return "REFUSED: Phase 2 does not start a device. Re-run with --dry-run."
+    """The dry-run's closing line. The real run path is :func:`run_spec`."""
+
+    return "devices not started (--dry-run)"
 
 
 def check_flags(spec: dict, grant: str | None, npu_session: str | None, cpu_window: str | None) -> None:
@@ -708,3 +725,142 @@ def check_flags(spec: dict, grant: str | None, npu_session: str | None, cpu_wind
         assess_step(device="NPU", npu_session=npu_session)
     if needs["cpu_window"]:
         assess_step(device="CPU", cpu_window=cpu_window, cpu_heavy=True)
+
+HEARTBEAT_DEFAULT = Path("E:/AI/training/_watchdog_HEARTBEAT")
+HEARTBEAT_ENV = "WATCHDOG_HEARTBEAT"
+
+
+def heartbeat_path(override: Path | None = None) -> Path:
+    """The VRAM watchdog heartbeat file. The WATCHDOG_HEARTBEAT environment
+    variable overrides the rig default, the same variable chain_step.sh honours."""
+
+    if override is not None:
+        return override
+    return Path(os.environ.get(HEARTBEAT_ENV, str(HEARTBEAT_DEFAULT)))
+
+
+def real_adapters(spec: dict) -> dict:
+    """One registry adapter per engine the spec names. Construction touches no device."""
+
+    return {engine: for_engine(engine) for engine in sorted({arm["engine"] for arm in spec["arms"]})}
+
+
+def _refuse_repo_interpreter(root: Path, python_path: Path) -> None:
+    """Refuse an interpreter inside the checkout.
+
+    uv's fallback is an in-repo ``.venv``. The pinned environment lives outside
+    the repo; a run from the shadow .venv is exactly where unpinned packages
+    would reach a receipt.
+    """
+
+    try:
+        python_path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return
+    raise GuardError(
+        "REFUSED: the interpreter is inside the repository checkout. Device "
+        "runs use the pinned environment outside the repo; run with "
+        "UV_PROJECT_ENVIRONMENT set, not the in-repo .venv."
+    )
+
+
+def _uses_5090(spec: dict) -> bool:
+    return any(
+        arm["device"] == CARD_5090 or arm.get("companion_device") == CARD_5090
+        for arm in spec["arms"]
+    )
+
+
+def _card_probe(adapters: dict, spec: dict):
+    """The loaded-models probe of the adapter serving the 5090 arms."""
+
+    engine = next(
+        arm["engine"]
+        for arm in spec["arms"]
+        if arm["device"] == CARD_5090 or arm.get("companion_device") == CARD_5090
+    )
+    probe = getattr(adapters[engine], "loaded_models", None)
+    if not callable(probe):
+        raise GuardError(f"REFUSED: the {engine} adapter cannot report the card state")
+    return probe
+
+
+def _card_guards(probe, path: Path, now: float) -> None:
+    """Heartbeat, then empty card. Both are read fresh on every call."""
+
+    require_heartbeat(path, now)
+    require_card_empty(probe())
+
+
+def _rest(spec: dict, sleep, clock) -> None:
+    """Sleep the spec's rest before the block, then prove the rest happened."""
+
+    rest_s = spec.get("rest_s") or 0
+    if rest_s <= 0:
+        return
+    start = clock()
+    sleep(rest_s)
+    require_rest(clock() - start, rest_s=rest_s)
+
+
+def run_spec(
+    spec_path: Path,
+    *,
+    root: Path,
+    grant: str | None = None,
+    npu_session: str | None = None,
+    cpu_window: str | None = None,
+    run_id: str | None = None,
+    date: str | None = None,
+    notes: str = "",
+    adapters: dict | None = None,
+    heartbeat: Path | None = None,
+    sleep=None,
+    clock=None,
+    wall=None,
+    python_path: str | None = None,
+) -> list[dict]:
+    """Run a committed interleaved spec. Every refusal lands before device contact.
+
+    The order is: interpreter, spec load, procedure, token flags, the
+    committed blob, the receipt-name collision, adapter construction, the
+    card heartbeat and empty-card check, the spec's rest, then heartbeat and
+    empty-card again at contact time. ``run_interleaved`` re-checks the blob
+    and flags and owns the measurement; a completed run appends its rows to
+    the routing table by the harness's own design.
+    """
+
+    _refuse_repo_interpreter(root, Path(python_path or sys.executable))
+    spec = load_spec(spec_path)
+    if spec["procedure"] != "interleaved":
+        raise GuardError(
+            f"REFUSED: a {spec['procedure']!r} spec has no run path; this command runs interleaved specs"
+        )
+    check_flags(spec, grant, npu_session, cpu_window)
+    require_unmodified(root, spec_path)
+    stamp = date or datetime.date.today().isoformat()
+    name = run_id or f"{spec['id'].lower()}-{stamp}"
+    receipt = root / "receipts" / f"{name}.jsonl"
+    if receipt.exists():
+        raise GuardError(f"REFUSED: receipts/{name}.jsonl already exists; pass --run-id for another name")
+    if adapters is None:
+        adapters = real_adapters(spec)
+    if _uses_5090(spec):
+        probe = _card_probe(adapters, spec)
+        path = heartbeat_path(heartbeat)
+        _card_guards(probe, path, (wall or time.time)())
+    _rest(spec, sleep or time.sleep, clock or time.monotonic)
+    if _uses_5090(spec):
+        _card_guards(probe, path, (wall or time.time)())
+    return run_interleaved(
+        adapters,
+        grant=grant,
+        npu_session=npu_session,
+        cpu_window=cpu_window,
+        root=root,
+        repo=root,
+        spec_path=spec_path,
+        run_id=name,
+        date=stamp,
+        notes=notes,
+    )
