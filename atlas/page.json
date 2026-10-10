@@ -20,31 +20,62 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 4,
-      "changed": 4,
+      "added": 9,
+      "changed": 19,
       "moved": 0,
       "parts": 3,
       "removed": 0
     },
     "items": [
       {
+        "kind": "unassigned",
+        "sentence": "receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.",
+        "subjects": [
+          "receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl"
+        ]
+      },
+      {
+        "kind": "unassigned",
+        "sentence": "receipts/e1-intel-2026-10-09-rerun.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.",
+        "subjects": [
+          "receipts/e1-intel-2026-10-09-rerun.jsonl"
+        ]
+      },
+      {
         "kind": "counts",
-        "sentence": "Nothing structural changed since 2026-10-09; 4 files added and 4 changed content.",
+        "sentence": "9 files added and 19 changed content, across 3 parts.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "82e20592727e96ffea4cb094f597be21c333f7c5",
-      "generatedAt": "2026-10-09T20:22:46.087Z"
+      "commit": "fbbbe9ca6fce7a69b771dcc7e87275c77515c7a5",
+      "generatedAt": "2026-10-09T20:38:09.210Z"
     },
-    "unchanged": true
+    "unchanged": false
   },
-  "changesTogether": [],
+  "changesTogether": [
+    {
+      "a": "src/switchyard/adapters/openvino.py",
+      "b": "tests/test_openvino_adapter.py",
+      "either": 5,
+      "partLabels": [
+        "src",
+        "tests"
+      ],
+      "parts": [
+        "src",
+        "tests"
+      ],
+      "relation": "b-imports-a",
+      "shared": 5
+    }
+  ],
   "changesTogetherNote": [
+    "Confidence is low: fewer than 30 qualifying commits in the window, and fewer than 25 source files reach 10 revisions.",
     "Window: 180 days; a pair counts from 3 shared commits, since the window holds fewer than 30 qualifying commits."
   ],
   "changesTogetherWithTests": 0,
-  "commit": "fbbbe9ca6fce7a69b771dcc7e87275c77515c7a5",
+  "commit": "962683d7cda3d8a10bafb4362522f7beb82297de",
   "defaultBranch": "main",
   "derived": "7 parts, mostly Python (44 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.",
   "doors": [
@@ -98,7 +129,7 @@
         {
           "boundary": "src",
           "depth": 0,
-          "files": 23
+          "files": 24
         }
       ],
       "runs": [
@@ -117,12 +148,12 @@
   "edges": [],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-09T20:38:09.210Z",
+  "generatedAt": "2026-10-10T00:25:29.070Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "1 read uses a path built at run time and is not named here.",
     "3 writes and 9 reads go to a path their caller passes, not to this repository.",
-    "4 files belong to no part: table/candidates.json, table/gaps.md, table/model-families.json and 1 more.",
+    "6 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, table/candidates.json and 3 more.",
     "Statistics confidence is low: fewer than 30 qualifying commits in the window, and fewer than 25 source files reach 10 revisions."
   ],
   "mainDoor": ".github/workflows/ci.yml",
