@@ -1,0 +1,77 @@
+# Standards compliance
+#
+# DIAGNOSTIC SPEC, agreed by R&D and the Publisher 2026-10-09. One arm,
+# run alone, as the very last block of the E1 re-run session. Both recorded
+# NPU losses at nomic-npu-l1024-b8 (experiments/e1/incident-2026-10-09.md)
+# ran with an uninitialized token_type_ids buffer (fixed in #22), which can
+# drive an out-of-bounds token-type embedding lookup; this diagnostic asks
+# whether the shape still kills the device with the input fix in place.
+# PIN_PER_STEP: 2. Model, revision, device, static shape and batch are in
+#   this file before any run.
+# ANDON_AUTHORITY: 2. A device loss is a recorded result, ends the sequence
+#   and ends the booked session. Never retried.
+# NAMED_COMPENSATORS: 2. No publish, no rental, no spend.
+# DECOMPOSE_BY_SECRETS: 2. This file is the pre-registration.
+# UNCERTAINTY_GATED_HUMANS: 2. Runs only inside a booked NPU session, after
+#   the Publisher's health check, after every other E1 spec's receipts are
+#   on disk, as the session's final block. This spec does not start a device.
+# EXTERNAL_VERIFIER: n/a. R&D reviewed this spec before any device time.
+
+id: E1
+procedure: interleaved
+compile_cache: fresh
+question: >
+  Does nomic-embed-text-v1.5 on the NPU at 8x1024 still lose the device with
+  token_type_ids fed correctly? A passing run also supplies the arm's E1
+  batch-8 measurement; a loss confirms the shape as driver-fatal regardless
+  of input correctness.
+decision: >
+  The arm is evaluated with every other E1 receipt: parity guard cosine
+  >= 0.999 against nomic-cpu-l1024-b1 from the accompanying main run. The
+  diagnostic runs inside the same booked quiet window as the re-run (final
+  block, alone), but its warm statistics stay descriptive: one arm, three
+  repeats, is not a routing measurement. A parity-invalid arm is stored with
+  parity_valid: false and kept out of select and the gap report. A device
+  loss or hang writes its recorded row, ends the run, and the session does
+  not continue to anything after it.
+band: 1.0
+warmups: 1
+repeats: 3
+rest_s: 900
+needs:
+  grant: false
+  npu_session: true
+  cpu_window: true
+  booked_together: false
+dataset:
+  name: e1-fixed-prompt
+  seed: "The switchyard counts the same cars on every pass. "
+  target_tokens: 2048
+  rule: >
+    As experiments/e1/spec.yaml: the expanded 2048-token prefix from the
+    runner-side fix, right-truncated to the arm's static length.
+metrics:
+  - compile_ms
+  - compile_warm_reload_ms
+  - first_call_ms
+  - latency_ms
+  - truncated_tokens
+stop_rules:
+  - One arm, one try. A device loss or a hang ends the session; nothing runs after it.
+  - Runs only after #22's token_type_ids fix is in the adapter being run.
+arms:
+  - id: nomic-npu-l1024-b8
+    task: embed
+    device: NPU
+    engine: openvino
+    model: nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x1024"
+    measure: latency_ms
