@@ -87,7 +87,7 @@ def measured_row(
         settings["keep_alive"] = arm["keep_alive"]
     if extra_settings:
         settings.update(extra_settings)
-    for key in ("prompt_tokens", "truncated_tokens"):
+    for key in ("prompt_tokens", "truncated_tokens", "token_type_ids_fed"):
         if learned.get(key) is not None:
             settings[key] = learned[key]
     latency = {

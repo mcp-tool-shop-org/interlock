@@ -586,6 +586,29 @@ def test_the_adapter_token_counts_and_warm_reload_overwrite_the_prefix_estimate(
     assert rows[0]["settings"]["truncated_tokens"] == 1920
 
 
+def test_a_receipt_row_carries_token_type_ids_fed(tmp_path: Path):
+    repo = tmp_path / "repo"
+    spec = _spec()
+    spec["warmups"] = 0
+    spec["repeats"] = 1
+    fed = _arm("fed", "CPU")
+    omitted = _arm("omitted", "NPU")
+    absent = _arm("absent", "iGPU")
+    spec["arms"] = [fed, omitted, absent]
+    counter = _Counting(
+        {
+            "fed": [_result(4, 1, resolved={"token_type_ids_fed": True}), _result(2, 1)],
+            "omitted": [_result(4, 1, resolved={"token_type_ids_fed": False}), _result(2, 1)],
+            "absent": [_result(4, 1, resolved={}), _result(2, 1)],
+        }
+    )
+    rows = _invoke(repo, _bind(repo, spec), {"fake": counter})
+    by_id = {row["id"]: row for row in rows}
+    assert by_id["T/fed/run-1"]["settings"]["token_type_ids_fed"] is True
+    assert by_id["T/omitted/run-1"]["settings"]["token_type_ids_fed"] is False
+    assert "token_type_ids_fed" not in by_id["T/absent/run-1"]["settings"]
+
+
 def test_a_target_without_a_tokenizer_is_refused_before_a_step(tmp_path: Path):
     repo = tmp_path / "repo"
     spec = _spec()
