@@ -617,7 +617,7 @@ def _run_generate(self, request: StepRequest, s: _Settings, resolved: dict) -> S
             resolved["outcome"] = "unsupported length"
             return StepResult(ok=True, resolved=resolved or None, sensors=None)
         raise AdapterError(f"the pipeline for {request.model} on {ov_id} did not build: {exc}") from exc
-    key = (request.model, ov_id)
+    key = _pipeline_key(request.model, ov_id, compile_config)
     genai = self._genai_module or _real_genai_module()
     config = genai.GenerationConfig()
     config.max_new_tokens = num_predict
@@ -631,14 +631,14 @@ def _run_generate(self, request: StepRequest, s: _Settings, resolved: dict) -> S
     except Exception as exc:
         if _is_device_lost(exc):
             self._lost_devices.add(ov_id)
-            self._pipelines.pop((request.model, ov_id), None)
+            self._pipelines.pop(key, None)
             resolved["outcome"] = "device_lost"
             return StepResult(ok=True, resolved=resolved, sensors=None)
         if _is_native_binary_rejected(exc):
             raise NativeBinaryRejected(str(exc), compile_s=compile_s) from exc
         raise
     if status == "hang":
-        self._pipelines.pop((request.model, ov_id), None)
+        self._pipelines.pop(key, None)
         self._poisoned.add((request.model, ov_id))
         return StepResult(
             ok=False,
@@ -727,8 +727,16 @@ def _model_dir(model: str) -> Path:
         raise AdapterError(f"the model {model} could not be fetched: {exc}") from exc
 
 
+def _pipeline_key(model: str, ov_id: str, compile_config: dict | None) -> tuple:
+    """One pipeline per model, device and compile config. On the NPU the config
+    sizes the static KV cache (MAX_PROMPT_LEN), so a pipeline built for a short
+    prompt must not be reused for a longer one."""
+
+    return (model, ov_id, tuple(sorted((compile_config or {}).items())))
+
+
 def _pipeline(self, model: str, ov_id: str, compile_config: dict):
-    key = (model, ov_id)
+    key = _pipeline_key(model, ov_id, compile_config)
     entry = self._pipelines.get(key)
     if entry is None:
         genai = self._genai_module or _real_genai_module()

@@ -563,7 +563,23 @@ def test_generate_npu_records_genai_config(tmp_path):
     assert r.ok
     # FakeTokenizer: "hi there" -> [101, w1, w2, 102] = 4 tokens + 64 margin
     assert r.resolved["genai_config"] == {"MAX_PROMPT_LEN": 68, "MIN_RESPONSE_LEN": 96}
-    assert a._pipelines[(str(tmp_path), "NPU")]["pipe"].config["MAX_PROMPT_LEN"] == 68
+    (entry,) = [v for k, v in a._pipelines.items() if k[:2] == (str(tmp_path), "NPU")]
+    assert entry["pipe"].config["MAX_PROMPT_LEN"] == 68
+
+
+def test_generate_npu_builds_a_pipeline_per_prompt_size(tmp_path):
+    # E3's second run: a pipeline sized for a short prompt was reused for a long one,
+    # and the NPU refused the long prompt (MAX_PROMPT_LEN too small).
+    a = make_adapter()
+    short = a.run(req(task="generate", model=str(tmp_path), device="NPU", num_predict=64, prompt="hi there"))
+    long = a.run(req(task="generate", model=str(tmp_path), device="NPU", num_predict=64,
+                     prompt="hi there " * 20))
+    assert short.ok and long.ok
+    assert long.compile_ms is not None  # a new pipeline, not the short one reused
+    sizes = sorted(v["pipe"].config["MAX_PROMPT_LEN"] for k, v in a._pipelines.items() if k[:2] == (str(tmp_path), "NPU"))
+    assert sizes == [68, long.resolved["genai_config"]["MAX_PROMPT_LEN"]] and sizes[1] > 68
+    again = a.run(req(task="generate", model=str(tmp_path), device="NPU", num_predict=64, prompt="hi there"))
+    assert again.compile_ms is None  # the short pipeline is still cached
 
 
 def test_generate_npu_unsupported_length_is_recorded_not_fatal(tmp_path):
