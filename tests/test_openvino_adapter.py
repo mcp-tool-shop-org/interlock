@@ -751,3 +751,117 @@ def test_runner_writes_no_row_for_the_adapters_not_run(tmp_path, monkeypatch):
     notes = rows["T/A/run-1"]["notes"]
     assert notes.startswith("kept. not run: B cold") and "B repeat 0" in notes
     assert set(table) == set(rows)
+
+
+# --- token_type_ids: an omitted declared input infers garbage (E1 rerun, 2026-10-09) ---
+
+
+class _NamedPort:
+    def __init__(self, name):
+        self._name = name
+
+    def get_any_name(self):
+        return self._name
+
+
+class TTCompiled:
+    """CompiledModel-shaped stand-in for the real (numpy) infer path."""
+
+    def __init__(self, declare_tt=True):
+        names = ["input_ids", "attention_mask"] + (["token_type_ids"] if declare_tt else [])
+        self.inputs = [_NamedPort(n) for n in names]
+        self.outputs = ["last_hidden_state"]
+        self.arrays = None
+
+    def __call__(self, arrays):
+        import numpy as np
+
+        self.arrays = {k: np.asarray(v) for k, v in arrays.items()}
+        length = self.arrays["input_ids"].shape[1]
+        return {"last_hidden_state": np.ones((1, length, 4), dtype=np.float32)}
+
+
+def test_infer_embed_feeds_token_type_ids_when_declared():
+    a = make_adapter()
+    model = TTCompiled(declare_tt=True)
+    out = a._infer_embed({"model": model}, [1, 2, 0], [1, 1, 0], [7, 7, 0], 1)
+    assert model.arrays["token_type_ids"].tolist() == [[7, 7, 0]]
+    assert len(out) == 3 and len(out[0]) == 4
+
+
+def test_infer_embed_omits_undeclared_token_type_ids():
+    a = make_adapter()
+    model = TTCompiled(declare_tt=False)
+    a._infer_embed({"model": model}, [1, 2, 0], [1, 1, 0], [0, 0, 0], 1)
+    assert "token_type_ids" not in model.arrays
+
+
+def test_encode_supplies_token_type_ids_or_zeros():
+    a = make_adapter()
+    ids, mask, tt = a._encode(FakeTokenizer(), "one two")
+    assert len(ids) == len(mask) == len(tt) and all(t == 0 for t in tt)
+
+    class TTTokenizer(FakeTokenizer):
+        def __call__(self, text, return_attention_mask=True):
+            enc = dict(super().__call__(text, return_attention_mask))
+            enc["token_type_ids"] = [7] * len(enc["input_ids"])
+            return enc
+
+    ids, mask, tt = a._encode(TTTokenizer(), "one two")
+    assert tt == [7] * len(ids)
+
+
+def test_pad_like_lockstep():
+    assert ovm.pad_like([7, 7], 4) == [7, 7, 0, 0]
+    assert ovm.pad_like([7, 7, 7, 7], 2) == [7, 7]
+    assert ovm.pad_like([], 3) == [0, 0, 0]
+
+
+def test_run_embed_pads_token_type_ids_in_lockstep(tmp_path, monkeypatch):
+    m = local_model(tmp_path)
+    monkeypatch.setitem(ovm._POOLING, m, "cls")
+    compiled = TTCompiled(declare_tt=True)
+
+    class TTCore(FakeCore):
+        def compile_model(self, graph, device, config):
+            self.compiled.append((device, dict(config)))
+            return compiled
+
+    a = make_adapter(core=TTCore())
+    r = a.run(req(model=m, device="CPU", static_shape="1x8", batch=1))
+    assert r.ok, r.error
+    ids = compiled.arrays["input_ids"][0].tolist()
+    assert compiled.arrays["token_type_ids"][0].tolist() == [0] * len(ids) and len(ids) == 8
+
+
+@pytest.mark.skipif(importlib.util.find_spec("openvino") is None, reason="no intel extra in this venv")
+@pytest.mark.skipif(importlib.util.find_spec("transformers") is None, reason="no transformers in this venv")
+def test_cpu_parity_is_exact_across_shapes_and_batches():
+    """E1 rerun regression pin: omitting token_type_ids gave cosine plateaus of
+    0.988 / 0.93 / 0.57 between shapes and batches on CPU. With the feed, the same
+    tokens must give the same vector at every static shape and batch size."""
+    import math
+
+    a = ovm.adapter()
+
+    def vec(model, shape, batch):
+        r = a.run(StepRequest(step_id="p", task="embed", model=model, device="CPU", engine="openvino",
+                              settings={"prompt": "The switchyard parity probe stays short.",
+                                        "static_shape": shape, "batch": batch}))
+        assert r.ok, r.error
+        return r.output
+
+    def cos(x, y):
+        d = sum(i * j for i, j in zip(x, y))
+        return d / (math.sqrt(sum(i * i for i in x)) * math.sqrt(sum(j * j for j in y)))
+
+    cases = [
+        ("BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a", [16, 128, 512]),
+        ("nomic-ai/nomic-embed-text-v1.5@e9b6763023c676ca8431644204f50c2b100d9aab", [16, 512, 1024]),
+    ]
+    for model, lengths in cases:
+        ref = vec(model, f"1x{lengths[0]}", 1)
+        for length in lengths[1:]:
+            for batch in (1, 8):
+                got = vec(model, f"{batch}x{length}", batch)
+                assert cos(ref, got) >= 1 - 1e-6, f"{model} {batch}x{length} cosine {cos(ref, got)}"
