@@ -99,6 +99,10 @@
 # booked session and quiet window, cheapest first, one try each. A device loss or hang there is a recorded row,
 # later arms are marked not run, and nothing is retried. The decision is unchanged: the batch-8 rows were
 # descriptive. A parity-invalid arm is stored with parity_valid: false and kept out of select and the gap report.
+# Amendment, 2026-10-10. Rest. rest_s is the length of a conditional rest,
+# applied only after a run of over 30 minutes on the same devices that ended
+# less than rest_s ago (maintainer, 2026-10-10).
+
 id: E2
 procedure: interleaved
 compile_cache: fresh
