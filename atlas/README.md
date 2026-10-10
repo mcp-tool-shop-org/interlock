@@ -1,20 +1,17 @@
 # switchyard: how it works
 
-Mapped at 2026-10-10 from commit 0716bef by Atlas 1.24.0.
+Mapped at 2026-10-10 from commit d174259 by Atlas 1.24.0.
 
 ## What this is
 
 switchyard routes each job to a model, engine and device from a receipt-backed table. (written by a person)
 
-7 parts, mostly Python (44 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.
+7 parts, mostly Python (46 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.
 
-## What changed since 2026-10-10 (962683d)
+## What changed since 2026-10-10 (caa4b43)
 
-- experiments/e1/spec.yaml is now read by tests/test_harness.py.
-- receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
-- receipts/e1-intel-2026-10-09-rerun2-nomic-diag.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
-- receipts/e1-intel-2026-10-09-rerun2.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
-- 4 files added and 15 changed content, across 3 parts.
+- receipts/e2-2026-10-10b.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
+- 1 file added.
 
 ## What comes in
 
@@ -24,7 +21,7 @@ switchyard routes each job to a model, engine and device from a receipt-backed t
 ## What happens through CI
 
 1. The workflow runs tests/ in tests.
-2. That reaches src (30 files).
+2. That reaches src (33 files).
 3. It uploads coverage to Codecov.
 
 ## Who reads the results
@@ -41,11 +38,15 @@ CI writes nothing this map can see.
 
 ## What tends to change together
 
-- **src/switchyard/adapters/openvino.py** and **tests/test_openvino_adapter.py** changed together in 7 of 7 commits, and the tests part imports the src part.
+- **src/switchyard/adapters/openvino.py** and **tests/test_openvino_adapter.py** changed together in 10 of 10 commits, and the tests part imports the src part.
+- **tests/test_importers.py** and **tests/test_task_scope.py** changed together in 5 of 7 commits, inside the tests part.
+- **src/switchyard/harness/receipts.py** and **tests/test_harness.py** changed together in 5 of 8 commits, and the tests part imports the src part.
+- **src/switchyard/harness/runner.py** and **tests/test_harness.py** changed together in 5 of 9 commits, and the tests part imports the src part.
+- **src/switchyard/importers/gaps.py** and **tests/test_importers.py** changed together in 4 of 8 commits, and the tests part imports the src part.
 
-Confidence is low: fewer than 30 qualifying commits in the window, and fewer than 25 source files reach 10 revisions.
+Confidence is low: fewer than 25 source files reach 10 revisions in the window.
 
-Window: 180 days; a pair counts from 3 shared commits, since the window holds fewer than 30 qualifying commits.
+Window: 180 days; a pair counts from 3 shared commits, since 2 source files reach 10 revisions; the floor rises to 10 when 25 do.
 
 ## What no test touches
 
@@ -76,9 +77,10 @@ Read those in order to follow one run of switchyard end to end. This path follow
 ## What this map cannot see
 
 - 1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.
-- 1 read uses a path built at run time and is not named here.
-- 3 writes and 9 reads go to a path their caller passes, not to this repository.
-- 9 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 6 more.
-- Statistics confidence is low: fewer than 30 qualifying commits in the window, and fewer than 25 source files reach 10 revisions.
+- 2 reads use paths built at run time and are not named here.
+- 4 writes and 12 reads go to a path their caller passes, not to this repository.
+- 3 reads go to the directory the command is run in (receipts/), not to this repository.
+- 10 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 7 more.
+- Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window.
 
 Regenerate with `npx --yes @dogfood-lab/atlas map`.

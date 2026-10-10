@@ -146,7 +146,11 @@
           "path": "experiments/e1/spec.yaml"
         },
         {
-          "hash": "5b5484fc0e11edaadee842cbdeb75fa012a40ed739b0cfa6d64fb8cf7ba5c1ed",
+          "hash": "26c788220c07e6af045f5bc08017809aa3bd39c559e0a5ba173cf0a43b4fc744",
+          "path": "experiments/e2/spec-b8tail.yaml"
+        },
+        {
+          "hash": "b52b5186614b2fadf7b5ab0dc45c3f03f4e32104fa1eab9209fce8e0f27c5bc5",
           "path": "experiments/e2/spec.yaml"
         },
         {
@@ -201,7 +205,7 @@
           "path": "LICENSE"
         },
         {
-          "hash": "8723eacbcd992dbf3413383ede76f05888ddfd301411ec227fbec76e7023fd1c",
+          "hash": "c6b7a11bbb3165899445c9e231c067b648a99a39edfe114409dee9d83a2a08da",
           "path": "README.md"
         },
         {
@@ -228,7 +232,7 @@
       "unresolvedSites": 0
     },
     {
-      "dynamicReads": 1,
+      "dynamicReads": 2,
       "dynamicSpawns": 0,
       "dynamicSpawnsInTests": 0,
       "dynamicWrites": 0,
@@ -264,7 +268,7 @@
           "path": "src/switchyard/adapters/__init__.py"
         },
         {
-          "hash": "0d0f10841a66911f013b2309f8f0fd9eda771d7ee9bb8c51f65cc17f8b431c4e",
+          "hash": "b83ce2418b9fc653bffac44b0bff240e2b41a94fec0184d664329cc1a56f60fb",
           "path": "src/switchyard/adapters/base.py"
         },
         {
@@ -392,142 +396,137 @@
           "failurePaths": [
             {
               "kind": "except",
-              "line": 67
+              "line": 71
             },
             {
               "in": "_need_openvino",
               "kind": "raise",
-              "line": 95
+              "line": 110
             },
             {
               "in": "parse_static_shape",
               "kind": "raise",
-              "line": 116
+              "line": 131
             },
             {
               "in": "parse_static_shape",
               "kind": "except",
-              "line": 119
+              "line": 134
             },
             {
               "in": "parse_static_shape",
               "kind": "raise",
-              "line": 120
+              "line": 135
             },
             {
               "in": "parse_static_shape",
               "kind": "raise",
-              "line": 122
+              "line": 137
             },
             {
               "in": "pad_truncate",
               "kind": "raise",
-              "line": 139
+              "line": 154
             },
             {
               "in": "pool",
               "kind": "raise",
-              "line": 163
+              "line": 178
             },
             {
               "in": "pool",
               "kind": "raise",
-              "line": 169
+              "line": 184
             },
             {
               "in": "pool",
               "kind": "raise",
-              "line": 173
+              "line": 188
             },
             {
               "in": "enumerate_devices",
               "kind": "except",
-              "line": 228
+              "line": 243
             },
             {
               "in": "_resolve_ov_id",
               "kind": "except",
-              "line": 244
+              "line": 259
             },
             {
               "in": "_resolve_ov_id",
               "kind": "raise",
-              "line": 245
+              "line": 260
             },
             {
               "in": "_model_path",
               "kind": "raise",
-              "line": 262
+              "line": 277
             },
             {
               "in": "_model_path",
               "kind": "except",
-              "line": 265
+              "line": 280
             },
             {
               "in": "_model_path",
               "kind": "raise",
-              "line": 266
+              "line": 281
             },
             {
               "in": "_model_path",
               "kind": "except",
-              "line": 271
+              "line": 286
+            },
+            {
+              "in": "_model_path",
+              "kind": "except",
+              "line": 294
             },
             {
               "in": "_model_path",
               "kind": "raise",
-              "line": 273
+              "line": 295
+            },
+            {
+              "in": "_model_path",
+              "kind": "raise",
+              "line": 297
             },
             {
               "in": "_load_compiled",
               "kind": "except",
-              "line": 284
+              "line": 308
             },
             {
               "in": "_load_compiled",
               "kind": "raise",
-              "line": 285
+              "line": 309
             },
             {
               "in": "_default_tokenizer_loader",
               "kind": "except",
-              "line": 351
+              "line": 375
             },
             {
               "in": "_default_tokenizer_loader",
               "kind": "raise",
-              "line": 352
+              "line": 376
             },
             {
               "in": "work",
               "kind": "except",
-              "line": 383
+              "line": 407
             },
             {
               "in": "_timed_call",
               "kind": "raise",
-              "line": 392
+              "line": 416
             },
             {
               "in": "_pooling_for",
               "kind": "raise",
-              "line": 423
-            },
-            {
-              "in": "_run_embed",
-              "kind": "raise",
-              "line": 436
-            },
-            {
-              "in": "_run_embed",
-              "kind": "raise",
-              "line": 441
-            },
-            {
-              "in": "_run_embed",
-              "kind": "except",
-              "line": 459
+              "line": 447
             },
             {
               "in": "_run_embed",
@@ -536,171 +535,196 @@
             },
             {
               "in": "_run_embed",
-              "kind": "except",
-              "line": 461
-            },
-            {
-              "in": "_run_embed",
               "kind": "raise",
-              "line": 466
+              "line": 465
             },
             {
               "in": "_run_embed",
               "kind": "except",
-              "line": 474
+              "line": 483
             },
             {
               "in": "_run_embed",
               "kind": "raise",
-              "line": 480
+              "line": 484
+            },
+            {
+              "in": "_run_embed",
+              "kind": "except",
+              "line": 485
+            },
+            {
+              "in": "_run_embed",
+              "kind": "raise",
+              "line": 490
+            },
+            {
+              "in": "_run_embed",
+              "kind": "except",
+              "line": 498
+            },
+            {
+              "in": "_run_embed",
+              "kind": "raise",
+              "line": 505
+            },
+            {
+              "in": "_run_embed",
+              "kind": "raise",
+              "line": 508
             },
             {
               "in": "_run_generate",
               "kind": "raise",
-              "line": 531
+              "line": 567
             },
             {
               "in": "_run_generate",
               "kind": "except",
-              "line": 546
+              "line": 582
             },
             {
               "in": "_run_generate",
               "kind": "raise",
-              "line": 547
+              "line": 583
             },
             {
               "in": "_run_generate",
               "kind": "except",
-              "line": 548
+              "line": 584
             },
             {
               "in": "_run_generate",
               "kind": "raise",
-              "line": 558
+              "line": 594
             },
             {
               "in": "_run_generate",
               "kind": "except",
-              "line": 569
+              "line": 605
             },
             {
               "in": "_run_generate",
               "kind": "raise",
-              "line": 575
+              "line": 612
+            },
+            {
+              "in": "_run_generate",
+              "kind": "raise",
+              "line": 613
             },
             {
               "in": "_run_generate",
               "kind": "except",
-              "line": 596
+              "line": 634
             },
             {
               "in": "_run_generate",
               "kind": "except",
-              "line": 604
+              "line": 642
             },
             {
               "in": "_real_genai_module",
               "kind": "except",
-              "line": 629
+              "line": 667
             },
             {
               "in": "_real_genai_module",
               "kind": "raise",
-              "line": 630
+              "line": 668
             },
             {
               "in": "_model_dir",
-              "kind": "except",
-              "line": 656
-            },
-            {
-              "in": "_model_dir",
-              "kind": "raise",
-              "line": 657
-            },
-            {
-              "in": "_model_dir",
-              "kind": "except",
-              "line": 660
-            },
-            {
-              "in": "_model_dir",
-              "kind": "raise",
-              "line": 661
-            },
-            {
-              "in": "_run",
-              "kind": "raise",
-              "line": 681
-            },
-            {
-              "in": "_run",
-              "kind": "raise",
-              "line": 689
-            },
-            {
-              "in": "_run",
-              "kind": "except",
-              "line": 692
-            },
-            {
-              "in": "_run",
-              "kind": "raise",
-              "line": 693
-            },
-            {
-              "in": "_run",
               "kind": "except",
               "line": 694
             },
             {
+              "in": "_model_dir",
+              "kind": "raise",
+              "line": 695
+            },
+            {
+              "in": "_model_dir",
+              "kind": "except",
+              "line": 698
+            },
+            {
+              "in": "_model_dir",
+              "kind": "raise",
+              "line": 699
+            },
+            {
+              "in": "_run",
+              "kind": "raise",
+              "line": 719
+            },
+            {
+              "in": "_run",
+              "kind": "raise",
+              "line": 727
+            },
+            {
+              "in": "_run",
+              "kind": "except",
+              "line": 730
+            },
+            {
+              "in": "_run",
+              "kind": "raise",
+              "line": 731
+            },
+            {
+              "in": "_run",
+              "kind": "except",
+              "line": 732
+            },
+            {
               "in": "_start_session",
               "kind": "raise",
-              "line": 716
+              "line": 754
             },
             {
               "in": "loop",
               "kind": "raise",
-              "line": 745
+              "line": 783
             },
             {
               "in": "loop",
               "kind": "except",
-              "line": 760
+              "line": 798
             },
             {
               "in": "_start_session",
               "kind": "raise",
-              "line": 775
+              "line": 813
             },
             {
               "in": "_start_session",
               "kind": "raise",
-              "line": 776
+              "line": 814
             },
             {
               "in": "_stop_session",
               "kind": "raise",
-              "line": 785
+              "line": 823
             },
             {
               "in": "_stop_session",
               "kind": "raise",
-              "line": 795
+              "line": 833
             },
             {
               "in": "_stop_session",
               "kind": "raise",
-              "line": 797
+              "line": 835
             },
             {
               "in": "_guarded_unload",
               "kind": "raise",
-              "line": 802
+              "line": 840
             }
           ],
-          "hash": "ece17588ee5a80a0c7bbc5d2b4793d204092072747ab898ce14d52728fba010e",
+          "hash": "f4bb7a0bb2f98e01e8c0ed2bd8ed616516483c80b6f7e8e5b5af223b11dd580e",
           "importsFiles": [
             "src/switchyard/adapters/base.py",
             "src/switchyard/devices.py"
@@ -754,20 +778,22 @@
             {
               "in": "_cmd_run",
               "kind": "except",
-              "line": 146
+              "line": 160
             }
           ],
-          "hash": "4b3df5018467476e894a5952ae51bce1886e64a02fa6177aad0b7662fc16f382",
+          "hash": "9aa27b6b98b5834102f8509e089d3b769b3835027943123a6aa0843b44c150fa",
           "importOrder": [
             "src/switchyard/receipt.py",
             "src/switchyard/importers/assemble.py",
             "src/switchyard/importers/gaps.py",
             "src/switchyard/importers/pins.py",
+            "src/switchyard/adapters/base.py",
             "src/switchyard/guards.py",
             "src/switchyard/harness/runner.py",
             "src/switchyard/harness/spec.py"
           ],
           "importsFiles": [
+            "src/switchyard/adapters/base.py",
             "src/switchyard/guards.py",
             "src/switchyard/harness/runner.py",
             "src/switchyard/harness/spec.py",
@@ -781,14 +807,14 @@
             {
               "calls": [
                 {
-                  "line": 47,
+                  "line": 52,
                   "name": "check_tree",
                   "target": {
                     "file": "src/switchyard/receipt.py"
                   }
                 },
                 {
-                  "line": 157,
+                  "line": 170,
                   "name": "receipt_paths",
                   "target": {
                     "file": "src/switchyard/receipt.py"
@@ -796,7 +822,7 @@
                   "via": "_count_rows"
                 },
                 {
-                  "line": 159,
+                  "line": 172,
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/switchyard/receipt.py"
@@ -812,7 +838,7 @@
             {
               "calls": [
                 {
-                  "line": 62,
+                  "line": 67,
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/switchyard/receipt.py"
@@ -827,21 +853,21 @@
             {
               "calls": [
                 {
-                  "line": 80,
+                  "line": 85,
                   "name": "import_receipts",
                   "target": {
                     "file": "src/switchyard/importers/assemble.py"
                   }
                 },
                 {
-                  "line": 85,
+                  "line": 90,
                   "name": "load_candidates",
                   "target": {
                     "file": "src/switchyard/importers/gaps.py"
                   }
                 },
                 {
-                  "line": 94,
+                  "line": 99,
                   "name": "render_gaps",
                   "target": {
                     "file": "src/switchyard/importers/gaps.py"
@@ -857,29 +883,15 @@
               "calls": [
                 {
                   "branch": "args.dry_run",
-                  "line": 143,
+                  "line": 149,
                   "name": "dry_run",
                   "target": {
                     "file": "src/switchyard/harness/runner.py"
                   }
                 },
                 {
-                  "line": 145,
-                  "name": "load_spec",
-                  "target": {
-                    "file": "src/switchyard/harness/spec.py"
-                  }
-                },
-                {
-                  "line": 145,
-                  "name": "check_flags",
-                  "target": {
-                    "file": "src/switchyard/harness/runner.py"
-                  }
-                },
-                {
-                  "line": 149,
-                  "name": "devices_not_started",
+                  "line": 151,
+                  "name": "run_spec",
                   "target": {
                     "file": "src/switchyard/harness/runner.py"
                   }
@@ -893,14 +905,14 @@
             {
               "calls": [
                 {
-                  "line": 157,
+                  "line": 170,
                   "name": "receipt_paths",
                   "target": {
                     "file": "src/switchyard/receipt.py"
                   }
                 },
                 {
-                  "line": 159,
+                  "line": 172,
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/switchyard/receipt.py"
@@ -1160,6 +1172,34 @@
         },
         {
           "exports": [
+            "clear_driver_cache",
+            "dist_version",
+            "driver_version_from_lines",
+            "npu_driver_version",
+            "package_versions"
+          ],
+          "failurePaths": [
+            {
+              "in": "dist_version",
+              "kind": "except",
+              "line": 29
+            },
+            {
+              "in": "dist_version",
+              "kind": "except",
+              "line": 31
+            },
+            {
+              "in": "_read_npu_driver",
+              "kind": "except",
+              "line": 104
+            }
+          ],
+          "hash": "9ee0551b2ac2e1beb846b56adfe1c347192a71df228eed0e39b2682210570961",
+          "path": "src/switchyard/harness/environment.py"
+        },
+        {
+          "exports": [
             "require_unmodified"
           ],
           "failurePaths": [
@@ -1210,24 +1250,30 @@
             {
               "in": "_append_table",
               "kind": "raise",
-              "line": 339
+              "line": 365
             }
           ],
-          "hash": "c5f28cb78ba1af935b3cc33ba60adca6cf474fcf60c9ba0ed543cb3908e37e89",
+          "hash": "ed68f2d853a86e1088953922006ed6d666e1e49ef2457a579cd5da649a0ff44f",
           "importOrder": [
+            "src/switchyard/harness/__init__.py",
+            "src/switchyard/harness/environment.py",
             "src/switchyard/harness/timing.py",
             "src/switchyard/families.py",
+            "src/switchyard/importers/gaps.py",
             "src/switchyard/receipt.py"
           ],
           "importsFiles": [
             "src/switchyard/families.py",
+            "src/switchyard/harness/__init__.py",
+            "src/switchyard/harness/environment.py",
             "src/switchyard/harness/timing.py",
+            "src/switchyard/importers/gaps.py",
             "src/switchyard/receipt.py"
           ],
           "path": "src/switchyard/harness/receipts.py"
         },
         {
-          "entry": "run_interleaved",
+          "entry": "run_spec",
           "entryRule": 4,
           "exports": [
             "check_flags",
@@ -1235,70 +1281,111 @@
             "devices_not_started",
             "dry_run",
             "hang_error",
-            "run_interleaved"
+            "heartbeat_path",
+            "native_binary_rejected_error",
+            "real_adapters",
+            "run_interleaved",
+            "run_spec"
           ],
           "failurePaths": [
             {
               "in": "run_interleaved",
               "kind": "raise",
-              "line": 125
+              "line": 149
             },
             {
               "in": "run_interleaved",
               "kind": "except",
-              "line": 255
+              "line": 344
             },
             {
               "in": "run_interleaved",
               "kind": "raise",
-              "line": 263
+              "line": 356
             },
             {
               "in": "run_interleaved",
               "kind": "raise",
-              "line": 281
+              "line": 375
             },
             {
               "in": "run_interleaved",
               "kind": "raise",
-              "line": 290
+              "line": 392
+            },
+            {
+              "in": "run_interleaved",
+              "kind": "except",
+              "line": 420
+            },
+            {
+              "in": "run_interleaved",
+              "kind": "raise",
+              "line": 426
             },
             {
               "in": "_summary",
               "kind": "raise",
-              "line": 424
+              "line": 607
             },
             {
               "in": "_session",
               "kind": "raise",
-              "line": 542
+              "line": 755
             },
             {
               "in": "_dataset_prompt",
               "kind": "raise",
-              "line": 571
+              "line": 784
             },
             {
               "in": "_dataset_prompt",
               "kind": "except",
-              "line": 580
+              "line": 793
             },
             {
               "in": "_dataset_prompt",
               "kind": "raise",
-              "line": 581
+              "line": 794
             },
             {
               "in": "_check_run_id",
               "kind": "raise",
-              "line": 631
+              "line": 844
+            },
+            {
+              "in": "_refuse_repo_interpreter",
+              "kind": "except",
+              "line": 923
+            },
+            {
+              "in": "_refuse_repo_interpreter",
+              "kind": "raise",
+              "line": 925
+            },
+            {
+              "in": "_card_probe",
+              "kind": "raise",
+              "line": 949
+            },
+            {
+              "in": "run_spec",
+              "kind": "raise",
+              "line": 1001
+            },
+            {
+              "in": "run_spec",
+              "kind": "raise",
+              "line": 1010
             }
           ],
-          "hash": "a983971a3805548bf68a773e67e0750ba3f764b0de64cfe3f64a42f540f4482c",
+          "hash": "1d2c29d15dc2957601f6c0e0cbb01a9ba07a8d05ab38f36ad08af9b9d89573f9",
           "importsFiles": [
             "src/switchyard/adapters/base.py",
             "src/switchyard/adapters/offrig_calibrate.py",
+            "src/switchyard/adapters/registry.py",
             "src/switchyard/cli.py",
+            "src/switchyard/devices.py",
             "src/switchyard/guards.py",
             "src/switchyard/harness/e5.py",
             "src/switchyard/harness/lock.py",
@@ -1312,14 +1399,14 @@
             {
               "calls": [
                 {
-                  "line": 57,
+                  "line": 72,
                   "name": "load_spec",
                   "target": {
                     "file": "src/switchyard/harness/spec.py"
                   }
                 },
                 {
-                  "line": 58,
+                  "line": 73,
                   "name": "require_unmodified",
                   "target": {
                     "file": "src/switchyard/harness/lock.py"
@@ -1327,7 +1414,7 @@
                 },
                 {
                   "branch": "order == \"aba\"",
-                  "line": 360,
+                  "line": 543,
                   "name": "schedule_aba",
                   "target": {
                     "file": "src/switchyard/harness/timing.py"
@@ -1335,7 +1422,7 @@
                   "via": "_slots"
                 },
                 {
-                  "line": 361,
+                  "line": 544,
                   "name": "schedule",
                   "target": {
                     "file": "src/switchyard/harness/timing.py"
@@ -1343,7 +1430,7 @@
                   "via": "_slots"
                 },
                 {
-                  "line": 82,
+                  "line": 97,
                   "name": "plan_argv",
                   "target": {
                     "file": "src/switchyard/adapters/offrig_calibrate.py"
@@ -1358,26 +1445,26 @@
             {
               "calls": [
                 {
-                  "line": 122,
+                  "line": 146,
                   "name": "require_unmodified",
                   "target": {
                     "file": "src/switchyard/harness/lock.py"
                   }
                 },
                 {
-                  "line": 123,
+                  "line": 147,
                   "name": "load_spec",
                   "target": {
                     "file": "src/switchyard/harness/spec.py"
                   }
                 },
                 {
-                  "line": 126,
+                  "line": 150,
                   "name": "resolve",
                   "target": null
                 },
                 {
-                  "line": 652,
+                  "line": 865,
                   "name": "assess_step",
                   "target": {
                     "file": "src/switchyard/guards.py"
@@ -1386,7 +1473,7 @@
                 },
                 {
                   "branch": "order == \"aba\"",
-                  "line": 360,
+                  "line": 543,
                   "name": "schedule_aba",
                   "target": {
                     "file": "src/switchyard/harness/timing.py"
@@ -1394,7 +1481,7 @@
                   "via": "_slots"
                 },
                 {
-                  "line": 361,
+                  "line": 544,
                   "name": "schedule",
                   "target": {
                     "file": "src/switchyard/harness/timing.py"
@@ -1402,14 +1489,14 @@
                   "via": "_slots"
                 },
                 {
-                  "line": 139,
+                  "line": 168,
                   "name": "environment",
                   "target": {
                     "file": "src/switchyard/harness/receipts.py"
                   }
                 },
                 {
-                  "line": 579,
+                  "line": 792,
                   "name": "fit_prompt",
                   "target": {
                     "file": "src/switchyard/harness/e5.py"
@@ -1417,7 +1504,7 @@
                   "via": "_dataset_prompt"
                 },
                 {
-                  "line": 381,
+                  "line": 564,
                   "name": "StepRequest",
                   "target": {
                     "file": "src/switchyard/adapters/base.py"
@@ -1425,7 +1512,16 @@
                   "via": "_request"
                 },
                 {
-                  "line": 489,
+                  "line": 493,
+                  "name": "NativeBinaryRejected",
+                  "passed": true,
+                  "target": {
+                    "file": "src/switchyard/adapters/base.py"
+                  },
+                  "via": "_is_rejection"
+                },
+                {
+                  "line": 702,
                   "name": "aba_call",
                   "target": {
                     "file": "src/switchyard/harness/timing.py"
@@ -1434,7 +1530,7 @@
                 },
                 {
                   "branch": "present and (len(set(present)) != 1 or len(present) != len(…",
-                  "line": 424,
+                  "line": 607,
                   "name": "TimingError",
                   "target": {
                     "file": "src/switchyard/harness/timing.py"
@@ -1442,7 +1538,7 @@
                   "via": "_summary"
                 },
                 {
-                  "line": 426,
+                  "line": 609,
                   "name": "summarize",
                   "target": {
                     "file": "src/switchyard/harness/timing.py"
@@ -1450,7 +1546,7 @@
                   "via": "_summary"
                 },
                 {
-                  "line": 154,
+                  "line": 186,
                   "name": "measured_row",
                   "target": {
                     "file": "src/switchyard/harness/receipts.py"
@@ -1458,7 +1554,7 @@
                   "via": "_finished_row"
                 },
                 {
-                  "line": 171,
+                  "line": 203,
                   "name": "validate_row",
                   "target": {
                     "file": "src/switchyard/receipt.py"
@@ -1466,7 +1562,7 @@
                   "via": "_finished_row"
                 },
                 {
-                  "line": 177,
+                  "line": 215,
                   "name": "device_lost_row",
                   "target": {
                     "file": "src/switchyard/harness/receipts.py"
@@ -1474,7 +1570,23 @@
                   "via": "_capability_row"
                 },
                 {
-                  "line": 201,
+                  "line": 251,
+                  "name": "measured_row",
+                  "target": {
+                    "file": "src/switchyard/harness/receipts.py"
+                  },
+                  "via": "_aborted_row"
+                },
+                {
+                  "line": 267,
+                  "name": "validate_row",
+                  "target": {
+                    "file": "src/switchyard/receipt.py"
+                  },
+                  "via": "_aborted_row"
+                },
+                {
+                  "line": 287,
                   "name": "write_receipt",
                   "target": {
                     "file": "src/switchyard/harness/receipts.py"
@@ -1482,28 +1594,28 @@
                   "via": "flush"
                 },
                 {
-                  "line": 313,
+                  "line": 416,
                   "name": "write_run",
                   "target": {
                     "file": "src/switchyard/harness/receipts.py"
                   }
                 },
                 {
-                  "line": 315,
+                  "line": 418,
                   "name": "announce_run",
                   "target": {
                     "file": "src/switchyard/cli.py"
                   }
                 },
                 {
-                  "line": 321,
+                  "line": 432,
                   "name": "import_receipt",
                   "target": {
                     "file": "src/switchyard/harness/receipts.py"
                   }
                 },
                 {
-                  "line": 322,
+                  "line": 433,
                   "name": "announce_run",
                   "target": {
                     "file": "src/switchyard/cli.py"
@@ -1518,15 +1630,31 @@
             {
               "calls": [
                 {
+                  "line": 493,
+                  "name": "NativeBinaryRejected",
+                  "passed": true,
+                  "target": {
+                    "file": "src/switchyard/adapters/base.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_is_rejection"
+            },
+            {
+              "calls": [
+                {
                   "branch": "order == \"aba\"",
-                  "line": 360,
+                  "line": 543,
                   "name": "schedule_aba",
                   "target": {
                     "file": "src/switchyard/harness/timing.py"
                   }
                 },
                 {
-                  "line": 361,
+                  "line": 544,
                   "name": "schedule",
                   "target": {
                     "file": "src/switchyard/harness/timing.py"
@@ -1541,7 +1669,7 @@
             {
               "calls": [
                 {
-                  "line": 579,
+                  "line": 792,
                   "name": "fit_prompt",
                   "target": {
                     "file": "src/switchyard/harness/e5.py"
@@ -1549,7 +1677,7 @@
                   "via": "_dataset_prompt"
                 },
                 {
-                  "line": 381,
+                  "line": 564,
                   "name": "StepRequest",
                   "target": {
                     "file": "src/switchyard/adapters/base.py"
@@ -1565,14 +1693,14 @@
               "calls": [
                 {
                   "branch": "present and (len(set(present)) != 1 or len(present) != len(…",
-                  "line": 424,
+                  "line": 607,
                   "name": "TimingError",
                   "target": {
                     "file": "src/switchyard/harness/timing.py"
                   }
                 },
                 {
-                  "line": 426,
+                  "line": 609,
                   "name": "summarize",
                   "target": {
                     "file": "src/switchyard/harness/timing.py"
@@ -1587,7 +1715,7 @@
             {
               "calls": [
                 {
-                  "line": 489,
+                  "line": 702,
                   "name": "aba_call",
                   "target": {
                     "file": "src/switchyard/harness/timing.py"
@@ -1602,7 +1730,7 @@
             {
               "calls": [
                 {
-                  "line": 579,
+                  "line": 792,
                   "name": "fit_prompt",
                   "target": {
                     "file": "src/switchyard/harness/e5.py"
@@ -1610,7 +1738,7 @@
                   "via": "_dataset_prompt"
                 },
                 {
-                  "line": 381,
+                  "line": 564,
                   "name": "StepRequest",
                   "target": {
                     "file": "src/switchyard/adapters/base.py"
@@ -1626,7 +1754,7 @@
             {
               "calls": [
                 {
-                  "line": 579,
+                  "line": 792,
                   "name": "fit_prompt",
                   "target": {
                     "file": "src/switchyard/harness/e5.py"
@@ -1641,7 +1769,7 @@
             {
               "calls": [
                 {
-                  "line": 652,
+                  "line": 865,
                   "name": "assess_step",
                   "target": {
                     "file": "src/switchyard/guards.py"
@@ -1657,7 +1785,7 @@
               "calls": [
                 {
                   "branch": "spec[\"procedure\"] == \"interleaved\"",
-                  "line": 652,
+                  "line": 865,
                   "name": "assess_step",
                   "target": {
                     "file": "src/switchyard/guards.py"
@@ -1665,7 +1793,7 @@
                   "via": "_guard_flags"
                 },
                 {
-                  "line": 673,
+                  "line": 888,
                   "name": "assess_step",
                   "target": {
                     "file": "src/switchyard/guards.py"
@@ -1676,12 +1804,298 @@
               "invokedAtTopLevel": false,
               "isDefaultExport": false,
               "name": "check_flags"
+            },
+            {
+              "calls": [
+                {
+                  "line": 910,
+                  "name": "for_engine",
+                  "target": {
+                    "file": "src/switchyard/adapters/registry.py"
+                  }
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "real_adapters"
+            },
+            {
+              "calls": [
+                {
+                  "line": 922,
+                  "name": "resolve",
+                  "target": null
+                },
+                {
+                  "line": 925,
+                  "name": "GuardError",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_refuse_repo_interpreter"
+            },
+            {
+              "calls": [
+                {
+                  "branch": "not callable(probe)",
+                  "line": 949,
+                  "name": "GuardError",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_card_probe"
+            },
+            {
+              "calls": [
+                {
+                  "line": 956,
+                  "name": "require_heartbeat",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  }
+                },
+                {
+                  "line": 957,
+                  "name": "require_card_empty",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_card_guards"
+            },
+            {
+              "calls": [
+                {
+                  "line": 968,
+                  "name": "require_rest",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_rest"
+            },
+            {
+              "calls": [
+                {
+                  "line": 922,
+                  "name": "resolve",
+                  "target": null,
+                  "via": "_refuse_repo_interpreter"
+                },
+                {
+                  "line": 925,
+                  "name": "GuardError",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  },
+                  "via": "_refuse_repo_interpreter"
+                },
+                {
+                  "line": 999,
+                  "name": "load_spec",
+                  "target": {
+                    "file": "src/switchyard/harness/spec.py"
+                  }
+                },
+                {
+                  "branch": "spec[\"procedure\"] != \"interleaved\"",
+                  "line": 1001,
+                  "name": "GuardError",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  }
+                },
+                {
+                  "branch": "spec[\"procedure\"] == \"interleaved\"",
+                  "line": 865,
+                  "name": "assess_step",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  },
+                  "via": "_guard_flags"
+                },
+                {
+                  "line": 888,
+                  "name": "assess_step",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  },
+                  "via": "check_flags"
+                },
+                {
+                  "line": 1005,
+                  "name": "require_unmodified",
+                  "target": {
+                    "file": "src/switchyard/harness/lock.py"
+                  }
+                },
+                {
+                  "branch": "receipt.exists()",
+                  "line": 1010,
+                  "name": "GuardError",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  }
+                },
+                {
+                  "line": 910,
+                  "name": "for_engine",
+                  "target": {
+                    "file": "src/switchyard/adapters/registry.py"
+                  },
+                  "via": "real_adapters"
+                },
+                {
+                  "branch": "not callable(probe)",
+                  "line": 949,
+                  "name": "GuardError",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  },
+                  "via": "_card_probe"
+                },
+                {
+                  "line": 956,
+                  "name": "require_heartbeat",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  },
+                  "via": "_card_guards"
+                },
+                {
+                  "line": 957,
+                  "name": "require_card_empty",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  },
+                  "via": "_card_guards"
+                },
+                {
+                  "line": 968,
+                  "name": "require_rest",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  },
+                  "via": "_rest"
+                },
+                {
+                  "line": 146,
+                  "name": "require_unmodified",
+                  "target": {
+                    "file": "src/switchyard/harness/lock.py"
+                  },
+                  "via": "run_interleaved"
+                },
+                {
+                  "line": 147,
+                  "name": "load_spec",
+                  "target": {
+                    "file": "src/switchyard/harness/spec.py"
+                  },
+                  "via": "run_interleaved"
+                },
+                {
+                  "line": 150,
+                  "name": "resolve",
+                  "target": null,
+                  "via": "run_interleaved"
+                },
+                {
+                  "branch": "order == \"aba\"",
+                  "line": 543,
+                  "name": "schedule_aba",
+                  "target": {
+                    "file": "src/switchyard/harness/timing.py"
+                  },
+                  "via": "_slots"
+                },
+                {
+                  "line": 544,
+                  "name": "schedule",
+                  "target": {
+                    "file": "src/switchyard/harness/timing.py"
+                  },
+                  "via": "_slots"
+                },
+                {
+                  "line": 168,
+                  "name": "environment",
+                  "target": {
+                    "file": "src/switchyard/harness/receipts.py"
+                  },
+                  "via": "run_interleaved"
+                },
+                {
+                  "line": 792,
+                  "name": "fit_prompt",
+                  "target": {
+                    "file": "src/switchyard/harness/e5.py"
+                  },
+                  "via": "_dataset_prompt"
+                },
+                {
+                  "line": 564,
+                  "name": "StepRequest",
+                  "target": {
+                    "file": "src/switchyard/adapters/base.py"
+                  },
+                  "via": "_request"
+                },
+                {
+                  "line": 493,
+                  "name": "NativeBinaryRejected",
+                  "passed": true,
+                  "target": {
+                    "file": "src/switchyard/adapters/base.py"
+                  },
+                  "via": "_is_rejection"
+                },
+                {
+                  "line": 702,
+                  "name": "aba_call",
+                  "target": {
+                    "file": "src/switchyard/harness/timing.py"
+                  },
+                  "via": "_extra_settings"
+                },
+                {
+                  "branch": "present and (len(set(present)) != 1 or len(present) != len(…",
+                  "line": 607,
+                  "name": "TimingError",
+                  "target": {
+                    "file": "src/switchyard/harness/timing.py"
+                  },
+                  "via": "_summary"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "run_spec",
+              "truncated": true
             }
           ]
         },
         {
-          "entry": "load_spec",
-          "entryRule": 4,
           "exports": [
             "load_spec",
             "validate_spec"
@@ -1943,22 +2357,7 @@
             "src/switchyard/harness/e5.py",
             "src/switchyard/tasks.py"
           ],
-          "path": "src/switchyard/harness/spec.py",
-          "sequences": [
-            {
-              "calls": [
-                {
-                  "line": 30,
-                  "name": "read_text",
-                  "target": null
-                }
-              ],
-              "exported": true,
-              "invokedAtTopLevel": false,
-              "isDefaultExport": false,
-              "name": "load_spec"
-            }
-          ]
+          "path": "src/switchyard/harness/spec.py"
         },
         {
           "exports": [
@@ -2074,84 +2473,106 @@
           "entry": "import_receipts",
           "entryRule": 4,
           "exports": [
+            "e1_rerun2_rows",
             "import_receipts",
             "require_pin",
             "show"
           ],
           "failurePaths": [
             {
+              "in": "e1_rerun2_rows",
+              "kind": "raise",
+              "line": 118
+            },
+            {
+              "in": "_e1_table_copy",
+              "kind": "raise",
+              "line": 132
+            },
+            {
+              "in": "_e1_table_copy",
+              "kind": "except",
+              "line": 138
+            },
+            {
+              "in": "_e1_table_copy",
+              "kind": "raise",
+              "line": 139
+            },
+            {
               "in": "_offer_source",
               "kind": "except",
-              "line": 98
+              "line": 148
             },
             {
               "in": "require_pin",
               "kind": "raise",
-              "line": 105
+              "line": 155
             },
             {
               "in": "show",
               "kind": "except",
-              "line": 111
+              "line": 161
             },
             {
               "in": "show",
               "kind": "raise",
-              "line": 112
+              "line": 162
             },
             {
               "in": "_calibration",
               "kind": "raise",
-              "line": 124
+              "line": 174
             },
             {
               "in": "_ladder",
               "kind": "except",
-              "line": 152
+              "line": 202
             },
             {
               "in": "_ladder",
               "kind": "raise",
-              "line": 153
+              "line": 203
             },
             {
               "in": "_check_gold",
               "kind": "raise",
-              "line": 174
+              "line": 224
             },
             {
               "in": "_written_date",
               "kind": "raise",
-              "line": 196
+              "line": 246
             },
             {
               "in": "_written_date",
               "kind": "raise",
-              "line": 199
+              "line": 249
             },
             {
               "in": "_written_date",
               "kind": "raise",
-              "line": 210
+              "line": 260
             },
             {
               "in": "_unique",
               "kind": "raise",
-              "line": 229
+              "line": 279
             },
             {
               "in": "_git",
               "kind": "except",
-              "line": 239
+              "line": 289
             },
             {
               "in": "_git",
               "kind": "raise",
-              "line": 241
+              "line": 291
             }
           ],
-          "hash": "f274312ef7ea4c8a90c2df3e640fdad7b453f788b42a3cdaabea25d9ad30bfa2",
+          "hash": "5172cda9446e761997eb1dfae98bcf80c6405a7279e8e71d8acc609d95e4abc6",
           "importsFiles": [
+            "src/switchyard/harness/receipts.py",
             "src/switchyard/importers/aspire_judges.py",
             "src/switchyard/importers/calibration.py",
             "src/switchyard/importers/common.py",
@@ -2159,20 +2580,21 @@
             "src/switchyard/importers/nli.py",
             "src/switchyard/importers/offers.py",
             "src/switchyard/importers/pins.py",
-            "src/switchyard/importers/probe.py"
+            "src/switchyard/importers/probe.py",
+            "src/switchyard/receipt.py"
           ],
           "path": "src/switchyard/importers/assemble.py",
           "sequences": [
             {
               "calls": [
                 {
-                  "line": 241,
+                  "line": 291,
                   "name": "as_posix",
                   "target": null,
                   "via": "_git"
                 },
                 {
-                  "line": 241,
+                  "line": 291,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2181,14 +2603,14 @@
                 },
                 {
                   "branch": "kind != \"commit\"",
-                  "line": 105,
+                  "line": 155,
                   "name": "as_posix",
                   "target": null,
                   "via": "require_pin"
                 },
                 {
                   "branch": "kind != \"commit\"",
-                  "line": 105,
+                  "line": 155,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2196,7 +2618,7 @@
                   "via": "require_pin"
                 },
                 {
-                  "line": 112,
+                  "line": 162,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2205,7 +2627,7 @@
                 },
                 {
                   "branch": "len(runs) != 12",
-                  "line": 124,
+                  "line": 174,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2213,7 +2635,7 @@
                   "via": "_calibration"
                 },
                 {
-                  "line": 131,
+                  "line": 181,
                   "name": "calibration_rows",
                   "target": {
                     "file": "src/switchyard/importers/calibration.py"
@@ -2221,7 +2643,7 @@
                   "via": "_calibration"
                 },
                 {
-                  "line": 153,
+                  "line": 203,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2229,7 +2651,7 @@
                   "via": "_ladder"
                 },
                 {
-                  "line": 172,
+                  "line": 222,
                   "name": "sha256_bytes",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2238,7 +2660,7 @@
                 },
                 {
                   "branch": "wanted != [digest]",
-                  "line": 174,
+                  "line": 224,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2246,7 +2668,7 @@
                   "via": "_check_gold"
                 },
                 {
-                  "line": 157,
+                  "line": 207,
                   "name": "ladder_rows",
                   "target": {
                     "file": "src/switchyard/importers/ladder.py"
@@ -2254,14 +2676,14 @@
                   "via": "_ladder"
                 },
                 {
-                  "line": 75,
+                  "line": 86,
                   "name": "probe_rows",
                   "target": {
                     "file": "src/switchyard/importers/probe.py"
                   }
                 },
                 {
-                  "line": 221,
+                  "line": 271,
                   "name": "prereg_names_intel_igpu",
                   "target": {
                     "file": "src/switchyard/importers/nli.py"
@@ -2269,7 +2691,7 @@
                   "via": "_nli"
                 },
                 {
-                  "line": 217,
+                  "line": 267,
                   "name": "nli_rows",
                   "target": {
                     "file": "src/switchyard/importers/nli.py"
@@ -2278,7 +2700,7 @@
                 },
                 {
                   "branch": "not isinstance(written, str) or len(written) < 10",
-                  "line": 196,
+                  "line": 246,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2287,7 +2709,7 @@
                 },
                 {
                   "branch": "len(parts) != 3",
-                  "line": 199,
+                  "line": 249,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2296,7 +2718,7 @@
                 },
                 {
                   "branch": "not dated",
-                  "line": 210,
+                  "line": 260,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2304,7 +2726,7 @@
                   "via": "_written_date"
                 },
                 {
-                  "line": 182,
+                  "line": 232,
                   "name": "b_rows",
                   "target": {
                     "file": "src/switchyard/importers/aspire_judges.py"
@@ -2312,43 +2734,149 @@
                   "via": "_aspire_b"
                 },
                 {
-                  "line": 86,
+                  "line": 97,
                   "name": "read_bytes",
                   "target": null
                 },
                 {
-                  "line": 97,
+                  "line": 147,
                   "name": "resolve",
                   "target": null,
                   "via": "_offer_source"
                 },
                 {
-                  "line": 87,
+                  "line": 98,
                   "name": "offer_rows",
                   "target": {
                     "file": "src/switchyard/importers/offers.py"
                   }
                 },
                 {
-                  "branch": "row[\"id\"] in seen",
-                  "line": 229,
+                  "branch": "not path.is_file()",
+                  "line": 118,
                   "name": "ImportError_",
-                  "over": "rows",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
                   },
-                  "via": "_unique"
+                  "via": "e1_rerun2_rows"
+                },
+                {
+                  "branch": "outcome in (\"device_lost\", \"hang\")",
+                  "line": 130,
+                  "name": "for_table",
+                  "target": {
+                    "file": "src/switchyard/harness/receipts.py"
+                  },
+                  "via": "_e1_table_copy"
+                },
+                {
+                  "branch": "row.get(\"parity_valid\") not in (True, False)",
+                  "line": 132,
+                  "name": "ImportError_",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  },
+                  "via": "_e1_table_copy"
                 }
               ],
               "exported": true,
               "invokedAtTopLevel": false,
               "isDefaultExport": false,
-              "name": "import_receipts"
+              "name": "import_receipts",
+              "truncated": true
             },
             {
               "calls": [
                 {
-                  "line": 97,
+                  "branch": "not path.is_file()",
+                  "line": 118,
+                  "name": "ImportError_",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  }
+                },
+                {
+                  "branch": "outcome in (\"device_lost\", \"hang\")",
+                  "line": 130,
+                  "name": "for_table",
+                  "target": {
+                    "file": "src/switchyard/harness/receipts.py"
+                  },
+                  "via": "_e1_table_copy"
+                },
+                {
+                  "branch": "row.get(\"parity_valid\") not in (True, False)",
+                  "line": 132,
+                  "name": "ImportError_",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  },
+                  "via": "_e1_table_copy"
+                },
+                {
+                  "line": 137,
+                  "name": "validate_row",
+                  "target": {
+                    "file": "src/switchyard/receipt.py"
+                  },
+                  "via": "_e1_table_copy"
+                },
+                {
+                  "line": 139,
+                  "name": "ImportError_",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  },
+                  "via": "_e1_table_copy"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "e1_rerun2_rows"
+            },
+            {
+              "calls": [
+                {
+                  "branch": "outcome in (\"device_lost\", \"hang\")",
+                  "line": 130,
+                  "name": "for_table",
+                  "target": {
+                    "file": "src/switchyard/harness/receipts.py"
+                  }
+                },
+                {
+                  "branch": "row.get(\"parity_valid\") not in (True, False)",
+                  "line": 132,
+                  "name": "ImportError_",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  }
+                },
+                {
+                  "line": 137,
+                  "name": "validate_row",
+                  "target": {
+                    "file": "src/switchyard/receipt.py"
+                  }
+                },
+                {
+                  "line": 139,
+                  "name": "ImportError_",
+                  "target": {
+                    "file": "src/switchyard/importers/common.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_e1_table_copy"
+            },
+            {
+              "calls": [
+                {
+                  "line": 147,
                   "name": "resolve",
                   "target": null
                 }
@@ -2361,13 +2889,13 @@
             {
               "calls": [
                 {
-                  "line": 241,
+                  "line": 291,
                   "name": "as_posix",
                   "target": null,
                   "via": "_git"
                 },
                 {
-                  "line": 241,
+                  "line": 291,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2376,13 +2904,13 @@
                 },
                 {
                   "branch": "kind != \"commit\"",
-                  "line": 105,
+                  "line": 155,
                   "name": "as_posix",
                   "target": null
                 },
                 {
                   "branch": "kind != \"commit\"",
-                  "line": 105,
+                  "line": 155,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2397,13 +2925,13 @@
             {
               "calls": [
                 {
-                  "line": 241,
+                  "line": 291,
                   "name": "as_posix",
                   "target": null,
                   "via": "_git"
                 },
                 {
-                  "line": 241,
+                  "line": 291,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2419,13 +2947,13 @@
             {
               "calls": [
                 {
-                  "line": 241,
+                  "line": 291,
                   "name": "as_posix",
                   "target": null,
                   "via": "_git"
                 },
                 {
-                  "line": 241,
+                  "line": 291,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2434,14 +2962,14 @@
                 },
                 {
                   "branch": "len(runs) != 12",
-                  "line": 124,
+                  "line": 174,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
                   }
                 },
                 {
-                  "line": 131,
+                  "line": 181,
                   "name": "calibration_rows",
                   "target": {
                     "file": "src/switchyard/importers/calibration.py"
@@ -2456,13 +2984,13 @@
             {
               "calls": [
                 {
-                  "line": 241,
+                  "line": 291,
                   "name": "as_posix",
                   "target": null,
                   "via": "_git"
                 },
                 {
-                  "line": 241,
+                  "line": 291,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2470,7 +2998,7 @@
                   "via": "_git"
                 },
                 {
-                  "line": 172,
+                  "line": 222,
                   "name": "sha256_bytes",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2479,7 +3007,7 @@
                 },
                 {
                   "branch": "wanted != [digest]",
-                  "line": 174,
+                  "line": 224,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2487,7 +3015,7 @@
                   "via": "_check_gold"
                 },
                 {
-                  "line": 157,
+                  "line": 207,
                   "name": "ladder_rows",
                   "target": {
                     "file": "src/switchyard/importers/ladder.py"
@@ -2502,7 +3030,7 @@
             {
               "calls": [
                 {
-                  "line": 172,
+                  "line": 222,
                   "name": "sha256_bytes",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2510,7 +3038,7 @@
                 },
                 {
                   "branch": "wanted != [digest]",
-                  "line": 174,
+                  "line": 224,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2525,13 +3053,13 @@
             {
               "calls": [
                 {
-                  "line": 241,
+                  "line": 291,
                   "name": "as_posix",
                   "target": null,
                   "via": "_git"
                 },
                 {
-                  "line": 241,
+                  "line": 291,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2540,7 +3068,7 @@
                 },
                 {
                   "branch": "not isinstance(written, str) or len(written) < 10",
-                  "line": 196,
+                  "line": 246,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2549,7 +3077,7 @@
                 },
                 {
                   "branch": "len(parts) != 3",
-                  "line": 199,
+                  "line": 249,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2558,7 +3086,7 @@
                 },
                 {
                   "branch": "not dated",
-                  "line": 210,
+                  "line": 260,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2566,7 +3094,7 @@
                   "via": "_written_date"
                 },
                 {
-                  "line": 182,
+                  "line": 232,
                   "name": "b_rows",
                   "target": {
                     "file": "src/switchyard/importers/aspire_judges.py"
@@ -2582,7 +3110,7 @@
               "calls": [
                 {
                   "branch": "not isinstance(written, str) or len(written) < 10",
-                  "line": 196,
+                  "line": 246,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2590,7 +3118,7 @@
                 },
                 {
                   "branch": "len(parts) != 3",
-                  "line": 199,
+                  "line": 249,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2598,7 +3126,7 @@
                 },
                 {
                   "branch": "not dated",
-                  "line": 210,
+                  "line": 260,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2613,13 +3141,13 @@
             {
               "calls": [
                 {
-                  "line": 241,
+                  "line": 291,
                   "name": "as_posix",
                   "target": null,
                   "via": "_git"
                 },
                 {
-                  "line": 241,
+                  "line": 291,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2627,14 +3155,14 @@
                   "via": "_git"
                 },
                 {
-                  "line": 221,
+                  "line": 271,
                   "name": "prereg_names_intel_igpu",
                   "target": {
                     "file": "src/switchyard/importers/nli.py"
                   }
                 },
                 {
-                  "line": 217,
+                  "line": 267,
                   "name": "nli_rows",
                   "target": {
                     "file": "src/switchyard/importers/nli.py"
@@ -2650,7 +3178,7 @@
               "calls": [
                 {
                   "branch": "row[\"id\"] in seen",
-                  "line": 229,
+                  "line": 279,
                   "name": "ImportError_",
                   "over": "rows",
                   "target": {
@@ -2666,12 +3194,12 @@
             {
               "calls": [
                 {
-                  "line": 241,
+                  "line": 291,
                   "name": "as_posix",
                   "target": null
                 },
                 {
-                  "line": 241,
+                  "line": 291,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/switchyard/importers/common.py"
@@ -2768,11 +3296,13 @@
           "entry": "load_candidates",
           "entryRule": 4,
           "exports": [
+            "aborted_run_lines",
+            "append_aborted_runs",
             "load_candidates",
             "open_gaps",
             "render_gaps"
           ],
-          "hash": "7dfb044cec140c6fa7ddbec7679a8a6e4e33bce7ee5f64767cb35c31e9459fc5",
+          "hash": "973793bba475087db848fbb40c7404c89ec61c6710f247bb5900aec0a33f4de1",
           "importsFiles": [
             "src/switchyard/receipt.py"
           ],
@@ -2781,7 +3311,7 @@
             {
               "calls": [
                 {
-                  "line": 17,
+                  "line": 73,
                   "name": "read_text",
                   "target": null
                 }
@@ -2794,7 +3324,7 @@
             {
               "calls": [
                 {
-                  "line": 26,
+                  "line": 82,
                   "name": "is_speed_row",
                   "target": {
                     "file": "src/switchyard/receipt.py"
@@ -2809,7 +3339,7 @@
             {
               "calls": [
                 {
-                  "line": 26,
+                  "line": 82,
                   "name": "is_speed_row",
                   "target": {
                     "file": "src/switchyard/receipt.py"
@@ -3003,60 +3533,60 @@
             {
               "in": "_check_device_lost",
               "kind": "raise",
-              "line": 145
+              "line": 159
             },
             {
               "in": "_check_device_lost",
               "kind": "raise",
-              "line": 147
+              "line": 161
             },
             {
               "in": "_reject_home_paths",
               "kind": "raise",
-              "line": 153
+              "line": 167
             },
             {
               "in": "_check_interval",
               "kind": "raise",
-              "line": 167
+              "line": 181
             },
             {
               "in": "_check_family",
               "kind": "except",
-              "line": 174
+              "line": 188
             },
             {
               "in": "_check_family",
               "kind": "raise",
-              "line": 175
+              "line": 189
             },
             {
               "in": "_check_family",
-              "kind": "raise",
-              "line": 179
-            },
-            {
-              "in": "_check_family",
-              "kind": "raise",
-              "line": 182
-            },
-            {
-              "in": "_check_residency",
               "kind": "raise",
               "line": 193
             },
             {
-              "in": "_check_residency",
+              "in": "_check_family",
               "kind": "raise",
               "line": 196
             },
             {
               "in": "_check_residency",
               "kind": "raise",
-              "line": 198
+              "line": 207
+            },
+            {
+              "in": "_check_residency",
+              "kind": "raise",
+              "line": 210
+            },
+            {
+              "in": "_check_residency",
+              "kind": "raise",
+              "line": 212
             }
           ],
-          "hash": "e7ccf84b8cd43f2a39cf2c34dc6400b35ab6dd79641acd0506192dbc7a9d1752",
+          "hash": "bdcb648bd2ae8919b3e10bb5abf4022f5778ad91deccaab9da26688868e3f6a2",
           "importsFiles": [
             "src/switchyard/families.py"
           ],
@@ -3065,7 +3595,7 @@
             {
               "calls": [
                 {
-                  "line": 173,
+                  "line": 187,
                   "name": "family_of",
                   "target": {
                     "file": "src/switchyard/families.py"
@@ -3093,7 +3623,7 @@
                   "via": "load_jsonl"
                 },
                 {
-                  "line": 173,
+                  "line": 187,
                   "name": "family_of",
                   "target": {
                     "file": "src/switchyard/families.py"
@@ -3127,7 +3657,7 @@
             {
               "calls": [
                 {
-                  "line": 173,
+                  "line": 187,
                   "name": "family_of",
                   "target": {
                     "file": "src/switchyard/families.py"
@@ -3142,7 +3672,7 @@
           ]
         },
         {
-          "hash": "e170fc245e51f0724cb04f312aabd26bf91c9e657d8ce05999dd4d6b526bbc44",
+          "hash": "000c78883ade4a8d08936ebb909d770feacce3ea3d47e7e8c59e9d308d2350d5",
           "path": "src/switchyard/schema/routing-row.schema.json"
         },
         {
@@ -3181,20 +3711,27 @@
       "origin": "authored",
       "outsidePlaces": [
         {
-          "reads": 9,
+          "reads": 12,
           "where": [
             "caller"
           ],
-          "writes": 3
+          "writes": 4
+        },
+        {
+          "reads": 3,
+          "where": [
+            "cwd:receipts/"
+          ],
+          "writes": 0
         }
       ],
-      "outsideReads": 9,
-      "outsideWrites": 3,
+      "outsideReads": 15,
+      "outsideWrites": 4,
       "role": "code",
       "testRunners": [
         "pytest"
       ],
-      "testedBy": 9,
+      "testedBy": 10,
       "unresolvedSites": 0
     },
     {
@@ -3294,26 +3831,36 @@
             "test_a_device_loss_keeps_a_finished_arm_and_the_other_device_goes_on",
             "test_a_failed_device_loss_marks_the_device_off_and_continues",
             "test_a_failed_parity_guard_is_recorded_on_the_run_and_not_served",
-            "test_a_failed_step_stops_and_writes_nothing",
+            "test_a_failed_step_stops_and_flushes_the_measured_slots",
+            "test_a_generate_row_carries_genai_counter_medians_from_repeats",
             "test_a_hang_is_not_a_device_loss",
             "test_a_hang_keeps_finished_arms_and_stops_without_retry",
             "test_a_later_failure_keeps_a_finished_arm_without_calling_it_device_lost",
+            "test_a_native_binary_rejection_is_a_capability_row_scoped_to_shape",
+            "test_a_native_binary_rejection_is_not_a_hang_or_a_device_loss",
             "test_a_not_run_step_writes_no_row_and_is_listed_in_the_notes",
             "test_a_raised_device_loss_marks_the_device_off_and_continues",
             "test_a_raised_hang_stops_the_run",
             "test_a_raised_spec_error_keeps_a_finished_arm",
+            "test_a_receipt_row_carries_token_type_ids_fed",
+            "test_a_rejection_after_a_success_is_a_state_change_and_aborts",
+            "test_a_rejection_off_the_npu_aborts_the_run",
+            "test_a_run_records_the_captured_environment_on_the_row",
             "test_a_seed_without_a_target_is_passed_through",
             "test_a_target_without_a_tokenizer_is_refused_before_a_step",
             "test_adapter_edges_stay_local",
             "test_an_edited_spec_is_refused_and_dry_run_does_not_touch_devices",
             "test_an_empty_seed_and_a_dataset_that_is_not_a_map_are_refused_or_skipped",
             "test_an_interleaved_companion_starts_on_measure_slots_only",
+            "test_an_unknown_error_flushes_aborted_rows_and_gaps_gets_the_line",
             "test_an_unsupported_length_stays_a_measured_row",
             "test_companion_device_is_guarded_even_when_no_arm_measures_it",
             "test_companion_sessions_wrap_only_the_paired_slot",
+            "test_dist_version_reads_metadata_and_a_missing_package_stays_unrecorded",
             "test_dry_run_plans_calibrate_and_names_the_cpu_window",
             "test_duplicate_receipt_ids_are_refused",
             "test_e4_and_e5_specs_pin_the_rules",
+            "test_environment_pins_openvino_the_npu_driver_and_packages",
             "test_fill_card_doubles_bisects_and_steps_back",
             "test_import_judges_a_later_receipt_against_the_table_and_keeps_the_timing",
             "test_offrig_calibrate_is_planned_and_not_launched",
@@ -3328,26 +3875,31 @@
             "test_the_adapter_token_counts_and_warm_reload_overwrite_the_prefix_estimate",
             "test_the_command_dry_runs_and_refuses_to_start_a_device",
             "test_the_importer_drops_a_speed_figure_from_device_lost",
+            "test_the_npu_driver_query_keeps_one_version_and_does_not_guess",
+            "test_the_rejected_row_validates_and_the_table_sees_pending_replication",
             "test_the_run_path_refuses_an_edited_spec_before_any_adapter_call"
           ],
-          "hash": "dc0911377650c9ba84401041010d5bbd4b67c1e2b6de7bb53e74253877eafef8",
+          "hash": "e62a9c9478c93ba8e07f33ca1ed23daaeed0aa4cf4e4420fa137767fa5029001",
           "importOrder": [
             "src/switchyard/adapters/base.py",
             "src/switchyard/adapters/offrig_calibrate.py",
             "src/switchyard/adapters/ollama.py",
             "src/switchyard/adapters/registry.py",
             "src/switchyard/guards.py",
+            "src/switchyard/harness/environment.py",
             "src/switchyard/harness/e5.py",
             "src/switchyard/harness/lock.py",
             "src/switchyard/harness/receipts.py",
             "src/switchyard/harness/runner.py",
             "src/switchyard/harness/spec.py",
             "src/switchyard/harness/timing.py",
+            "src/switchyard/importers/gaps.py",
             "src/switchyard/receipt.py",
             "tests/support.py",
             "src/switchyard/scope.py",
             "src/switchyard/cli.py",
-            "src/switchyard/adapters/openvino.py"
+            "src/switchyard/adapters/openvino.py",
+            "src/switchyard/harness/__init__.py"
           ],
           "importsFiles": [
             "src/switchyard/adapters/base.py",
@@ -3357,12 +3909,15 @@
             "src/switchyard/adapters/registry.py",
             "src/switchyard/cli.py",
             "src/switchyard/guards.py",
+            "src/switchyard/harness/__init__.py",
             "src/switchyard/harness/e5.py",
+            "src/switchyard/harness/environment.py",
             "src/switchyard/harness/lock.py",
             "src/switchyard/harness/receipts.py",
             "src/switchyard/harness/runner.py",
             "src/switchyard/harness/spec.py",
             "src/switchyard/harness/timing.py",
+            "src/switchyard/importers/gaps.py",
             "src/switchyard/receipt.py",
             "src/switchyard/scope.py",
             "tests/support.py"
@@ -3373,15 +3928,19 @@
         {
           "exports": [
             "test_a_missing_pin_is_refused",
+            "test_a_pinned_revision_matches_the_unpinned_candidate_and_a_miss_does_not",
             "test_a_tier_row_is_recounted_from_the_verdict_lines",
+            "test_an_e1_copy_drops_artifacts_and_refuses_an_unmarked_row",
             "test_an_unknown_check_type_is_not_called_verify",
             "test_aspire_import_records_the_pin_path_and_content_sha256",
             "test_aspire_import_refuses_a_missing_readout_and_an_undated_selection",
             "test_calibration_copies_the_published_interval_and_infers_quote_rule_1",
+            "test_e1_rerun2_copies_47_rows_and_leaves_the_receipt_files_alone",
             "test_gap_report_names_the_missing_field_on_a_partial_row",
             "test_import_command_writes_jsonl_and_the_gap_report",
             "test_import_reads_a_pinned_tree_and_refuses_a_missing_ladder",
             "test_ladder_cell_is_tallied_on_both_views",
+            "test_local_e1_rows_join_an_import_only_when_a_root_is_passed",
             "test_nli_row_uses_the_prereg_name_and_copies_the_interval",
             "test_offer_snapshot_is_version_locked_and_does_not_invent_a_budget_pass",
             "test_probe_keeps_a_named_intel_gpu_and_skips_an_unnamed_one",
@@ -3390,7 +3949,7 @@
             "test_quote_rules_that_disagree_are_refused",
             "test_table_filters_by_task"
           ],
-          "hash": "45328b01fb30124a079ddcd3bbf233fc085e583ee9562975427911cbc0a00020",
+          "hash": "414d1a33388a866f4d8314bfb50de12aa8d55d57513595993012051da029241e",
           "importOrder": [
             "src/switchyard/importers/calibration.py",
             "src/switchyard/importers/common.py",
@@ -3403,10 +3962,12 @@
             "src/switchyard/cli.py",
             "tests/support.py",
             "src/switchyard/importers/assemble.py",
-            "src/switchyard/importers/pins.py"
+            "src/switchyard/importers/pins.py",
+            "src/switchyard/importers/__init__.py"
           ],
           "importsFiles": [
             "src/switchyard/cli.py",
+            "src/switchyard/importers/__init__.py",
             "src/switchyard/importers/assemble.py",
             "src/switchyard/importers/calibration.py",
             "src/switchyard/importers/common.py",
@@ -3455,11 +4016,16 @@
             "test_hang_marks_inconclusive_and_poisons",
             "test_infer_embed_feeds_token_type_ids_when_declared",
             "test_infer_embed_omits_undeclared_token_type_ids",
+            "test_ir_xml_hub_download_fetches_the_weights_sidecar",
+            "test_ir_xml_hub_download_refuses_when_weights_are_missing",
             "test_last_pooling_records_eos_state",
             "test_measurement_failure_is_ok_false",
+            "test_native_binary_rejected_generate_raises_with_the_compile_time",
+            "test_native_binary_rejected_raises_with_the_compile_time",
             "test_nli_pooling_none",
             "test_no_warm_reload_without_cache_dir",
             "test_non_loss_failures_keep_their_old_shape",
+            "test_onnx_hub_download_stays_single_file",
             "test_pad_like_lockstep",
             "test_pad_truncate",
             "test_parse_model_ref",
@@ -3471,6 +4037,8 @@
             "test_quant_of",
             "test_real_core_enumerates_this_rig",
             "test_registry_finds_the_adapter",
+            "test_resolved_marks_token_type_ids_absent_when_undeclared",
+            "test_resolved_marks_token_type_ids_fed",
             "test_run_embed_pads_token_type_ids_in_lockstep",
             "test_runner_makes_a_capability_row_of_the_adapters_device_loss",
             "test_runner_writes_no_row_for_the_adapters_not_run",
@@ -3481,7 +4049,7 @@
             "test_unload_drops_compiled_and_tokenizer",
             "test_warm_reload_compile_recorded_on_fresh_cache"
           ],
-          "hash": "67e710a18ff32af4f5b5bc144a29fff437f89165fe6d01578f6834d1cf234987",
+          "hash": "347679c3fff58a53273569fdec2148b59a820c96c073e2cb110febd2f969dc64",
           "importOrder": [
             "src/switchyard/adapters/__init__.py",
             "src/switchyard/adapters/registry.py",
@@ -3523,6 +4091,39 @@
         },
         {
           "exports": [
+            "test_a_5090_run_proceeds_after_both_card_checks",
+            "test_a_clean_run_writes_a_receipt_check_accepts",
+            "test_a_fill_card_spec_has_no_run_path",
+            "test_a_hang_stops_the_run_and_keeps_a_partial_receipt",
+            "test_a_loaded_card_refuses",
+            "test_a_missing_cpu_window_refuses_before_any_adapter",
+            "test_a_missing_grant_refuses_before_any_adapter",
+            "test_a_missing_npu_session_refuses_before_any_adapter",
+            "test_a_short_rest_refuses",
+            "test_an_edited_spec_refuses_before_any_adapter",
+            "test_an_existing_receipt_name_is_refused",
+            "test_an_in_repo_interpreter_is_refused",
+            "test_heartbeat_path_prefers_the_env_override",
+            "test_real_adapters_uses_the_registry_per_engine",
+            "test_stale_heartbeat_refuses_before_the_probe",
+            "test_the_command_refuses_a_missing_token_before_building_adapters",
+            "test_the_command_runs_and_refuses_a_name_collision",
+            "test_the_dry_run_closes_with_devices_not_started"
+          ],
+          "hash": "0ffe64c071ed46779591124b87f01ec3f23061de69bd82be1afd0bb1867c66ed",
+          "importsFiles": [
+            "src/switchyard/adapters/base.py",
+            "src/switchyard/cli.py",
+            "src/switchyard/guards.py",
+            "src/switchyard/harness/runner.py",
+            "src/switchyard/harness/spec.py",
+            "src/switchyard/receipt.py"
+          ],
+          "path": "tests/test_run_path.py",
+          "testFramework": "pytest"
+        },
+        {
+          "exports": [
             "test_a_broken_family_table_refuses_the_row",
             "test_a_failed_parity_guard_is_not_a_speed_answer",
             "test_a_row_must_agree_with_the_family_table",
@@ -3538,7 +4139,7 @@
             "test_the_committed_table_is_rekeyed_and_does_not_invent_judge_rates",
             "test_the_schema_task_list_is_the_code_task_list"
           ],
-          "hash": "844731be13307268061a7db56230c329ede85118fd1b28e669e2122ef20b9ae7",
+          "hash": "ec165dd25590686c65d637bc6f1880206705012e436821ad7e396dac8e0b7190",
           "importsFiles": [
             "src/switchyard/families.py",
             "src/switchyard/harness/choice.py",
@@ -3636,7 +4237,7 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 10
+          "files": 11
         },
         {
           "boundary": "src",
@@ -3645,7 +4246,7 @@
             "file": "src/switchyard/importers/aspire_judges.py",
             "from": "tests/test_aspire_judges.py"
           },
-          "files": 30
+          "files": 33
         }
       ],
       "readers": [],
@@ -3676,7 +4277,7 @@
         {
           "config": "pyproject.toml",
           "coverage": true,
-          "files": 10,
+          "files": 11,
           "job": "test",
           "runner": "pytest",
           "step": "Test"
@@ -3745,7 +4346,7 @@
         {
           "boundary": "src",
           "depth": 0,
-          "files": 24
+          "files": 29
         }
       ],
       "readers": [],
@@ -3783,8 +4384,8 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "0716bef1bac8f6725047cefb8afd47bfba2280c9",
-    "tracked": 87
+    "commit": "d1742597b794f3a99966c689c7c026122d02b091",
+    "tracked": 91
   },
   "landings": [
     {
@@ -3836,7 +4437,7 @@
   "overlaps": [],
   "submodules": [],
   "symlinks": [],
-  "testFiles": 10,
+  "testFiles": 11,
   "unassigned": [
     {
       "hash": "be418720d26ab2999db6b0a7e07f4f2d6532c8c35f3c2d5329f9ce506b82109f",
@@ -3859,11 +4460,15 @@
       "path": "receipts/e1-intel-2026-10-09-rerun2.jsonl"
     },
     {
+      "hash": "c576682029d3573d3d0d4069e9bdb6354d510781380e60932d93bc68ad2a33c0",
+      "path": "receipts/e2-2026-10-10b.jsonl"
+    },
+    {
       "hash": "ec72d834ffb89f9e672da48ac0e21d48c1854a5764cca1975a04b856ab2e65a6",
       "path": "table/candidates.json"
     },
     {
-      "hash": "dba4eb63ceb9141902e17562e832ca6eca632bf01bbbade230e3316883bc1392",
+      "hash": "a9ab3f930cd6755e7bfa53493fd0ee1be8f1df5cf9fbb3e032e9c8ed67bfea3f",
       "path": "table/gaps.md"
     },
     {
@@ -3871,7 +4476,7 @@
       "path": "table/model-families.json"
     },
     {
-      "hash": "9f94955533fcb95b1e52c11f25464b7fa6bbd5746323922d57bcce06644f3afc",
+      "hash": "385f00a81c85740972dea7721adc3a216c5e48f4c58b0aba91b0647f836dc26d",
       "path": "table/routing.jsonl"
     }
   ]

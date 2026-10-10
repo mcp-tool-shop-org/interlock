@@ -20,51 +20,29 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 4,
-      "changed": 15,
+      "added": 1,
+      "changed": 0,
       "moved": 0,
-      "parts": 3,
+      "parts": 0,
       "removed": 0
     },
     "items": [
       {
-        "kind": "landing",
-        "sentence": "experiments/e1/spec.yaml is now read by tests/test_harness.py.",
-        "subjects": [
-          "experiments/e1/spec.yaml",
-          "tests/test_harness.py"
-        ]
-      },
-      {
         "kind": "unassigned",
-        "sentence": "receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.",
+        "sentence": "receipts/e2-2026-10-10b.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.",
         "subjects": [
-          "receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl"
-        ]
-      },
-      {
-        "kind": "unassigned",
-        "sentence": "receipts/e1-intel-2026-10-09-rerun2-nomic-diag.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.",
-        "subjects": [
-          "receipts/e1-intel-2026-10-09-rerun2-nomic-diag.jsonl"
-        ]
-      },
-      {
-        "kind": "unassigned",
-        "sentence": "receipts/e1-intel-2026-10-09-rerun2.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.",
-        "subjects": [
-          "receipts/e1-intel-2026-10-09-rerun2.jsonl"
+          "receipts/e2-2026-10-10b.jsonl"
         ]
       },
       {
         "kind": "counts",
-        "sentence": "4 files added and 15 changed content, across 3 parts.",
+        "sentence": "1 file added.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "962683d7cda3d8a10bafb4362522f7beb82297de",
-      "generatedAt": "2026-10-10T00:25:29.070Z"
+      "commit": "caa4b438c18f5ed92027b4f8712418ce0656b0d5",
+      "generatedAt": "2026-10-10T21:17:37.151Z"
     },
     "unchanged": false
   },
@@ -72,7 +50,7 @@
     {
       "a": "src/switchyard/adapters/openvino.py",
       "b": "tests/test_openvino_adapter.py",
-      "either": 7,
+      "either": 10,
       "partLabels": [
         "src",
         "tests"
@@ -82,17 +60,77 @@
         "tests"
       ],
       "relation": "b-imports-a",
-      "shared": 7
+      "shared": 10
+    },
+    {
+      "a": "tests/test_importers.py",
+      "b": "tests/test_task_scope.py",
+      "either": 7,
+      "partLabels": [
+        "tests",
+        "tests"
+      ],
+      "parts": [
+        "tests",
+        "tests"
+      ],
+      "relation": "inside",
+      "shared": 5
+    },
+    {
+      "a": "src/switchyard/harness/receipts.py",
+      "b": "tests/test_harness.py",
+      "either": 8,
+      "partLabels": [
+        "src",
+        "tests"
+      ],
+      "parts": [
+        "src",
+        "tests"
+      ],
+      "relation": "b-imports-a",
+      "shared": 5
+    },
+    {
+      "a": "src/switchyard/harness/runner.py",
+      "b": "tests/test_harness.py",
+      "either": 9,
+      "partLabels": [
+        "src",
+        "tests"
+      ],
+      "parts": [
+        "src",
+        "tests"
+      ],
+      "relation": "b-imports-a",
+      "shared": 5
+    },
+    {
+      "a": "src/switchyard/importers/gaps.py",
+      "b": "tests/test_importers.py",
+      "either": 8,
+      "partLabels": [
+        "src",
+        "tests"
+      ],
+      "parts": [
+        "src",
+        "tests"
+      ],
+      "relation": "b-imports-a",
+      "shared": 4
     }
   ],
   "changesTogetherNote": [
-    "Confidence is low: fewer than 30 qualifying commits in the window, and fewer than 25 source files reach 10 revisions.",
-    "Window: 180 days; a pair counts from 3 shared commits, since the window holds fewer than 30 qualifying commits."
+    "Confidence is low: fewer than 25 source files reach 10 revisions in the window.",
+    "Window: 180 days; a pair counts from 3 shared commits, since 2 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 0,
-  "commit": "0716bef1bac8f6725047cefb8afd47bfba2280c9",
+  "commit": "d1742597b794f3a99966c689c7c026122d02b091",
   "defaultBranch": "main",
-  "derived": "7 parts, mostly Python (44 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.",
+  "derived": "7 parts, mostly Python (46 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.",
   "doors": [
     {
       "checks": [],
@@ -107,12 +145,12 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 10
+          "files": 11
         },
         {
           "boundary": "src",
           "depth": 1,
-          "files": 30
+          "files": 33
         }
       ],
       "runs": [
@@ -144,7 +182,7 @@
         {
           "boundary": "src",
           "depth": 0,
-          "files": 24
+          "files": 29
         }
       ],
       "runs": [
@@ -163,13 +201,14 @@
   "edges": [],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-10T03:10:47.885Z",
+  "generatedAt": "2026-10-10T21:18:15.613Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
-    "1 read uses a path built at run time and is not named here.",
-    "3 writes and 9 reads go to a path their caller passes, not to this repository.",
-    "9 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 6 more.",
-    "Statistics confidence is low: fewer than 30 qualifying commits in the window, and fewer than 25 source files reach 10 revisions."
+    "2 reads use paths built at run time and are not named here.",
+    "4 writes and 12 reads go to a path their caller passes, not to this repository.",
+    "3 reads go to the directory the command is run in (receipts/), not to this repository.",
+    "10 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 7 more.",
+    "Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window."
   ],
   "mainDoor": ".github/workflows/ci.yml",
   "partLabels": {
@@ -194,9 +233,9 @@
   "startReason": "This path follows switchyard (a command people run) from its entry, since CI runs only tests.",
   "summary": "switchyard routes each job to a model, engine and device from a receipt-backed table.",
   "summaryFrom": "person",
-  "testFiles": 10,
+  "testFiles": 11,
   "testedBy": {
-    "src": 9
+    "src": 10
   },
   "unnamedWrites": 0,
   "unread": [],
