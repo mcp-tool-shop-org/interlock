@@ -1880,6 +1880,45 @@ def test_companion_sessions_wrap_only_the_paired_slot(tmp_path: Path):
     assert "start_session" in stored[0]["settings"]["abortion"]["error"]
 
 
+def test_a_companion_session_gets_its_own_arms_bound(tmp_path: Path):
+    class BoundSessions(Scripted):
+        def start_session(self, request):
+            super().start_session(request)
+            self.session_bounds.append(request.settings.get("call_timeout_s"))
+
+    alone = _arm("A", "5090")
+    paired = _arm("P", "NPU")
+    paired["companion"] = "A"
+    paired["companion_device"] = "5090"
+    paired["measure"] = "decode_tok_s"
+    spec = _spec()
+    spec.update(
+        {
+            "compile_cache": "fresh",
+            "order": "aba",
+            "warmups": 0,
+            "repeats": 1,
+            "arms": [alone, paired],
+            "pairs": [{"id": "p1", "alone": "A", "paired": "P"}],
+        }
+    )
+    script = BoundSessions(
+        {
+            # A's cold call takes 50 s, so A's warm bound is 150 s; P's cold is 8 ms, so P's is 60 s.
+            "A": [_result(50_000, 100, compile_ms=12), _result(40, 100), _result(40, 100)],
+            "P": [_result(8, 100, compile_ms=4), _result(9, 100)],
+        },
+        sessions=True,
+    )
+    script.session_bounds = []
+    repo = tmp_path / "repo"
+    _invoke(repo, _bind(repo, spec), {"fake": script})
+    assert script.sessions[0] == ("start", "A", "5090")
+    assert script.session_bounds == [150.0]
+    measured = [r.settings.get("call_timeout_s") for r in script.requests if r.step_id == "P"]
+    assert measured[-1] == 60.0
+
+
 def test_an_interleaved_companion_starts_on_measure_slots_only(tmp_path: Path):
     spec = _spec()
     spec["warmups"] = 0
@@ -2184,3 +2223,185 @@ def test_a_generate_row_carries_genai_counter_medians_from_repeats(tmp_path: Pat
     assert genai["input_tokens"] == 1024 and genai["generated_tokens"] == 128
     assert genai["repeats_counted"] == 3
     assert "genai" not in by_id["T/plain/run-1"]["settings"]
+
+
+# ---------------------------------------------------------------------------
+# Ruling #36: the per-arm per-call bound, and the CPU-noise addendum.
+# ---------------------------------------------------------------------------
+
+
+from types import SimpleNamespace
+
+
+class Timed:
+    """A fake adapter whose calls take planned seconds, honouring the bound.
+
+    The runner hands each request its per-arm bound under
+    ``settings["call_timeout_s"]``; a call planned above it answers the
+    adapter's hang verdict, exactly as the OpenVINO adapter would.
+    """
+
+    def __init__(self, plan: dict[str, list[float]]):
+        self.plan = plan
+        self.calls = []
+        self.bounds = []
+        self.unloaded = []
+
+    def run(self, request):
+        self.calls.append(request.step_id)
+        bound = request.settings.get("call_timeout_s", 60.0)
+        self.bounds.append(bound)
+        seconds = self.plan[request.step_id].pop(0)
+        if seconds > bound:
+            return StepResult(
+                ok=False,
+                error=f"hang: no result within {bound:g} s; arm inconclusive, device pair poisoned for the run",
+            )
+        return _result(seconds * 1000, 4)
+
+    def unload(self, model, device=None):
+        self.unloaded.append((model, device))
+
+
+def _timed_spec():
+    spec = _spec()
+    spec["warmups"] = 1
+    spec["repeats"] = 1
+    spec["arms"] = [_arm("A", "CPU")]
+    return spec
+
+
+def test_a_cold_call_above_60s_passes_under_the_ceiling(tmp_path: Path):
+    """Ruling #36a: the cold call has no reference, so it gets the ceiling."""
+
+    repo = tmp_path / "repo"
+    spec = _timed_spec()
+    script = Timed({"A": [90.0, 120.0, 200.0]})
+    rows = _invoke(repo, _bind(repo, spec), {"fake": script})
+    assert script.bounds == [600.0, 270.0, 270.0]
+    row = rows[0]
+    assert row["settings"]["bound_s"] == {"cold": 600.0, "warm": 270.0}
+    assert row["settings"]["cold_call_s"] == 90.0
+    slots = {s["phase"]: s for s in row["artifacts"]["slots"]}
+    assert slots["cold"]["bound_s"] == 600.0
+    assert slots["warmup"]["bound_s"] == 270.0
+
+
+def test_a_warm_call_between_60s_and_3x_cold_passes(tmp_path: Path):
+    """Ruling #36a: max(60 s, 3 x the arm's own cold call) is the warm bound."""
+
+    repo = tmp_path / "repo"
+    spec = _timed_spec()
+    script = Timed({"A": [30.0, 75.0, 80.0]})
+    rows = _invoke(repo, _bind(repo, spec), {"fake": script})
+    assert script.bounds == [600.0, 90.0, 90.0]
+    assert rows[0]["latency"]["warm_p50_ms"] == 80000
+
+
+def test_a_warm_call_above_3x_cold_is_a_hang(tmp_path: Path):
+    """Ruling #36a: exceeding the arm's own bound is still the hang verdict."""
+
+    repo = tmp_path / "repo"
+    spec = _timed_spec()
+    script = Timed({"A": [10.0, 61.0]})
+    with pytest.raises(RunnerError, match="hang:"):
+        _invoke(repo, _bind(repo, spec), {"fake": script})
+    assert script.bounds == [600.0, 60.0]
+    stored = load_jsonl(repo / "receipts" / "run-1.jsonl")
+    assert stored[0]["outcome"] == "hang"
+    assert stored[0]["settings"]["bound_s"] == {"cold": 600.0, "warm": 60.0}
+
+
+def test_nothing_exceeds_the_ceiling(tmp_path: Path):
+    """Ruling #36a: C bounds every call, the cold call included."""
+
+    repo = tmp_path / "repo"
+    spec = _timed_spec()
+    spec["call_ceiling_s"] = 100
+    script = Timed({"A": [150.0]})
+    with pytest.raises(RunnerError, match="hang: no result within 100"):
+        _invoke(repo, _bind(repo, spec), {"fake": script})
+    assert script.bounds == [100.0]
+
+
+def test_call_ceiling_s_is_validated(tmp_path: Path):
+    spec = _timed_spec()
+    assert validate_spec({**spec, "call_ceiling_s": 120})["call_ceiling_s"] == 120
+    with pytest.raises(SpecError, match="call_ceiling_s"):
+        validate_spec({**spec, "call_ceiling_s": 59})
+    with pytest.raises(SpecError, match="call_ceiling_s"):
+        validate_spec({**spec, "call_ceiling_s": True})
+    with pytest.raises(SpecError, match="call_ceiling_s"):
+        validate_spec({**spec, "call_ceiling_s": "600"})
+
+
+def test_an_arm_the_spec_says_not_run_is_declined(tmp_path: Path):
+    """Ruling #36b: the amendment excludes an arm with ``not_run: <reason>``."""
+
+    repo = tmp_path / "repo"
+    spec = _timed_spec()
+    l512 = _emb_arm("l512", "NPU", "1x512")
+    l512["not_run"] = "not supported at this shape on driver 32.0.100.5540"
+    spec["arms"] = [_arm("A", "CPU"), l512]
+    script = Timed({"A": [5.0, 5.0, 5.0], "l512": [1.0, 1.0, 1.0]})
+    rows = _invoke(repo, _bind(repo, spec), {"fake": script})
+    assert script.calls == ["A", "A", "A"]
+    assert [row["id"] for row in rows] == ["T/A/run-1"]
+    assert rows[0]["notes"] == "not run: l512 (the spec says not run: not supported at this shape on driver 32.0.100.5540)"
+
+
+def test_not_run_needs_a_reason():
+    arm = _arm("A", "NPU")
+    arm["not_run"] = ""
+    with pytest.raises(SpecError, match="not_run"):
+        validate_spec({**_timed_spec(), "arms": [arm]})
+    arm["not_run"] = True
+    with pytest.raises(SpecError, match="not_run"):
+        validate_spec({**_timed_spec(), "arms": [arm]})
+
+
+class _FakePsutil:
+    """The addendum's counter source: fixed percent and frequency readings."""
+
+    def __init__(self, percent=42.0, mhz=3500.0):
+        self.percent = percent
+        self.mhz = mhz
+
+    def cpu_percent(self, interval=None):
+        return self.percent
+
+    def cpu_freq(self):
+        return SimpleNamespace(current=self.mhz)
+
+
+def test_a_slot_records_cpu_load_and_frequency(monkeypatch, tmp_path: Path):
+    """The #36 addendum: psutil readings at each slot edge, summarized max."""
+
+    import switchyard.harness.runner as mod
+
+    monkeypatch.setattr(mod, "psutil", _FakePsutil())
+    repo = tmp_path / "repo"
+    spec = _timed_spec()
+    script = Timed({"A": [5.0, 5.0, 5.0]})
+    rows = _invoke(repo, _bind(repo, spec), {"fake": script})
+    row = rows[0]
+    assert row["settings"]["cpu_percent_max"] == 42.0
+    cold = row["artifacts"]["slots"][0]
+    assert cold["cpu"]["slot_start"] == {"cpu_percent": 42.0, "cpu_freq_mhz": 3500.0}
+    assert cold["cpu"]["slot_end"] == {"cpu_percent": 42.0, "cpu_freq_mhz": 3500.0}
+
+
+def test_cpu_noise_is_unrecorded_and_never_a_failure(monkeypatch, tmp_path: Path):
+    """The #36 addendum: without psutil the field says unrecorded and the run passes."""
+
+    import switchyard.harness.runner as mod
+
+    monkeypatch.setattr(mod, "psutil", None)
+    repo = tmp_path / "repo"
+    spec = _timed_spec()
+    script = Timed({"A": [5.0, 5.0, 5.0]})
+    rows = _invoke(repo, _bind(repo, spec), {"fake": script})
+    row = rows[0]
+    assert row["settings"]["cpu_percent_max"] == "unrecorded"
+    cold = row["artifacts"]["slots"][0]
+    assert cold["cpu"] == {"slot_start": "unrecorded", "slot_end": "unrecorded"}
