@@ -78,3 +78,7 @@ No open cell. This experiment's candidates are filled.
 - experiments/npu-probe/results/2026-10-09-mac-chain.json#5: GPU.0 has no Intel full name in this file
 - experiments/npu-probe/results/2026-10-09-mac-chain.json#7: GPU.0 has no Intel full name in this file
 
+## Aborted runs
+
+- Aborted run `e2-2026-10-10b` stopped at `qwen3emb-cpu-l2048-b8 warmup 0`: hang: no result within 60 s; arm inconclusive, device pair poisoned for the run
+
