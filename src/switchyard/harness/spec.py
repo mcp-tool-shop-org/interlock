@@ -58,6 +58,11 @@ def validate_spec(data: object) -> dict:
         _fill_card(data)
     else:
         _offrig(data)
+    ceiling = data.get("call_ceiling_s")
+    if ceiling is not None and (
+        isinstance(ceiling, bool) or not isinstance(ceiling, (int, float)) or ceiling < 60
+    ):
+        raise SpecError("call_ceiling_s must be a number of at least 60")
     _choice_rule(data)
     return data
 
@@ -93,6 +98,9 @@ def _interleaved(data: dict) -> None:
         companion_device = arm.get("companion_device")
         if companion_device is not None and companion_device not in DEVICES:
             raise SpecError(f"arm {arm['id']} names a companion device the resolver does not allow")
+        not_run = arm.get("not_run")
+        if not_run is not None and (not isinstance(not_run, str) or not not_run.strip()):
+            raise SpecError(f"arm {arm['id']} not_run needs a reason")
     for arm in arms:
         companion = arm.get("companion")
         if companion is not None and companion not in seen:

@@ -386,10 +386,19 @@ class _Settings:
         self.compile_cache = raw.pop("compile_cache", None)
         v = raw.pop("compile_cache_dir", None)
         self.compile_cache_dir = None if v is None else str(v)
+        v = raw.pop("call_timeout_s", None)
+        self.call_timeout_s = None if v is None else float(v)
         self.values = {k: v for k, v in raw.items() if v is not None}
 
     def get(self, key, default=None):
         return self.values.get(key, default)
+
+
+def _bound(self, s: _Settings) -> float:
+    """The per-call bound for this request: the run loop's per-arm value
+    (ruling #36) when present, else the adapter default."""
+
+    return s.call_timeout_s if s.call_timeout_s is not None else self.call_timeout_s
 
 
 def _timed_call(fn, timeout_s: float):
@@ -491,9 +500,10 @@ def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> Step
     compiled_now = not entry["warmed"]
     t0 = self.clock()
     try:
+        bound = _bound(self, s)
         status, matrix = _timed_call(
             lambda: self._infer_embed(entry, ids, mask, tt, batch_rows if static is None else static[0]),
-            self.call_timeout_s,
+            bound,
         )
     except Exception as exc:
         if _is_device_lost(exc):
@@ -511,7 +521,7 @@ def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> Step
         self._poisoned.add((repo, ov_id))
         return StepResult(
             ok=False,
-            error=f"hang: no result within {self.call_timeout_s:g} s; arm inconclusive, device pair poisoned for the run",
+            error=f"hang: no result within {bound:g} s; arm inconclusive, device pair poisoned for the run",
             resolved=resolved or None,
             sensors=None,
         )
@@ -601,7 +611,8 @@ def _run_generate(self, request: StepRequest, s: _Settings, resolved: dict) -> S
         config.temperature = float(s.get("temperature"))
     t0 = self.clock()
     try:
-        status, out = _timed_call(lambda: pipe.generate(str(s.get("prompt") or "hello"), config), self.call_timeout_s)
+        bound = _bound(self, s)
+        status, out = _timed_call(lambda: pipe.generate(str(s.get("prompt") or "hello"), config), bound)
     except Exception as exc:
         if _is_device_lost(exc):
             self._lost_devices.add(ov_id)
@@ -616,7 +627,7 @@ def _run_generate(self, request: StepRequest, s: _Settings, resolved: dict) -> S
         self._poisoned.add((request.model, ov_id))
         return StepResult(
             ok=False,
-            error=f"hang: no result within {self.call_timeout_s:g} s; arm inconclusive, device pair poisoned for the run",
+            error=f"hang: no result within {bound:g} s; arm inconclusive, device pair poisoned for the run",
             resolved=resolved or None,
             sensors=None,
         )
@@ -771,9 +782,10 @@ def _start_session(self, request: StepRequest) -> None:
                 config.max_new_tokens = _SESSION_NEW_TOKENS
                 while not stop.is_set():
                     t0 = self.clock()
-                    status, _ = _timed_call(lambda: pipe.generate(str(s.get("prompt") or "hello"), config), self.call_timeout_s)
+                    bound = _bound(self, s)
+                    status, _ = _timed_call(lambda: pipe.generate(str(s.get("prompt") or "hello"), config), bound)
                     if status == "hang":
-                        box["fault"] = AdapterError(f"hang: companion call exceeded {self.call_timeout_s:g} s")
+                        box["fault"] = AdapterError(f"hang: companion call exceeded {bound:g} s")
                         return
                     box["call_s"] = self.clock() - t0
             else:
@@ -790,9 +802,10 @@ def _start_session(self, request: StepRequest) -> None:
                 rows = static[0] if static else int(s.get("batch", 1))
                 while not stop.is_set():
                     t0 = self.clock()
-                    status, _ = _timed_call(lambda: self._infer_embed(entry, ids, mask, tt, rows), self.call_timeout_s)
+                    bound = _bound(self, s)
+                    status, _ = _timed_call(lambda: self._infer_embed(entry, ids, mask, tt, rows), bound)
                     if status == "hang":
-                        box["fault"] = AdapterError(f"hang: companion call exceeded {self.call_timeout_s:g} s")
+                        box["fault"] = AdapterError(f"hang: companion call exceeded {bound:g} s")
                         return
                     box["call_s"] = self.clock() - t0
         except Exception as exc:  # surfaced as a refusal on start, or on stop mid-run

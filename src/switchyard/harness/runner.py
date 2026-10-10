@@ -47,6 +47,11 @@ from switchyard.harness.spec import load_spec
 from switchyard.receipt import validate_row
 from switchyard.harness.timing import Slot, TimingError, aba_call, schedule, schedule_aba, summarize
 
+try:  # the CPU-window evidence of ruling #36's addendum; never a step failure
+    import psutil
+except ImportError:  # pragma: no cover
+    psutil = None
+
 PASSTHROUGH = (
     "thinking_level",
     "num_predict",
@@ -165,6 +170,9 @@ def run_interleaved(
     rejections: dict[str, dict] = {}
     aborted: dict | None = None
     current: Slot | None = None
+    ceiling = _call_ceiling(spec)
+    cold_calls: dict[str, float] = {}
+    declined_ids: set[str] = set()
     captured = env if env is not None else environment()
     cache_dirs = _cache_dirs(spec, root, run_id, arms)
     prompt_cache: dict[str, tuple[str, int]] = {}
@@ -177,9 +185,18 @@ def run_interleaved(
             return f"{notes}. {extra}"
         return notes or extra
 
+    def _bound_settings(arm_id: str) -> dict:
+        """The per-arm call bound actually applied (ruling #36a), on every row."""
+
+        cold_call = cold_calls.get(arm_id)
+        warm = min(ceiling, max(60.0, 3.0 * cold_call)) if cold_call is not None else ceiling
+        return {"bound_s": {"cold": ceiling, "warm": warm}, "cold_call_s": cold_call}
+
     def _finished_row(arm_id: str, *, partial: bool, gone: set[str]) -> dict:
         extra = _extra_settings(spec, arms[arm_id], records, run_id, gone)
         extra.update(_prompt_counts(arms[arm_id], prompt_cache))
+        extra.update(_bound_settings(arm_id))
+        extra["cpu_percent_max"] = _cpu_percent_max(records, arm_id)
         genai = _genai_summary(records, arm_id)
         if genai:
             extra["genai"] = genai
@@ -206,6 +223,8 @@ def run_interleaved(
     def _capability_row(arm_id: str, *, partial: bool, gone: set[str]) -> dict:
         extra = _extra_settings(spec, arms[arm_id], [], run_id, gone)
         extra.update(_prompt_counts(arms[arm_id], prompt_cache))
+        extra.update(_bound_settings(arm_id))
+        extra["cpu_percent_max"] = _cpu_percent_max(records, arm_id)
         outcome = capability[arm_id]
         evidence = rejections.get(arm_id)
         compile_ms = None
@@ -234,6 +253,8 @@ def run_interleaved(
         arm = arms[arm_id]
         extra = _extra_settings(spec, arm, records, run_id, gone)
         extra.update(_prompt_counts(arm, prompt_cache))
+        extra.update(_bound_settings(arm_id))
+        extra["cpu_percent_max"] = _cpu_percent_max(records, arm_id)
         genai = _genai_summary(records, arm_id)
         if genai:
             extra["genai"] = genai
@@ -304,6 +325,11 @@ def run_interleaved(
                 current = slot
                 arm = arms[slot.step_id]
                 companion = _companion(arm, arms, slot)
+                if arm.get("not_run"):
+                    if arm["id"] not in declined_ids:
+                        declined_ids.add(arm["id"])
+                        skipped.append(f"{arm['id']} (the spec says not run: {arm['not_run']})")
+                    continue
                 if _shape_key(arm) in rejected_keys or (
                     companion is not None and _shape_key(companion) in rejected_keys
                 ):
@@ -316,6 +342,7 @@ def run_interleaved(
                     continue
                 started = False
                 compile_s: float | None = None
+                bound = _call_bound(slot, cold_calls.get(slot.step_id), ceiling)
                 if companion is not None:
                     _session(
                         adapters,
@@ -325,8 +352,10 @@ def run_interleaved(
                         spec_rel,
                         cache_dirs.get(companion["id"]),
                         prompt_cache,
+                        bound_s=bound,
                     )
                     started = True
+                cpu_start = _cpu_sample()
                 try:
                     kind = "ok"
                     error = ""
@@ -339,9 +368,11 @@ def run_interleaved(
                                 cache_dirs.get(arm["id"]),
                                 adapters[arm["engine"]],
                                 prompt_cache,
+                                bound_s=bound,
                             )
                         )
                     except AdapterError as exc:
+                        cpu_end = _cpu_sample()
                         error = str(exc)
                         if hang_error(error):
                             kind = "hang"
@@ -355,6 +386,7 @@ def run_interleaved(
                             flush()
                             raise
                     else:
+                        cpu_end = _cpu_sample()
                         reported = _reported_outcome(result)
                         if reported == "device_lost":
                             kind = "device_lost"
@@ -391,7 +423,17 @@ def run_interleaved(
                         flush()
                         raise RunnerError(f"step {slot.step_id} failed: {error}")
                     else:
-                        records.append(_record(slot, result))
+                        records.append(
+                            _record(
+                                slot,
+                                result,
+                                bound,
+                                cold_calls.get(arm["id"]),
+                                {"slot_start": cpu_start, "slot_end": cpu_end},
+                            )
+                        )
+                        if slot.phase == "cold" and result.latency_ms is not None:
+                            cold_calls[arm["id"]] = result.latency_ms / 1000
                         executed_ok.add(_shape_key(arm))
                         seen[slot.step_id] = seen.get(slot.step_id, 0) + 1
                         if seen[slot.step_id] == needed[slot.step_id]:
@@ -465,6 +507,60 @@ def native_binary_rejected_error(error: str | None) -> bool:
         return False
     text = error.lower()
     return "ze_result_error_invalid_native_binary" in text or "0x7800000f" in text
+
+
+CALL_CEILING_DEFAULT = 600.0
+
+
+def _call_ceiling(spec: dict) -> float:
+    """The per-call ceiling C (ruling #36a). The cold call gets the ceiling."""
+
+    value = spec.get("call_ceiling_s")
+    if value is None:
+        return CALL_CEILING_DEFAULT
+    return float(value)
+
+
+def _call_bound(slot: Slot, cold_call_s: float | None, ceiling: float) -> float:
+    """The slot's per-call bound: the ceiling for a cold, else
+    ``max(60 s, 3 x the arm's own cold call)``, capped at the ceiling."""
+
+    if slot.phase == "cold" or cold_call_s is None:
+        return ceiling
+    return min(ceiling, max(60.0, 3.0 * cold_call_s))
+
+
+def _cpu_sample():
+    """The system CPU load and frequency at a slot edge. ``unrecorded``,
+    never a failure, when psutil or a counter is missing."""
+
+    if psutil is None:
+        return "unrecorded"
+    try:
+        percent = psutil.cpu_percent(interval=0.2)
+        freq = psutil.cpu_freq()
+        mhz = getattr(freq, "current", None)
+        return {
+            "cpu_percent": percent,
+            "cpu_freq_mhz": mhz if mhz is not None else "unrecorded",
+        }
+    except Exception:  # pragma: no cover
+        return "unrecorded"
+
+
+def _cpu_percent_max(records: list[dict], arm_id: str):
+    """The max sampled CPU percent across an arm's slots, or ``unrecorded``."""
+
+    values = []
+    for row in records:
+        if row["step_id"] != arm_id:
+            continue
+        cpu = row.get("cpu") or {}
+        for side in ("slot_start", "slot_end"):
+            sample = cpu.get(side)
+            if isinstance(sample, dict) and isinstance(sample.get("cpu_percent"), (int, float)):
+                values.append(sample["cpu_percent"])
+    return max(values) if values else "unrecorded"
 
 
 def _label(slot: Slot) -> str:
@@ -551,6 +647,7 @@ def _request(
     cache_dir: Path | None,
     adapter,
     prompt_cache: dict[str, tuple[str, int]],
+    bound_s: float | None = None,
 ) -> StepRequest:
     settings = {key: arm.get(key) for key in PASSTHROUGH}
     if not settings.get("prompt"):
@@ -561,6 +658,8 @@ def _request(
     settings["compile_cache"] = spec.get("compile_cache")
     if cache_dir is not None:
         settings["compile_cache_dir"] = str(cache_dir)
+    if bound_s is not None:
+        settings["call_timeout_s"] = bound_s
     return StepRequest(
         step_id=arm["id"],
         task=arm["task"],
@@ -571,7 +670,13 @@ def _request(
     )
 
 
-def _record(slot: Slot, result) -> dict:
+def _record(
+    slot: Slot,
+    result,
+    bound_s: float | None = None,
+    cold_call_s: float | None = None,
+    cpu: dict | None = None,
+) -> dict:
     sensors = None
     if isinstance(result.sensors, dict):
         sensors = {key: result.sensors.get(key) for key in SENSOR_KEYS if key in result.sensors}
@@ -587,6 +692,9 @@ def _record(slot: Slot, result) -> dict:
         "prompt_tok_s": result.prompt_tok_s,
         "compile_ms": result.compile_ms,
         "first_call_ms": result.first_call_ms,
+        "bound_s": bound_s,
+        "cold_call_s": cold_call_s,
+        "cpu": cpu,
         "output": result.output,
         "resolved": result.resolved,
         "sensors": sensors,
@@ -642,6 +750,10 @@ def _artifacts(records: list[dict], arm_id: str) -> dict | None:
             "throughput_unit": row["throughput_unit"],
             "prompt_tok_s": row["prompt_tok_s"],
         }
+        if row.get("bound_s") is not None:
+            item["bound_s"] = row["bound_s"]
+        if row.get("cpu") is not None:
+            item["cpu"] = row["cpu"]
         if row["output"] is not None:
             item["output"] = row["output"]
         if row["sensors"]:
@@ -748,6 +860,7 @@ def _session(
     spec_rel: str,
     cache_dir: Path | None,
     prompt_cache: dict[str, tuple[str, int]],
+    bound_s: float | None = None,
 ) -> None:
     adapter = adapters[arm["engine"]]
     method = getattr(adapter, f"{action}_session", None)
@@ -756,7 +869,7 @@ def _session(
             f"{arm['engine']} has no {action}_session. "
             "The harness owns companion sessions and does not fake one."
         )
-    method(_request(arm, spec, spec_rel, cache_dir, adapter, prompt_cache))
+    method(_request(arm, spec, spec_rel, cache_dir, adapter, prompt_cache, bound_s=bound_s))
 
 
 def _dataset_prompt(arm: dict, spec: dict, adapter, prompt_cache: dict[str, tuple[str, int]]) -> str | None:
