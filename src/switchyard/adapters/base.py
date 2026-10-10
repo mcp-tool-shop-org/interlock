@@ -40,6 +40,37 @@ class NativeBinaryRejected(AdapterError):
         self.compile_s = compile_s
 
 
+COMPILER_MESSAGE_MARKER = "[NPU_VCL] Compiler returned msg"
+COMPILE_REJECTED_CODE = "0x78000007"
+
+
+def compile_rejected_error(error: str | None) -> bool:
+    """The NPU compiler refused the graph (ruling on #36).
+
+    Both markers must be present: the compiler's own message line and the Level
+    Zero code ``0x78000007`` (``ZE_RESULT_ERROR_INVALID_NULL_POINTER``). Either
+    alone is some other failure and stays an abort.
+    """
+
+    if not isinstance(error, str) or not error:
+        return False
+    return COMPILER_MESSAGE_MARKER in error and COMPILE_REJECTED_CODE in error.lower()
+
+
+class CompileRejected(AdapterError):
+    """The NPU compiler refused the graph, raised inside ``compile_model``.
+
+    Raised only at the compile site, with the signature in
+    :func:`compile_rejected_error`. ``failed_s`` is the time from the start of
+    the compile to the failure. The harness reads the subtype to tell a compile
+    refusal from an execute failure. Nothing is retried.
+    """
+
+    def __init__(self, message: str, *, failed_s: float | None = None) -> None:
+        super().__init__(message)
+        self.failed_s = failed_s
+
+
 @dataclass(frozen=True)
 class StepRequest:
     step_id: str

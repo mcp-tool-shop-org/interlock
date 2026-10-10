@@ -14,6 +14,28 @@ from pathlib import Path
 from switchyard.receipt import is_speed_row
 
 
+def summarize_error(error: object) -> str:
+    """One line for a possibly multi-line exception.
+
+    OpenVINO errors lead with a stack of "Exception from src" lines and
+    carry the cause late. Prefer the compiler's message (the line holding
+    ``Compiler returned msg`` joined with the next non-empty line), else the
+    Level Zero result line (``ZE_RESULT_``), else the last non-empty line.
+    """
+
+    lines = [line.strip() for line in str(error or "").splitlines() if line.strip()]
+    if not lines:
+        return ""
+    for index, line in enumerate(lines):
+        if "Compiler returned msg" in line:
+            following = lines[index + 1] if index + 1 < len(lines) else ""
+            return f"{line} {following}".strip()
+    for line in lines:
+        if "ZE_RESULT_" in line:
+            return line
+    return lines[-1]
+
+
 def aborted_run_lines(rows: list[dict]) -> list[str]:
     """One line per aborted run: the run id, the step that stopped it, and the error.
 
@@ -35,7 +57,7 @@ def aborted_run_lines(rows: list[dict]) -> list[str]:
         if not isinstance(abortion, dict):
             abortion = {}
         step = abortion.get("stop_step") or "unknown step"
-        error = str(abortion.get("error") or "").splitlines()[0].strip()
+        error = summarize_error(abortion.get("error"))
         if len(error) > 200:
             error = error[:199] + "…"
         lines.append(f"Aborted run `{run_id}` stopped at `{step}`: {error}")

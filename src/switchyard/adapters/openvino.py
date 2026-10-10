@@ -39,7 +39,9 @@ steps on it are recorded, not attempted. A compiled binary the device refuses
 at execute (``ZE_RESULT_ERROR_INVALID_NATIVE_BINARY``, ``0x7800000f``) is
 raised as :class:`NativeBinaryRejected` with the compile time attached; the
 runner scopes it to model x device x static shape and the other shapes still
-run.
+run. An NPU compile that the compiler refuses (``[NPU_VCL] Compiler returned
+msg`` with ``0x78000007``) is raised as :class:`CompileRejected` with the time
+to failure; any other compile error is left as it was.
 
 The NPU infers static shapes only, so a NPU step without ``static_shape``
 (``"BxL"``) is refused before any compile. AUTO, HETERO, Multi and GPU.1 are
@@ -63,7 +65,14 @@ import time
 import warnings
 from pathlib import Path
 
-from switchyard.adapters.base import AdapterError, NativeBinaryRejected, StepRequest, StepResult
+from switchyard.adapters.base import (
+    AdapterError,
+    CompileRejected,
+    NativeBinaryRejected,
+    StepRequest,
+    StepResult,
+    compile_rejected_error,
+)
 from switchyard.devices import DeviceRefused, resolve_device
 
 try:  # CI has no intel extra; importing this module must still succeed.
@@ -487,6 +496,7 @@ def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> Step
                                           allow_truncate=bool(s.get("truncate", True)))
         tt = pad_like(tt, static[1])
     batch_rows = int(s.get("batch", 1))
+    build_t0 = self.clock()
     try:
         entry = self._embedder(repo, ref, ov_id, static, _compile_config(s))
     except AdapterError:
@@ -496,6 +506,8 @@ def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> Step
             self._lost_devices.add(ov_id)
             resolved["outcome"] = "device_lost"
             return StepResult(ok=True, resolved=resolved, sensors=None)
+        if ov_id == "NPU" and compile_rejected_error(str(exc)):
+            raise CompileRejected(str(exc), failed_s=self.clock() - build_t0) from exc
         raise
     compiled_now = not entry["warmed"]
     t0 = self.clock()
@@ -587,6 +599,7 @@ def _run_generate(self, request: StepRequest, s: _Settings, resolved: dict) -> S
             "MAX_PROMPT_LEN": compile_config["MAX_PROMPT_LEN"],
             "MIN_RESPONSE_LEN": compile_config["MIN_RESPONSE_LEN"],
         }
+    build_t0 = self.clock()
     try:
         pipe, compile_s = self._pipeline(request.model, ov_id, compile_config)
     except AdapterError:
@@ -596,6 +609,8 @@ def _run_generate(self, request: StepRequest, s: _Settings, resolved: dict) -> S
             self._lost_devices.add(ov_id)
             resolved["outcome"] = "device_lost"
             return StepResult(ok=True, resolved=resolved or None, sensors=None)
+        if ov_id == "NPU" and compile_rejected_error(str(exc)):
+            raise CompileRejected(str(exc), failed_s=self.clock() - build_t0) from exc
         if ov_id == "NPU":
             # recorded, not retried: the KV cache cannot cover this prompt;
             # ok stays true so the sequence continues past the arm

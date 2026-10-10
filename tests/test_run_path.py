@@ -6,6 +6,8 @@ this file touches a device.
 
 from __future__ import annotations
 
+import datetime
+import json
 import os
 import subprocess
 import time
@@ -227,7 +229,14 @@ def test_a_loaded_card_refuses(tmp_path: Path):
 def test_a_short_rest_refuses(tmp_path: Path):
     repo = tmp_path / "repo"
     spec_path = _bind(repo, _spec([_arm("A", "5090")], needs=NEED_GRANT))
-    clock = FakeTime(advance=100.0)  # the sleep lied: less than the spec's rest passed
+    # a 40-minute prior run on the card ended 1 minute ago, so a rest is owed
+    (repo / "receipts").mkdir()
+    window = {"start": "2026-10-10T08:00:00+00:00", "end": "2026-10-10T08:40:00+00:00"}
+    prior = {"id": "X/a/old", "device": "5090", "date": "2026-10-10", "settings": {"run_window": window},
+             "provenance": {"experiment_spec": "x", "run_id": "old"}}
+    (repo / "receipts" / "old.jsonl").write_text(json.dumps(prior) + "\n", encoding="utf-8")
+    now = datetime.datetime.fromisoformat("2026-10-10T08:41:00+00:00").timestamp()
+    clock = FakeTime(advance=100.0)  # the sleep lied: less than the owed rest passed
     fake = Fake(loaded=[])
     with pytest.raises(GuardError, match="rested"):
         run_spec(
@@ -238,6 +247,7 @@ def test_a_short_rest_refuses(tmp_path: Path):
             heartbeat=_fresh_heartbeat(tmp_path),
             sleep=clock.sleep,
             clock=clock.monotonic,
+            wall=lambda: now,
         )
     assert fake.calls == []
 
