@@ -13,7 +13,8 @@ from switchyard.harness import environment as env_capture
 from switchyard.harness.environment import UNRECORDED
 from switchyard.harness.timing import Summary
 from switchyard.families import stamp_family
-from switchyard.receipt import load_jsonl, validate_row
+from switchyard.importers.gaps import append_aborted_runs
+from switchyard.receipt import CAPABILITY_OUTCOMES, load_jsonl, validate_row
 
 # The pre-registered parity guard. The first repeat must reach this cosine
 # against the same model's CPU batch-1 arm at the same length.
@@ -143,12 +144,15 @@ def device_lost_row(
     extra_settings: dict | None = None,
     outcome: str = "device_lost",
     partial: bool = True,
+    compile_ms: float | None = None,
 ) -> dict:
-    """A hang or a device loss. No timing, and no retry.
+    """A capability row: a hang, a device loss, or a refused native binary.
 
-    ``outcome`` is ``device_lost`` or ``hang``. Both tell the table that this
-    device cannot do the setting. ``partial`` stays on while the run is still
-    open.
+    No timing, and no retry. ``outcome`` is ``device_lost``, ``hang`` or
+    ``native_binary_rejected``. All three tell the table that this device
+    cannot do the setting. ``partial`` stays on while the run is still open.
+    A rejection carries ``compile_ms``: the compile finished, the execute did
+    not. The other outcomes have no timing.
     """
 
     text = DEVICE_LOST_NOTE if not notes else f"{DEVICE_LOST_NOTE}. {notes}"
@@ -170,6 +174,8 @@ def device_lost_row(
         row["partial"] = True
     row["provisional"] = True
     row["latency"] = _blank_latency()
+    if compile_ms is not None:
+        row["latency"]["compile_ms"] = compile_ms
     row.pop("artifacts", None)
     validate_row(row)
     return row
@@ -178,16 +184,20 @@ def device_lost_row(
 def for_table(row: dict) -> dict:
     """The table copy of a receipt row.
 
-    A ``device_lost`` or ``hang`` row cannot carry a speed. Timing and
-    artifacts are stripped, and the note says the device cannot do the setting.
+    A capability row (``device_lost``, ``hang``, ``native_binary_rejected``)
+    cannot carry a speed. Timing and artifacts are stripped, and the note says
+    the device cannot do the setting. A refused native binary keeps its
+    compile time: the compile is evidence, the execute never happened.
     """
 
-    if row.get("outcome") not in ("device_lost", "hang"):
+    if row.get("outcome") not in CAPABILITY_OUTCOMES:
         validate_row(row)
         return row
     cleaned = dict(row)
     cleaned.pop("artifacts", None)
     cleaned["latency"] = _blank_latency()
+    if row.get("outcome") == "native_binary_rejected":
+        cleaned["latency"]["compile_ms"] = (row.get("latency") or {}).get("compile_ms")
     notes = cleaned.get("notes") or ""
     if DEVICE_LOST_NOTE not in notes:
         cleaned["notes"] = DEVICE_LOST_NOTE if not notes else f"{DEVICE_LOST_NOTE}. {notes}"
@@ -210,17 +220,26 @@ def write_receipt(root: Path, run_id: str, rows: list[dict]) -> Path:
 def import_receipt(root: Path, run_id: str) -> list[dict]:
     """Bring a run receipt into the routing table.
 
-    ``device_lost`` and ``hang`` land as "this device can't do this setting",
-    with the timing removed. A failed parity guard is recorded with its timing
-    and is not a speed figure. CPU batch-1 references already in the table
-    count, so a later receipt can be judged against them.
+    ``device_lost``, ``hang`` and ``native_binary_rejected`` land as "this
+    device can't do this setting", with the timing removed (a rejection keeps
+    its compile time). A failed parity guard is recorded with its timing and
+    is not a speed figure. CPU batch-1 references already in the table count,
+    so a later receipt can be judged against them.
+
+    Rows marked ``aborted: true`` never route: they stay in the receipt as
+    the record, and each aborted run gets one line in ``table/gaps.md``.
     """
 
     path = root / "receipts" / f"{run_id}.jsonl"
-    rows = apply_parity(load_jsonl(path), references=_table_rows(root))
+    loaded = load_jsonl(path)
+    aborted = [row for row in loaded if row.get("aborted") is True]
+    routable = [row for row in loaded if row.get("aborted") is not True]
+    rows = apply_parity(routable, references=_table_rows(root))
     rows = [for_table(row) for row in rows]
-    _dump(path, rows)
+    _dump(path, rows + aborted)
     _append_table(root, rows)
+    if aborted:
+        append_aborted_runs(root, aborted)
     return rows
 
 
@@ -247,7 +266,7 @@ def apply_parity(rows: list[dict], *, references: list[dict] | None = None) -> l
     pool = list(references or []) + list(rows)
     cpu: dict[tuple, list[float]] = {}
     for row in pool:
-        if row.get("outcome") in ("device_lost", "hang") or row.get("device") != "CPU":
+        if row.get("outcome") in CAPABILITY_OUTCOMES or row.get("device") != "CPU":
             continue
         parsed = _length_batch(row)
         vector = _first_repeat_vector(row)
@@ -255,7 +274,7 @@ def apply_parity(rows: list[dict], *, references: list[dict] | None = None) -> l
             continue
         cpu.setdefault((_model_key(row), parsed[1]), vector)
     for row in rows:
-        if row.get("outcome") in ("device_lost", "hang"):
+        if row.get("outcome") in CAPABILITY_OUTCOMES:
             continue
         parsed = _length_batch(row)
         vector = _first_repeat_vector(row)

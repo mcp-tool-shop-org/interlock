@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from switchyard.adapters.base import AdapterError, StepRequest, StepResult
+from switchyard.adapters.base import AdapterError, NativeBinaryRejected, StepRequest, StepResult
 from switchyard.adapters.offrig_calibrate import OffrigCalibrateAdapter, plan_argv, scratch_project
 from switchyard.adapters.ollama import (
     OllamaAdapter,
@@ -36,13 +36,14 @@ from switchyard.harness.e5 import (
     search,
 )
 from switchyard.harness.lock import require_unmodified
-from switchyard.harness.receipts import apply_parity, device_lost_row, environment, import_receipt, write_run
+from switchyard.harness.receipts import apply_parity, device_lost_row, environment, for_table, import_receipt, write_run
 from switchyard.harness.runner import (
     RunnerError,
     check_flags,
     device_lost_error,
     dry_run,
     hang_error,
+    native_binary_rejected_error,
     run_interleaved,
 )
 from switchyard.harness.spec import SpecError, load_spec, validate_spec
@@ -56,7 +57,8 @@ from switchyard.harness.timing import (
     summarize,
     within_band,
 )
-from switchyard.receipt import load_jsonl
+from switchyard.importers.gaps import open_gaps
+from switchyard.receipt import ReceiptError, check_tree, is_speed_row, load_jsonl, validate_row
 
 ROOT = Path(__file__).resolve().parents[1]
 E4 = ROOT / "experiments" / "e4" / "spec.yaml"
@@ -178,6 +180,36 @@ def _invoke(repo: Path, spec_path: Path, adapters: dict, **kwargs):
     )
 
 
+# The E2 signature (driver 32.0.100.5540): the l512 compile wrote a complete
+# blob and the NPU refused the native binary at execute (issue #33).
+NATIVE_BINARY_REJECTED = (
+    "L0 pfnAppendGraphExecute: ZE_RESULT_ERROR_INVALID_NATIVE_BINARY, "
+    "code 0x7800000f - native binary is not supported by the device"
+)
+
+
+class ScriptedRaise(Scripted):
+    """A sample that is an exception instance is raised, not returned."""
+
+    def run(self, request):
+        self.calls.append(request.step_id)
+        self.requests.append(request)
+        item = self.samples[request.step_id].pop(0)
+        if isinstance(item, BaseException):
+            raise item
+        return item
+
+
+def _emb_arm(arm_id, device, shape):
+    """An arm with the static shape the NPU lane needs."""
+
+    arm = _arm(arm_id, device)
+    arm["task"] = "embed"
+    arm["batch"] = 1
+    arm["static_shape"] = shape
+    return arm
+
+
 def _resident(peak, *, failed=False, shared=1000, prompt=20.0, tok_s=10, ttft=100):
     return Observation(
         resident=not failed,
@@ -210,7 +242,9 @@ def test_schedule_interleaves_and_percentiles_ignore_warmups():
     assert within_band(0, 1, band=0.1) is False
 
 
-def test_a_failed_step_stops_and_writes_nothing(tmp_path: Path):
+def test_a_failed_step_stops_and_flushes_the_measured_slots(tmp_path: Path):
+    """Ruling #33: an abort keeps the slots already measured as aborted rows."""
+
     repo = tmp_path / "repo"
     spec_path = _bind(repo, _spec())
     script = Scripted(
@@ -223,7 +257,19 @@ def test_a_failed_step_stops_and_writes_nothing(tmp_path: Path):
         _invoke(repo, spec_path, {"fake": script})
     assert script.calls == ["A", "B"]
     assert script.unloaded == [("qwen3:8b", "5090"), ("qwen3:8b", "NPU")]
-    assert not (repo / "receipts").exists()
+    stored = load_jsonl(repo / "receipts" / "run-1.jsonl")
+    assert [row["id"] for row in stored] == ["T/A/run-1"]
+    row = stored[0]
+    assert row["aborted"] is True
+    assert "outcome" not in row
+    assert row["latency"]["cold_ms"] == 100
+    assert row["settings"]["abortion"] == {
+        "stop_step": "B cold",
+        "error": "stopped",
+        "cold_done": True,
+        "repeats_done": 0,
+        "repeats_required": 2,
+    }
 
 
 def test_a_hang_is_not_a_device_loss():
@@ -241,6 +287,17 @@ def test_a_hang_is_not_a_device_loss():
     assert device_lost_error("device hung, reset, was removed") is False
     assert device_lost_error("") is False
     assert device_lost_error(None) is False
+
+
+def test_a_native_binary_rejection_is_not_a_hang_or_a_device_loss():
+    assert native_binary_rejected_error(NATIVE_BINARY_REJECTED) is True
+    assert native_binary_rejected_error("ZE_RESULT_ERROR_INVALID_NATIVE_BINARY") is True
+    assert native_binary_rejected_error("code 0x7800000f") is True
+    assert native_binary_rejected_error("hang: no result within 60 s") is False
+    assert native_binary_rejected_error("ZE_RESULT_ERROR_DEVICE_LOST") is False
+    assert native_binary_rejected_error("ze_result_error_invalid_extension") is False
+    assert native_binary_rejected_error("") is False
+    assert native_binary_rejected_error(None) is False
 
 
 def test_a_hang_keeps_finished_arms_and_stops_without_retry(tmp_path: Path, capsys):
@@ -274,7 +331,7 @@ def test_a_hang_keeps_finished_arms_and_stops_without_retry(tmp_path: Path, caps
     assert script.calls == ["A", "B", "C", "A", "B"]
     assert seen == {"ids": ["T/A/run-1"], "partial": True, "cold": 100}
     stored = {row["id"]: row for row in load_jsonl(repo / "receipts" / "run-1.jsonl")}
-    assert set(stored) == {"T/A/run-1", "T/B/run-1"}
+    assert set(stored) == {"T/A/run-1", "T/B/run-1", "T/C/run-1"}
     assert stored["T/A/run-1"]["partial"] is True
     assert stored["T/A/run-1"]["latency"]["cold_ms"] == 100
     assert "outcome" not in stored["T/A/run-1"]
@@ -284,10 +341,19 @@ def test_a_hang_keeps_finished_arms_and_stops_without_retry(tmp_path: Path, caps
     assert hung["notes"] == "this device can't do this setting"
     assert all(value is None for value in hung["latency"].values())
     assert "artifacts" not in hung
+    cut = stored["T/C/run-1"]
+    assert cut["aborted"] is True
+    assert "outcome" not in cut
+    assert cut["latency"]["cold_ms"] == 7
+    assert cut["settings"]["abortion"]["stop_step"] == "B repeat 0"
+    assert cut["settings"]["abortion"]["repeats_done"] == 0
+    assert cut["settings"]["abortion"]["repeats_required"] == 1
     table = {row["id"]: row for row in load_jsonl(repo / "table" / "routing.jsonl")}
     assert table["T/B/run-1"]["outcome"] == "hang"
     assert table["T/B/run-1"]["latency"]["cold_ms"] is None
     assert table["T/B/run-1"]["notes"] == "this device can't do this setting"
+    assert "T/A/run-1" in table
+    assert "T/C/run-1" not in table
     assert script.unloaded == [("qwen3:8b", "5090"), ("qwen3:8b", "NPU"), ("qwen3:8b", "iGPU")]
     assert capsys.readouterr().out == "B NPU hang\n"
 
@@ -392,9 +458,230 @@ def test_a_raised_hang_stops_the_run(tmp_path: Path):
         _invoke(repo, spec_path, {"fake": script})
     assert script.calls == ["A", "B"]
     stored = load_jsonl(repo / "receipts" / "run-1.jsonl")
-    assert [row["id"] for row in stored] == ["T/B/run-1"]
+    assert [row["id"] for row in stored] == ["T/B/run-1", "T/A/run-1"]
     assert stored[0]["outcome"] == "hang"
     assert all(value is None for value in stored[0]["latency"].values())
+    assert stored[1]["aborted"] is True
+    assert stored[1]["latency"]["cold_ms"] == 10
+    assert stored[1]["settings"]["abortion"]["stop_step"] == "B cold"
+
+
+def test_a_native_binary_rejection_is_a_capability_row_scoped_to_shape(tmp_path: Path, capsys):
+    """Ruling #33.1: the l512 NPU arm records the outcome; every other shape runs."""
+
+    repo = tmp_path / "repo"
+    spec = _spec()
+    spec["warmups"] = 0
+    spec["repeats"] = 1
+    spec["compile_cache"] = "fresh"
+    spec["arms"] = [
+        _emb_arm("npu512", "NPU", "1x512"),
+        _emb_arm("npu128", "NPU", "1x128"),
+        _emb_arm("cpu512", "CPU", "1x512"),
+        _emb_arm("igpu512", "iGPU", "1x512"),
+    ]
+    spec_path = _bind(repo, spec)
+
+    class Rejecting(ScriptedRaise):
+        def run(self, request):
+            item = self.samples[request.step_id][0]
+            if isinstance(item, NativeBinaryRejected):
+                blob = Path(request.settings["compile_cache_dir"]) / "compiled.blob"
+                blob.write_bytes(b"x" * 4096)
+            return super().run(request)
+
+    script = Rejecting(
+        {
+            "npu512": [NativeBinaryRejected(NATIVE_BINARY_REJECTED, compile_s=41.25)],
+            "npu128": [_result(30), _result(5)],
+            "cpu512": [_result(50), _result(10)],
+            "igpu512": [_result(70), _result(12)],
+        }
+    )
+    (repo / "table").mkdir()
+    rows = _invoke(repo, spec_path, {"fake": script})
+    # The NPU is not marked off: after the l512 cold, l128, CPU and iGPU all run.
+    # Only the rejected shape's repeat is skipped, and it is listed in the notes.
+    assert script.calls == ["npu512", "npu128", "cpu512", "igpu512", "npu128", "cpu512", "igpu512"]
+    by_id = {row["id"]: row for row in rows}
+    assert set(by_id) == {"T/npu512/run-1", "T/npu128/run-1", "T/cpu512/run-1", "T/igpu512/run-1"}
+    rejected = by_id["T/npu512/run-1"]
+    assert rejected["outcome"] == "native_binary_rejected"
+    assert rejected["provisional"] is True
+    assert "partial" not in rejected
+    assert "aborted" not in rejected
+    latency = rejected["latency"]
+    assert latency["compile_ms"] == pytest.approx(41250.0)
+    for key in ("cold_ms", "warm_p50_ms", "warm_p95_ms", "throughput", "first_call_ms", "compile_warm_reload_ms"):
+        assert latency[key] is None
+    assert latency["throughput_unit"] is None
+    assert "artifacts" not in rejected
+    evidence = rejected["settings"]["rejection"]
+    assert "ZE_RESULT_ERROR_INVALID_NATIVE_BINARY" in evidence["error"]
+    assert evidence["code"] == "0x7800000f"
+    assert evidence["shape"] == {"batch": 1, "static_shape": "1x512"}
+    assert evidence["compile_cache_dir"] == "compile-cache/run-1/npu512"
+    assert evidence["blob_bytes"] == 4096
+    assert "npu_driver" in evidence
+    assert rejected["notes"].startswith("this device can't do this setting")
+    assert "not run: npu512 repeat 0" in rejected["notes"]
+    for done in ("npu128", "cpu512", "igpu512"):
+        row = by_id[f"T/{done}/run-1"]
+        assert "outcome" not in row and "aborted" not in row and "partial" not in row
+    table = {row["id"]: row for row in load_jsonl(repo / "table" / "routing.jsonl")}
+    kept = table["T/npu512/run-1"]
+    assert kept["outcome"] == "native_binary_rejected"
+    assert kept["latency"]["compile_ms"] == pytest.approx(41250.0)
+    assert kept["provisional"] is True
+    assert capsys.readouterr().out == "npu512 NPU native_binary_rejected\ndone\n"
+    assert check_tree(repo) == []
+
+
+def test_a_rejection_after_a_success_is_a_state_change_and_aborts(tmp_path: Path):
+    """Ruling #33.1: a shape that already ran, then rejected, is not a capability."""
+
+    repo = tmp_path / "repo"
+    spec = _spec()
+    spec["warmups"] = 0
+    spec["repeats"] = 2
+    spec["arms"] = [_emb_arm("a", "NPU", "1x128"), _emb_arm("b", "NPU", "1x128")]
+    spec_path = _bind(repo, spec)
+    script = ScriptedRaise(
+        {
+            "a": [_result(10), _result(4), _result(4)],
+            "b": [NativeBinaryRejected(NATIVE_BINARY_REJECTED, compile_s=30.0)],
+        }
+    )
+    (repo / "table").mkdir()
+    with pytest.raises(NativeBinaryRejected, match="0x7800000f"):
+        _invoke(repo, spec_path, {"fake": script})
+    assert script.calls == ["a", "b"]
+    stored = load_jsonl(repo / "receipts" / "run-1.jsonl")
+    assert [row["id"] for row in stored] == ["T/a/run-1"]
+    row = stored[0]
+    assert row["aborted"] is True
+    assert "outcome" not in row
+    assert row["settings"]["abortion"]["stop_step"] == "b cold"
+    assert "0x7800000f" in row["settings"]["abortion"]["error"]
+    table_rows = load_jsonl(repo / "table" / "routing.jsonl")
+    assert all(row["aborted"] is not True for row in table_rows)
+    assert "T/a/run-1" not in {row["id"] for row in table_rows}
+
+
+def test_a_rejection_off_the_npu_aborts_the_run(tmp_path: Path):
+    """Ruling #33.1: the capability bound holds on the NPU only."""
+
+    repo = tmp_path / "repo"
+    spec = _spec()
+    spec["warmups"] = 0
+    spec["repeats"] = 1
+    spec["arms"] = [_emb_arm("npu128", "NPU", "1x128"), _emb_arm("cpu128", "CPU", "1x128")]
+    spec_path = _bind(repo, spec)
+    script = ScriptedRaise(
+        {
+            "npu128": [_result(10), _result(4)],
+            "cpu128": [NativeBinaryRejected(NATIVE_BINARY_REJECTED, compile_s=0.5), _result(2)],
+        }
+    )
+    with pytest.raises(NativeBinaryRejected, match="0x7800000f"):
+        _invoke(repo, spec_path, {"fake": script})
+    assert script.calls == ["npu128", "cpu128"]
+    stored = load_jsonl(repo / "receipts" / "run-1.jsonl")
+    assert [row["id"] for row in stored] == ["T/npu128/run-1"]
+    assert stored[0]["aborted"] is True
+    assert "outcome" not in stored[0]
+
+
+def test_an_unknown_error_flushes_aborted_rows_and_gaps_gets_the_line(tmp_path: Path):
+    """Ruling #33.1d: on abort every completed slot lands as an aborted row."""
+
+    repo = tmp_path / "repo"
+    spec = _spec()
+    spec["warmups"] = 0
+    spec["repeats"] = 2
+    spec["arms"] = [_arm("A", "5090"), _arm("B", "NPU"), _arm("C", "iGPU")]
+    spec_path = _bind(repo, spec)
+    script = Scripted(
+        {
+            "A": [_result(100, 4), _result(20, 8), _result(21, 8)],
+            "B": [_result(5, 1), _result(1, ok=False, error="some driver timeout weirdness")],
+            "C": [_result(7, 1), _result(3, 1), _result(3, 1)],
+        }
+    )
+    table = repo / "table"
+    table.mkdir()
+    (table / "gaps.md").write_text("# Gap report\n", encoding="utf-8")
+    with pytest.raises(RunnerError, match="weirdness"):
+        _invoke(repo, spec_path, {"fake": script})
+    assert script.calls == ["A", "B", "C", "A", "B"]
+    stored = {row["id"]: row for row in load_jsonl(repo / "receipts" / "run-1.jsonl")}
+    assert set(stored) == {"T/A/run-1", "T/B/run-1", "T/C/run-1"}
+    for row in stored.values():
+        assert row["aborted"] is True
+        assert "outcome" not in row
+    assert stored["T/A/run-1"]["settings"]["abortion"]["repeats_done"] == 1
+    assert stored["T/A/run-1"]["settings"]["abortion"]["repeats_required"] == 2
+    assert stored["T/A/run-1"]["latency"]["warm_p50_ms"] == 20
+    assert stored["T/B/run-1"]["settings"]["abortion"]["repeats_done"] == 0
+    assert stored["T/B/run-1"]["settings"]["abortion"]["cold_done"] is True
+    assert stored["T/B/run-1"]["latency"]["cold_ms"] == 5
+    assert stored["T/C/run-1"]["settings"]["abortion"]["repeats_done"] == 0
+    # The routing-table import refuses the aborted rows; the receipt keeps them.
+    assert load_jsonl(table / "routing.jsonl") == []
+    gaps = (table / "gaps.md").read_text(encoding="utf-8")
+    line = "Aborted run `run-1` stopped at `B repeat 0`: some driver timeout weirdness"
+    assert gaps.count(line) == 1
+    assert check_tree(repo) == []
+
+
+def test_the_rejected_row_validates_and_the_table_sees_pending_replication():
+    """Ruling #33.2b: one occurrence is provisional "not supported", n=1."""
+
+    row = device_lost_row(
+        spec_id="T",
+        arm=_emb_arm("npu512", "NPU", "1x512"),
+        repeats=1,
+        date="2026-10-10",
+        spec_rel="experiments/t/spec.yaml",
+        run_id="run-1",
+        grant=None,
+        env={"npu_firmware": "32.0.100.5540", "nvidia_driver": "unrecorded"},
+        extra_settings={
+            "rejection": {
+                "error": NATIVE_BINARY_REJECTED,
+                "code": "0x7800000f",
+                "npu_driver": "32.0.100.5540",
+                "shape": {"batch": 1, "static_shape": "1x512"},
+                "compile_cache_dir": "compile-cache/run-1/npu512",
+                "blob_bytes": 1212121212,
+            }
+        },
+        outcome="native_binary_rejected",
+        compile_ms=41250.0,
+    )
+    assert row["outcome"] == "native_binary_rejected"
+    assert row["provisional"] is True
+    assert row["latency"]["compile_ms"] == 41250.0
+    assert is_speed_row(row) is False
+    tabled = for_table(row)
+    assert tabled["latency"]["compile_ms"] == 41250.0
+    assert "artifacts" not in tabled
+    assert tabled["notes"] == "this device can't do this setting"
+    assert tabled["provisional"] is True
+    # Timing beyond the compile refuses validation.
+    bad = json.loads(json.dumps(row))
+    bad["latency"]["cold_ms"] = 12.0
+    with pytest.raises(ReceiptError):
+        validate_row(bad)
+    # The gap stays open: a capability row is not a speed.
+    candidate = {
+        "id": "e2-npu-l512",
+        "experiment": "E2",
+        "why": "needs a speed row at the shape",
+        "match": {"model": "qwen3:8b", "task": "generate", "device": "NPU"},
+        "needs": [],
+    }
+    assert open_gaps([tabled], [candidate])[0]["id"] == "e2-npu-l512"
 
 
 def test_a_raised_device_loss_marks_the_device_off_and_continues(tmp_path: Path):
@@ -845,9 +1132,11 @@ def test_a_raised_spec_error_keeps_a_finished_arm(tmp_path: Path):
         _invoke(repo, spec_path, {"fake": script})
     assert script.calls == ["A", "B", "A", "B"]
     stored = load_jsonl(repo / "receipts" / "run-1.jsonl")
-    assert [row["id"] for row in stored] == ["T/A/run-1"]
+    assert [row["id"] for row in stored] == ["T/A/run-1", "T/B/run-1"]
     assert stored[0]["partial"] is True
     assert "outcome" not in stored[0]
+    assert stored[1]["aborted"] is True
+    assert stored[1]["settings"]["abortion"]["stop_step"] == "B repeat 0"
 
 
 def test_a_later_failure_keeps_a_finished_arm_without_calling_it_device_lost(tmp_path: Path):
@@ -866,10 +1155,19 @@ def test_a_later_failure_keeps_a_finished_arm_without_calling_it_device_lost(tmp
         _invoke(repo, spec_path, {"fake": script})
     assert script.calls == ["A", "B", "A", "B"]
     stored = load_jsonl(repo / "receipts" / "run-1.jsonl")
-    assert [row["id"] for row in stored] == ["T/A/run-1"]
+    assert [row["id"] for row in stored] == ["T/A/run-1", "T/B/run-1"]
     assert stored[0]["partial"] is True
     assert stored[0]["latency"]["cold_ms"] == 100
     assert "outcome" not in stored[0]
+    assert stored[1]["aborted"] is True
+    assert stored[1]["latency"]["cold_ms"] == 5
+    assert stored[1]["settings"]["abortion"] == {
+        "stop_step": "B repeat 0",
+        "error": "stopped",
+        "cold_done": True,
+        "repeats_done": 0,
+        "repeats_required": 1,
+    }
 
 
 def test_repeats_build_a_receipt_and_keep_cold_separate(tmp_path: Path, capsys):
@@ -1576,7 +1874,10 @@ def test_companion_sessions_wrap_only_the_paired_slot(tmp_path: Path):
     repo2 = tmp_path / "bare"
     with pytest.raises(RunnerError, match="start_session"):
         _invoke(repo2, _bind(repo2, spec), {"fake": bare}, run_id="run-2")
-    assert not (repo2 / "receipts").exists()
+    stored = load_jsonl(repo2 / "receipts" / "run-2.jsonl")
+    assert [row["id"] for row in stored] == ["T/A/run-2", "T/P/run-2"]
+    assert all(row["aborted"] is True for row in stored)
+    assert "start_session" in stored[0]["settings"]["abortion"]["error"]
 
 
 def test_an_interleaved_companion_starts_on_measure_slots_only(tmp_path: Path):

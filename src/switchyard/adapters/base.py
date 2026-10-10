@@ -25,6 +25,21 @@ class AdapterError(Exception):
     """The adapter refused the step before measuring it."""
 
 
+class NativeBinaryRejected(AdapterError):
+    """The device refused the compiled native binary at execute time.
+
+    Raised only at the execute site, after this run's compile succeeded, with
+    the Level Zero signature ``ZE_RESULT_ERROR_INVALID_NATIVE_BINARY``
+    (``0x7800000f``). ``compile_s`` carries that compile's time, so the
+    harness's capability row can record that the compile finished. Nothing is
+    retried.
+    """
+
+    def __init__(self, message: str, *, compile_s: float | None = None) -> None:
+        super().__init__(message)
+        self.compile_s = compile_s
+
+
 @dataclass(frozen=True)
 class StepRequest:
     step_id: str
