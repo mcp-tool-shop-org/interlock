@@ -756,6 +756,10 @@ def test_runner_writes_no_row_for_the_adapters_not_run(tmp_path, monkeypatch):
 # --- token_type_ids: an omitted declared input infers garbage (E1 rerun, 2026-10-09) ---
 
 
+_NEEDS_NUMPY = pytest.mark.skipif(importlib.util.find_spec("numpy") is None,
+                                  reason="the real infer path needs numpy (intel extra)")
+
+
 class _NamedPort:
     def __init__(self, name):
         self._name = name
@@ -781,6 +785,7 @@ class TTCompiled:
         return {"last_hidden_state": np.ones((1, length, 4), dtype=np.float32)}
 
 
+@_NEEDS_NUMPY
 def test_infer_embed_feeds_token_type_ids_when_declared():
     a = make_adapter()
     model = TTCompiled(declare_tt=True)
@@ -789,6 +794,7 @@ def test_infer_embed_feeds_token_type_ids_when_declared():
     assert len(out) == 3 and len(out[0]) == 4
 
 
+@_NEEDS_NUMPY
 def test_infer_embed_omits_undeclared_token_type_ids():
     a = make_adapter()
     model = TTCompiled(declare_tt=False)
@@ -817,6 +823,7 @@ def test_pad_like_lockstep():
     assert ovm.pad_like([], 3) == [0, 0, 0]
 
 
+@_NEEDS_NUMPY
 def test_run_embed_pads_token_type_ids_in_lockstep(tmp_path, monkeypatch):
     m = local_model(tmp_path)
     monkeypatch.setitem(ovm._POOLING, m, "cls")
