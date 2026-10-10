@@ -218,9 +218,12 @@ arms:
     batch: 8
     static_shape: "8x512"
     measure: latency_ms
-  # nomic-npu-l1024-b8 REMOVED 2026-10-09: ZE_RESULT_ERROR_DEVICE_LOST at this
-  # exact shape in two consecutive sessions (see incident-2026-10-09.md). Never
-  # re-add; a batch-8 nomic NPU arm needs R&D sign-off on a fixed driver.
+  # nomic-npu-l1024-b8 moved to experiments/e1/spec-nomic-8x1024-diag.yaml:
+  # ZE_RESULT_ERROR_DEVICE_LOST at this exact shape in two consecutive runs
+  # (incident-2026-10-09.md). Both losses ran with the #22 token_type_ids bug
+  # present, so the arm gets one diagnostic try, alone, as the session's final
+  # block, by R&D + Publisher agreement (2026-10-09). It is never part of this
+  # tail again unless the diagnostic passes.
   - id: nomic-npu-l2048-b8
     task: embed
     device: NPU

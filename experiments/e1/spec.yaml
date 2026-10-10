@@ -9,12 +9,17 @@
 #   2. harness/runner.py passes dataset.seed verbatim (~13 tokens) as the
 #      prompt; the 2048-token prefix rule below never ran, so warm medians
 #      are costs of a short padded call. Runner-side fix is Grok's.
-# The analysis below is unchanged and now pre-registers the full re-run,
-# which proceeds only after ALL of: (a) PR #22 merged, (b) the runner
-# dataset-expansion fix merged, (c) the compile_warm_reload_ms receipt field
-# merged, (d) the Publisher's NPU health check passed, (e) a new booked NPU
-# session. The rerun receipts stay on the record as evidence, labelled
-# invalid-routing in experiments/e1/receipts-2026-10-09-rerun.md.
+# Storage: a parity-invalid arm is stored with parity_valid: false and kept
+# out of select and the gap report (#24's behaviour). The analysis below is
+# unchanged and now pre-registers the full re-run, which proceeds only after
+# ALL of: (a) the token_type_ids fix merged (#22, 0cde683), (b) the runner
+# dataset-expansion fix merged (#24), (c) the compile_warm_reload_ms receipt
+# field merged (#24), (d) the Publisher's NPU health check passed, (e) a new
+# booked NPU session. The rerun receipts stay on the record as evidence,
+# labelled invalid-routing in experiments/e1/receipts-2026-10-09-rerun.md.
+# The nomic-npu-l1024-b8 arm is not in the tail spec; it runs as one
+# diagnostic arm, last block of the session, per
+# experiments/e1/spec-nomic-8x1024-diag.yaml (R&D + Publisher, 2026-10-09).
 #
 # PIN_PER_STEP: 2. Model, revision, device, static shape, batch, the prompt
 #   rule, the break-even formula and its threshold, and the parity guard are
