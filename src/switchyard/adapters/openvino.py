@@ -496,6 +496,14 @@ def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> Step
     )
     resolved["prompt_tokens"] = encoded_len
     resolved["truncated_tokens"] = dropped
+    # Receipt marker: the embed input was fed iff the graph declares it
+    # (E1, 2026-10-09: an omitted declared input infers a stale buffer).
+    # False means the model has no such input (e.g. Qwen3-Embedding).
+    model = entry["model"]
+    resolved["token_type_ids_fed"] = bool(
+        hasattr(model, "infer_lists")
+        or any(port.get_any_name() == "token_type_ids" for port in getattr(model, "inputs", []))
+    )
     if eos_appended is not None:
         # Last-token pooling reads the last unmasked row: correct only when
         # that row is the tokenizer's EOS. Truncation cuts EOS off the kept

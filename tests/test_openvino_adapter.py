@@ -928,3 +928,27 @@ def test_cpu_parity_is_exact_across_shapes_and_batches():
             for batch in (1, 8):
                 got = vec(model, f"{batch}x{length}", batch)
                 assert cos(ref, got) >= 1 - 1e-6, f"{model} {batch}x{length} cosine {cos(ref, got)}"
+
+
+def test_resolved_marks_token_type_ids_fed(tmp_path, monkeypatch):
+    a = make_adapter()
+    m = local_model(tmp_path)
+    monkeypatch.setitem(ovm._POOLING, m, "cls")
+    r = a.run(req(model=m, device="CPU", static_shape="1x8", batch=1))
+    assert r.ok and r.resolved["token_type_ids_fed"] is True  # fake seam always receives it
+
+
+@_NEEDS_NUMPY
+def test_resolved_marks_token_type_ids_absent_when_undeclared(tmp_path, monkeypatch):
+    compiled = TTCompiled(declare_tt=False)
+
+    class NoTTCore(FakeCore):
+        def compile_model(self, graph, device, config):
+            self.compiled.append((device, dict(config)))
+            return compiled
+
+    a = make_adapter(core=NoTTCore())
+    m = local_model(tmp_path)
+    monkeypatch.setitem(ovm._POOLING, m, "cls")
+    r = a.run(req(model=m, device="CPU", static_shape="1x8", batch=1))
+    assert r.ok and r.resolved["token_type_ids_fed"] is False
