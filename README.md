@@ -33,6 +33,8 @@ The NPU is exclusive. A 5090 step runs only inside a Publisher grant. The runner
 
 A routing row names the task, the model (repo or tag, revision or digest, quantisation, licence), the engine and its version, the device, the settings, and the quality and latency it measured. Quality metrics carry their own `n`, interval and dataset hash. Latency keeps cold and warm apart. A single run is marked provisional. The row points at the source receipt and the commit it was imported from, or at an experiment spec and a run id.
 
+A run can also record a capability row instead of a speed. `device_lost` and `hang` carry no timing. `native_binary_rejected` — the device compiled the model and refused the native binary at execute — keeps only the compile time as evidence, and is scoped to the model, device and static shape: only arms with that identical key are marked not run, and the device's other shapes still run. All three are provisional and never count as speeds. An arm that an abort stopped mid-schedule is kept in its receipt marked `aborted: true`, with the slots actually completed; the routing table refuses aborted rows, and `table/gaps.md` lists the aborted run.
+
 ```
 switchyard check
 ```
