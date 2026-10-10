@@ -1,6 +1,6 @@
 # switchyard: how it works
 
-Mapped at 2026-10-10 from commit 962683d by Atlas 1.24.0.
+Mapped at 2026-10-10 from commit 0716bef by Atlas 1.24.0.
 
 ## What this is
 
@@ -8,11 +8,13 @@ switchyard routes each job to a model, engine and device from a receipt-backed t
 
 7 parts, mostly Python (44 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.
 
-## What changed since 2026-10-09 (fbbbe9c)
+## What changed since 2026-10-10 (962683d)
 
-- receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
-- receipts/e1-intel-2026-10-09-rerun.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
-- 9 files added and 19 changed content, across 3 parts.
+- experiments/e1/spec.yaml is now read by tests/test_harness.py.
+- receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
+- receipts/e1-intel-2026-10-09-rerun2-nomic-diag.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
+- receipts/e1-intel-2026-10-09-rerun2.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
+- 4 files added and 15 changed content, across 3 parts.
 
 ## What comes in
 
@@ -39,7 +41,7 @@ CI writes nothing this map can see.
 
 ## What tends to change together
 
-- **src/switchyard/adapters/openvino.py** and **tests/test_openvino_adapter.py** changed together in 5 of 5 commits, and the tests part imports the src part.
+- **src/switchyard/adapters/openvino.py** and **tests/test_openvino_adapter.py** changed together in 7 of 7 commits, and the tests part imports the src part.
 
 Confidence is low: fewer than 30 qualifying commits in the window, and fewer than 25 source files reach 10 revisions.
 
@@ -76,7 +78,7 @@ Read those in order to follow one run of switchyard end to end. This path follow
 - 1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.
 - 1 read uses a path built at run time and is not named here.
 - 3 writes and 9 reads go to a path their caller passes, not to this repository.
-- 6 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, table/candidates.json and 3 more.
+- 9 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 6 more.
 - Statistics confidence is low: fewer than 30 qualifying commits in the window, and fewer than 25 source files reach 10 revisions.
 
 Regenerate with `npx --yes @dogfood-lab/atlas map`.
