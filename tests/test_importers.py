@@ -311,6 +311,33 @@ def test_gap_report_names_the_missing_field_on_a_partial_row():
     assert "probe/bge/NPU" in parity_text
 
 
+def test_a_pinned_revision_matches_the_unpinned_candidate_and_a_miss_does_not():
+    from switchyard.importers.gaps import open_gaps
+
+    candidate = {
+        "id": "E1-bge-NPU",
+        "experiment": "E1",
+        "match": {"task": "embed", "model": "BAAI/bge-base-en-v1.5", "device": "NPU"},
+        "needs": ["cold_ms", "warm_p50_ms"],
+        "why": "speed without a cold split",
+    }
+    pinned = {
+        "id": "E1/bge/npu",
+        "task": "embed",
+        "device": "NPU",
+        "parity_valid": True,
+        "model": {"repo_or_tag": "BAAI/bge-base-en-v1.5@abc"},
+        "settings": {},
+        "latency": {"cold_ms": 1.0, "warm_p50_ms": 1.0},
+        "quality": [],
+    }
+    assert open_gaps([pinned], [candidate]) == []
+    other = {**pinned, "id": "E1/small/npu", "model": {"repo_or_tag": "BAAI/bge-small-en-v1.5@abc"}}
+    assert [item["id"] for item in open_gaps([other], [candidate])] == ["E1-bge-NPU"]
+    missed = {**pinned, "id": "E1/bge/miss", "parity_valid": False}
+    assert [item["id"] for item in open_gaps([missed], [candidate])] == ["E1-bge-NPU"]
+
+
 def test_import_command_writes_jsonl_and_the_gap_report(tmp_path: Path, monkeypatch, capsys):
     from switchyard.cli import main
     from tests.support import row
@@ -332,11 +359,15 @@ def test_import_command_writes_jsonl_and_the_gap_report(tmp_path: Path, monkeypa
         encoding="utf-8",
     )
 
+    seen = {}
+
     def fake_import(**kwargs):
+        seen.update(kwargs)
         return [row()], ["one skip"]
 
     monkeypatch.setattr("switchyard.importers.assemble.import_receipts", fake_import)
     assert main(["import", "--root", str(tmp_path)]) == 0
+    assert seen["local_root"] == tmp_path.resolve()
     written = (table / "routing.jsonl").read_text(encoding="utf-8")
     assert "BAAI/bge-base-en-v1.5" in written
     assert "Why E1" in (table / "gaps.md").read_text(encoding="utf-8")
@@ -584,6 +615,7 @@ def test_import_reads_a_pinned_tree_and_refuses_a_missing_ladder(tmp_path: Path)
     assert any(row["task"] == "nli" for row in rows)
     assert any(row["settings"].get("quote_rule") == 1 and "8114f07" in row["settings"].get("quote_rule_source", "") for row in rows)
     assert skipped
+    assert not any(row["id"].startswith("E1/") for row in rows)
 
 
 def _commit_more(repo: Path) -> str:
@@ -603,3 +635,77 @@ def test_a_missing_pin_is_refused(tmp_path: Path):
     subprocess.run(["git", "commit", "-m", "a"], cwd=tmp_path, check=True, capture_output=True)
     with pytest.raises(ImportError_):
         require_pin(tmp_path, "0123456789abcdef0123456789abcdef01234567")
+
+
+def test_local_e1_rows_join_an_import_only_when_a_root_is_passed(monkeypatch):
+    from switchyard.importers import assemble
+
+    monkeypatch.setattr(assemble, "require_pin", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(assemble, "_PROBES", ())
+    monkeypatch.setattr(assemble, "_calibration", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(assemble, "_ladder", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(assemble, "_nli", lambda *_args, **_kwargs: [{"id": "pin"}])
+    monkeypatch.setattr(assemble, "_aspire_b", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(assemble, "e1_rerun2_rows", lambda _root: [{"id": "E1/x"}])
+    bare, _skipped = assemble.import_receipts()
+    assert [row["id"] for row in bare] == ["pin"]
+    both, _skipped = assemble.import_receipts(local_root=Path("."))
+    assert [row["id"] for row in both] == ["E1/x", "pin"]
+
+
+def test_an_e1_copy_drops_artifacts_and_refuses_an_unmarked_row():
+    from switchyard.importers.assemble import _e1_table_copy
+    from tests.support import row
+
+    kept = _e1_table_copy(row(parity_valid=True, artifacts={"vector": [1, 2, 3]}))
+    assert kept["parity_valid"] is True
+    assert "artifacts" not in kept
+    assert kept["latency"]["throughput"] == 20.5
+    missed = _e1_table_copy(
+        row(id="E1/miss", parity_valid=False, artifacts={"vector": [1]}, latency={
+            "cold_ms": 4,
+            "warm_p50_ms": 2,
+            "warm_p95_ms": 3,
+            "throughput": 1,
+            "compile_ms": 5,
+        }),
+    )
+    assert missed["parity_valid"] is False
+    assert missed["latency"]["cold_ms"] == 4
+    assert "artifacts" not in missed
+    lost = _e1_table_copy(row(id="E1/lost", outcome="device_lost", notes="boom"))
+    assert lost["outcome"] == "device_lost"
+    assert lost["latency"]["cold_ms"] is None
+    assert lost["latency"]["throughput"] is None
+    assert "artifacts" not in lost
+    assert lost["notes"].startswith("this device can't do this setting")
+    hung = _e1_table_copy(row(id="E1/hung", outcome="hang"))
+    assert hung["outcome"] == "hang"
+    assert hung["latency"]["warm_p50_ms"] is None
+    with pytest.raises(ImportError_, match="parity-stamped"):
+        _e1_table_copy(row(id="E1/bare"))
+    broken = row(parity_valid=True)
+    del broken["task"]
+    with pytest.raises(ImportError_):
+        _e1_table_copy(broken)
+
+
+def test_e1_rerun2_copies_47_rows_and_leaves_the_receipt_files_alone():
+    from switchyard.importers.assemble import _E1_RERUN2, e1_rerun2_rows
+
+    root = Path(__file__).resolve().parents[1]
+    before = [(root / rel).read_bytes() for rel in _E1_RERUN2]
+    rows = e1_rerun2_rows(root)
+    assert [(root / rel).read_bytes() for rel in _E1_RERUN2] == before
+    assert len(rows) == 47
+    assert all("rerun2" in row["id"] for row in rows)
+    assert all("artifacts" not in row for row in rows)
+    assert sum(row.get("parity_valid") is True for row in rows) == 44
+    assert sum(row.get("outcome") == "device_lost" for row in rows) == 2
+    miss = next(row for row in rows if row["id"] == "E1/nomic-npu-l2048-b1/e1-intel-2026-10-09-rerun2")
+    assert miss["parity_valid"] is False
+    assert miss["latency"]["cold_ms"] is not None
+    assert miss["latency"]["warm_p50_ms"] is not None
+    assert all(row["settings"]["environment"]["openvino"] == "unrecorded" for row in rows)
+    with pytest.raises(ImportError_, match="missing local receipt"):
+        e1_rerun2_rows(root / "does-not-exist")

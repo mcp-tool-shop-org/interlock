@@ -24,7 +24,10 @@ def main(argv: list[str] | None = None) -> int:
     table.add_argument("--device")
     table.set_defaults(func=_cmd_table)
 
-    importer = sub.add_parser("import", help="rebuild the routing table from pinned receipts")
+    importer = sub.add_parser(
+        "import",
+        help="rebuild the routing table from pinned receipts and the local E1 rerun",
+    )
     importer.add_argument("--root", type=Path, default=Path("."))
     importer.add_argument("--offers", type=Path, default=None)
     importer.set_defaults(func=_cmd_import)
@@ -77,7 +80,7 @@ def _cmd_import(args: argparse.Namespace) -> int:
     from switchyard.importers.pins import ASPIRE_COMMIT
 
     root = args.root.resolve()
-    rows, skipped = import_receipts(offers_path=args.offers)
+    rows, skipped = import_receipts(offers_path=args.offers, local_root=root)
     table = root / "table"
     table.mkdir(exist_ok=True)
     lines = [json.dumps(row, sort_keys=True) for row in rows]
