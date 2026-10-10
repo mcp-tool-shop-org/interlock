@@ -1,5 +1,30 @@
 # E2 batch-8 tail (R&D, 2026-10-10). Runs after experiments/e2/spec.yaml, same session, one try per arm.
 
+# Amendment, 2026-10-10, after the first tail run (R&D rulings on switchyard issue #36).
+#
+# Outcome. An NPU compile that the driver compiler refuses, raised inside
+# compile_model with "[NPU_VCL] Compiler returned msg" and code 0x78000007, is
+# a capability outcome, compile_rejected, scoped to model x device x static
+# shape, provisional under the #33 replication rule, never retried. It records
+# the compiler message, the code, the NPU driver and the OpenVINO version. Any
+# other compile error still aborts.
+#
+# Excluded arm. qwen3emb-npu-l512-b8 is not run: it had its one try in
+# e2-b8tail-2026-10-10c and the driver compiler refused it ("Target buffer size
+# '2048' does not match source buffer size '256'"); its row is re-recorded as
+# compile_rejected from the logged error.
+#
+# Run note. e2-b8tail-2026-10-10c at main 58c95c2 stopped at that compile. The
+# qwen3emb-npu-l128-b8 cold had passed (compile 45 s) but no repeat ran, so its
+# row is aborted and it never had a complete try. qwen3emb-npu-l2048-b8 never
+# started. Both run again, one try each, cheapest first, each on a fresh compile
+# cache, with a health check before and after the run. A device loss at 8x2048
+# is a recorded result, given E1's 8x1024 history.
+#
+# Rest. rest_s is the length of a conditional rest, applied only after a run of
+# over 30 minutes on the same devices that ended less than rest_s ago
+# (maintainer, 2026-10-10).
+
 id: E2
 procedure: interleaved
 compile_cache: fresh
@@ -88,6 +113,7 @@ arms:
     static_shape: "8x128"
     measure: latency_ms
   - id: qwen3emb-npu-l512-b8
+    not_run: compile_rejected in e2-b8tail-2026-10-10c (the driver compiler refused 8x512); one try per arm (issue #36)
     task: embed
     device: NPU
     engine: openvino
