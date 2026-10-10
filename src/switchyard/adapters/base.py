@@ -62,7 +62,8 @@ class CompileRejected(AdapterError):
 
     Raised only at the compile site, with the signature in
     :func:`compile_rejected_error`. ``failed_s`` is the time from the start of
-    the compile to the failure. The harness reads the subtype to tell a compile
+    the build to the failure: for embed that is the compile; for generate it
+    also includes the pipeline load. The harness reads the subtype to tell a compile
     refusal from an execute failure. Nothing is retried.
     """
 

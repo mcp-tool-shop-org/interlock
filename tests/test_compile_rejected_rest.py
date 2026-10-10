@@ -376,10 +376,11 @@ def test_unparseable_times_rest_the_full_rest_s_with_the_reason(tmp_path):
             tmp_path / name,
             prior=lambda r, w=window: _prior(r, "old", duration_min=90, ended_min_ago=1, window=w),
         )
-        assert sleeps.calls == [900.0]
+        # treated as long, measured from the file time (written 1 minute ago)
+        assert sleeps.calls == [840.0]
         rest = rows[0]["settings"]["rest"]
-        assert rest["ran"] is True and rest["rest_s_applied"] == 900.0
-        assert rest["prior_run_id"] == "old" and "unreadable" in rest["reason"]
+        assert rest["ran"] is True and rest["rest_s_applied"] == 840.0
+        assert rest["prior_run_id"] == "old" and "fail-safe" in rest["reason"]
 
 
 def test_unrecorded_times_owe_nothing_once_the_receipt_is_older_than_the_rest(tmp_path):
@@ -391,7 +392,7 @@ def test_unrecorded_times_owe_nothing_once_the_receipt_is_older_than_the_rest(tm
     assert sleeps.calls == []
     rest = rows[0]["settings"]["rest"]
     assert rest["ran"] is False and rest["rest_s_applied"] == 0.0
-    assert rest["gap_min"] == pytest.approx(20.0) and "past the rest" in rest["reason"]
+    assert rest["gap_min"] == pytest.approx(20.0) and "nothing owed" in rest["reason"]
 
 
 def test_an_aborted_long_run_still_counts(tmp_path):
@@ -409,7 +410,7 @@ def test_the_latest_run_decides_and_a_long_gap_is_already_rested(tmp_path):
     sleeps, rows = _run(tmp_path / "b", prior=lambda r: _prior(r, "long", duration_min=120, ended_min_ago=20 * 60))
     assert sleeps.calls == []
     assert rows[0]["settings"]["rest"]["ran"] is False
-    assert "already rested" in rows[0]["settings"]["rest"]["reason"]
+    assert "nothing owed" in rows[0]["settings"]["rest"]["reason"]
 
 
 def test_plan_rest_on_an_empty_tree(tmp_path):
@@ -421,3 +422,34 @@ def test_the_dry_run_says_the_rest_is_conditional(tmp_path):
     repo = tmp_path / "repo"
     spec_path = _bind(repo, _spec([_arm("A", "CPU")]))
     assert "rest_s: 900 (conditional" in dry_run(spec_path, repo)
+
+
+def test_an_unrecorded_old_receipt_cannot_hide_a_long_run_that_just_ended(tmp_path):
+    # R&D's mixed case: same date, an old receipt with no window, and a 45-minute
+    # run that ended 2 minutes ago. The long run is owed 13 minutes.
+    def prior(repo):
+        _prior(repo, "e3-old", duration_min=30, ended_min_ago=180, window=False, date="2026-10-10")
+        _prior(repo, "tail-l128", duration_min=45, ended_min_ago=2, date="2026-10-10")
+
+    sleeps, rows = _run(tmp_path, prior=prior)
+    assert sleeps.calls == [780.0]
+    assert rows[0]["settings"]["rest"]["prior_run_id"] == "tail-l128"
+
+
+def test_a_receipt_that_does_not_parse_is_bounded_by_its_file_time(tmp_path):
+    def prior(repo):
+        folder = repo / "receipts"
+        folder.mkdir(exist_ok=True)
+        path = folder / "broken.jsonl"
+        path.write_text("{not json\n", encoding="utf-8")
+        os.utime(path, (NOW - 60, NOW - 60))
+
+    sleeps, rows = _run(tmp_path, prior=prior)
+    assert sleeps.calls == [840.0]
+    assert rows[0]["settings"]["rest"]["prior_run_id"] == "broken"
+
+
+def test_a_5090_spec_always_rests_in_full(tmp_path):
+    plan = plan_rest({"rest_s": 900, "arms": [{"device": "5090"}]}, tmp_path, NOW)
+    assert plan["ran"] is True and plan["rest_s_applied"] == 900.0
+    assert "card's own rule" in plan["reason"]

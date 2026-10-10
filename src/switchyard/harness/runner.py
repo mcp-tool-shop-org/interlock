@@ -1224,59 +1224,69 @@ def _prior_runs(root: Path, devices: set[str]) -> list[dict]:
 def plan_rest(spec: dict, root: Path, now: float) -> dict:
     """What rest this run owes (maintainer's rule, R&D approved).
 
-    The previous run on any of this spec's devices decides: the one with the
-    latest ``date``, and within that date the latest end. Health checks and
-    smokes write no receipt, so they never count. No prior run, or one that
-    lasted ``REST_FREE_RUN_S`` or less, owes nothing. A longer one owes
-    ``rest_s`` less the time since it ended. A prior run whose times cannot be
-    read owes the full ``rest_s`` (fail-safe) and the reason says so.
+    Every prior switchyard receipt that touches one of this spec's devices is
+    asked what it is owed, and the largest answer is rested:
+
+    - times readable, run longer than ``REST_FREE_RUN_S``: ``rest_s`` less the
+      time since it ended;
+    - times readable, run that long or shorter: nothing;
+    - times unreadable (receipts before ``run_window``, or a file that does not
+      parse): treated as long, measured from the file time, which is at or after
+      the run's end, so the gap can only be underestimated;
+    - an end in the future: the full ``rest_s``.
+
+    In a real sequence this is "the previous run decides", since a long run is
+    always followed by its rest, but mixed receipts and date strings cannot
+    fool it. Health checks and smokes write no receipt, so they never count.
+
+    A spec that uses the 5090 always rests the full ``rest_s``: the card's own
+    rule. Other jobs on the card leave no switchyard receipt, so the receipts
+    cannot show whether the card has rested.
     """
 
     rest_s = float(spec.get("rest_s") or 0)
     plan = {"ran": False, "reason": "", "prior_run_id": None, "prior_run_min": None, "gap_min": None, "rest_s_applied": 0.0}
+    if _uses_5090(spec):
+        plan.update(
+            ran=rest_s > 0,
+            reason="the card's own rule: a 5090 spec rests in full; card runs outside switchyard leave no receipt",
+            rest_s_applied=rest_s,
+        )
+        return plan
     runs = _prior_runs(root, _spec_devices(spec))
     if not runs:
         plan["reason"] = "no prior run on these devices"
         return plan
-    latest = max(run["date"] for run in runs)
-    group = [run for run in runs if run["date"] == latest]
-    unreadable = [run for run in group if run["window"] is None]
-    prior = max(group, key=lambda run: run["window"][1] if run["window"] else 0.0)
-    plan["prior_run_id"] = (unreadable[0] if unreadable else prior)["run_id"]
-    if unreadable or now < prior["window"][1]:
-        # A receipt is written at or after its run ends, so its file time is an
-        # upper bound on that end: a gap measured from it can only be too short.
-        # If even that gap covers the rest, nothing is owed; otherwise rest in full.
-        latest_write = max(run["written"] for run in (unreadable or [prior]))
-        if unreadable and now - latest_write >= rest_s:
-            plan["gap_min"] = (now - latest_write) / 60
-            plan["reason"] = (
-                "the prior run's times are unrecorded; its receipt was last written "
-                f"{(now - latest_write) / 60:.1f} min ago, past the rest"
-            )
-            return plan
-        plan.update(
-            ran=rest_s > 0,
-            reason="the prior run's start and end times are missing or unreadable; full rest (fail-safe)",
-            rest_s_applied=rest_s,
-        )
-        return plan
-    start, end = prior["window"]
-    duration = end - start
-    gap = now - end
-    plan["prior_run_min"] = duration / 60
+    best = None
+    for run in runs:
+        if run["window"] is None:
+            gap = now - run["written"]
+            owed = rest_s if gap < 0 else max(0.0, rest_s - gap)
+            why = f"its times are unrecorded; its receipt was last written {gap / 60:.1f} min ago (fail-safe: treated as long)"
+            duration = None
+        else:
+            start, end = run["window"]
+            duration = end - start
+            gap = now - end
+            if gap < 0:
+                owed = rest_s
+                why = "its recorded end is in the future (fail-safe)"
+            elif duration <= REST_FREE_RUN_S:
+                owed = 0.0
+                why = f"it lasted {duration / 60:.1f} min, at most {REST_FREE_RUN_S // 60}"
+            else:
+                owed = max(0.0, rest_s - gap)
+                why = f"it lasted {duration / 60:.1f} min, over {REST_FREE_RUN_S // 60}; it ended {gap / 60:.1f} min ago"
+        candidate = (owed, -gap, run, duration, gap, why)
+        if best is None or candidate[:2] > best[:2]:
+            best = candidate
+    owed, _, run, duration, gap, why = best
+    plan["prior_run_id"] = run["run_id"]
+    plan["prior_run_min"] = None if duration is None else duration / 60
     plan["gap_min"] = gap / 60
-    if duration <= REST_FREE_RUN_S:
-        plan["reason"] = f"the prior run lasted {duration / 60:.1f} min, at most {REST_FREE_RUN_S // 60}"
-        return plan
-    applied = max(0.0, rest_s - gap)
-    plan["rest_s_applied"] = applied
-    plan["ran"] = applied > 0
-    plan["reason"] = (
-        f"the prior run lasted {duration / 60:.1f} min, over {REST_FREE_RUN_S // 60}; "
-        f"it ended {gap / 60:.1f} min ago"
-        + ("" if applied > 0 else "; already rested")
-    )
+    plan["rest_s_applied"] = owed
+    plan["ran"] = owed > 0
+    plan["reason"] = f"prior run {run['run_id']}: {why}" + ("" if owed > 0 else "; nothing owed")
     return plan
 
 
