@@ -4384,8 +4384,8 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "caa4b438c18f5ed92027b4f8712418ce0656b0d5",
-    "tracked": 90
+    "commit": "d1742597b794f3a99966c689c7c026122d02b091",
+    "tracked": 91
   },
   "landings": [
     {
@@ -4458,6 +4458,10 @@
     {
       "hash": "bb25ef40dc0f112d68b897aead4d6f3bb637543245ace38d36435e3413ac1217",
       "path": "receipts/e1-intel-2026-10-09-rerun2.jsonl"
+    },
+    {
+      "hash": "c576682029d3573d3d0d4069e9bdb6354d510781380e60932d93bc68ad2a33c0",
+      "path": "receipts/e2-2026-10-10b.jsonl"
     },
     {
       "hash": "ec72d834ffb89f9e672da48ac0e21d48c1854a5764cca1975a04b856ab2e65a6",

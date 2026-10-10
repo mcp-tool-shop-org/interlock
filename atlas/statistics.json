@@ -99,7 +99,7 @@
       "confidence": "low",
       "highWater": null,
       "name": "src",
-      "qualifyingSourceCommits": 19,
+      "qualifyingSourceCommits": 21,
       "rebaseline": null
     },
     {
@@ -112,12 +112,12 @@
         "importsAndCoChanges": [],
         "importsOnly": []
       },
-      "cohesion": 0,
+      "cohesion": 0.210403,
       "cohesionDropped": false,
       "confidence": "low",
       "highWater": null,
       "name": "tests",
-      "qualifyingSourceCommits": 20,
+      "qualifyingSourceCommits": 22,
       "rebaseline": null
     }
   ],
@@ -195,8 +195,8 @@
         "path": "assets/logo/switchyard_64.png"
       },
       {
-        "commits": 9,
-        "lines": 288,
+        "commits": 10,
+        "lines": 316,
         "path": "atlas/README.md"
       },
       {
@@ -205,18 +205,18 @@
         "path": "atlas/boundaries.yaml"
       },
       {
-        "commits": 9,
-        "lines": 765,
+        "commits": 10,
+        "lines": 854,
         "path": "atlas/page.json"
       },
       {
-        "commits": 9,
-        "lines": 1654,
+        "commits": 10,
+        "lines": 1786,
         "path": "atlas/statistics.json"
       },
       {
-        "commits": 9,
-        "lines": 6048,
+        "commits": 10,
+        "lines": 7325,
         "path": "atlas/structure.json"
       },
       {
@@ -338,6 +338,11 @@
         "commits": 1,
         "lines": 45,
         "path": "receipts/e1-intel-2026-10-09-rerun2.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 15,
+        "path": "receipts/e2-2026-10-10b.jsonl"
       },
       {
         "commits": 2,
@@ -525,8 +530,8 @@
         "path": "table/candidates.json"
       },
       {
-        "commits": 4,
-        "lines": 116,
+        "commits": 5,
+        "lines": 120,
         "path": "table/gaps.md"
       },
       {
@@ -535,8 +540,8 @@
         "path": "table/model-families.json"
       },
       {
-        "commits": 4,
-        "lines": 1188,
+        "commits": 5,
+        "lines": 1190,
         "path": "table/routing.jsonl"
       },
       {
@@ -605,11 +610,53 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-10-10T21:17:37.151Z",
+  "generatedAt": "2026-10-10T21:18:15.613Z",
   "generatedFrom": {
-    "commit": "caa4b438c18f5ed92027b4f8712418ce0656b0d5"
+    "commit": "d1742597b794f3a99966c689c7c026122d02b091"
   },
   "pairs": [
+    {
+      "a": "atlas/README.md",
+      "b": "atlas/page.json",
+      "either": 7,
+      "shared": 7,
+      "strength": 1
+    },
+    {
+      "a": "atlas/README.md",
+      "b": "atlas/statistics.json",
+      "either": 7,
+      "shared": 7,
+      "strength": 1
+    },
+    {
+      "a": "atlas/README.md",
+      "b": "atlas/structure.json",
+      "either": 7,
+      "shared": 7,
+      "strength": 1
+    },
+    {
+      "a": "atlas/page.json",
+      "b": "atlas/statistics.json",
+      "either": 7,
+      "shared": 7,
+      "strength": 1
+    },
+    {
+      "a": "atlas/page.json",
+      "b": "atlas/structure.json",
+      "either": 7,
+      "shared": 7,
+      "strength": 1
+    },
+    {
+      "a": "atlas/statistics.json",
+      "b": "atlas/structure.json",
+      "either": 7,
+      "shared": 7,
+      "strength": 1
+    },
     {
       "a": "src/switchyard/adapters/openvino.py",
       "b": "tests/test_openvino_adapter.py",
@@ -618,15 +665,78 @@
       "strength": 1
     },
     {
-      "a": "src/switchyard/harness/runner.py",
+      "a": "src/switchyard/harness/receipts.py",
+      "b": "src/switchyard/schema/routing-row.schema.json",
+      "either": 6,
+      "shared": 4,
+      "strength": 0.666667
+    },
+    {
+      "a": "src/switchyard/harness/receipts.py",
       "b": "tests/test_harness.py",
       "either": 8,
       "shared": 5,
       "strength": 0.625
+    },
+    {
+      "a": "src/switchyard/harness/runner.py",
+      "b": "tests/test_harness.py",
+      "either": 9,
+      "shared": 5,
+      "strength": 0.555556
+    },
+    {
+      "a": "src/switchyard/importers/gaps.py",
+      "b": "src/switchyard/schema/routing-row.schema.json",
+      "either": 6,
+      "shared": 4,
+      "strength": 0.666667
+    },
+    {
+      "a": "src/switchyard/importers/gaps.py",
+      "b": "tests/test_importers.py",
+      "either": 8,
+      "shared": 4,
+      "strength": 0.5
+    },
+    {
+      "a": "src/switchyard/schema/routing-row.schema.json",
+      "b": "tests/test_importers.py",
+      "either": 8,
+      "shared": 4,
+      "strength": 0.5
+    },
+    {
+      "a": "table/gaps.md",
+      "b": "table/routing.jsonl",
+      "either": 5,
+      "shared": 5,
+      "strength": 1
+    },
+    {
+      "a": "table/gaps.md",
+      "b": "tests/test_importers.py",
+      "either": 8,
+      "shared": 4,
+      "strength": 0.5
+    },
+    {
+      "a": "table/routing.jsonl",
+      "b": "tests/test_importers.py",
+      "either": 8,
+      "shared": 4,
+      "strength": 0.5
+    },
+    {
+      "a": "tests/test_importers.py",
+      "b": "tests/test_task_scope.py",
+      "either": 7,
+      "shared": 5,
+      "strength": 0.714286
     }
   ],
   "parameters": {
-    "appliedChangesetLimit": 23.75,
+    "appliedChangesetLimit": 24,
     "changeset": 50,
     "changesetFraction": 0.25,
     "cohesionDrop": 0.2,
@@ -635,16 +745,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-10-10T13:44:45-07:00",
-    "inScopeFiles": 95,
+    "headDate": "2026-10-10T17:17:59-04:00",
+    "inScopeFiles": 96,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 35,
+    "qualifyingCommits": 38,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-04-13T20:44:45.000Z",
+    "since": "2026-04-13T21:17:59.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",
