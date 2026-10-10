@@ -24,6 +24,7 @@ from switchyard.adapters.ollama import (
 )
 from switchyard.adapters.registry import for_engine
 from switchyard.guards import GuardError
+from switchyard.harness.environment import driver_version_from_lines, package_versions
 from switchyard.harness.e5 import (
     PROMPT_RATIO,
     SHARED_GROWTH_MIB,
@@ -35,7 +36,7 @@ from switchyard.harness.e5 import (
     search,
 )
 from switchyard.harness.lock import require_unmodified
-from switchyard.harness.receipts import apply_parity, device_lost_row, import_receipt, write_run
+from switchyard.harness.receipts import apply_parity, device_lost_row, environment, import_receipt, write_run
 from switchyard.harness.runner import (
     RunnerError,
     check_flags,
@@ -583,6 +584,29 @@ def test_the_adapter_token_counts_and_warm_reload_overwrite_the_prefix_estimate(
     assert rows[0]["latency"]["compile_ms"] == 4
     assert rows[0]["settings"]["prompt_tokens"] == 2048
     assert rows[0]["settings"]["truncated_tokens"] == 1920
+
+
+def test_a_receipt_row_carries_token_type_ids_fed(tmp_path: Path):
+    repo = tmp_path / "repo"
+    spec = _spec()
+    spec["warmups"] = 0
+    spec["repeats"] = 1
+    fed = _arm("fed", "CPU")
+    omitted = _arm("omitted", "NPU")
+    absent = _arm("absent", "iGPU")
+    spec["arms"] = [fed, omitted, absent]
+    counter = _Counting(
+        {
+            "fed": [_result(4, 1, resolved={"token_type_ids_fed": True}), _result(2, 1)],
+            "omitted": [_result(4, 1, resolved={"token_type_ids_fed": False}), _result(2, 1)],
+            "absent": [_result(4, 1, resolved={}), _result(2, 1)],
+        }
+    )
+    rows = _invoke(repo, _bind(repo, spec), {"fake": counter})
+    by_id = {row["id"]: row for row in rows}
+    assert by_id["T/fed/run-1"]["settings"]["token_type_ids_fed"] is True
+    assert by_id["T/omitted/run-1"]["settings"]["token_type_ids_fed"] is False
+    assert "token_type_ids_fed" not in by_id["T/absent/run-1"]["settings"]
 
 
 def test_a_target_without_a_tokenizer_is_refused_before_a_step(tmp_path: Path):
@@ -1716,6 +1740,111 @@ def test_ollama_resolves_show_and_does_not_fake_a_companion():
         OllamaAdapter(transport=lambda *_args: {"error": "missing"}).show("qwen3:8b")
     with pytest.raises(AdapterError, match="non-object"):
         OllamaAdapter(transport=lambda *_args: ["nope"]).show("qwen3:8b")
+
+
+def test_environment_pins_openvino_the_npu_driver_and_packages(monkeypatch):
+    from switchyard.harness import environment as env_capture
+
+    versions = {"openvino": "2026.4.1", "openvino-tokenizers": "2026.4.1.0"}
+
+    def fake_dist(name: str) -> str:
+        return versions.get(name.lower().replace("_", "-"), "unrecorded")
+
+    monkeypatch.setattr(env_capture, "dist_version", fake_dist)
+    monkeypatch.setattr(env_capture, "npu_driver_version", lambda: "32.0.100.5540")
+    captured = environment()
+    assert captured["openvino"] == "2026.4.1"
+    assert captured["npu_firmware"] == "32.0.100.5540"
+    assert captured["packages"] == "openvino==2026.4.1 openvino-tokenizers==2026.4.1.0"
+    assert captured["power_plan"] == "unrecorded"
+    assert captured["ollama_ps"] == "unrecorded"
+    assert captured["nvidia_driver"] == "unrecorded"
+    assert environment(openvino="kept")["openvino"] == "kept"
+    assert driver_version_from_lines(["32.0.100.5540", "32.0.100.5540"]) == "32.0.100.5540"
+    assert driver_version_from_lines(["32.0.100.5540", "32.0.100.1"]) == "unrecorded"
+    assert driver_version_from_lines(["32.0.100.5540 extra"]) == "unrecorded"
+    assert driver_version_from_lines([]) == "unrecorded"
+    assert package_versions(()) == "unrecorded"
+
+
+def test_dist_version_reads_metadata_and_a_missing_package_stays_unrecorded(monkeypatch):
+    from switchyard.harness import environment as env_capture
+
+    assert env_capture.dist_version("this-package-is-not-installed") == "unrecorded"
+    assert env_capture.dist_version("pytest") != "unrecorded"
+
+    def blank(_name):
+        return "  "
+
+    monkeypatch.setattr(env_capture, "version", blank)
+    assert env_capture.dist_version("pytest") == "unrecorded"
+
+    def broken(_name):
+        raise RuntimeError("metadata failed")
+
+    monkeypatch.setattr(env_capture, "version", broken)
+    assert env_capture.dist_version("pytest") == "unrecorded"
+
+
+def test_the_npu_driver_query_keeps_one_version_and_does_not_guess(monkeypatch):
+    from switchyard.harness import environment as env_capture
+
+    calls = []
+
+    class Completed:
+        def __init__(self, code, out):
+            self.returncode = code
+            self.stdout = out
+
+    def fake_run(cmd, **_kwargs):
+        calls.append(cmd)
+        return Completed(0, "32.0.100.5540\n")
+
+    monkeypatch.setattr(env_capture.sys, "platform", "win32")
+    monkeypatch.setattr(env_capture.subprocess, "run", fake_run)
+    env_capture.clear_driver_cache()
+    assert env_capture.npu_driver_version() == "32.0.100.5540"
+    assert env_capture.npu_driver_version() == "32.0.100.5540"
+    assert len(calls) == 1
+
+    def failed(cmd, **_kwargs):
+        return Completed(1, "")
+
+    monkeypatch.setattr(env_capture.subprocess, "run", failed)
+    env_capture.clear_driver_cache()
+    assert env_capture.npu_driver_version() == "unrecorded"
+
+    def explode(cmd, **_kwargs):
+        raise env_capture.subprocess.TimeoutExpired(cmd, 30)
+
+    monkeypatch.setattr(env_capture.subprocess, "run", explode)
+    env_capture.clear_driver_cache()
+    assert env_capture.npu_driver_version() == "unrecorded"
+
+    monkeypatch.setattr(env_capture.sys, "platform", "linux")
+    env_capture.clear_driver_cache()
+    assert env_capture.npu_driver_version() == "unrecorded"
+
+
+def test_a_run_records_the_captured_environment_on_the_row(tmp_path, monkeypatch):
+    from switchyard.harness import environment as env_capture
+
+    monkeypatch.setattr(env_capture, "dist_version", lambda name: "2026.4.1" if name == "openvino" else "unrecorded")
+    monkeypatch.setattr(env_capture, "npu_driver_version", lambda: "32.0.100.5540")
+    monkeypatch.setattr(env_capture, "package_versions", lambda: "openvino==2026.4.1")
+    repo = tmp_path / "repo"
+    spec = _spec()
+    spec["warmups"] = 0
+    spec["repeats"] = 1
+    spec["needs"] = {"grant": False, "npu_session": False, "cpu_window": False}
+    spec["arms"] = [_arm("A", "CPU")]
+    adapter = MeasureOnly({"A": [_result(4.0), _result(2.0)]})
+    rows = _invoke(repo, _bind(repo, spec), {"fake": adapter}, grant=None, npu_session=None)
+    env = rows[0]["settings"]["environment"]
+    assert env["openvino"] == "2026.4.1"
+    assert env["npu_firmware"] == "32.0.100.5540"
+    assert env["packages"] == "openvino==2026.4.1"
+    assert env["ollama_ps"] == "unrecorded"
 
 
 def _commit(repo: Path) -> None:

@@ -9,6 +9,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from switchyard.harness import environment as env_capture
+from switchyard.harness.environment import UNRECORDED
 from switchyard.harness.timing import Summary
 from switchyard.families import stamp_family
 from switchyard.receipt import load_jsonl, validate_row
@@ -17,7 +19,6 @@ from switchyard.receipt import load_jsonl, validate_row
 # against the same model's CPU batch-1 arm at the same length.
 PARITY_MIN = 0.999
 
-UNRECORDED = "unrecorded"
 DEVICE_LOST_NOTE = "this device can't do this setting"
 
 
@@ -35,13 +36,19 @@ def _blank_latency() -> dict:
 
 
 def environment(**overrides) -> dict:
+    """The receipt environment. A passed field replaces the captured one.
+
+    OpenVINO, the Intel package stack, and the NPU driver are read when this
+    process can see them. Power plan and ``ollama_ps`` stay ``unrecorded``.
+    """
+
     base = {
         "nvidia_driver": UNRECORDED,
-        "npu_firmware": UNRECORDED,
-        "openvino": UNRECORDED,
+        "npu_firmware": env_capture.npu_driver_version(),
+        "openvino": env_capture.dist_version("openvino"),
         "power_plan": UNRECORDED,
         "ollama_ps": UNRECORDED,
-        "packages": UNRECORDED,
+        "packages": env_capture.package_versions(),
         "cuda_backend": UNRECORDED,
     }
     base.update(overrides)
@@ -80,7 +87,7 @@ def measured_row(
         settings["keep_alive"] = arm["keep_alive"]
     if extra_settings:
         settings.update(extra_settings)
-    for key in ("prompt_tokens", "truncated_tokens"):
+    for key in ("prompt_tokens", "truncated_tokens", "token_type_ids_fed"):
         if learned.get(key) is not None:
             settings[key] = learned[key]
     latency = {
