@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import importlib.util
 import subprocess
+import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -952,3 +954,57 @@ def test_resolved_marks_token_type_ids_absent_when_undeclared(tmp_path, monkeypa
     monkeypatch.setitem(ovm._POOLING, m, "cls")
     r = a.run(req(model=m, device="CPU", static_shape="1x8", batch=1))
     assert r.ok and r.resolved["token_type_ids_fed"] is False
+def test_ir_xml_hub_download_fetches_the_weights_sidecar(tmp_path, monkeypatch):
+    calls = []
+
+    def fake_hub_download(repo, filename, revision=None):
+        calls.append((repo, filename, revision))
+        path = tmp_path / filename
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("x", encoding="utf-8")
+        return str(path)
+
+    fake_hub = types.ModuleType("huggingface_hub")
+    fake_hub.hf_hub_download = fake_hub_download
+    monkeypatch.setitem(sys.modules, "huggingface_hub", fake_hub)
+    path = make_adapter()._model_path("acme/ir-embed", "abc123")
+    assert path.name == "openvino_model.xml"
+    assert calls[:2] == [
+        ("acme/ir-embed", "openvino_model.xml", "abc123"),
+        ("acme/ir-embed", "openvino_model.bin", "abc123"),
+    ]
+
+
+def test_ir_xml_hub_download_refuses_when_weights_are_missing(tmp_path, monkeypatch):
+    def fake_hub_download(repo, filename, revision=None):
+        if filename.endswith(".bin"):
+            raise RuntimeError("404")
+        path = tmp_path / filename
+        path.write_text("x", encoding="utf-8")
+        return str(path)
+
+    fake_hub = types.ModuleType("huggingface_hub")
+    fake_hub.hf_hub_download = fake_hub_download
+    monkeypatch.setitem(sys.modules, "huggingface_hub", fake_hub)
+    with pytest.raises(AdapterError, match="weights"):
+        make_adapter()._model_path("acme/ir-embed", "abc123")
+
+
+def test_onnx_hub_download_stays_single_file(tmp_path, monkeypatch):
+    calls = []
+
+    def fake_hub_download(repo, filename, revision=None):
+        calls.append(filename)
+        if filename.endswith(".xml"):
+            raise RuntimeError("no IR export")
+        path = tmp_path / filename
+        path.write_text("x", encoding="utf-8")
+        return str(path)
+
+    fake_hub = types.ModuleType("huggingface_hub")
+    fake_hub.hf_hub_download = fake_hub_download
+    monkeypatch.setitem(sys.modules, "huggingface_hub", fake_hub)
+    path = make_adapter()._model_path("acme/onnx-embed", "abc123")
+    assert path.name == "model.onnx"
+    # the failed .xml probe fetched no weights; the .onnx artifact stands alone
+    assert calls == ["openvino_model.xml", "model.onnx"]

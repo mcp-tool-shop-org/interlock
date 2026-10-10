@@ -267,9 +267,18 @@ class OpenvinoAdapter:
         last: Exception | None = None
         for name in ("openvino_model.xml", "model.onnx", "onnx/model.onnx"):
             try:
-                return Path(hf_hub_download(model, name, revision=revision))
+                artifact = Path(hf_hub_download(model, name, revision=revision))
             except Exception as exc:
                 last = exc
+                continue
+            if name.endswith(".xml"):
+                # OpenVINO IR: the .xml reads its weights from the sibling .bin.
+                weights = name[:-4] + ".bin"
+                try:
+                    hf_hub_download(model, weights, revision=revision)
+                except Exception as exc:
+                    raise AdapterError(f"{model} artifact {name} has no weights {weights}: {exc}") from exc
+            return artifact
         raise AdapterError(f"no embedder artifact found for {model}: {last}")
 
     def _load_compiled(self, file: Path, ov_id: str, static: tuple[int, int] | None, config: dict) -> tuple[object, float]:
