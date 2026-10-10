@@ -99,7 +99,7 @@
       "confidence": "low",
       "highWater": null,
       "name": "src",
-      "qualifyingSourceCommits": 21,
+      "qualifyingSourceCommits": 22,
       "rebaseline": null
     },
     {
@@ -112,12 +112,12 @@
         "importsAndCoChanges": [],
         "importsOnly": []
       },
-      "cohesion": 0.210403,
+      "cohesion": 0.178051,
       "cohesionDropped": false,
       "confidence": "low",
       "highWater": null,
       "name": "tests",
-      "qualifyingSourceCommits": 22,
+      "qualifyingSourceCommits": 25,
       "rebaseline": null
     }
   ],
@@ -196,7 +196,7 @@
       },
       {
         "commits": 10,
-        "lines": 316,
+        "lines": 322,
         "path": "atlas/README.md"
       },
       {
@@ -206,17 +206,17 @@
       },
       {
         "commits": 10,
-        "lines": 854,
+        "lines": 894,
         "path": "atlas/page.json"
       },
       {
         "commits": 10,
-        "lines": 1786,
+        "lines": 1896,
         "path": "atlas/statistics.json"
       },
       {
         "commits": 10,
-        "lines": 7325,
+        "lines": 7329,
         "path": "atlas/structure.json"
       },
       {
@@ -281,12 +281,17 @@
       },
       {
         "commits": 1,
+        "lines": 120,
+        "path": "experiments/e2/quiet-window-cpu-e2-2026-10-10c.csv"
+      },
+      {
+        "commits": 1,
         "lines": 119,
         "path": "experiments/e2/spec-b8tail.yaml"
       },
       {
-        "commits": 3,
-        "lines": 468,
+        "commits": 4,
+        "lines": 500,
         "path": "experiments/e2/spec.yaml"
       },
       {
@@ -295,8 +300,8 @@
         "path": "experiments/e3-ref/spec.yaml"
       },
       {
-        "commits": 1,
-        "lines": 518,
+        "commits": 2,
+        "lines": 539,
         "path": "experiments/e3/spec.yaml"
       },
       {
@@ -310,8 +315,8 @@
         "path": "experiments/e5/spec.yaml"
       },
       {
-        "commits": 3,
-        "lines": 86,
+        "commits": 4,
+        "lines": 87,
         "path": "pyproject.toml"
       },
       {
@@ -345,6 +350,16 @@
         "path": "receipts/e2-2026-10-10b.jsonl"
       },
       {
+        "commits": 1,
+        "lines": 14,
+        "path": "receipts/e2-2026-10-10c.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 1,
+        "path": "receipts/e2-b8tail-2026-10-10c.jsonl"
+      },
+      {
         "commits": 2,
         "lines": 6,
         "path": "src/switchyard/__init__.py"
@@ -375,8 +390,8 @@
         "path": "src/switchyard/adapters/ollama.py"
       },
       {
-        "commits": 10,
-        "lines": 929,
+        "commits": 11,
+        "lines": 958,
         "path": "src/switchyard/adapters/openvino.py"
       },
       {
@@ -435,13 +450,13 @@
         "path": "src/switchyard/harness/receipts.py"
       },
       {
-        "commits": 7,
-        "lines": 1177,
+        "commits": 8,
+        "lines": 1296,
         "path": "src/switchyard/harness/runner.py"
       },
       {
-        "commits": 2,
-        "lines": 209,
+        "commits": 3,
+        "lines": 217,
         "path": "src/switchyard/harness/spec.py"
       },
       {
@@ -530,8 +545,8 @@
         "path": "table/candidates.json"
       },
       {
-        "commits": 5,
-        "lines": 120,
+        "commits": 6,
+        "lines": 121,
         "path": "table/gaps.md"
       },
       {
@@ -540,8 +555,8 @@
         "path": "table/model-families.json"
       },
       {
-        "commits": 5,
-        "lines": 1190,
+        "commits": 6,
+        "lines": 1203,
         "path": "table/routing.jsonl"
       },
       {
@@ -570,8 +585,8 @@
         "path": "tests/test_guards.py"
       },
       {
-        "commits": 9,
-        "lines": 2226,
+        "commits": 10,
+        "lines": 2447,
         "path": "tests/test_harness.py"
       },
       {
@@ -595,13 +610,13 @@
         "path": "tests/test_run_path.py"
       },
       {
-        "commits": 5,
-        "lines": 402,
+        "commits": 7,
+        "lines": 406,
         "path": "tests/test_task_scope.py"
       },
       {
-        "commits": 3,
-        "lines": 936,
+        "commits": 4,
+        "lines": 954,
         "path": "uv.lock"
       }
     ]
@@ -610,9 +625,9 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-10-10T21:18:15.613Z",
+  "generatedAt": "2026-10-10T23:29:57.572Z",
   "generatedFrom": {
-    "commit": "d1742597b794f3a99966c689c7c026122d02b091"
+    "commit": "7012d078112d7487bc53d31efb3db00af9448a26"
   },
   "pairs": [
     {
@@ -660,9 +675,9 @@
     {
       "a": "src/switchyard/adapters/openvino.py",
       "b": "tests/test_openvino_adapter.py",
-      "either": 10,
+      "either": 11,
       "shared": 10,
-      "strength": 1
+      "strength": 0.909091
     },
     {
       "a": "src/switchyard/harness/receipts.py",
@@ -674,16 +689,16 @@
     {
       "a": "src/switchyard/harness/receipts.py",
       "b": "tests/test_harness.py",
-      "either": 8,
+      "either": 9,
       "shared": 5,
-      "strength": 0.625
+      "strength": 0.555556
     },
     {
       "a": "src/switchyard/harness/runner.py",
       "b": "tests/test_harness.py",
-      "either": 9,
-      "shared": 5,
-      "strength": 0.555556
+      "either": 10,
+      "shared": 6,
+      "strength": 0.6
     },
     {
       "a": "src/switchyard/importers/gaps.py",
@@ -709,34 +724,34 @@
     {
       "a": "table/gaps.md",
       "b": "table/routing.jsonl",
-      "either": 5,
-      "shared": 5,
+      "either": 6,
+      "shared": 6,
       "strength": 1
     },
     {
       "a": "table/gaps.md",
-      "b": "tests/test_importers.py",
+      "b": "tests/test_task_scope.py",
       "either": 8,
-      "shared": 4,
-      "strength": 0.5
+      "shared": 5,
+      "strength": 0.625
     },
     {
       "a": "table/routing.jsonl",
-      "b": "tests/test_importers.py",
+      "b": "tests/test_task_scope.py",
       "either": 8,
-      "shared": 4,
-      "strength": 0.5
+      "shared": 5,
+      "strength": 0.625
     },
     {
       "a": "tests/test_importers.py",
       "b": "tests/test_task_scope.py",
-      "either": 7,
+      "either": 9,
       "shared": 5,
-      "strength": 0.714286
+      "strength": 0.555556
     }
   ],
   "parameters": {
-    "appliedChangesetLimit": 24,
+    "appliedChangesetLimit": 24.75,
     "changeset": 50,
     "changesetFraction": 0.25,
     "cohesionDrop": 0.2,
@@ -745,16 +760,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-10-10T17:17:59-04:00",
-    "inScopeFiles": 96,
+    "headDate": "2026-10-10T18:57:58-04:00",
+    "inScopeFiles": 99,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 38,
+    "qualifyingCommits": 42,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-04-13T21:17:59.000Z",
+    "since": "2026-04-13T22:57:58.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",
