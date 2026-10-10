@@ -81,4 +81,5 @@ No open cell. This experiment's candidates are filled.
 ## Aborted runs
 
 - Aborted run `e2-2026-10-10b` stopped at `qwen3emb-cpu-l2048-b8 warmup 0`: hang: no result within 60 s; arm inconclusive, device pair poisoned for the run
+- Aborted run `e2-b8tail-2026-10-10c` stopped at `qwen3emb-npu-l512-b8 cold`: Exception from src\inference\src\cpp\core.cpp:120:
 
