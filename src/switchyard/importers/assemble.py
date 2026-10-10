@@ -5,6 +5,9 @@ must be a commit in that repo. The worktree is not read. Ladder runs are in
 the rnd pin. Offer rows are optional and come only from a version-1 snapshot
 file. aspire-si is read at the B pin only: the 3b judge-control receipts are
 a later commit, and this assembler does not import them.
+
+When ``local_root`` is set, the #25 E1 rerun in that tree is copied in.
+The receipt files stay as measured. The table copy drops embedding artifacts.
 """
 
 from __future__ import annotations
@@ -29,6 +32,7 @@ from switchyard.importers.pins import (
     RND_REPO,
 )
 from switchyard.importers.probe import probe_rows
+from switchyard.receipt import ReceiptError, validate_row
 
 _CHAIN = "experiments/verifier-gold/calibration/results/2026-10-09-chain"
 _TIERS = "experiments/verifier-gold/calibration/tiers.json"
@@ -48,6 +52,12 @@ _B_READOUT = f"{_AUDITOR}/B-readout.json"
 _B_MANIFEST = f"{_AUDITOR}/B-manifest.json"
 _B_VERDICTS = f"{_AUDITOR}/verdicts-error-B-mistral-small_24b.json"
 _B_SELECTION = f"{_AUDITOR}/B-selection.json"
+# #25's re-run only. The earlier rerun files measured a 13-token seed.
+_E1_RERUN2 = (
+    "receipts/e1-intel-2026-10-09-rerun2.jsonl",
+    "receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl",
+    "receipts/e1-intel-2026-10-09-rerun2-nomic-diag.jsonl",
+)
 
 
 def import_receipts(
@@ -59,6 +69,7 @@ def import_receipts(
     rnd_pin: str = RND_COMMIT,
     npu_pin: str = NPU_BUILDOUT_COMMIT,
     aspire_pin: str = ASPIRE_COMMIT,
+    local_root: Path | None = None,
 ) -> tuple[list[dict], list[str]]:
     rnd = Path(rnd_repo or RND_REPO)
     npu = Path(npu_repo or NPU_REPO)
@@ -85,9 +96,48 @@ def import_receipts(
     if offers_path is not None:
         content = offers_path.read_bytes()
         rows.extend(offer_rows(_json(content), source_path=_offer_source(offers_path), content=content))
+    if local_root is not None:
+        rows.extend(e1_rerun2_rows(Path(local_root)))
     _unique(rows)
     rows.sort(key=lambda row: row["id"])
     return rows, skipped
+
+
+def e1_rerun2_rows(root: Path) -> list[dict]:
+    """Table copies of the #25 rerun.
+
+    The receipt files are not rewritten and parity is not recomputed.
+    A pass or a miss keeps its timing, without artifacts. ``device_lost``
+    and ``hang`` land as untimed capability rows. Anything else is refused.
+    """
+
+    rows: list[dict] = []
+    for rel in _E1_RERUN2:
+        path = root / rel
+        if not path.is_file():
+            raise ImportError_(f"missing local receipt {rel}")
+        for row in _jsonl(path.read_bytes()):
+            rows.append(_e1_table_copy(row))
+    return rows
+
+
+def _e1_table_copy(row: dict) -> dict:
+    from switchyard.harness.receipts import for_table
+
+    outcome = row.get("outcome")
+    try:
+        if outcome in ("device_lost", "hang"):
+            return for_table(row)
+        if row.get("parity_valid") not in (True, False):
+            raise ImportError_(
+                f"{row.get('id', '?')}: an E1 row must be parity-stamped or an untimed capability row"
+            )
+        copied = dict(row)
+        copied.pop("artifacts", None)
+        validate_row(copied)
+    except ReceiptError as exc:
+        raise ImportError_(str(exc)) from exc
+    return copied
 
 
 def _offer_source(path: Path) -> str:

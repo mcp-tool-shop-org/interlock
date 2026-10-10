@@ -14,7 +14,7 @@ from switchyard.families import FamilyError, family_of, stamp_family
 from switchyard.harness.choice import choose
 from switchyard.harness.spec import SpecError, validate_spec
 from switchyard.importers.gaps import open_gaps
-from switchyard.receipt import ReceiptError, schema, validate_row
+from switchyard.receipt import ReceiptError, is_speed_row, schema, validate_row
 from switchyard.scope import ScopeError, select
 from switchyard.tasks import JUDGE_RATES, TASKS
 from tests.support import row
@@ -366,6 +366,29 @@ def test_the_committed_table_is_rekeyed_and_does_not_invent_judge_rates():
     assert "verify" not in counts
     assert counts["judge:planted-error"] == 1
     assert "judge:same-meaning-rewrite" not in counts
-    assert len(rows) == 409
+    assert len(rows) == 456
     assert sum(1 for item in rows if item["id"].startswith("ladder/")) == 312
     assert sum(1 for item in rows if item["id"].startswith("verify/")) == 54
+    e1 = [item for item in rows if item["id"].startswith("E1/")]
+    assert len(e1) == 47
+    assert all("artifacts" not in item for item in e1)
+    assert all(item["settings"]["environment"]["openvino"] == "unrecorded" for item in e1)
+    miss_id = "E1/nomic-npu-l2048-b1/e1-intel-2026-10-09-rerun2"
+    miss = next(item for item in e1 if item["id"] == miss_id)
+    assert miss["parity_valid"] is False
+    assert miss["latency"]["cold_ms"] is not None
+    assert miss["latency"]["warm_p50_ms"] is not None
+    assert is_speed_row(miss) is False
+    assert miss_id not in {item["id"] for item in select(rows, "embed").rows}
+    lost_ids = {
+        "E1/nomic-npu-l2048-b8/e1-intel-2026-10-09-rerun2-b8tail",
+        "E1/nomic-npu-l1024-b8/e1-intel-2026-10-09-rerun2-nomic-diag",
+    }
+    lost = [item for item in e1 if item["id"] in lost_ids]
+    assert {item["id"] for item in lost} == lost_ids
+    for item in lost:
+        assert item["outcome"] == "device_lost"
+        assert item["latency"]["cold_ms"] is None
+        assert item["latency"]["warm_p50_ms"] is None
+        assert "this device can't do this setting" in item["notes"]
+        assert is_speed_row(item) is False

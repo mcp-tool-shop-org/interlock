@@ -1,7 +1,7 @@
 # Gap report
 
 This is the experiment backlog. A cell is open when the table has no row that fills it.
-Imported rows: 409.
+Imported rows: 456.
 
 Ladder rows are imported from rnd at 08ca419f647a3ed69ee645610eaa1c7f35f40f91. Difficulty length quartiles are not imported. Tier rows are. Chain and ladder rows with no pins.quote_rule are quote rule 1 by the pre-#47 inference. B's planted-error judge row is imported from aspire-si at 3b05eab928894311993ffa3af2075fef39cccce6. That commit has B's receipts only. The 3b judge-control receipts are a later pin.
 
@@ -9,16 +9,7 @@ Ladder rows are imported from rnd at 08ca419f647a3ed69ee645610eaa1c7f35f40f91. D
 
 ### E1
 
-- `E1-nomic-NPU`. No cold-versus-warm split for nomic-embed-text v1.5 on the NPU. A speed row that lacks cold_ms and warm_p50_ms does not answer whether the NPU may be treated as warm-only.
-- `E1-nomic-iGPU`. Same cold-versus-warm question for nomic-embed-text v1.5 on the iGPU, at batch 1 and 8 and three lengths.
-- `E1-nomic-CPU`. Same cold-versus-warm question for nomic-embed-text v1.5 on the CPU.
-- `E1-bge-NPU`. bge-base may already have a probe speed row. It still has no cold_ms or warm_p50_ms, so E1 stays open.
-  - Partial `probe/2026-10-09-probe/BAAI/bge-base-en-v1.5/NPU/b1/embed` is missing cold_ms, warm_p50_ms.
-  - Partial `probe/2026-10-09-probe/BAAI/bge-base-en-v1.5/NPU/b8/embed` is missing cold_ms, warm_p50_ms.
-- `E1-bge-iGPU`. bge-base on the iGPU has no cold-versus-warm split.
-- `E1-bge-CPU`. bge-base on the CPU has no cold-versus-warm split.
-  - Partial `probe/2026-10-09-probe/BAAI/bge-base-en-v1.5/CPU/b1/embed` is missing cold_ms, warm_p50_ms.
-  - Partial `probe/2026-10-09-probe/BAAI/bge-base-en-v1.5/CPU/b8/embed` is missing cold_ms, warm_p50_ms.
+No open cell. This experiment's candidates are filled.
 
 ### E2
 
@@ -40,6 +31,9 @@ Ladder rows are imported from rnd at 08ca419f647a3ed69ee645610eaa1c7f35f40f91. D
 
 - `E4-5090-alone`. No contention measurement: 5090 decode alone versus with an NPU embed load and versus with an iGPU NLI load.
 - `E4-npu-embed`. No measurement of NPU embed latency with and without the 5090 busy. E4 uses bge-base so it does not depend on E2.
+  - Partial `E1/bge-base-npu-l128-b1/e1-intel-2026-10-09-rerun2` is missing contention.
+  - Partial `E1/bge-base-npu-l256-b1/e1-intel-2026-10-09-rerun2` is missing contention.
+  - Partial `E1/bge-base-npu-l512-b1/e1-intel-2026-10-09-rerun2` is missing contention.
   - Partial `probe/2026-10-09-probe/BAAI/bge-base-en-v1.5/NPU/b1/embed` is missing contention.
   - Partial `probe/2026-10-09-probe/BAAI/bge-base-en-v1.5/NPU/b8/embed` is missing contention.
 - `E4-igpu-nli`. No measurement of iGPU NLI latency with and without the 5090 busy. Batch 8 on the NPU is not this cell.
@@ -60,8 +54,9 @@ Ladder rows are imported from rnd at 08ca419f647a3ed69ee645610eaa1c7f35f40f91. D
 
 ## What the table does hold
 
-- embed / CPU: 4
-- embed / NPU: 4
+- embed / CPU: 22
+- embed / NPU: 15
+- embed / iGPU: 18
 - engine / CPU: 8
 - engine / NPU: 11
 - engine / iGPU: 8

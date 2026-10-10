@@ -1,8 +1,9 @@
 """The gap report is the experiment backlog.
 
 A candidate is open when no row matches it, or when a row matches the model
-and device but is missing a field the candidate needs. E1 stays open while
-embed rows have speed but no cold/warm split.
+and device but is missing a field the candidate needs. A row pinned as
+``repo@revision`` matches a candidate that names the repo. E1 stays open
+while embed rows have speed but no cold/warm split.
 """
 
 from __future__ import annotations
@@ -107,8 +108,10 @@ def render_gaps(
 
 def _matches(row: dict, match: dict) -> bool:
     for key, expected in match.items():
-        if key == "model" and row["model"]["repo_or_tag"] != expected:
-            return False
+        if key == "model":
+            actual = row["model"]["repo_or_tag"]
+            if actual != expected and actual.split("@", 1)[0] != expected:
+                return False
         if key == "task" and row["task"] != expected:
             return False
         if key == "device" and row["device"] != expected:
