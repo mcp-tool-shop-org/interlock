@@ -352,7 +352,7 @@ def run_interleaved(
                         spec_rel,
                         cache_dirs.get(companion["id"]),
                         prompt_cache,
-                        bound_s=bound,
+                        bound_s=_call_bound(slot, cold_calls.get(companion["id"]), ceiling),
                     )
                     started = True
                 cpu_start = _cpu_sample()

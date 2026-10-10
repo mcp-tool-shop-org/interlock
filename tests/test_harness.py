@@ -1880,6 +1880,45 @@ def test_companion_sessions_wrap_only_the_paired_slot(tmp_path: Path):
     assert "start_session" in stored[0]["settings"]["abortion"]["error"]
 
 
+def test_a_companion_session_gets_its_own_arms_bound(tmp_path: Path):
+    class BoundSessions(Scripted):
+        def start_session(self, request):
+            super().start_session(request)
+            self.session_bounds.append(request.settings.get("call_timeout_s"))
+
+    alone = _arm("A", "5090")
+    paired = _arm("P", "NPU")
+    paired["companion"] = "A"
+    paired["companion_device"] = "5090"
+    paired["measure"] = "decode_tok_s"
+    spec = _spec()
+    spec.update(
+        {
+            "compile_cache": "fresh",
+            "order": "aba",
+            "warmups": 0,
+            "repeats": 1,
+            "arms": [alone, paired],
+            "pairs": [{"id": "p1", "alone": "A", "paired": "P"}],
+        }
+    )
+    script = BoundSessions(
+        {
+            # A's cold call takes 50 s, so A's warm bound is 150 s; P's cold is 8 ms, so P's is 60 s.
+            "A": [_result(50_000, 100, compile_ms=12), _result(40, 100), _result(40, 100)],
+            "P": [_result(8, 100, compile_ms=4), _result(9, 100)],
+        },
+        sessions=True,
+    )
+    script.session_bounds = []
+    repo = tmp_path / "repo"
+    _invoke(repo, _bind(repo, spec), {"fake": script})
+    assert script.sessions[0] == ("start", "A", "5090")
+    assert script.session_bounds == [150.0]
+    measured = [r.settings.get("call_timeout_s") for r in script.requests if r.step_id == "P"]
+    assert measured[-1] == 60.0
+
+
 def test_an_interleaved_companion_starts_on_measure_slots_only(tmp_path: Path):
     spec = _spec()
     spec["warmups"] = 0
