@@ -109,9 +109,10 @@
     "repeats": {"type": "integer", "minimum": 1},
     "provisional": {"type": "boolean"},
     "provenance": {"$ref": "#/$defs/provenance"},
-    "outcome": {"type": "string", "enum": ["device_lost", "hang"]},
+    "outcome": {"type": "string", "enum": ["device_lost", "hang", "native_binary_rejected"]},
     "parity_valid": {"type": "boolean"},
     "partial": {"type": "boolean"},
+    "aborted": {"type": "boolean"},
     "model_family": {"type": ["string", "null"]},
     "gpu_resident": {"type": ["boolean", "null"]},
     "cost": {

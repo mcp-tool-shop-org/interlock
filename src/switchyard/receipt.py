@@ -123,6 +123,10 @@ _TIMING = (
     "compile_warm_reload_ms",
 )
 _UNTIMED = frozenset({"device_lost", "hang"})
+# The compile finished and the device refused the native binary at execute.
+# Such a row keeps the compile time and nothing else.
+_COMPILE_ONLY = frozenset({"native_binary_rejected"})
+CAPABILITY_OUTCOMES = frozenset(_UNTIMED | _COMPILE_ONLY)
 
 
 def is_speed_row(row: dict) -> bool:
@@ -131,17 +135,27 @@ def is_speed_row(row: dict) -> bool:
     A failed guard keeps its timing. It is not an untimed outcome.
     """
 
-    return row.get("outcome") not in _UNTIMED and row.get("parity_valid") is not False
+    return row.get("outcome") not in CAPABILITY_OUTCOMES and row.get("parity_valid") is not False
 
 
 def _check_device_lost(row: dict) -> None:
-    """A device_lost or hang row says the device cannot do the setting. It is not a speed."""
+    """A capability row says the device cannot do the setting. It is not a speed.
+
+    ``device_lost`` and ``hang`` carry no timing. ``native_binary_rejected``
+    keeps the compile time only: the compile finished, the execute did not.
+    """
 
     outcome = row.get("outcome")
-    if outcome not in _UNTIMED:
+    if outcome in _UNTIMED:
+        allowed: frozenset[str] = frozenset()
+    elif outcome in _COMPILE_ONLY:
+        allowed = frozenset({"compile_ms"})
+    else:
         return
     latency = row.get("latency") or {}
-    if any(latency.get(key) is not None for key in _TIMING) or latency.get("throughput_unit"):
+    if any(latency.get(key) is not None for key in _TIMING if key not in allowed) or latency.get(
+        "throughput_unit"
+    ):
         raise ReceiptError(f"{row['id']}: a {outcome} row has no timing")
     if row.get("artifacts"):
         raise ReceiptError(f"{row['id']}: a {outcome} row has no timing")

@@ -349,8 +349,11 @@ def test_a_hang_stops_the_run_and_keeps_a_partial_receipt(tmp_path: Path):
     receipt = repo / "receipts" / "hang-1.jsonl"
     assert receipt.is_file()
     rows = load_jsonl(receipt)
-    assert [row["outcome"] for row in rows] == ["hang"]
+    assert [row.get("outcome") for row in rows] == ["hang", None]
     assert rows[0]["partial"] is True
+    assert rows[1]["aborted"] is True
+    assert rows[1]["id"] == "T/A/hang-1"
+    assert rows[1]["settings"]["abortion"]["stop_step"] == "B cold"
     assert check_tree(repo) == []
 
 

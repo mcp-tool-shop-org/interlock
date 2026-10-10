@@ -14,6 +14,61 @@ from pathlib import Path
 from switchyard.receipt import is_speed_row
 
 
+def aborted_run_lines(rows: list[dict]) -> list[str]:
+    """One line per aborted run: the run id, the step that stopped it, and the error.
+
+    Rows marked ``aborted: true`` carry the abort context under
+    ``settings.abortion``. Repeated rows from the same run collapse into one
+    line on the first row seen.
+    """
+
+    lines: list[str] = []
+    seen: set[str] = set()
+    for row in rows:
+        if row.get("aborted") is not True:
+            continue
+        run_id = (row.get("provenance") or {}).get("run_id")
+        if not run_id or run_id in seen:
+            continue
+        seen.add(run_id)
+        abortion = (row.get("settings") or {}).get("abortion")
+        if not isinstance(abortion, dict):
+            abortion = {}
+        step = abortion.get("stop_step") or "unknown step"
+        error = str(abortion.get("error") or "").splitlines()[0].strip()
+        if len(error) > 200:
+            error = error[:199] + "…"
+        lines.append(f"Aborted run `{run_id}` stopped at `{step}`: {error}")
+    return lines
+
+
+def append_aborted_runs(root: Path, rows: list[dict]) -> list[str]:
+    """Append the aborted-run lines to ``table/gaps.md``. Returns the lines added.
+
+    ``gaps.md`` is a generated file; the Aborted runs section lives at its end
+    so a regeneration can carry the same lines. A run already listed is not
+    repeated. No gaps file yet means nothing to append to; the receipt keeps
+    the rows either way.
+    """
+
+    lines = aborted_run_lines(rows)
+    if not lines:
+        return []
+    path = root / "table" / "gaps.md"
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8")
+    new = [line for line in lines if line not in text]
+    if not new:
+        return []
+    text = text.rstrip("\n") + "\n"
+    if "## Aborted runs" not in text:
+        text += "\n## Aborted runs\n\n"
+    text += "".join(f"- {line}\n" for line in new) + "\n"
+    path.write_text(text, encoding="utf-8")
+    return new
+
+
 def load_candidates(path: Path) -> list[dict]:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -44,6 +99,7 @@ def render_gaps(
     *,
     ladder_note: str,
     skipped: list[str] | None = None,
+    aborted: list[str] | None = None,
 ) -> str:
     open_items = open_gaps(rows, candidates)
     by_experiment: dict[str, list[dict]] = {}
@@ -101,6 +157,15 @@ def render_gaps(
             lines.append(f"- {line}")
         if len(skipped) > 40:
             lines.append(f"- … {len(skipped) - 40} more.")
+    if aborted is not None:
+        lines.append("")
+        lines.append("## Aborted runs")
+        lines.append("")
+        if aborted:
+            for line in aborted:
+                lines.append(f"- {line}")
+        else:
+            lines.append("None.")
     lines.append("")
     lines.append("")
     return "\n".join(lines)

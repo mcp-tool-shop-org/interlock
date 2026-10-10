@@ -35,7 +35,11 @@ that device is off for the rest of the run and its remaining steps report
 ``"not run"`` without touching the hardware. A companion session that loses
 its device still surfaces the fault — the concurrent measurements are invalid
 without the load — and the device is marked the same way, so later one-shot
-steps on it are recorded, not attempted.
+steps on it are recorded, not attempted. A compiled binary the device refuses
+at execute (``ZE_RESULT_ERROR_INVALID_NATIVE_BINARY``, ``0x7800000f``) is
+raised as :class:`NativeBinaryRejected` with the compile time attached; the
+runner scopes it to model x device x static shape and the other shapes still
+run.
 
 The NPU infers static shapes only, so a NPU step without ``static_shape``
 (``"BxL"``) is refused before any compile. AUTO, HETERO, Multi and GPU.1 are
@@ -59,7 +63,7 @@ import time
 import warnings
 from pathlib import Path
 
-from switchyard.adapters.base import AdapterError, StepRequest, StepResult
+from switchyard.adapters.base import AdapterError, NativeBinaryRejected, StepRequest, StepResult
 from switchyard.devices import DeviceRefused, resolve_device
 
 try:  # CI has no intel extra; importing this module must still succeed.
@@ -81,6 +85,17 @@ _QUANTS = ("int4", "int8", "fp16", "fp32")
 # from a 60 s timeout hang: a hang ends the run, a device loss becomes a
 # result row and the device is then off for the rest of the run.
 _LOST_MARKERS = ("ze_result_error_device_lost", "device_lost", "device lost")
+
+# Level Zero native-binary rejection, seen live: E2's Qwen3-Embedding l512
+# compile wrote a complete blob and the NPU refused the binary at execute
+# (driver 32.0.100.5540). The compile succeeded, so this is not a compile
+# error, a device loss, or a hang: the runner turns it into a capability row
+# scoped to model x device x static shape (ruling #33).
+_REJECTED_MARKERS = ("ze_result_error_invalid_native_binary", "0x7800000f")
+
+
+def _is_native_binary_rejected(exc: BaseException) -> bool:
+    return any(marker in str(exc).lower() for marker in _REJECTED_MARKERS)
 
 
 def _is_device_lost(exc: BaseException) -> bool:
@@ -486,6 +501,10 @@ def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> Step
             self._compiled = {k: v for k, v in self._compiled.items() if not (k[0] == repo and k[2] == ov_id)}
             resolved["outcome"] = "device_lost"
             return StepResult(ok=True, resolved=resolved, sensors=None)
+        if _is_native_binary_rejected(exc):
+            raise NativeBinaryRejected(
+                str(exc), compile_s=entry["compile_s"] if compiled_now else None
+            ) from exc
         raise
     if status == "hang":
         self._compiled = {k: v for k, v in self._compiled.items() if not (k[0] == repo and k[2] == ov_id)}
@@ -589,6 +608,8 @@ def _run_generate(self, request: StepRequest, s: _Settings, resolved: dict) -> S
             self._pipelines.pop((request.model, ov_id), None)
             resolved["outcome"] = "device_lost"
             return StepResult(ok=True, resolved=resolved, sensors=None)
+        if _is_native_binary_rejected(exc):
+            raise NativeBinaryRejected(str(exc), compile_s=compile_s) from exc
         raise
     if status == "hang":
         self._pipelines.pop((request.model, ov_id), None)

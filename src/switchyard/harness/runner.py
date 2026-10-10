@@ -15,12 +15,13 @@ from __future__ import annotations
 
 import datetime
 import os
+import re
 import shutil
 import sys
 import time
 from pathlib import Path
 
-from switchyard.adapters.base import AdapterError, StepRequest
+from switchyard.adapters.base import AdapterError, NativeBinaryRejected, StepRequest
 from switchyard.adapters.offrig_calibrate import plan_argv
 from switchyard.adapters.registry import for_engine
 from switchyard.cli import announce_run
@@ -131,6 +132,14 @@ def run_interleaved(
     device is marked off, and the other devices carry on. A step reported as
     not run writes no row; it is listed in the receipt notes. Neither outcome
     is retried.
+
+    An NPU that refuses its compiled binary at execute becomes one
+    ``native_binary_rejected`` row scoped to model x device x static shape
+    (ruling #33). The shape keeps its compile time as evidence, arms with the
+    identical key are marked not run, and every other arm carries on. On any
+    abort the slots already measured are flushed as rows marked
+    ``aborted: true`` with the counts actually completed; the table import
+    refuses them and ``gaps.md`` records the aborted run.
     """
 
     _check_run_id(run_id)
@@ -151,6 +160,11 @@ def run_interleaved(
     capability: dict[str, str] = {}
     off_devices: set[str] = set()
     skipped: list[str] = []
+    executed_ok: set[tuple] = set()
+    rejected_keys: set[tuple] = set()
+    rejections: dict[str, dict] = {}
+    aborted: dict | None = None
+    current: Slot | None = None
     captured = env if env is not None else environment()
     cache_dirs = _cache_dirs(spec, root, run_id, arms)
     prompt_cache: dict[str, tuple[str, int]] = {}
@@ -192,6 +206,12 @@ def run_interleaved(
     def _capability_row(arm_id: str, *, partial: bool, gone: set[str]) -> dict:
         extra = _extra_settings(spec, arms[arm_id], [], run_id, gone)
         extra.update(_prompt_counts(arms[arm_id], prompt_cache))
+        outcome = capability[arm_id]
+        evidence = rejections.get(arm_id)
+        compile_ms = None
+        if evidence is not None:
+            compile_ms = evidence.get("compile_ms")
+            extra["rejection"] = {key: value for key, value in evidence.items() if key != "compile_ms"}
         return device_lost_row(
             spec_id=spec["id"],
             arm=arms[arm_id],
@@ -203,13 +223,61 @@ def run_interleaved(
             env=captured,
             notes=_run_notes(),
             extra_settings=extra,
-            outcome=capability[arm_id],
+            outcome=outcome,
             partial=partial,
+            compile_ms=compile_ms,
         )
+
+    def _aborted_row(arm_id: str, *, gone: set[str]) -> dict:
+        """The partial record of an arm the abort stopped mid-schedule."""
+
+        arm = arms[arm_id]
+        extra = _extra_settings(spec, arm, records, run_id, gone)
+        extra.update(_prompt_counts(arm, prompt_cache))
+        genai = _genai_summary(records, arm_id)
+        if genai:
+            extra["genai"] = genai
+        cold_done = any(row["step_id"] == arm_id and row["phase"] == "cold" for row in records)
+        warm_done = sum(1 for row in records if row["step_id"] == arm_id and row["phase"] == "repeat")
+        extra["abortion"] = {
+            "stop_step": aborted["step"],
+            "error": aborted["error"],
+            "cold_done": cold_done,
+            "repeats_done": warm_done,
+            "repeats_required": spec["repeats"],
+        }
+        progress = f"aborted: cold {'done' if cold_done else 'not done'}, warm repeats {warm_done} of {spec['repeats']}"
+        base = _run_notes()
+        row = measured_row(
+            spec_id=spec["id"],
+            arm=arm,
+            summary=_summary(records, arm_id),
+            repeats=spec["repeats"],
+            date=date,
+            spec_rel=spec_rel,
+            run_id=run_id,
+            grant=grant,
+            env=captured,
+            notes=f"{progress}. {base}" if base else progress,
+            resolved=_resolved(records, arm_id),
+            artifacts=_artifacts(records, arm_id),
+            extra_settings=extra,
+        )
+        row["aborted"] = True
+        validate_row(row)
+        return row
 
     def _rows(*, partial: bool, gone: set[str]) -> list[dict]:
         rows = [_finished_row(arm_id, partial=partial, gone=gone) for arm_id in finished]
         rows.extend(_capability_row(arm_id, partial=partial, gone=gone) for arm_id in capability)
+        if aborted is not None and partial:
+            for arm in spec["arms"]:
+                arm_id = arm["id"]
+                if arm_id in finished or arm_id in capability:
+                    continue
+                if not any(record["step_id"] == arm_id for record in records):
+                    continue
+                rows.append(_aborted_row(arm_id, gone=gone))
         return rows
 
     def flush(*, gone: set[str] | None = None) -> None:
@@ -228,23 +296,26 @@ def run_interleaved(
             off_devices.add(arm["device"])
 
     def _note(slot: Slot) -> None:
-        if slot.phase == "cold":
-            label = f"{slot.step_id} cold"
-        else:
-            label = f"{slot.step_id} {slot.phase} {slot.round_index}"
-        skipped.append(label)
+        skipped.append(_label(slot))
 
     try:
         try:
             for slot in slots:
+                current = slot
                 arm = arms[slot.step_id]
                 companion = _companion(arm, arms, slot)
+                if _shape_key(arm) in rejected_keys or (
+                    companion is not None and _shape_key(companion) in rejected_keys
+                ):
+                    _note(slot)
+                    continue
                 if arm["device"] in off_devices or (
                     companion is not None and companion["device"] in off_devices
                 ):
                     _note(slot)
                     continue
                 started = False
+                compile_s: float | None = None
                 if companion is not None:
                     _session(
                         adapters,
@@ -276,7 +347,11 @@ def run_interleaved(
                             kind = "hang"
                         elif device_lost_error(error):
                             kind = "device_lost"
+                        elif _is_rejection(exc, error, arm, executed_ok):
+                            kind = "native_binary_rejected"
+                            compile_s = exc.compile_s
                         else:
+                            aborted = {"step": _label(slot), "error": error}
                             flush()
                             raise
                     else:
@@ -294,20 +369,30 @@ def run_interleaved(
                             else:
                                 kind = "fail"
                     if kind == "hang":
+                        aborted = {"step": _label(slot), "error": error}
                         _remember(arm, "hang")
                         flush()
                         raise RunnerError(f"step {slot.step_id} failed: {error}")
                     if kind == "device_lost":
                         _remember(arm, "device_lost")
                         flush()
+                    elif kind == "native_binary_rejected":
+                        rejected_keys.add(_shape_key(arm))
+                        rejections[arm["id"]] = _rejection_evidence(
+                            arm, error, compile_s, cache_dirs, run_id, captured
+                        )
+                        _remember(arm, "native_binary_rejected")
+                        flush()
                     elif kind == "not run":
                         off_devices.add(arm["device"])
                         _note(slot)
                     elif kind == "fail":
+                        aborted = {"step": _label(slot), "error": error}
                         flush()
                         raise RunnerError(f"step {slot.step_id} failed: {error}")
                     else:
                         records.append(_record(slot, result))
+                        executed_ok.add(_shape_key(arm))
                         seen[slot.step_id] = seen.get(slot.step_id, 0) + 1
                         if seen[slot.step_id] == needed[slot.step_id]:
                             finished.append(slot.step_id)
@@ -332,12 +417,20 @@ def run_interleaved(
         imported = True
         announce_run(rows, finished=True)
         return rows
+    except BaseException as exc:
+        if aborted is None:
+            aborted = {
+                "step": _label(current) if current is not None else "setup",
+                "error": str(exc) or type(exc).__name__,
+            }
+        raise
     finally:
         receipt = root / "receipts" / f"{run_id}.jsonl"
-        if not imported and receipt.is_file():
+        if not imported and (receipt.is_file() or aborted is not None):
             flush(gone=removed)
-            written = import_receipt(root, run_id)
-            announce_run(written, finished=False)
+            if receipt.is_file():
+                written = import_receipt(root, run_id)
+                announce_run(written, finished=False)
 
 
 def hang_error(error: str | None) -> bool:
@@ -358,6 +451,78 @@ def device_lost_error(error: str | None) -> bool:
         return False
     text = error.lower()
     return "ze_result_error_device_lost" in text or "device_lost" in text or "device lost" in text
+
+
+def native_binary_rejected_error(error: str | None) -> bool:
+    """The device refused the compiled binary at execute (ruling #33).
+
+    The match is the Level Zero code ``ZE_RESULT_ERROR_INVALID_NATIVE_BINARY``
+    or its number, ``0x7800000f``. A hang is not a rejection. Distinct from a
+    ``device_lost`` driver reset: the device is healthy and other shapes run.
+    """
+
+    if not isinstance(error, str) or not error or hang_error(error):
+        return False
+    text = error.lower()
+    return "ze_result_error_invalid_native_binary" in text or "0x7800000f" in text
+
+
+def _label(slot: Slot) -> str:
+    if slot.phase == "cold":
+        return f"{slot.step_id} cold"
+    return f"{slot.step_id} {slot.phase} {slot.round_index}"
+
+
+def _shape_key(arm: dict) -> tuple:
+    """The capability scope: model x device x static shape (batch and length)."""
+
+    return (arm["model"], arm["device"], arm.get("batch"), arm.get("static_shape"))
+
+
+def _is_rejection(exc: BaseException, error: str, arm: dict, executed_ok: set[tuple]) -> bool:
+    """The native-binary capability bound. All four conditions, or the error aborts.
+
+    The device is the NPU; the adapter raised the execute-site subtype (the
+    compile succeeded first); the error carries the signature; and this run
+    has not already executed the same shape — a shape that ran and is then
+    refused means the device changed state, which is an unknown error.
+    """
+
+    if arm["device"] != "NPU":
+        return False
+    if not isinstance(exc, NativeBinaryRejected):
+        return False
+    if not native_binary_rejected_error(error):
+        return False
+    return _shape_key(arm) not in executed_ok
+
+
+def _rejection_evidence(
+    arm: dict,
+    error: str,
+    compile_s: float | None,
+    cache_dirs: dict[str, Path],
+    run_id: str,
+    env: dict,
+) -> dict:
+    """What the rejected row records, beyond the shape the arm already carries."""
+
+    cache_dir = cache_dirs.get(arm["id"])
+    blob_bytes = None
+    cache_rel = None
+    if cache_dir is not None and cache_dir.is_dir():
+        blob_bytes = sum(path.stat().st_size for path in cache_dir.rglob("*") if path.is_file())
+        cache_rel = f"compile-cache/{run_id}/{arm['id']}"
+    match = re.search(r"0x[0-9a-fA-F]+", error)
+    return {
+        "error": error,
+        "code": match.group(0) if match else None,
+        "npu_driver": env.get("npu_firmware") or "unrecorded",
+        "shape": {"batch": arm.get("batch"), "static_shape": arm.get("static_shape")},
+        "compile_cache_dir": cache_rel,
+        "blob_bytes": blob_bytes,
+        "compile_ms": None if compile_s is None else compile_s * 1000,
+    }
 
 
 def _reported_outcome(result) -> str | None:

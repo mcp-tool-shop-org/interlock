@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from switchyard.adapters import registry
-from switchyard.adapters.base import AdapterError, StepRequest
+from switchyard.adapters.base import AdapterError, NativeBinaryRejected, StepRequest
 from switchyard.adapters import openvino as ovm
 
 
@@ -680,6 +680,50 @@ def test_device_loss_generate_call_marks_and_skips(tmp_path):
     assert (str(tmp_path), "NPU") not in a._pipelines
     rest = a.run(req(task="generate", model=str(tmp_path), device="NPU", prompt="hi there"))
     assert rest.ok and rest.resolved["outcome"] == "not run"
+
+
+REJECTED_MSG = (
+    "L0 pfnAppendGraphExecute: ZE_RESULT_ERROR_INVALID_NATIVE_BINARY, "
+    "code 0x7800000f - native binary is not supported by the device"
+)
+
+
+class RejectedInferCore(FakeCore):
+    """The E2 failure: compile writes a blob, execute refuses the binary."""
+
+    def compile_model(self, graph, device, config):
+        self.compiled.append((device, dict(config)))
+        if device == "NPU":
+            return FakeCompiled(fail=True, msg=REJECTED_MSG)
+        return FakeCompiled()
+
+
+def test_native_binary_rejected_raises_with_the_compile_time(tmp_path, monkeypatch):
+    m = local_model(tmp_path)
+    monkeypatch.setitem(ovm._POOLING, m, "cls")
+    a = make_adapter(core=RejectedInferCore())
+    with pytest.raises(NativeBinaryRejected, match="0x7800000f") as caught:
+        a.run(req(model=m, device="NPU", static_shape="1x16"))
+    assert caught.value.compile_s is not None
+    assert a._lost_devices == set()  # a rejection is not a device loss
+    cpu = a.run(req(model=m, device="CPU", static_shape="1x16"))
+    assert cpu.ok and cpu.latency_ms is not None  # the other devices run on
+
+
+def test_native_binary_rejected_generate_raises_with_the_compile_time(tmp_path):
+    class RejectedCallGenai(FakeGenai):
+        class LLMPipeline(FakePipeline):
+            def generate(self, prompt, config=None):
+                if self.device == "NPU":
+                    raise RuntimeError(REJECTED_MSG)
+                return super().generate(prompt, config)
+
+    a = make_adapter(genai_module=RejectedCallGenai)
+    with pytest.raises(NativeBinaryRejected, match="0x7800000f") as caught:
+        a.run(req(task="generate", model=str(tmp_path), device="NPU", prompt="hi"))
+    assert caught.value.compile_s is not None
+    cpu = a.run(req(task="generate", model=str(tmp_path), device="CPU", prompt="hi"))
+    assert cpu.ok and cpu.latency_ms is not None
 
 
 def test_device_loss_in_companion_start_marks_the_device(tmp_path, monkeypatch):
