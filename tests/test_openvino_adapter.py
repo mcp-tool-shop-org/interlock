@@ -118,8 +118,12 @@ class FakePipeline:
         self.config = dict(config)
 
     def generate(self, prompt, config=None):
+        # The real LLMPipeline returns a plain str for a str prompt and
+        # DecodedResults (texts, perf_metrics) only for a list of prompts.
         self.generated.append(prompt)
-        return type("Decoded", (), {"texts": [f"text:{prompt}"], "perf_metrics": FakePerf()})()
+        if isinstance(prompt, str):
+            return f"text:{prompt}"
+        return type("Decoded", (), {"texts": [f"text:{p}" for p in prompt], "perf_metrics": FakePerf()})()
 
 
 class FakeGenai:
@@ -323,6 +327,8 @@ def test_generate_step(tmp_path):
     assert r.compile_ms is not None and r.first_call_ms is not None
     genai = r.resolved["genai"]
     assert genai["ttft_ms"] == pytest.approx(12.5) and genai["generated_tokens"] == 8
+    # A str prompt would get a bare str back, with no perf_metrics (E3's first run).
+    assert FakePipeline.generated[-1] == ["hi"]
     r2 = a.run(req(task="generate", model=str(tmp_path), device="GPU.0", prompt="hi"))
     assert r2.compile_ms is None  # pipeline cached
 
