@@ -1,0 +1,119 @@
+# E2 batch-8 tail (R&D, 2026-10-10). Runs after experiments/e2/spec.yaml, same session, one try per arm.
+
+id: E2
+procedure: interleaved
+compile_cache: fresh
+question: >
+  The batch-8 tail of E2. The NPU arms with batch > 1 run here, in one final
+  block after the main run of experiments/e2/spec.yaml, in the same booked
+  session and quiet CPU window, cheapest first. They moved here because NPU
+  batch-8 shapes have lost the device before (nomic 8x1024 3/3 and 8x2048 1/1
+  in E1, with correct inputs), so they must not stop the main run.
+decision: >
+  Descriptive only, as in the main spec: warm statistics and the parity guard
+  (first repeat row cosine >= 0.999 against the CPU batch-1 arm at the same
+  length, from the main run) are recorded. A device loss or hang is a recorded
+  row with no timing, later arms are marked not run, and nothing is retried.
+band: 1.0
+warmups: 1
+repeats: 19
+rest_s: 900
+needs:
+  grant: false
+  npu_session: true
+  cpu_window: true
+  booked_together: true
+dataset:
+  name: e2-fixed-prompt
+  seed: "The switchyard counts the same cars on every pass. "
+  target_tokens: 2048
+  rule: >
+    Repeat the seed until the model tokenizer counts at least 2048 tokens,
+    then keep the shortest prefix of that repetition that still counts as
+    2048. Every arm gets the same prefix; the adapter right-truncates to
+    the arm's static length, so every device sees byte-identical tokens at
+    each length. The dropped count is recorded as truncated_tokens. No
+    instruction prefix is prepended — E2 measures identical generic tokens
+    for speed and parity, not the retrieval recipe. Every E2 row carries
+    the label "speed and parity only; not the retrieval recipe".
+metrics:
+  - compile_ms
+  - compile_warm_reload_ms
+  - first_call_ms
+  - latency_ms
+  - throughput
+  - truncated_tokens
+stop_rules:
+  - A non-zero step stops the sequence. Later arms do not run.
+  - Every arm is static-shaped on every device, so all devices see
+    identical tokens and identical shapes per length.
+  - Cold is once per arm on its fresh compile cache and stays out of the
+    percentiles; the cold row carries compile_ms and
+    compile_warm_reload_ms, and first-call time beside them.
+  - Repeats are deterministic — the same artifact and the same tokens give
+    the same vector, so the parity guard reads the first repeat row.
+  - The pin is the official OpenVINO export OpenVINO/Qwen3-Embedding-0.6B-fp16-ov at 82a0035040926a5c0dcf251209218e096c5eeb1c,
+    licence apache-2.0 verified on the hub this week. The fp16 IR is the
+    parity-faithful choice — the CPU reference runs the same artifact.
+  - Pooling is last-token, the model card's recipe, pinned in the adapter
+    table and recorded per row.
+  - E2 arms are an embedding model, so the batch-8 cross-encoder refusal
+    does not apply. Every measured call carries the adapter's automatic
+    60 second per-call bound — a hang returns ok=False, marks the arm
+    inconclusive, poisons the model+device pair for the run, and the
+    runner's non-zero-step stop ends the sequence and the session.
+  - The NPU, iGPU and CPU arms run in one booked block inside a quiet CPU
+    window. The 900 second rest is taken before the block, not between
+    arms.
+  - Booked through the Publisher; never beside a timed calibration or the
+    math ladder on the 5090.
+  - Retrieval quality, calibration and any benchmark placement belong to
+    the later retrieval benchmark, not this run. Every row this run writes
+    is labelled "speed and parity only; not the retrieval recipe", and that
+    label travels into the report.
+arms:
+  - id: qwen3emb-npu-l128-b8
+    task: embed
+    device: NPU
+    engine: openvino
+    model: OpenVINO/Qwen3-Embedding-0.6B-fp16-ov@82a0035040926a5c0dcf251209218e096c5eeb1c
+    revision_or_digest: 82a0035040926a5c0dcf251209218e096c5eeb1c
+    quant: fp16
+    licence: apache-2.0
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x128"
+    measure: latency_ms
+  - id: qwen3emb-npu-l512-b8
+    task: embed
+    device: NPU
+    engine: openvino
+    model: OpenVINO/Qwen3-Embedding-0.6B-fp16-ov@82a0035040926a5c0dcf251209218e096c5eeb1c
+    revision_or_digest: 82a0035040926a5c0dcf251209218e096c5eeb1c
+    quant: fp16
+    licence: apache-2.0
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x512"
+    measure: latency_ms
+  - id: qwen3emb-npu-l2048-b8
+    task: embed
+    device: NPU
+    engine: openvino
+    model: OpenVINO/Qwen3-Embedding-0.6B-fp16-ov@82a0035040926a5c0dcf251209218e096c5eeb1c
+    revision_or_digest: 82a0035040926a5c0dcf251209218e096c5eeb1c
+    quant: fp16
+    licence: apache-2.0
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 8
+    static_shape: "8x2048"
+    measure: latency_ms

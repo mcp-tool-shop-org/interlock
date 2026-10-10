@@ -13,6 +13,11 @@
 #   window, booked through the Publisher. This spec does not start a device.
 # EXTERNAL_VERIFIER: n/a. R&D reviews this spec before any device time.
 
+# Amendment, 2026-10-10, before any E2 run (R&D, per the E1 rulings of 2026-10-09):
+# the three NPU batch-8 arms moved to experiments/e2/spec-b8tail.yaml, which runs after this spec in the same
+# booked session and quiet window, cheapest first, one try each. A device loss or hang there is a recorded row,
+# later arms are marked not run, and nothing is retried. The decision is unchanged: the batch-8 rows were
+# descriptive. A parity-invalid arm is stored with parity_valid: false and kept out of select and the gap report.
 id: E2
 procedure: interleaved
 compile_cache: fresh
@@ -290,21 +295,6 @@ arms:
     batch: 1
     static_shape: "1x128"
     measure: latency_ms
-  - id: qwen3emb-npu-l128-b8
-    task: embed
-    device: NPU
-    engine: openvino
-    model: OpenVINO/Qwen3-Embedding-0.6B-fp16-ov@82a0035040926a5c0dcf251209218e096c5eeb1c
-    revision_or_digest: 82a0035040926a5c0dcf251209218e096c5eeb1c
-    quant: fp16
-    licence: apache-2.0
-    engine_version: "2026.4.1"
-    thinking_level: "off"
-    num_predict: null
-    num_ctx: null
-    batch: 8
-    static_shape: "8x128"
-    measure: latency_ms
   - id: qwen3emb-npu-l512-b1
     task: embed
     device: NPU
@@ -320,21 +310,6 @@ arms:
     batch: 1
     static_shape: "1x512"
     measure: latency_ms
-  - id: qwen3emb-npu-l512-b8
-    task: embed
-    device: NPU
-    engine: openvino
-    model: OpenVINO/Qwen3-Embedding-0.6B-fp16-ov@82a0035040926a5c0dcf251209218e096c5eeb1c
-    revision_or_digest: 82a0035040926a5c0dcf251209218e096c5eeb1c
-    quant: fp16
-    licence: apache-2.0
-    engine_version: "2026.4.1"
-    thinking_level: "off"
-    num_predict: null
-    num_ctx: null
-    batch: 8
-    static_shape: "8x512"
-    measure: latency_ms
   - id: qwen3emb-npu-l2048-b1
     task: embed
     device: NPU
@@ -349,19 +324,4 @@ arms:
     num_ctx: null
     batch: 1
     static_shape: "1x2048"
-    measure: latency_ms
-  - id: qwen3emb-npu-l2048-b8
-    task: embed
-    device: NPU
-    engine: openvino
-    model: OpenVINO/Qwen3-Embedding-0.6B-fp16-ov@82a0035040926a5c0dcf251209218e096c5eeb1c
-    revision_or_digest: 82a0035040926a5c0dcf251209218e096c5eeb1c
-    quant: fp16
-    licence: apache-2.0
-    engine_version: "2026.4.1"
-    thinking_level: "off"
-    num_predict: null
-    num_ctx: null
-    batch: 8
-    static_shape: "8x2048"
     measure: latency_ms
