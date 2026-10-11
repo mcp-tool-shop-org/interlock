@@ -168,3 +168,79 @@ def test_check_reports_a_privacy_hit_in_a_receipt(tmp_path: Path):
 
 def test_committed_receipts_and_table_rows_pass_the_privacy_check():
     assert check_tree(ROOT) == []
+
+
+def test_privacy_check_refuses_unc_paths():
+    planted = row()
+    planted["notes"] = "\\\\" + "server\\share\\file"
+    with pytest.raises(ReceiptError, match="UNC path"):
+        validate_row(planted)
+
+
+def test_privacy_check_refuses_non_http_schemes_and_user_at_host():
+    for planted in (
+        "ssh" + "://myrig/repo",
+        "sftp" + "://myrig/repo",
+        "ssh" + "://gpu-box.local/repo",
+        "git" + "@" + "myrig:org/repo",
+        "git" + "@" + "example.com:org/repo",
+        "ada" + "@" + "box.corp",
+    ):
+        remote = row()
+        remote["notes"] = planted
+        with pytest.raises(ReceiptError, match="hostname"):
+            validate_row(remote)
+    allowed = row()
+    allowed["notes"] = "ssh" + "://127.0.0.1/repo and git" + "@" + "localhost:repo"
+    validate_row(allowed)
+
+
+def test_privacy_check_refuses_more_token_prefixes():
+    for prefix in (
+        "github" + "_pat_",
+        "gh" + "o_",
+        "gh" + "s_",
+        "gh" + "u_",
+        "xox" + "a-",
+        "xox" + "b-",
+        "xox" + "p-",
+        "xox" + "r-",
+    ):
+        token = row()
+        token["notes"] = prefix + "example"
+        with pytest.raises(ReceiptError, match="token-shaped"):
+            validate_row(token)
+    access_key = row()
+    access_key["notes"] = "AKIA" + ("A1" * 8)
+    with pytest.raises(ReceiptError, match="token-shaped"):
+        validate_row(access_key)
+    bearer = row()
+    bearer["notes"] = "Bearer " + ("a" * 16)
+    with pytest.raises(ReceiptError, match="token-shaped"):
+        validate_row(bearer)
+
+
+def test_an_expanded_userprofile_path_is_already_refused():
+    for planted in (
+        "C:" + "\\Users\\" + "someone\\receipt.json",
+        "C:" + "/Users/" + "someone/receipt.json",
+    ):
+        homed = row()
+        homed["notes"] = planted
+        with pytest.raises(ReceiptError, match="home-directory"):
+            validate_row(homed)
+
+
+def test_a_bare_host_port_is_a_known_limit_until_host_port_is_set():
+    bare = row()
+    bare["notes"] = "myrig:11434"
+    validate_row(bare)
+    with pytest.raises(ReceiptError, match="hostname"):
+        validate_row(bare, host_port=True)
+    tagged = row()
+    tagged["notes"] = "gemma4:31b and localhost:11434 and 127.0.0.1:11434 and myrig:65536"
+    validate_row(tagged, host_port=True)
+
+
+def test_committed_receipts_pass_the_host_port_check():
+    assert check_tree(ROOT, host_port=True) == []

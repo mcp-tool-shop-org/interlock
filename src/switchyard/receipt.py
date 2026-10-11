@@ -2,8 +2,14 @@
 
 ``switchyard check`` is green when the repository has no receipts yet.
 Every receipt and every table row has to validate. None may carry a
-home-directory path, a hostname other than ``127.0.0.1`` or ``localhost``,
-or a token-shaped value.
+home-directory path, including one an expanded profile variable would
+produce, a UNC path, a hostname other than ``127.0.0.1``, ``localhost``
+or ``::1``, an ``ssh://`` or ``sftp://`` host, a ``git@host:`` or
+``user@host.domain`` form, or a token-shaped value.
+
+A bare single-label host and port (``myrig:11434``) is a known limit.
+``switchyard check --host-port`` refuses it. A model tag such as
+``gemma4:31b`` is not a host.
 """
 
 from __future__ import annotations
@@ -19,6 +25,7 @@ from switchyard.families import FamilyError, family_of
 
 RUN_MARKER_SUFFIX = ".run.json"
 _HOME = re.compile(r"(?i)(?:[A-Za-z]:[\\/]+Users[\\/]|[\\/]Users[\\/]|[\\/]home[\\/])")
+_UNC = re.compile(r"\\\\[A-Za-z0-9._$-]+\\[A-Za-z0-9._$-]+")
 _LOOPBACK = frozenset({"localhost", "127.0.0.1", "::1"})
 _HOST_SUFFIXES = frozenset(
     {
@@ -46,9 +53,17 @@ _HOST_SUFFIXES = frozenset(
     }
 )
 _IPV4 = re.compile(r"(?<!\d)(?:\d{1,3}\.){3}\d{1,3}(?!\d)")
-_URL_HOST = re.compile(r"(?i)\b(?:https?|wss?)://(\[[^\]]+\]|[^/\s:]+)")
+_URL_HOST = re.compile(r"(?i)\b(?:https?|wss?|ssh|sftp)://(\[[^\]]+\]|[^/\s:]+)")
 _FQDN = re.compile(r"(?<![A-Za-z0-9_\\/])(?:[A-Za-z0-9-]+\.)+([A-Za-z]{2,})(?![A-Za-z0-9_])")
-_TOKEN_PREFIX = re.compile(r"(?<![A-Za-z0-9])(?:hf_|sk-|ghp_)[A-Za-z0-9]")
+_SCP_HOST = re.compile(r"(?<![A-Za-z0-9])[A-Za-z0-9._+-]+@([A-Za-z0-9.-]+):")
+_USER_HOST = re.compile(
+    r"(?<![A-Za-z0-9])[A-Za-z0-9._+-]+@((?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,})(?![A-Za-z0-9])"
+)
+_HOST_PORT = re.compile(r"(?<![A-Za-z0-9.])([A-Za-z][A-Za-z0-9-]{0,62}):(\d{2,5})(?![A-Za-z0-9])")
+_TOKEN_PREFIX = re.compile(
+    r"(?<![A-Za-z0-9])(?:(?:hf_|sk-|ghp_|github_pat_|gho_|ghs_|ghu_|xox[abpr]-)[A-Za-z0-9]|AKIA[0-9A-Z]{16})"
+)
+_BEARER = re.compile(r"(?<![A-Za-z0-9])Bearer [A-Za-z0-9\-._~+/=]{8,}")
 _SECRET_FIELD = re.compile(r"(?i)(?:^|_)(?:key|token|secret|password|passwd)(?:$|_)")
 _LONG_HEX = re.compile(r"(?<![A-Za-z0-9])[0-9a-fA-F]{32,}(?![A-Za-z0-9])")
 _LONG_B64 = re.compile(r"(?<![A-Za-z0-9+/])[A-Za-z0-9+/]{32,}={0,2}(?![A-Za-z0-9+/])")
@@ -75,11 +90,11 @@ def validator() -> Draft202012Validator:
     return _VALIDATOR
 
 
-def validate_row(row: dict) -> None:
+def validate_row(row: dict, *, host_port: bool = False) -> None:
     errors = sorted(validator().iter_errors(row), key=lambda item: list(item.path))
     if errors:
         raise ReceiptError(_format_error(errors[0]))
-    _reject_home_paths(row)
+    _reject_home_paths(row, host_port=host_port)
     for metric in row["quality"]:
         _check_interval(row, metric)
     for metric in row.get("per_type", {}).values():
@@ -93,8 +108,12 @@ def validate_row(row: dict) -> None:
             raise ReceiptError(f"{row['id']}: a receipt with no commit sha needs content_sha256")
 
 
-def check_tree(root: Path) -> list[str]:
-    """Return human-readable errors. An empty tree returns an empty list."""
+def check_tree(root: Path, *, host_port: bool = False) -> list[str]:
+    """Return human-readable errors. An empty tree returns an empty list.
+
+    ``host_port`` also refuses a bare single-label host and port. That check
+    is off by default: ``myrig:11434`` is a known limit.
+    """
 
     problems: list[str] = []
     for path in receipt_paths(root):
@@ -107,7 +126,7 @@ def check_tree(root: Path) -> list[str]:
             continue
         for index, row in enumerate(rows):
             try:
-                validate_row(row)
+                validate_row(row, host_port=host_port)
             except ReceiptError as exc:
                 label = row.get("id") if isinstance(row, dict) else None
                 where = f"{path}#{label or index}"
@@ -202,13 +221,20 @@ def _check_device_lost(row: dict) -> None:
         raise ReceiptError(f"{row['id']}: a {outcome} row has no timing")
 
 
-def _reject_home_paths(value: object, where: str = "$", field: str | None = None) -> None:
-    """Refuse a home path, a non-loopback hostname, or a token-shaped value."""
+def _reject_home_paths(
+    value: object, where: str = "$", field: str | None = None, *, host_port: bool = False
+) -> None:
+    """Refuse a home path, a UNC path, a non-loopback hostname, or a token-shaped value.
+
+    A bare single-label host and port is refused only when ``host_port`` is set.
+    """
 
     if isinstance(value, str):
         if _HOME.search(value):
             raise ReceiptError(f"home-directory path in {where}")
-        host = _forbidden_host(value)
+        if _UNC.search(value):
+            raise ReceiptError(f"UNC path in {where}")
+        host = _forbidden_host(value, host_port=host_port)
         if host is not None:
             raise ReceiptError(f"hostname {host} in {where}")
         if _token_shaped(value, field):
@@ -216,14 +242,14 @@ def _reject_home_paths(value: object, where: str = "$", field: str | None = None
         return
     if isinstance(value, dict):
         for key, item in value.items():
-            _reject_home_paths(item, f"{where}.{key}", str(key))
+            _reject_home_paths(item, f"{where}.{key}", str(key), host_port=host_port)
         return
     if isinstance(value, list):
         for index, item in enumerate(value):
-            _reject_home_paths(item, f"{where}[{index}]", field)
+            _reject_home_paths(item, f"{where}[{index}]", field, host_port=host_port)
 
 
-def _forbidden_host(text: str) -> str | None:
+def _forbidden_host(text: str, *, host_port: bool = False) -> str | None:
     for match in _IPV4.finditer(text):
         ip = match.group(0)
         parts = ip.split(".")
@@ -234,6 +260,16 @@ def _forbidden_host(text: str) -> str | None:
     for match in _URL_HOST.finditer(text):
         raw = match.group(1)
         host = raw[1:-1] if raw.startswith("[") and raw.endswith("]") else raw
+        if "@" in host:
+            host = host.rsplit("@", 1)[1]
+        if host.casefold() not in _LOOPBACK:
+            return host
+    for match in _SCP_HOST.finditer(text):
+        host = match.group(1)
+        if host.casefold() not in _LOOPBACK:
+            return host
+    for match in _USER_HOST.finditer(text):
+        host = match.group(1)
         if host.casefold() not in _LOOPBACK:
             return host
     for match in _FQDN.finditer(text):
@@ -242,11 +278,18 @@ def _forbidden_host(text: str) -> str | None:
             continue
         if name.casefold() not in _LOOPBACK:
             return name
+    if host_port:
+        for match in _HOST_PORT.finditer(text):
+            name, port_text = match.group(1), match.group(2)
+            port = int(port_text)
+            if port < 1 or port > 65535 or name.casefold() in _LOOPBACK:
+                continue
+            return f"{name}:{port_text}"
     return None
 
 
 def _token_shaped(value: str, field: str | None) -> bool:
-    if _TOKEN_PREFIX.search(value):
+    if _TOKEN_PREFIX.search(value) or _BEARER.search(value):
         return True
     if field is None or _SECRET_FIELD.search(field) is None:
         return False

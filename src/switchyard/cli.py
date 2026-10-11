@@ -59,6 +59,11 @@ def main(argv: list[str] | None = None) -> int:
         help="validate every receipt and table row, including the privacy check",
     )
     check.add_argument("--root", type=Path, default=Path("."))
+    check.add_argument(
+        "--host-port",
+        action="store_true",
+        help="also refuse a single-label host and port, such as myrig:11434. A model tag is not a host",
+    )
     check.set_defaults(func=_cmd_check)
 
     table = sub.add_parser("table", help="print routing rows, filtered by task or device")
@@ -142,7 +147,7 @@ def _take_min_metrics(argv: list[str]) -> tuple[list[str], dict[str, float]]:
 
 def _cmd_check(args: argparse.Namespace) -> int:
     root = args.root.resolve()
-    problems = check_tree(root)
+    problems = check_tree(root, host_port=args.host_port)
     count = _count_rows(root)
     if problems:
         for problem in problems:
