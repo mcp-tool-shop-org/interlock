@@ -1282,6 +1282,9 @@ def test_an_edited_spec_is_refused_and_dry_run_does_not_touch_devices(tmp_path: 
     e4_text = dry_run(repo / "experiments" / "e4" / "spec.yaml", repo)
     e5_text = dry_run(repo / "experiments" / "e5" / "spec.yaml", repo)
     assert "heartbeat not read" in e4_text
+    assert "prompt built at run time by prompt_eval_count" in e4_text
+    assert "the final prefix is counted again from a cold load" in e4_text
+    assert "prompt built at run time by prompt_eval_count" not in e5_text
     assert "slots: 79" in e4_text
     assert "order: aba" in e4_text
     assert "compile_cache: fresh" in e4_text
