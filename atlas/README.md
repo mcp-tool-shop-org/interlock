@@ -1,17 +1,19 @@
 # switchyard: how it works
 
-Mapped at 2026-10-11 from commit e4547dd by Atlas 1.24.0.
+Mapped at 2026-10-11 from commit 3de07c6 by Atlas 1.24.0.
 
 ## What this is
 
 switchyard routes each job to a model, engine and device from a receipt-backed table. (written by a person)
 
-7 parts, mostly Python (53 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.
+7 parts, mostly Python (59 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.
 
-## What changed since 2026-10-11 (09958db)
+## What changed since 2026-10-11 (e4547dd)
 
-- receipts/e3-ref-2026-10-11b.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
-- 2 files added and 25 changed content, across 4 parts.
+- experiments/ is now read by tests/test_router_policy.py.
+- experiments/e3-ref/spec.yaml is now read by tests/test_router_policy.py.
+- experiments/e3/spec.yaml is now read by tests/router_rows.py, tests/test_route_cli.py and tests/test_router_policy.py.
+- 10 files added and 5 changed content, across 4 parts.
 
 ## What comes in
 
@@ -21,7 +23,7 @@ switchyard routes each job to a model, engine and device from a receipt-backed t
 ## What happens through CI
 
 1. The workflow runs tests/ in tests.
-2. That reaches src (35 files).
+2. That reaches src (36 files).
 3. It uploads coverage to Codecov.
 
 ## Who reads the results
@@ -46,7 +48,7 @@ CI writes nothing this map can see.
 
 Confidence is low: fewer than 25 source files reach 10 revisions in the window.
 
-Window: 180 days; a pair counts from 3 shared commits, since 5 source files reach 10 revisions; the floor rises to 10 when 25 do.
+Window: 180 days; a pair counts from 3 shared commits, since 6 source files reach 10 revisions; the floor rises to 10 when 25 do.
 
 ## What no test touches
 
@@ -78,7 +80,7 @@ Read those in order to follow one run of switchyard end to end. This path follow
 
 - 1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.
 - 3 writes and 3 reads use paths built at run time and are not named here.
-- 4 writes and 17 reads go to a path their caller passes, not to this repository.
+- 4 writes and 18 reads go to a path their caller passes, not to this repository.
 - 3 reads go to the directory the command is run in (receipts/), not to this repository.
 - 17 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 14 more.
 - Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window.
