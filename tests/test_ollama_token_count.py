@@ -135,6 +135,35 @@ class _Transport:
         }
 
 
+class _CachingTransport(_Transport):
+    """A resident model reports one token fewer for a prompt it has already seen."""
+
+    def __init__(self):
+        self.seen: list[str] = []
+        self.resident = False
+        super().__init__(self._cached_count)
+
+    def __call__(self, method, url, body):
+        if isinstance(body, dict) and body.get("keep_alive") == 0 and body.get("prompt") == "":
+            self.resident = False
+            self.seen.clear()
+        result = super().__call__(method, url, body)
+        if isinstance(body, dict) and body.get("raw") is True:
+            if body.get("keep_alive") == 0:
+                self.resident = False
+                self.seen.clear()
+            else:
+                self.seen.append(str(body.get("prompt") or ""))
+                self.resident = True
+        return result
+
+    def _cached_count(self, prompt: str) -> int:
+        true = len(prompt.split())
+        if self.resident and any(prompt.startswith(earlier) for earlier in self.seen):
+            return max(0, true - 1)
+        return true
+
+
 def _kinds(calls):
     kinds = []
     for _method, url, body in calls:
@@ -274,6 +303,8 @@ def test_an_exact_ollama_count_lands_on_the_receipt_after_the_guards(tmp_path: P
     assert all(body["prompt"] == "aa bb aa" for body in measured)
     assert "raw" not in measured[0]
     assert rows[0]["settings"]["prompt_tokens"] == 3
+    assert rows[0]["settings"]["prompt_token_search"] == 3
+    assert rows[0]["settings"]["prompt_token_cold"] == 3
     assert rows[0]["settings"]["prompt_token_method"] == "prompt_eval_count"
 
 
@@ -284,6 +315,40 @@ def test_the_shortest_prefix_at_or_above_is_recorded(tmp_path: Path):
     assert rows[0]["settings"]["prompt_token_method"] == "prompt_eval_count (shortest prefix at or above)"
     counts = [body for _method, _url, body in transport.calls if isinstance(body, dict) and body.get("raw") is True]
     assert counts[-1]["prompt"] == "aa bb aa"
+
+
+def test_a_cached_count_lower_than_the_cold_load_refuses_the_arm(tmp_path: Path):
+    """A resident prompt cache reports fewer tokens. The cold re-count disagrees."""
+
+    transport = _CachingTransport()
+    repo = tmp_path / "repo"
+    with pytest.raises(RunnerError, match="search counted 3 and a cold load counted 4"):
+        run_spec(
+            _bind(repo, _spec(_arm())),
+            root=repo,
+            grant="grant-t",
+            adapters={"ollama": OllamaAdapter(transport=transport, device="5090")},
+            heartbeat=_fresh_heartbeat(tmp_path),
+            date="2026-10-11",
+            run_id="run-1",
+            watch=_watch(),
+        )
+    raw_at = [
+        index
+        for index, (_method, _url, body) in enumerate(transport.calls)
+        if isinstance(body, dict) and body.get("raw") is True
+    ]
+    unloads = [
+        index
+        for index, (_method, _url, body) in enumerate(transport.calls)
+        if isinstance(body, dict) and body.get("prompt") == "" and body.get("keep_alive") == 0
+    ]
+    assert raw_at and unloads and unloads[0] < raw_at[-1]
+    assert transport.calls[raw_at[-1]][2]["prompt"] == "aa bb aa bb"
+    assert not any(
+        isinstance(body, dict) and body.get("options", {}).get("num_predict") == 8
+        for _method, _url, body in transport.calls
+    )
 
 
 def test_a_count_error_refuses_the_arm_before_a_measurement(tmp_path: Path):
@@ -367,6 +432,7 @@ def test_dry_run_names_the_count_and_does_not_call_it(tmp_path: Path, monkeypatc
     e4_text = dry_run(repo / "experiments" / "e4" / "spec.yaml", repo)
     e5_text = dry_run(repo / "experiments" / "e5" / "spec.yaml", repo)
     assert "prompt built at run time by prompt_eval_count" in e4_text
+    assert "the final prefix is counted again from a cold load" in e4_text
     assert "prompt built at run time by prompt_eval_count" not in e5_text
     assert "heartbeat not read; adapters not called" in e4_text
     assert "devices not started (--dry-run)" in e4_text

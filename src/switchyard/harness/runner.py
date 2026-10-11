@@ -149,7 +149,10 @@ def dry_run(spec_path: Path, repo: Path) -> str:
     if needs["cpu_window"]:
         flags.append("--cpu-window")
     if _prompt_built_at_runtime(spec):
-        lines.append("prompt built at run time by prompt_eval_count")
+        lines.append(
+            "prompt built at run time by prompt_eval_count; "
+            "the final prefix is counted again from a cold load"
+        )
     lines.append("a device run would require: " + (", ".join(flags) if flags else "no extra flag"))
     lines.append("heartbeat not read; adapters not called")
     lines.append(devices_not_started())
@@ -246,7 +249,7 @@ def run_interleaved(
     captured = env if env is not None else environment()
     cache_report: dict = {"cleared": set(), "failures": {}}
     cache_dirs = _cache_dirs(spec, root, run_id, arms, cache_report["cleared"])
-    prompt_cache: dict[str, tuple[str, int, str | None]] = {}
+    prompt_cache: dict[str, tuple[str, int, str | None, int | None, int | None]] = {}
     removed: set[str] = set()
     imported = False
     wall = wall or time.time
@@ -1041,7 +1044,7 @@ def _request(
     spec_rel: str,
     cache_dir: Path | None,
     adapter,
-    prompt_cache: dict[str, tuple[str, int, str | None]],
+    prompt_cache: dict[str, tuple[str, int, str | None, int | None, int | None]],
     bound_s: float | None = None,
 ) -> StepRequest:
     settings = {key: arm.get(key) for key in PASSTHROUGH}
@@ -1264,7 +1267,7 @@ def _session(
     spec: dict,
     spec_rel: str,
     cache_dir: Path | None,
-    prompt_cache: dict[str, tuple[str, int, str | None]],
+    prompt_cache: dict[str, tuple[str, int, str | None, int | None, int | None]],
     bound_s: float | None = None,
 ) -> None:
     adapter = adapters[arm["engine"]]
@@ -1316,7 +1319,7 @@ def _ollama_prompt_method(fit: str) -> str:
     return "prompt_eval_count (shortest prefix at or above)"
 
 
-def _dataset_prompt(arm: dict, spec: dict, adapter, prompt_cache: dict[str, tuple[str, int, str | None]]) -> str | None:
+def _dataset_prompt(arm: dict, spec: dict, adapter, prompt_cache: dict[str, tuple[str, int, str | None, int | None, int | None]]) -> str | None:
     """The spec's prefix: repeat the seed until the model tokenizer reaches the target.
 
     One prefix per model, shared by every device of that model. A spec with a
@@ -1327,8 +1330,13 @@ def _dataset_prompt(arm: dict, spec: dict, adapter, prompt_cache: dict[str, tupl
     trims on word boundaries. That count is device contact. It runs only from
     a granted run, after the heartbeat and the empty-card check, because this
     function is reached from the measurement loop. The dry-run never calls it.
-    After the prefix is chosen, the model is unloaded when the count would
-    otherwise leave it loaded, so the measurement load is the spec's own load.
+    A resident model can report only the tokens it evaluated, so a later
+    prefix of an earlier one can undercount. After the prefix is chosen, the
+    model is unloaded when the search would leave it loaded, and the final
+    prefix is counted once more from that cold load. A cold count that differs
+    from the search refuses the arm before any measurement. Both counts are
+    recorded. The measurement load stays the spec's own: a count that would
+    leave the model resident is unloaded again before it.
     """
 
     dataset = spec.get("dataset") if isinstance(spec.get("dataset"), dict) else None
@@ -1355,7 +1363,17 @@ def _dataset_prompt(arm: dict, spec: dict, adapter, prompt_cache: dict[str, tupl
                     return counter(model, text, settings=_count_settings(arm), device=arm["device"])
 
                 text, tokens, fit = fit_prompt_words(seed, target, count)
-                cached = (text, tokens, _ollama_prompt_method(fit))
+                if _count_leaves_loaded(arm):
+                    adapter.unload(model, arm["device"])
+                cold_tokens = count(text)
+                if cold_tokens != tokens:
+                    if _count_leaves_loaded(arm):
+                        adapter.unload(model, arm["device"])
+                    raise RunnerError(
+                        f"{arm['id']}: Ollama token count refused: "
+                        f"the search counted {tokens} and a cold load counted {cold_tokens}"
+                    )
+                cached = (text, cold_tokens, _ollama_prompt_method(fit), tokens, cold_tokens)
                 prompt_cache[model] = cached
                 if _count_leaves_loaded(arm):
                     adapter.unload(model, arm["device"])
@@ -1365,7 +1383,7 @@ def _dataset_prompt(arm: dict, spec: dict, adapter, prompt_cache: dict[str, tupl
                     return counter(model, text)
 
                 text = fit_prompt(seed, target, count)
-                cached = (text, count(text), None)
+                cached = (text, count(text), None, None, None)
                 prompt_cache[model] = cached
         except SearchError as exc:
             raise RunnerError(str(exc)) from exc
@@ -1374,14 +1392,18 @@ def _dataset_prompt(arm: dict, spec: dict, adapter, prompt_cache: dict[str, tupl
     return cached[0]
 
 
-def _prompt_counts(arm: dict, prompt_cache: dict[str, tuple[str, int, str | None]]) -> dict:
+def _prompt_counts(arm: dict, prompt_cache: dict[str, tuple[str, int, str | None, int | None, int | None]]) -> dict:
     cached = prompt_cache.get(arm["model"])
     if cached is None:
         return {}
-    _text, prompt_tokens, method = cached
+    _text, prompt_tokens, method, search_tokens, cold_tokens = cached
     counts = {"prompt_tokens": prompt_tokens}
     if method:
         counts["prompt_token_method"] = method
+    if search_tokens is not None:
+        counts["prompt_token_search"] = search_tokens
+    if cold_tokens is not None:
+        counts["prompt_token_cold"] = cold_tokens
     length = _static_length(arm.get("static_shape"))
     if length is not None:
         counts["truncated_tokens"] = max(0, prompt_tokens - length)
