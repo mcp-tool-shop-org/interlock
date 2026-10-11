@@ -33,8 +33,90 @@
 # applied only after a run of over 30 minutes on the same devices that ended
 # less than rest_s ago (maintainer, 2026-10-10).
 
+# Amendment, 2026-10-10, after e3-2026-10-10c's RAM stop (R&D ruling; harness #47 and #48).
+#
+# Why. e3-2026-10-10c was hard-killed at 89.2% system RAM (2-s sample 95%) as
+# pipelines piled up: under the interleaved order across all 27 arms, every
+# (model, device, compile config) generate pipeline stays resident at once, and
+# on the NPU that is one per prompt length (#45). On a 63 GB machine with the
+# 57% shared-memory override it does not fit. e3-2026-10-10b and -10c are kept
+# as evidence; neither produced a row.
+#
+# Order. order: blocked replaces whole-run interleaving for E3 only. One block
+# per (model, device) on CPU and iGPU, holding all lengths and both thinking
+# modes: one generate pipeline serves every length there (the compile config
+# does not vary by prompt). On the NPU, one block per (model, length, thinking
+# mode): MAX_PROMPT_LEN is the prompt's token count + 64, and "/no_think"
+# changes the token count, so each thinking mode needs its own pipeline. Inside
+# a block the existing interleaved procedure applies to that block's arms:
+# cold once per arm, warmups 1, repeats 5, the per-arm call bound. Between
+# blocks the block's rows are flushed, its pipeline unloaded, and system RAM
+# must return within 3 GiB of the run's starting baseline within 60 s, or the
+# run stops cleanly. At most one generate pipeline is resident at any time.
+#
+# Block order, cheapest and least risky first: Phi-3.5 before Qwen3-8B; within
+# each model CPU, then iGPU, then NPU by length (l256, l1024, l4096), thinking
+# off before on.
+#
+# Memory guard, in the harness: system RAM is sampled every 2 s; a pipeline
+# build that would cross 85% (used RAM + the largest measured build step for the
+# model; 12 GiB for the 8B and 6 GiB for Phi before the first measurement) is
+# refused and its block is not run, "memory headroom", which is not a capability
+# result; an 88% crossing at any time stops the run cleanly.
+#
+# Compile bound: compile_ceiling_s is 900. A pipeline build past it is a
+# compile_timeout capability row (provisional, scoped to model x device x
+# compile config), never retried.
+#
+# Drift check, descriptive and not a gate: devices are now measured at
+# different times, so phi-35-mini-cpu-l256 is run again at the end as a drift
+# block (warm only, 5 repeats). Its compulsory warmup absorbs the pipeline
+# rebuild after the Qwen NPU blocks unloaded everything; the warmup is discarded
+# and the ratio (drift warm decode tok/s / first block's warm decode tok/s) uses
+# the warm repeats only. Drift rows are descriptive and stay out of the routing
+# table. The NPU-versus-iGPU/CPU expectation check now compares across time; the
+# drift ratio is its context, and the readout says so.
+#
+# Unchanged: models, revisions, prompts, num_predict 128, the thinking switch,
+# the 15 tok/s viability floor at l1024 thinking off, the expectation check
+# (descriptive), rest_s (conditional), call_ceiling_s and compile_cache reuse.
+
 id: E3
 procedure: interleaved
+order: blocked
+compile_ceiling_s: 900
+blocks:
+  - id: phi-cpu
+    arms: [phi-35-mini-cpu-l256, phi-35-mini-cpu-l1024, phi-35-mini-cpu-l4096]
+  - id: phi-igpu
+    arms: [phi-35-mini-igpu-l256, phi-35-mini-igpu-l1024, phi-35-mini-igpu-l4096]
+  - id: phi-npu-l256
+    arms: [phi-35-mini-npu-l256]
+  - id: phi-npu-l1024
+    arms: [phi-35-mini-npu-l1024]
+  - id: phi-npu-l4096
+    arms: [phi-35-mini-npu-l4096]
+  - id: qwen-cpu
+    arms: [qwen3-8b-cpu-l256, qwen3-8b-cpu-l256-think, qwen3-8b-cpu-l1024, qwen3-8b-cpu-l1024-think, qwen3-8b-cpu-l4096, qwen3-8b-cpu-l4096-think]
+  - id: qwen-igpu
+    arms: [qwen3-8b-igpu-l256, qwen3-8b-igpu-l256-think, qwen3-8b-igpu-l1024, qwen3-8b-igpu-l1024-think, qwen3-8b-igpu-l4096, qwen3-8b-igpu-l4096-think]
+  - id: qwen-npu-l256
+    arms: [qwen3-8b-npu-l256]
+  - id: qwen-npu-l256-think
+    arms: [qwen3-8b-npu-l256-think]
+  - id: qwen-npu-l1024
+    arms: [qwen3-8b-npu-l1024]
+  - id: qwen-npu-l1024-think
+    arms: [qwen3-8b-npu-l1024-think]
+  - id: qwen-npu-l4096
+    arms: [qwen3-8b-npu-l4096]
+  - id: qwen-npu-l4096-think
+    arms: [qwen3-8b-npu-l4096-think]
+drift_block:
+  id: phi-cpu-drift
+  repeat_of: phi-cpu
+  arms: [phi-35-mini-cpu-l256]
+  repeats: 5
 compile_cache: reuse
 question: >
   Can the Intel side host an always-on small generator, and at what
