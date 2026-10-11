@@ -69,6 +69,7 @@ from switchyard.harness.watch import (
     RunWatch,
     WatchHooks,
     read_bytes,
+    slot_probe,
 )
 from switchyard.receipt import ReceiptError, load_jsonl, validate_row
 from switchyard.harness.timing import Slot, TimingError, aba_call, schedule, schedule_aba, summarize
@@ -679,11 +680,16 @@ def run_interleaved(
                     )
                     started = True
                 cpu_start = _cpu_sample()
+                adapter = adapters[arm["engine"]]
+                probe = slot_probe(hooks)
+                if probe is not None:
+                    adapter._slot_probe = probe
+                    probe.open()
                 try:
                     kind = "ok"
                     error = ""
                     try:
-                        result = adapters[arm["engine"]].run(
+                        result = adapter.run(
                             _request(
                                 arm,
                                 spec,
@@ -771,6 +777,7 @@ def run_interleaved(
                                     bound,
                                     cold_calls.get(arm["id"]),
                                     {"slot_start": cpu_start, "slot_end": cpu_end},
+                                    _finish_slot_probe(probe, adapter),
                                 )
                             )
                             if slot.phase == "cold" and result.latency_ms is not None:
@@ -800,6 +807,7 @@ def run_interleaved(
                                     flush()
                                     raise RunnerError(error)
                 finally:
+                    _finish_slot_probe(probe, adapter)
                     if started and companion is not None:
                         _session(
                             adapters,
@@ -901,6 +909,17 @@ def _call_bound(slot: Slot, cold_call_s: float | None, ceiling: float) -> float:
     if slot.phase == "cold" or cold_call_s is None:
         return ceiling
     return min(ceiling, max(60.0, 3.0 * cold_call_s))
+
+
+def _finish_slot_probe(probe, adapter) -> dict | None:
+    """The slot's min/max/mean, after the final reading. A second call does not sample again."""
+
+    if probe is None:
+        return None
+    summary = probe.close()
+    if getattr(adapter, "_slot_probe", None) is probe:
+        adapter._slot_probe = None
+    return summary
 
 
 def _cpu_sample():
@@ -1155,6 +1174,7 @@ def _record(
     bound_s: float | None = None,
     cold_call_s: float | None = None,
     cpu: dict | None = None,
+    sample: dict | None = None,
 ) -> dict:
     sensors = None
     if isinstance(result.sensors, dict):
@@ -1174,6 +1194,7 @@ def _record(
         "bound_s": bound_s,
         "cold_call_s": cold_call_s,
         "cpu": cpu,
+        "sample": sample,
         "output": result.output,
         "resolved": result.resolved,
         "sensors": sensors,
@@ -1233,6 +1254,8 @@ def _artifacts(records: list[dict], arm_id: str) -> dict | None:
             item["bound_s"] = row["bound_s"]
         if row.get("cpu") is not None:
             item["cpu"] = row["cpu"]
+        if row.get("sample"):
+            item["sample"] = row["sample"]
         if row["output"] is not None:
             item["output"] = row["output"]
         if row["sensors"]:

@@ -17,6 +17,10 @@ The runner owns what to write (the callbacks); the watcher owns when. The
 clock, the RAM and working-set samplers and the exit function are injectable,
 so tests prove the receipt is written while a compile is still blocked and
 never end the test process.
+
+A slot probe is separate from that thread. The runner opens one around each
+measured call: a reading before, one a second while the call runs, and one
+after. Tests pass a ``slot_reader`` and leave the thread off.
 """
 
 from __future__ import annotations
@@ -151,6 +155,226 @@ class WatchHooks:
     interval_s: float = RAM_SAMPLE_S
     lock_wait_s: float = 10.0  # how long the watcher waits for the run's state lock before flushing without it
     start_thread: bool = True
+    # None plus start_thread False means a test takes no per-slot samples.
+    # None plus start_thread True is the real reader (production).
+    slot_reader: Callable[[str | None], dict] | None = None
+
+
+def _number(value) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def _span(readings: list[dict], key: str) -> dict | None:
+    values = [row[key] for row in readings if row.get(key) is not None]
+    if not values:
+        return None
+    return {"min": min(values), "max": max(values), "mean": sum(values) / len(values)}
+
+
+def summarize_slot(readings: list[dict]) -> dict:
+    """Min, max and mean for one slot. Top-process names only when CPU passes 30%."""
+
+    cpu = _span(readings, "cpu_pct")
+    names: list[str] = []
+    if cpu is not None and cpu["max"] > 30:
+        for row in readings:
+            if row.get("cpu_pct") is None or row["cpu_pct"] <= 30:
+                continue
+            for name in row.get("top") or []:
+                if name not in names:
+                    names.append(name)
+    drives = [row["drive"] for row in readings if row.get("drive")]
+    return {
+        "samples": len(readings),
+        "cpu_pct": cpu,
+        "ram_pct": _span(readings, "ram_pct"),
+        "disk_read_mb_s": _span(readings, "disk_read_mb_s"),
+        "top_processes": names,
+        "load_drive": drives[-1] if drives else None,
+    }
+
+
+class _DiskRate:
+    """Read MB/s from a cumulative counter. The first look at a drive is not a rate."""
+
+    def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
+        self._clock = clock
+        self._last: dict[str, tuple[float, int]] = {}
+
+    def mb_s(self, drive: str | None) -> float | None:
+        if not drive or drive == UNRECORDED or psutil is None:
+            return None
+        try:
+            counters = psutil.disk_io_counters(perdisk=True) or {}
+        except Exception:
+            return None
+        key = _disk_key(counters, drive)
+        if key is None:
+            return None
+        try:
+            read = int(counters[key].read_bytes)
+        except Exception:
+            return None
+        now = self._clock()
+        previous = self._last.get(key)
+        self._last[key] = (now, read)
+        if previous is None:
+            return None
+        elapsed = now - previous[0]
+        if elapsed <= 0:
+            return None
+        delta = read - previous[1]
+        if delta < 0:
+            return None
+        return delta / elapsed / (1024 * 1024)
+
+
+def _disk_key(counters: dict, drive: str) -> str | None:
+    """The counter for a drive letter, or None when the platform does not key that way.
+
+    A missing counter stays unrecorded. It is not recorded as zero.
+    """
+
+    letter = drive[:1].upper()
+    if not letter.isalpha():
+        return None
+    for key in counters:
+        label = str(key).upper().rstrip("\\")
+        if label in {letter, f"{letter}:"}:
+            return key
+    return None
+
+
+_DISK = _DiskRate()
+
+
+def _top_other(limit: int = 3) -> list[str]:
+    """The busiest other processes. This process and its children are left out."""
+
+    if psutil is None:
+        return []
+    try:
+        me = psutil.Process()
+        excluded = {int(me.pid)}
+        for child in me.children(recursive=True):
+            excluded.add(int(child.pid))
+    except Exception:
+        return []
+    ranked: list[tuple[float, str]] = []
+    try:
+        processes = psutil.process_iter()
+    except Exception:
+        return []
+    for proc in processes:
+        try:
+            if int(proc.pid) in excluded:
+                continue
+            cpu = _number(proc.cpu_percent(interval=None))
+            if cpu is None:
+                continue
+            ranked.append((cpu, str(proc.name())))
+        except Exception:
+            continue
+    ranked.sort(key=lambda item: item[0], reverse=True)
+    return [name for _cpu, name in ranked[:limit]]
+
+
+def read_slot(drive: str | None) -> dict:
+    """One sample of total CPU, used RAM, disk read MB/s and the top other processes.
+
+    ``drive`` is the letter the weights are loaded from. Disk stays None until
+    that letter is known and the counter can be read.
+    """
+
+    cpu = None
+    ram = None
+    if psutil is not None:
+        try:
+            cpu = float(psutil.cpu_percent(interval=None))
+        except Exception:
+            cpu = None
+        try:
+            ram = float(psutil.virtual_memory().percent)
+        except Exception:
+            ram = None
+    return {
+        "cpu_pct": cpu,
+        "ram_pct": ram,
+        "disk_read_mb_s": _DISK.mb_s(drive),
+        "top": _top_other(3),
+    }
+
+
+class SlotProbe:
+    """Readings around one measured call. The runner opens it and closes it."""
+
+    def __init__(self, reader: Callable[[str | None], dict], *, start_thread: bool = True, interval_s: float = 1.0) -> None:
+        self._reader = reader
+        self._start_thread = start_thread
+        self.interval_s = float(interval_s)
+        self._drive: str | None = None
+        self._readings: list[dict] = []
+        self._lock = threading.Lock()
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._closed = False
+
+    def set_drive(self, drive: str | None) -> None:
+        with self._lock:
+            self._drive = None if not drive or drive == UNRECORDED else str(drive)
+
+    def sample(self) -> None:
+        with self._lock:
+            drive = self._drive
+        try:
+            raw = self._reader(drive) or {}
+        except Exception:
+            raw = {}
+        reading = {
+            "cpu_pct": _number(raw.get("cpu_pct")),
+            "ram_pct": _number(raw.get("ram_pct")),
+            "disk_read_mb_s": _number(raw.get("disk_read_mb_s")),
+            "top": [str(name) for name in list(raw.get("top") or [])[:3]],
+            "drive": drive,
+        }
+        with self._lock:
+            self._readings.append(reading)
+
+    def open(self) -> None:
+        self.sample()
+        if self._start_thread and self._thread is None:
+            self._thread = threading.Thread(target=self._loop, name="switchyard-slot-sample", daemon=True)
+            self._thread.start()
+
+    def _loop(self) -> None:
+        while not self._stop.wait(self.interval_s):
+            self.sample()
+
+    def close(self) -> dict:
+        if self._closed:
+            return self.summary()
+        self._stop.set()
+        thread = self._thread
+        if thread is not None and thread is not threading.current_thread():
+            thread.join(timeout=2)
+        self.sample()
+        self._closed = True
+        return self.summary()
+
+    def summary(self) -> dict:
+        with self._lock:
+            readings = list(self._readings)
+        return summarize_slot(readings)
+
+
+def slot_probe(hooks: WatchHooks) -> SlotProbe | None:
+    """A probe for this run, or None when a test asked for no slot samples."""
+
+    if hooks.slot_reader is None and not hooks.start_thread:
+        return None
+    return SlotProbe(hooks.slot_reader or read_slot, start_thread=hooks.start_thread)
 
 
 class RunWatch:

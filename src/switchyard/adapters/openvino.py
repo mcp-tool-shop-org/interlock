@@ -61,6 +61,7 @@ from __future__ import annotations
 
 import contextlib
 import gc
+import os
 import shutil
 import subprocess
 import threading
@@ -326,7 +327,19 @@ class OpenvinoAdapter:
         except DeviceRefused as exc:
             raise AdapterError(str(exc)) from exc
 
-    def _load_tokenizer(self, model: str, revision: str | None):
+    def _load_tokenizer(self, model: str, revision: str | None, *, directory: Path | None = None):
+        """A generate arm passes ``directory`` and is loaded from that snapshot.
+
+        Embed and token counts still pass the model id. A directory load never
+        sends a hub id to the tokenizer.
+        """
+
+        if directory is not None:
+            key = (model, f"dir:{directory}")
+            if key not in self._tokenizers:
+                loader = self._tokenizer_loader or _directory_tokenizer_loader
+                self._tokenizers[key] = loader(str(directory), None)
+            return self._tokenizers[key]
         key = (model, revision)
         if key not in self._tokenizers:
             loader = self._tokenizer_loader or _default_tokenizer_loader
@@ -445,6 +458,48 @@ def _default_tokenizer_loader(model: str, revision: str | None):
         raise AdapterError("the 'transformers' package is needed for tokenizers; install the intel extra") from exc
     kwargs = {"revision": revision} if revision else {}
     return AutoTokenizer.from_pretrained(model, **kwargs)
+
+
+def _directory_tokenizer_loader(model: str, revision: str | None):
+    """``model`` is a resolved snapshot directory. ``local_files_only`` blocks a hub fetch."""
+
+    try:
+        from transformers import AutoTokenizer
+    except ImportError as exc:
+        raise AdapterError("the 'transformers' package is needed for tokenizers; install the intel extra") from exc
+    try:
+        return AutoTokenizer.from_pretrained(model, local_files_only=True)
+    except Exception as exc:
+        raise AdapterError(
+            "tokenizer is missing under the resolved directory; refusing instead of fetching it"
+        ) from exc
+
+
+@contextlib.contextmanager
+def _offline_when_hot(s: "_Settings"):
+    """A hot arm must not reach the hub. The directory load is the rule; this is the backstop."""
+
+    if s.get("hf_cache") != "hot":
+        yield
+        return
+    previous = os.environ.get("HF_HUB_OFFLINE")
+    os.environ["HF_HUB_OFFLINE"] = "1"
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("HF_HUB_OFFLINE", None)
+        else:
+            os.environ["HF_HUB_OFFLINE"] = previous
+
+
+def _tell_probe(self, path: Path) -> None:
+    """Tell the slot probe which drive this load reads, once that directory exists."""
+
+    probe = getattr(self, "_slot_probe", None)
+    setter = getattr(probe, "set_drive", None)
+    if callable(setter):
+        setter(drive_letter(path))
 
 class _Settings:
     """request.settings with the harness-added keys split out and Nones gone."""
@@ -654,37 +709,44 @@ def _run_generate(self, request: StepRequest, s: _Settings, resolved: dict) -> S
         )
     compile_config = _compile_config(s)
     num_predict = int(s.get("num_predict", 128))
-    if ov_id == "NPU":
-        repo, ref = parse_model_ref(request.model)
-        prompt_tokens = len(self._encode(self._load_tokenizer(repo, ref), str(s.get("prompt") or "hello"))[0])
-        compile_config.update(_npu_genai_config(prompt_tokens, num_predict))
-        resolved["genai_config"] = {
-            "MAX_PROMPT_LEN": compile_config["MAX_PROMPT_LEN"],
-            "MIN_RESPONSE_LEN": compile_config["MIN_RESPONSE_LEN"],
-        }
     prefix = _prefix_mode(s)
     resolved["prefix_caching"] = _prefix_recorded(prefix)
-    load_dir, snapshot = _prepare_dir(self, request, s)
-    _note_storage(self, s, resolved, snapshot, load_dir)
-    build_t0 = self.clock()
-    try:
-        pipe, compile_s = self._pipeline(request.model, ov_id, compile_config, prefix, load_dir)
-    except AdapterError:
-        raise
-    except Exception as exc:
-        if _is_device_lost(exc):
-            self._lost_devices.add(ov_id)
-            resolved["outcome"] = "device_lost"
-            return StepResult(ok=True, resolved=resolved or None, sensors=None)
-        if ov_id == "NPU" and compile_rejected_error(str(exc)):
-            raise CompileRejected(str(exc), failed_s=self.clock() - build_t0) from exc
+    hf_cache = s.get("hf_cache") or "archive"
+    cold = s.get("cold_copy") is True
+    with _offline_when_hot(s):
+        load_dir, snapshot = _prepare_dir(self, request, s)
+        _note_storage(self, s, resolved, snapshot, load_dir)
+        # Every generate arm, not only the NPU. The tokenizer is the snapshot's,
+        # so a hot arm cannot fall back to another cache or download one.
+        tokenizer = self._load_tokenizer(request.model, None, directory=load_dir)
         if ov_id == "NPU":
-            # recorded, not retried: the KV cache cannot cover this prompt;
-            # ok stays true so the sequence continues past the arm
-            resolved["outcome"] = "unsupported length"
-            return StepResult(ok=True, resolved=resolved or None, sensors=None)
-        raise AdapterError(f"the pipeline for {request.model} on {ov_id} did not build: {exc}") from exc
-    key = _pipeline_key(request.model, ov_id, compile_config, prefix)
+            prompt_tokens = len(self._encode(tokenizer, str(s.get("prompt") or "hello"))[0])
+            compile_config.update(_npu_genai_config(prompt_tokens, num_predict))
+            resolved["genai_config"] = {
+                "MAX_PROMPT_LEN": compile_config["MAX_PROMPT_LEN"],
+                "MIN_RESPONSE_LEN": compile_config["MIN_RESPONSE_LEN"],
+            }
+        build_t0 = self.clock()
+        try:
+            pipe, compile_s = self._pipeline(
+                request.model, ov_id, compile_config, prefix, load_dir, hf_cache, cold
+            )
+        except AdapterError:
+            raise
+        except Exception as exc:
+            if _is_device_lost(exc):
+                self._lost_devices.add(ov_id)
+                resolved["outcome"] = "device_lost"
+                return StepResult(ok=True, resolved=resolved or None, sensors=None)
+            if ov_id == "NPU" and compile_rejected_error(str(exc)):
+                raise CompileRejected(str(exc), failed_s=self.clock() - build_t0) from exc
+            if ov_id == "NPU":
+                # recorded, not retried: the KV cache cannot cover this prompt;
+                # ok stays true so the sequence continues past the arm
+                resolved["outcome"] = "unsupported length"
+                return StepResult(ok=True, resolved=resolved or None, sensors=None)
+            raise AdapterError(f"the pipeline for {request.model} on {ov_id} did not build: {exc}") from exc
+        key = _pipeline_key(request.model, ov_id, compile_config, prefix, hf_cache, cold, load_dir)
     genai = self._genai_module or _real_genai_module()
     config = genai.GenerationConfig()
     config.max_new_tokens = num_predict
@@ -788,6 +850,7 @@ def _prepare_dir(self, request: StepRequest, s: _Settings) -> tuple[Path, Path]:
 
     cached = self._arm_dirs.get(request.step_id)
     if cached is not None:
+        _tell_probe(self, cached[0])
         return cached
     model = request.model
     repo, revision = parse_model_ref(model)
@@ -812,9 +875,12 @@ def _prepare_dir(self, request: StepRequest, s: _Settings) -> tuple[Path, Path]:
             raise
         except Exception as exc:
             raise AdapterError(f"the model {model} could not be fetched: {exc}") from exc
+    # Before the copy, so a sample taken while the copy runs already names this drive.
+    _tell_probe(self, snapshot)
     load_dir = snapshot
     if s.get("cold_copy") is True:
         load_dir = _cold_copy(self, model, snapshot)
+        _tell_probe(self, load_dir)
     self._arm_dirs[request.step_id] = (load_dir, snapshot)
     return load_dir, snapshot
 
@@ -871,12 +937,31 @@ def _mean(value) -> float:
     return float(getattr(value, "mean", value))
 
 
-def _pipeline_key(model: str, ov_id: str, compile_config: dict | None, prefix_caching: str = "default") -> tuple:
-    """One pipeline per model, device and compile config. On the NPU the config
-    sizes the static KV cache (MAX_PROMPT_LEN), so a pipeline built for a short
-    prompt must not be reused for a longer one."""
+def _pipeline_key(
+    model: str,
+    ov_id: str,
+    compile_config: dict | None,
+    prefix_caching: str = "default",
+    hf_cache: str | None = None,
+    cold_copy: bool = False,
+    directory: Path | str | None = None,
+) -> tuple:
+    """One pipeline per model, device, compile config and where the weights were read.
 
-    key = (model, ov_id, tuple(sorted((compile_config or {}).items())))
+    On the NPU the config sizes the static KV cache (MAX_PROMPT_LEN), so a
+    pipeline built for a short prompt must not be reused for a longer one.
+    ``hf_cache``, ``cold_copy`` and the resolved directory keep a hot arm from
+    reusing an archive pipeline (and the reverse).
+    """
+
+    key = (
+        model,
+        ov_id,
+        tuple(sorted((compile_config or {}).items())),
+        hf_cache or "archive",
+        bool(cold_copy),
+        None if directory is None else str(directory),
+    )
     return key if prefix_caching == "default" else key + (prefix_caching,)
 
 
@@ -901,8 +986,19 @@ def _prefix_recorded(mode: str) -> str:
     return f"{mode} (continuous-batching scheduler_config)"
 
 
-def _pipeline(self, model: str, ov_id: str, compile_config: dict, prefix_caching: str = "default", directory: Path | None = None):
-    key = _pipeline_key(model, ov_id, compile_config, prefix_caching)
+def _pipeline(
+    self,
+    model: str,
+    ov_id: str,
+    compile_config: dict,
+    prefix_caching: str = "default",
+    directory: Path | None = None,
+    hf_cache: str | None = None,
+    cold_copy: bool = False,
+):
+    if directory is None:
+        directory = _model_dir(model)
+    key = _pipeline_key(model, ov_id, compile_config, prefix_caching, hf_cache, cold_copy, directory)
     entry = self._pipelines.get(key)
     if entry is None:
         if self.build_guard is not None and self._pipelines:
@@ -996,11 +1092,22 @@ def _start_session(self, request: StepRequest) -> None:
             if request.task == "generate":
                 genai = self._genai_module or _real_genai_module()
                 config_map = _compile_config(s)
-                if ov_id == "NPU":
-                    repo, ref = parse_model_ref(request.model)
-                    n_tok = len(self._encode(self._load_tokenizer(repo, ref), str(s.get("prompt") or "hello"))[0])
-                    config_map.update(_npu_genai_config(n_tok, int(s.get("num_predict", 128))))
-                pipe, _ = _pipeline(self, request.model, ov_id, config_map, _prefix_mode(s))
+                with _offline_when_hot(s):
+                    load_dir, _snapshot = _prepare_dir(self, request, s)
+                    tokenizer = self._load_tokenizer(request.model, None, directory=load_dir)
+                    if ov_id == "NPU":
+                        n_tok = len(self._encode(tokenizer, str(s.get("prompt") or "hello"))[0])
+                        config_map.update(_npu_genai_config(n_tok, int(s.get("num_predict", 128))))
+                    pipe, _ = _pipeline(
+                        self,
+                        request.model,
+                        ov_id,
+                        config_map,
+                        _prefix_mode(s),
+                        load_dir,
+                        s.get("hf_cache") or "archive",
+                        s.get("cold_copy") is True,
+                    )
                 config = genai.GenerationConfig()
                 config.max_new_tokens = _SESSION_NEW_TOKENS
                 while not stop.is_set():

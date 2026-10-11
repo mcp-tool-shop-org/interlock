@@ -7,15 +7,19 @@ downloads a model.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
+import time
 import types
 from pathlib import Path
 
 import pytest
 import yaml
 
+from switchyard.adapters import openvino as ov_mod
 from switchyard.adapters.base import AdapterError, StepRequest
+from switchyard.harness import watch as watch_mod
 from switchyard.harness.runner import RunnerError, dry_run, run_interleaved
 from switchyard.harness.spec import SpecError, validate_spec
 from switchyard.harness.steady import BlockPlan, SlotStream, UntilSteady
@@ -516,3 +520,320 @@ def test_until_steady_refuses_aba_and_a_non_openvino_cache():
         validate_spec(ollama)
     with pytest.raises(SpecError, match="until_steady true"):
         validate_spec(_spec(warmups={"until_steady": False, "max": 6, "tolerance": 0.05}))
+
+
+def _measured(arm: dict) -> dict:
+    spec = _spec(
+        arms=[arm],
+        warmups=0,
+        repeats=1,
+        needs={"grant": False, "npu_session": False, "cpu_window": False},
+    )
+    spec.pop("decision_metric", None)
+    return spec
+
+
+def _reader_hooks(reader):
+    return WatchHooks(
+        state_sampler=lambda _uses_5090: {},
+        start_thread=False,
+        ram_sampler=lambda: 1.0,
+        slot_reader=reader,
+    )
+
+
+def _samples(row: dict) -> list[dict]:
+    return [slot["sample"] for slot in row["artifacts"]["slots"]]
+
+
+def test_a_busy_process_during_a_call_is_in_the_top_three(tmp_path: Path):
+    def reader(_drive):
+        return {
+            "cpu_pct": 72.0,
+            "ram_pct": 40.0,
+            "disk_read_mb_s": None,
+            "top": ["busy-neighbor", "second", "third", "fourth"],
+        }
+
+    adapter = Scripted({"phi": [_result(1.0, 10.0), _result(1.0, 10.0)]})
+    rows = _run(
+        tmp_path / "repo",
+        _measured(_arm("phi", engine="fake", model="phi-fake")),
+        {"fake": adapter},
+        name="busy",
+        run_id="phi-busy",
+        watch=_reader_hooks(reader),
+    )
+    samples = _samples(rows[0])
+    assert len(samples) == 2
+    assert all(sample["top_processes"][:3] == ["busy-neighbor", "second", "third"] for sample in samples)
+    assert all(sample["cpu_pct"]["max"] > 30 for sample in samples)
+
+
+def test_a_short_call_still_has_two_readings(tmp_path: Path):
+    def reader(_drive):
+        return {"cpu_pct": 5.0, "ram_pct": 11.0, "disk_read_mb_s": None, "top": ["quiet"]}
+
+    adapter = Scripted({"phi": [_result(1.0, 10.0), _result(1.0, 10.0)]})
+    rows = _run(
+        tmp_path / "repo",
+        _measured(_arm("phi", engine="fake", model="phi-fake")),
+        {"fake": adapter},
+        name="short",
+        run_id="phi-short",
+        watch=_reader_hooks(reader),
+    )
+    samples = _samples(rows[0])
+    assert [sample["samples"] for sample in samples] == [2, 2]
+    assert all(sample["cpu_pct"] == {"min": 5.0, "max": 5.0, "mean": 5.0} for sample in samples)
+    assert all(sample["top_processes"] == [] for sample in samples)
+
+
+def test_the_disk_counter_follows_the_load_drive(tmp_path: Path):
+    snap = tmp_path / "snap"
+    snap.mkdir()
+    (snap / "openvino_model.xml").write_text("<xml/>", encoding="utf-8")
+    letter = drive_letter(snap)
+    seen: list = []
+
+    def download(repo, revision):
+        assert (repo, revision) == (REPO, REV)
+        return str(snap)
+
+    def reader(drive):
+        seen.append(drive)
+        return {
+            "cpu_pct": 4.0,
+            "ram_pct": 8.0,
+            "disk_read_mb_s": 7.25 if drive == letter else None,
+            "top": [],
+        }
+
+    def copy_tree(_argv):
+        return _Completed(0)
+
+    adapter = make_adapter(snapshot_download=download, copy_tree=copy_tree, disk_facts=_facts)
+    rows = _run(
+        tmp_path / "repo",
+        _measured(_arm(hf_cache="archive", cold_copy=True)),
+        {"openvino": adapter},
+        name="disk",
+        run_id="phi-disk",
+        watch=_reader_hooks(reader),
+    )
+    samples = _samples(rows[0])
+    assert len(samples) == 2
+    assert all(sample["load_drive"] == letter for sample in samples)
+    assert all(sample["disk_read_mb_s"]["mean"] == pytest.approx(7.25) for sample in samples)
+    assert set(seen) <= {None, letter}
+    assert letter in seen
+
+
+def test_two_arms_that_differ_only_in_hf_cache_get_two_pipelines(tmp_path: Path):
+    hot = tmp_path / "hot"
+    hot_snap = _plant(hot, REV, ref="main")
+    archive = tmp_path / "archive"
+    archive.mkdir()
+    (archive / "openvino_model.xml").write_text("<xml/>", encoding="utf-8")
+    built: list[Path] = []
+
+    class Recording(FakePipeline):
+        def __init__(self, path, device, config):
+            built.append(Path(path))
+            super().__init__(path, device, config)
+
+    class Genai(FakeGenai):
+        LLMPipeline = Recording
+
+    adapter = make_adapter(
+        genai_module=Genai,
+        snapshot_download=lambda _repo, _revision: str(archive),
+        hot_root=hot,
+        disk_facts=_facts,
+    )
+
+    def _one(step_id: str, cache: str) -> None:
+        result = adapter.run(
+            StepRequest(
+                step_id=step_id,
+                task="generate",
+                model=MODEL,
+                device="CPU",
+                engine="openvino",
+                settings={"prompt": "hi", "num_predict": 8, "hf_cache": cache},
+            )
+        )
+        assert result.ok
+
+    _one("phi-hot", "hot")
+    _one("phi-archive", "archive")
+    assert built == [hot_snap, archive]
+    assert len(adapter._pipelines) == 2
+    assert {key[3] for key in adapter._pipelines} == {"hot", "archive"}
+    assert {Path(key[5]) for key in adapter._pipelines} == {hot_snap, archive}
+
+
+def test_a_hot_arm_whose_tokenizer_is_missing_is_refused(tmp_path: Path):
+    root = tmp_path / "hot"
+    snap = _plant(root, REV, ref="main")
+    asked: list = []
+    downloads: list = []
+
+    def download(*_args, **_kwargs):
+        downloads.append(True)
+        raise AssertionError("hot must not download")
+
+    def loader(model, revision):
+        asked.append((model, revision, os.environ.get("HF_HUB_OFFLINE")))
+        raise AdapterError("tokenizer missing")
+
+    previous = os.environ.get("HF_HUB_OFFLINE")
+    os.environ.pop("HF_HUB_OFFLINE", None)
+    try:
+        adapter = make_adapter(
+            snapshot_download=download,
+            hot_root=root,
+            disk_facts=_facts,
+            tokenizer_loader=loader,
+        )
+        with pytest.raises(AdapterError, match="tokenizer missing"):
+            adapter.run(_req(MODEL, hf_cache="hot"))
+        assert downloads == []
+        assert asked == [(str(snap), None, "1")]
+        assert os.environ.get("HF_HUB_OFFLINE") is None
+
+        asked.clear()
+        missing = make_adapter(
+            snapshot_download=download,
+            hot_root=tmp_path / "empty",
+            disk_facts=_facts,
+            tokenizer_loader=loader,
+        )
+        with pytest.raises(AdapterError, match="refusing instead of downloading"):
+            missing.run(_req(MODEL, hf_cache="hot"))
+        assert asked == []
+        assert downloads == []
+    finally:
+        if previous is None:
+            os.environ.pop("HF_HUB_OFFLINE", None)
+        else:
+            os.environ["HF_HUB_OFFLINE"] = previous
+
+
+def test_a_directory_tokenizer_refuses_a_hub_fetch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    calls: list = []
+
+    class AutoTokenizer:
+        @staticmethod
+        def from_pretrained(model, local_files_only=False, **kwargs):
+            calls.append((model, local_files_only, kwargs))
+            raise OSError("missing")
+
+    module = types.ModuleType("transformers")
+    module.AutoTokenizer = AutoTokenizer
+    monkeypatch.setitem(sys.modules, "transformers", module)
+    with pytest.raises(AdapterError, match="refusing instead of fetching"):
+        ov_mod._directory_tokenizer_loader(str(tmp_path / "snap"), "ignored-revision")
+    assert calls == [(str(tmp_path / "snap"), True, {})]
+    assert "snap" not in "tokenizer is missing under the resolved directory; refusing instead of fetching it"
+
+
+def test_the_slot_reader_skips_this_process_and_a_missing_disk(monkeypatch: pytest.MonkeyPatch):
+    class Proc:
+        def __init__(self, pid, name, cpu):
+            self.pid = pid
+            self._name = name
+            self._cpu = cpu
+
+        def cpu_percent(self, interval=None):
+            return self._cpu
+
+        def name(self):
+            return self._name
+
+    class Me:
+        pid = 10
+
+        def children(self, recursive=False):
+            return [Proc(11, "child", 99.0)]
+
+    class Counter:
+        def __init__(self, read_bytes):
+            self.read_bytes = read_bytes
+
+    class FakePsutil:
+        def __init__(self):
+            self.bytes = 0
+
+        def cpu_percent(self, interval=None):
+            return 15.0
+
+        def virtual_memory(self):
+            return type("Mem", (), {"percent": 22.0})()
+
+        def disk_io_counters(self, perdisk=True):
+            return {"C:": Counter(self.bytes)}
+
+        def Process(self):
+            return Me()
+
+        def process_iter(self):
+            return [
+                Proc(10, "switchyard", 50.0),
+                Proc(11, "child", 99.0),
+                Proc(12, "busy-neighbor", 80.0),
+                Proc(13, "second", 10.0),
+            ]
+
+    fake = FakePsutil()
+    ticks = iter([0.0, 1.0])
+    monkeypatch.setattr(watch_mod, "psutil", fake)
+    monkeypatch.setattr(watch_mod, "_DISK", watch_mod._DiskRate(clock=lambda: next(ticks)))
+    first = watch_mod.read_slot("C")
+    assert first["cpu_pct"] == 15.0 and first["ram_pct"] == 22.0
+    assert first["disk_read_mb_s"] is None
+    assert first["top"] == ["busy-neighbor", "second"]
+    assert "switchyard" not in first["top"] and "child" not in first["top"]
+    fake.bytes = 2 * 1024 * 1024
+    second = watch_mod.read_slot("C")
+    assert second["disk_read_mb_s"] == pytest.approx(2.0)
+    assert watch_mod.read_slot("Z")["disk_read_mb_s"] is None
+
+    class Boom:
+        def cpu_percent(self, interval=None):
+            raise RuntimeError("cpu")
+
+        def virtual_memory(self):
+            raise RuntimeError("ram")
+
+        def disk_io_counters(self, perdisk=True):
+            raise RuntimeError("disk")
+
+        def Process(self):
+            raise RuntimeError("proc")
+
+    monkeypatch.setattr(watch_mod, "psutil", Boom())
+    blank = watch_mod.read_slot("C")
+    assert blank["cpu_pct"] is None and blank["ram_pct"] is None
+    assert blank["disk_read_mb_s"] is None and blank["top"] == []
+    probe = watch_mod.slot_probe(WatchHooks(start_thread=True, slot_reader=None))
+    assert probe is not None and probe._reader is watch_mod.read_slot
+    quiet = watch_mod.SlotProbe(lambda _drive: (_ for _ in ()).throw(RuntimeError("counter")), start_thread=False)
+    quiet.open()
+    summary = quiet.close()
+    assert summary["samples"] == 2 and summary["cpu_pct"] is None
+
+
+def test_a_slot_probe_samples_during_a_call():
+    seen = {"n": 0}
+
+    def reader(_drive):
+        seen["n"] += 1
+        return {"cpu_pct": 1.0, "ram_pct": 1.0, "disk_read_mb_s": None, "top": []}
+
+    probe = watch_mod.SlotProbe(reader, start_thread=True, interval_s=0.02)
+    probe.open()
+    time.sleep(0.12)
+    summary = probe.close()
+    assert summary["samples"] >= 3
+    assert seen["n"] == summary["samples"]
