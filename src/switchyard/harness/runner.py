@@ -368,16 +368,22 @@ def run_interleaved(
             if rest is not None:
                 row["settings"]["rest"] = rest
             row["settings"]["ram_guard"] = guard.ram_guard()
+            row["settings"]["compile_ceiling_s"] = guard.ceiling_s
         return rows
 
-    def flush(*, gone: set[str] | None = None) -> None:
+    def _flush_locked(*, gone: set[str] | None = None) -> None:
+        """The flush body. The caller holds ``state_lock``, or is the watcher that could not get it."""
+
         used = removed if gone is None else gone
+        guard.sample_ram()  # the peak is current at every flush
+        rows = _rows(partial=True, gone=used)
+        if rows:
+            write_receipt(root, run_id, rows)
+        marker.touch(_iso(wall()))
+
+    def flush(*, gone: set[str] | None = None) -> None:
         with state_lock:
-            guard.sample_ram()  # the peak is current at every flush
-            rows = _rows(partial=True, gone=used)
-            if rows:
-                write_receipt(root, run_id, rows)
-            marker.touch(_iso(wall()))
+            _flush_locked(gone=gone)
 
     def _halt(error: str, outcome: str | None = None) -> None:
         """The watcher ends the run: record why, flush every row, bring the receipt into the table.
@@ -388,13 +394,14 @@ def run_interleaved(
         """
 
         nonlocal aborted, halted_by_watch
-        held = state_lock.acquire(timeout=10)
+        held = state_lock.acquire(timeout=hooks.lock_wait_s)
         try:
             halted_by_watch = True
             aborted = {"step": _label(current) if current is not None else "setup", "error": error}
             if outcome is not None and current is not None:
                 _remember(arms[current.step_id], outcome)
-            flush()
+            _flush_locked()  # never blocks on the lock: the watcher must reach exit_fn
+            marker.close(_iso(wall()))  # an unclosed marker then means only "killed from outside"
             if (root / "receipts" / f"{run_id}.jsonl").is_file():
                 try:
                     announce_run(import_receipt(root, run_id), finished=False)

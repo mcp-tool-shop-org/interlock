@@ -68,6 +68,7 @@ class WatchHooks:
     rss_sampler: Callable[[], int] | None = _own_rss_bytes if psutil is not None else None
     exit_fn: Callable[[int], None] = _exit_now
     interval_s: float = RAM_SAMPLE_S
+    lock_wait_s: float = 10.0  # how long the watcher waits for the run's state lock before flushing without it
     start_thread: bool = True
 
 
@@ -105,7 +106,12 @@ class RunWatch:
         if self.hooks.ram_sampler is None:
             return "unrecorded"
         with self._lock:
-            return {"stop_pct": _plain(self.stop_pct), "peak_pct": self._peak_pct, "samples": self._samples}
+            return {
+                "stop_pct": _plain(self.stop_pct),
+                "sample_s": _plain(self.hooks.interval_s),
+                "peak_pct": self._peak_pct,
+                "samples": self._samples,
+            }
 
     def sample_ram(self) -> float | None:
         """One RAM reading, folded into the peak. None when it cannot be read."""

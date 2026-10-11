@@ -108,7 +108,9 @@ def append_aborted_runs(root: Path, rows: list[dict]) -> list[str]:
     if "## Aborted runs" not in text:
         text += "\n## Aborted runs\n\n"
     text += "".join(f"- {line}\n" for line in new) + "\n"
-    path.write_text(text, encoding="utf-8")
+    from switchyard.harness.receipts import write_atomic
+
+    write_atomic(path, text)
     return new
 
 

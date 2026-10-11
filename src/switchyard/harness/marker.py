@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from pathlib import Path
 
 from switchyard.receipt import RUN_MARKER_SUFFIX
@@ -40,7 +41,7 @@ class RunMarker:
 
     def write(self) -> None:
         self.path.parent.mkdir(exist_ok=True)
-        temporary = self.path.with_name(self.path.name + ".tmp")
+        temporary = self.path.with_name(f"{self.path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
         temporary.write_text(json.dumps(self._data, sort_keys=True) + "\n", encoding="utf-8")
         os.replace(temporary, self.path)
 

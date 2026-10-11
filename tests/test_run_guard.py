@@ -74,9 +74,13 @@ class Exits:
         self.codes: list[int] = []
         self.seen: list[dict] = []
         self.blocked_when_called = None
+        self.marker: dict = {}
 
     def __call__(self, code: int) -> None:
         self.codes.append(code)
+        marker = self.receipt.with_name("run-1.run.json")
+        if marker.is_file():
+            self.marker = json.loads(marker.read_text(encoding="utf-8"))
         self.blocked_when_called = not self.gate.is_set()
         if self.receipt.is_file():
             self.seen = load_jsonl(self.receipt)
@@ -175,6 +179,10 @@ def test_a_compile_past_the_ceiling_writes_the_receipt_while_still_blocked_and_e
     assert "compile ceiling" in aborted["settings"]["abortion"]["error"]
     assert aborted["settings"]["abortion"]["stop_step"] == "npu cold"
     assert timed_out["settings"]["ram_guard"]["stop_pct"] == 88
+    assert timed_out["settings"]["ram_guard"]["sample_s"] == 0.01  # the injected interval; 2 by default
+    assert timed_out["settings"]["compile_ceiling_s"] == 900
+    # the halt closed the marker: unclosed now means only "killed from outside"
+    assert exits.marker["closed"] is True and exits.marker["end"]
     for row in exits.seen:
         validate_row(row)
 
@@ -206,6 +214,7 @@ def test_the_spec_can_move_the_ceiling(tmp_path):
         _invoke(repo, spec_path, BlockingAdapter(clock, gate, compile_spent_s=130), hooks)
     row = next(row for row in exits.seen if row.get("outcome") == "compile_timeout")
     assert row["settings"]["compile_timeout"]["ceiling_s"] == 120
+    assert row["settings"]["compile_ceiling_s"] == 120
 
 
 def test_compile_ceiling_s_is_validated():
@@ -293,7 +302,7 @@ def test_a_failing_sampler_is_not_a_reading():
     )
     assert watch.sample_ram() is None
     assert watch.tick() is False
-    assert watch.ram_guard() == {"stop_pct": 88, "peak_pct": None, "samples": 0}
+    assert watch.ram_guard() == {"stop_pct": 88, "sample_s": 2, "peak_pct": None, "samples": 0}
     watch.start()  # start_thread False: nothing runs
     watch.stop()
 
@@ -310,6 +319,7 @@ def test_ram_at_the_stop_flushes_and_ends_the_run_even_outside_a_compile(tmp_pat
     with pytest.raises(AdapterError):
         _invoke(repo, spec_path, adapter, hooks)
     assert exits.codes == [EXIT_RAM_STOP]
+    assert exits.marker["closed"] is True and exits.marker["end"]
     assert exits.blocked_when_called is True
     by_id = {row["id"]: row for row in exits.seen}
     reason = "system RAM reached 91.0% (stop at 88%)"
@@ -748,3 +758,87 @@ def test_the_environment_carries_the_override(monkeypatch):
     monkeypatch.setattr(env_capture, "igpu_shared_memory_override", lambda reader=None: "57%")
     assert environment()["igpu_shared_memory_override"] == "57%"
     assert environment(igpu_shared_memory_override="kept")["igpu_shared_memory_override"] == "kept"
+
+
+# --- review fixes: no blocking on the lock, atomic writes --------------------------
+
+
+def test_the_watcher_flushes_and_exits_even_when_another_thread_holds_the_state_lock(tmp_path, monkeypatch):
+    repo, spec_path = _spec(tmp_path)
+    clock, gate = Clock(), threading.Event()
+    exits = Exits(repo / "receipts" / "run-1.jsonl", gate)
+    hooks, _ram = _hooks(clock, exits)
+    hooks.lock_wait_s = 0.1
+    made = []
+    real_rlock = threading.RLock
+
+    def capturing():
+        lock = real_rlock()
+        made.append(lock)
+        return lock
+
+    monkeypatch.setattr(runner_module.threading, "RLock", capturing)
+
+    class Holding(BlockingAdapter):
+        def run(self, request):
+            if request.step_id == "npu":
+                held = threading.Event()
+
+                def hold():
+                    with made[0]:
+                        held.set()
+                        gate.wait(timeout=30)
+
+                threading.Thread(target=hold, daemon=True).start()
+                assert held.wait(timeout=10)
+            return super().run(request)
+
+    started = time.monotonic()
+    with pytest.raises(AdapterError):
+        _invoke(repo, spec_path, Holding(clock, gate, compile_spent_s=901), hooks)
+    assert time.monotonic() - started < 10
+    assert exits.codes == [EXIT_COMPILE_TIMEOUT]
+    assert any(row.get("outcome") == "compile_timeout" for row in exits.seen)
+
+
+def test_a_receipt_write_is_all_or_nothing(tmp_path, monkeypatch):
+    from switchyard.harness import receipts as receipts_module
+    from switchyard.harness.receipts import write_atomic
+
+    path = tmp_path / "receipts" / "r.jsonl"
+    path.parent.mkdir()
+    write_atomic(path, "old\n")
+
+    def interrupted(source, target):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(receipts_module.os, "replace", interrupted)
+    with pytest.raises(KeyboardInterrupt):
+        write_atomic(path, "new\n")
+    assert path.read_text(encoding="utf-8") == "old\n"
+    assert [p.name for p in path.parent.iterdir()] == ["r.jsonl"]  # the temp file was cleaned up
+    monkeypatch.undo()
+
+    # A process killed after the temp file was written leaves it behind: nothing reads it.
+    (path.parent / "r.jsonl.1.2.tmp").write_text("half", encoding="utf-8")
+    (path.parent / "run-1.run.json.1.2.tmp").write_text("half", encoding="utf-8")
+    assert receipt_paths(tmp_path) == []
+    assert check_tree(tmp_path) == []
+    assert not (path.parent / "r.jsonl.1.2.tmp").is_dir()
+    from switchyard.harness.runner import _prior_runs
+
+    assert [run["run_id"] for run in _prior_runs(tmp_path, {"CPU"})] == ["r"]  # only the real file
+
+    # Two writers: the file is one complete text, never a mixture.
+    texts = ["a" * 50_000 + "\n", "b" * 50_000 + "\n"]
+
+    def writer(text):
+        for _ in range(20):
+            write_atomic(path, text)
+
+    threads = [threading.Thread(target=writer, args=(text,)) for text in texts]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert path.read_text(encoding="utf-8") in texts
