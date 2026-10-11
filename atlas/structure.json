@@ -236,10 +236,10 @@
       "unresolvedSites": 0
     },
     {
-      "dynamicReads": 2,
+      "dynamicReads": 3,
       "dynamicSpawns": 0,
       "dynamicSpawnsInTests": 0,
-      "dynamicWrites": 0,
+      "dynamicWrites": 2,
       "entryPoints": [
         "src/switchyard/cli.py"
       ],
@@ -1270,6 +1270,39 @@
         },
         {
           "exports": [
+            "marker_path",
+            "read_markers"
+          ],
+          "failurePaths": [
+            {
+              "in": "touch",
+              "kind": "except",
+              "line": 59
+            },
+            {
+              "in": "close",
+              "kind": "except",
+              "line": 67
+            },
+            {
+              "in": "discard",
+              "kind": "except",
+              "line": 75
+            },
+            {
+              "in": "read_markers",
+              "kind": "except",
+              "line": 87
+            }
+          ],
+          "hash": "92acc4c36709d227867ed04fc88e0fc4d9b92c5d4f05feb543c03178b1f7d414",
+          "importsFiles": [
+            "src/switchyard/receipt.py"
+          ],
+          "path": "src/switchyard/harness/marker.py"
+        },
+        {
+          "exports": [
             "apply_parity",
             "device_lost_row",
             "environment",
@@ -1463,9 +1496,11 @@
             "src/switchyard/guards.py",
             "src/switchyard/harness/e5.py",
             "src/switchyard/harness/lock.py",
+            "src/switchyard/harness/marker.py",
             "src/switchyard/harness/receipts.py",
             "src/switchyard/harness/spec.py",
             "src/switchyard/harness/timing.py",
+            "src/switchyard/harness/watch.py",
             "src/switchyard/receipt.py"
           ],
           "path": "src/switchyard/harness/runner.py",
@@ -1579,6 +1614,13 @@
                   "via": "_cache_dirs"
                 },
                 {
+                  "line": 231,
+                  "name": "WatchHooks",
+                  "target": {
+                    "file": "src/switchyard/harness/watch.py"
+                  }
+                },
+                {
                   "line": 232,
                   "name": "CompileTracker",
                   "target": {
@@ -1586,9 +1628,39 @@
                   }
                 },
                 {
+                  "line": 236,
+                  "name": "RunMarker",
+                  "target": {
+                    "file": "src/switchyard/harness/marker.py"
+                  }
+                },
+                {
                   "line": 240,
                   "name": "restart",
                   "target": null
+                },
+                {
+                  "line": 414,
+                  "name": "RunWatch",
+                  "target": {
+                    "file": "src/switchyard/harness/watch.py"
+                  }
+                },
+                {
+                  "line": 420,
+                  "name": "RAM_STOP_PCT",
+                  "passed": true,
+                  "target": {
+                    "file": "src/switchyard/harness/watch.py"
+                  }
+                },
+                {
+                  "line": 439,
+                  "name": "start",
+                  "receiver": "RunWatch",
+                  "target": {
+                    "file": "src/switchyard/harness/watch.py"
+                  }
                 },
                 {
                   "line": 1116,
@@ -1633,6 +1705,15 @@
                   "via": "_is_rejection"
                 },
                 {
+                  "line": 376,
+                  "name": "sample_ram",
+                  "receiver": "RunWatch",
+                  "target": {
+                    "file": "src/switchyard/harness/watch.py"
+                  },
+                  "via": "flush"
+                },
+                {
                   "line": 1025,
                   "name": "aba_call",
                   "target": {
@@ -1656,54 +1737,6 @@
                     "file": "src/switchyard/harness/timing.py"
                   },
                   "via": "_summary"
-                },
-                {
-                  "line": 263,
-                  "name": "measured_row",
-                  "target": {
-                    "file": "src/switchyard/harness/receipts.py"
-                  },
-                  "via": "_finished_row"
-                },
-                {
-                  "line": 280,
-                  "name": "validate_row",
-                  "target": {
-                    "file": "src/switchyard/receipt.py"
-                  },
-                  "via": "_finished_row"
-                },
-                {
-                  "line": 296,
-                  "name": "device_lost_row",
-                  "target": {
-                    "file": "src/switchyard/harness/receipts.py"
-                  },
-                  "via": "_capability_row"
-                },
-                {
-                  "line": 334,
-                  "name": "measured_row",
-                  "target": {
-                    "file": "src/switchyard/harness/receipts.py"
-                  },
-                  "via": "_aborted_row"
-                },
-                {
-                  "line": 350,
-                  "name": "validate_row",
-                  "target": {
-                    "file": "src/switchyard/receipt.py"
-                  },
-                  "via": "_aborted_row"
-                },
-                {
-                  "line": 379,
-                  "name": "write_receipt",
-                  "target": {
-                    "file": "src/switchyard/harness/receipts.py"
-                  },
-                  "via": "flush"
                 }
               ],
               "exported": true,
@@ -2056,6 +2089,13 @@
                   }
                 },
                 {
+                  "line": 1404,
+                  "name": "read_markers",
+                  "target": {
+                    "file": "src/switchyard/harness/marker.py"
+                  }
+                },
+                {
                   "line": 1413,
                   "name": "intersection",
                   "target": null
@@ -2073,6 +2113,14 @@
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/switchyard/receipt.py"
+                  },
+                  "via": "_prior_runs"
+                },
+                {
+                  "line": 1404,
+                  "name": "read_markers",
+                  "target": {
+                    "file": "src/switchyard/harness/marker.py"
                   },
                   "via": "_prior_runs"
                 },
@@ -2172,6 +2220,21 @@
                   "target": null
                 },
                 {
+                  "line": 1559,
+                  "name": "RunMarker",
+                  "target": {
+                    "file": "src/switchyard/harness/marker.py"
+                  }
+                },
+                {
+                  "line": 1567,
+                  "name": "write",
+                  "receiver": "RunMarker",
+                  "target": {
+                    "file": "src/switchyard/harness/marker.py"
+                  }
+                },
+                {
                   "line": 1289,
                   "name": "for_engine",
                   "target": {
@@ -2209,6 +2272,14 @@
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/switchyard/receipt.py"
+                  },
+                  "via": "_prior_runs"
+                },
+                {
+                  "line": 1404,
+                  "name": "read_markers",
+                  "target": {
+                    "file": "src/switchyard/harness/marker.py"
                   },
                   "via": "_prior_runs"
                 },
@@ -2264,31 +2335,6 @@
                     "file": "src/switchyard/harness/timing.py"
                   },
                   "via": "_slots"
-                },
-                {
-                  "line": 223,
-                  "name": "environment",
-                  "target": {
-                    "file": "src/switchyard/harness/receipts.py"
-                  },
-                  "via": "run_interleaved"
-                },
-                {
-                  "branch": "path.is_dir() and any(path.iterdir())",
-                  "line": 1166,
-                  "name": "GuardError",
-                  "target": {
-                    "file": "src/switchyard/guards.py"
-                  },
-                  "via": "_cache_dirs"
-                },
-                {
-                  "line": 232,
-                  "name": "CompileTracker",
-                  "target": {
-                    "file": "src/switchyard/adapters/base.py"
-                  },
-                  "via": "run_interleaved"
                 }
               ],
               "exported": true,
@@ -2632,6 +2678,36 @@
           ],
           "hash": "d32da389627e87f17a213605e3a669b762a218deaec0fbc035208293fc5d6c5f",
           "path": "src/switchyard/harness/timing.py"
+        },
+        {
+          "failurePaths": [
+            {
+              "kind": "except",
+              "line": 30
+            },
+            {
+              "in": "sample_ram",
+              "kind": "except",
+              "line": 118
+            },
+            {
+              "in": "_sample_working_set",
+              "kind": "except",
+              "line": 185
+            },
+            {
+              "in": "_fire",
+              "kind": "except",
+              "line": 192
+            },
+            {
+              "in": "_fire",
+              "kind": "except",
+              "line": 195
+            }
+          ],
+          "hash": "23c3d991a64ec64df9a368cfdce91c4bff0ee2c3bc9751d65b556c0ac20b01c3",
+          "path": "src/switchyard/harness/watch.py"
         },
         {
           "hash": "a80241985f5ce658bc6ed7967d97e3d27379e734165863530139acae88fc833b",
@@ -3992,7 +4068,7 @@
       "origin": "authored",
       "outsidePlaces": [
         {
-          "reads": 16,
+          "reads": 17,
           "where": [
             "caller"
           ],
@@ -4006,26 +4082,14 @@
           "writes": 0
         }
       ],
-      "outsideReads": 19,
+      "outsideReads": 20,
       "outsideWrites": 4,
       "role": "code",
       "testRunners": [
         "pytest"
       ],
-      "testedBy": 11,
-      "unresolvedNamed": [
-        {
-          "path": "src/switchyard/harness/runner.py",
-          "specifier": "switchyard.harness.marker",
-          "why": "unplaced"
-        },
-        {
-          "path": "src/switchyard/harness/runner.py",
-          "specifier": "switchyard.harness.watch",
-          "why": "unplaced"
-        }
-      ],
-      "unresolvedSites": 2
+      "testedBy": 13,
+      "unresolvedSites": 0
     },
     {
       "dynamicReads": 0,
@@ -4035,6 +4099,15 @@
       "entryPoints": [],
       "externals": 0,
       "files": [
+        {
+          "hash": "b2f4bbbfc779e3c02ad727ed3b9e643b98adbd740826fa9fb64f4886e8e5a525",
+          "importsFiles": [
+            "src/switchyard/harness/runner.py",
+            "src/switchyard/harness/watch.py"
+          ],
+          "path": "tests/conftest.py",
+          "testFramework": "pytest"
+        },
         {
           "exports": [
             "row"
@@ -4459,6 +4532,82 @@
         },
         {
           "exports": [
+            "test_a_closed_marker_of_a_long_run_owes_the_remainder",
+            "test_a_closed_marker_of_a_twenty_minute_run_owes_nothing",
+            "test_a_compile_past_the_ceiling_writes_the_receipt_while_still_blocked_and_ends_the_process",
+            "test_a_compile_timeout_row_is_an_untimed_capability_row",
+            "test_a_compile_under_the_ceiling_does_nothing",
+            "test_a_delete_that_fails_is_reported_not_swallowed",
+            "test_a_failed_delete_lands_in_the_row_settings",
+            "test_a_failing_sampler_is_not_a_reading",
+            "test_a_fresh_arm_starts_on_an_empty_directory",
+            "test_a_fresh_cache_that_cannot_be_cleared_refuses_before_any_device_contact",
+            "test_a_killed_run_leaves_a_marker_that_owes_rest_from_its_file_time",
+            "test_a_marker_is_not_a_receipt",
+            "test_a_marker_on_other_devices_or_the_asking_run_itself_is_ignored",
+            "test_a_read_only_cache_blob_is_deleted",
+            "test_a_refusal_before_the_run_starts_leaves_no_marker",
+            "test_a_run_with_a_receipt_and_a_marker_owes_the_larger_rest",
+            "test_an_unreadable_marker_counts_as_a_long_run",
+            "test_compile_ceiling_s_is_validated",
+            "test_marker_writes_after_the_start_never_fail_the_run",
+            "test_ram_at_the_stop_flushes_and_ends_the_run_even_outside_a_compile",
+            "test_ram_below_the_stop_does_nothing_and_every_row_records_the_guard",
+            "test_run_spec_writes_the_marker_before_the_card_probe_and_not_its_own_rest",
+            "test_the_compile_tracker_brackets_a_compile_and_clears_on_error",
+            "test_the_default_reader_never_fails_and_is_unrecorded_off_windows",
+            "test_the_environment_carries_the_override",
+            "test_the_marker_is_closed_when_the_run_fails_in_order",
+            "test_the_marker_is_written_before_any_adapter_call_and_updated_at_every_flush",
+            "test_the_openvino_adapter_signals_each_compile_site",
+            "test_the_ram_stop_reason_names_the_percent_and_the_stop",
+            "test_the_shared_memory_override_reads_a_percent_and_falls_back_to_unrecorded",
+            "test_the_spec_can_move_the_ceiling",
+            "test_the_watch_fires_once_and_survives_a_failing_recorder",
+            "test_without_psutil_the_guard_records_unrecorded_and_the_run_goes_on"
+          ],
+          "hash": "764d029d0b76de4a14c3eb363d689c4d4473dd6224f828b11bbb47bba4ab1048",
+          "importOrder": [
+            "src/switchyard/adapters/base.py",
+            "src/switchyard/cli.py",
+            "src/switchyard/guards.py",
+            "src/switchyard/harness/__init__.py",
+            "src/switchyard/harness/environment.py",
+            "src/switchyard/harness/runner.py",
+            "src/switchyard/harness/marker.py",
+            "src/switchyard/harness/receipts.py",
+            "src/switchyard/harness/spec.py",
+            "src/switchyard/harness/watch.py",
+            "src/switchyard/receipt.py",
+            "tests/test_harness.py",
+            "tests/test_run_path.py",
+            "tests/test_openvino_adapter.py",
+            "src/switchyard/adapters/openvino.py",
+            "tests/test_compile_rejected_rest.py"
+          ],
+          "importsFiles": [
+            "src/switchyard/adapters/base.py",
+            "src/switchyard/adapters/openvino.py",
+            "src/switchyard/cli.py",
+            "src/switchyard/guards.py",
+            "src/switchyard/harness/__init__.py",
+            "src/switchyard/harness/environment.py",
+            "src/switchyard/harness/marker.py",
+            "src/switchyard/harness/receipts.py",
+            "src/switchyard/harness/runner.py",
+            "src/switchyard/harness/spec.py",
+            "src/switchyard/harness/watch.py",
+            "src/switchyard/receipt.py",
+            "tests/test_compile_rejected_rest.py",
+            "tests/test_harness.py",
+            "tests/test_openvino_adapter.py",
+            "tests/test_run_path.py"
+          ],
+          "path": "tests/test_run_guard.py",
+          "testFramework": "pytest"
+        },
+        {
+          "exports": [
             "test_a_5090_run_proceeds_after_both_card_checks",
             "test_a_clean_run_writes_a_receipt_check_accepts",
             "test_a_fill_card_spec_has_no_run_path",
@@ -4605,16 +4754,16 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 12
+          "files": 14
         },
         {
           "boundary": "src",
           "depth": 1,
           "enters": {
-            "file": "src/switchyard/importers/aspire_judges.py",
-            "from": "tests/test_aspire_judges.py"
+            "file": "src/switchyard/harness/runner.py",
+            "from": "tests/conftest.py"
           },
-          "files": 33
+          "files": 35
         }
       ],
       "readers": [],
@@ -4645,7 +4794,7 @@
         {
           "config": "pyproject.toml",
           "coverage": true,
-          "files": 12,
+          "files": 14,
           "job": "test",
           "runner": "pytest",
           "step": "Test"
@@ -4714,7 +4863,7 @@
         {
           "boundary": "src",
           "depth": 0,
-          "files": 29
+          "files": 31
         }
       ],
       "readers": [],
@@ -4752,8 +4901,8 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "3b27e6a3ff4acd779c7c2448936085803743858c",
-    "tracked": 95
+    "commit": "0b8d38bf02f12b50a98f031a051bbba8b7a193be",
+    "tracked": 99
   },
   "landings": [
     {
@@ -4805,7 +4954,7 @@
   "overlaps": [],
   "submodules": [],
   "symlinks": [],
-  "testFiles": 12,
+  "testFiles": 14,
   "unassigned": [
     {
       "hash": "be418720d26ab2999db6b0a7e07f4f2d6532c8c35f3c2d5329f9ce506b82109f",
