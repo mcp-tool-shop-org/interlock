@@ -80,6 +80,10 @@ SENSOR_KEYS = ("gpu_temp_c", "sm_clock_mhz", "power_w", "shared_mib", "dedicated
 # The rest is conditional (maintainer's rule, R&D approved): it is owed only
 # when the previous run on these devices lasted longer than this.
 REST_FREE_RUN_S = 30 * 60
+# How many times _rest sleeps the remainder before proving the rest happened.
+REST_TOP_UPS = 3
+# A top-up overshoots by this much, so an early wake cannot leave a sliver unrested.
+REST_TOP_UP_PAD_S = 0.05
 REST_CONDITIONAL_NOTE = (
     f" (conditional: owed only after a prior run on these devices longer than {REST_FREE_RUN_S // 60} min)"
 )
@@ -1296,7 +1300,16 @@ def _rest(rest_s: float, sleep, clock) -> None:
     if rest_s <= 0:
         return
     start = clock()
+    # A real sleep can wake a fraction of a second early (Windows timer
+    # granularity), and the conditional rest is fractional, so top up the
+    # remainder a few times. A sleep that is genuinely broken still falls
+    # short after the top-ups and is refused below.
     sleep(rest_s)
+    for _ in range(REST_TOP_UPS):
+        remaining = rest_s - (clock() - start)
+        if remaining <= 0:
+            break
+        sleep(remaining + REST_TOP_UP_PAD_S)
     require_rest(clock() - start, rest_s=rest_s)
 
 
