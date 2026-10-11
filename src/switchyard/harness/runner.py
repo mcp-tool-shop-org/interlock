@@ -14,6 +14,7 @@ working tree. That is the same lock the dry-run uses, on the path Phase 3 runs.
 from __future__ import annotations
 
 import datetime
+import gc
 import os
 import re
 import shutil
@@ -27,6 +28,7 @@ from switchyard.adapters.base import (
     COMPILE_REJECTED_CODE,
     COMPILER_MESSAGE_MARKER,
     AdapterError,
+    BuildRefused,
     CompileRejected,
     NativeBinaryRejected,
     CompileTracker,
@@ -56,7 +58,18 @@ from switchyard.harness.receipts import (
     write_run,
 )
 from switchyard.harness.spec import load_spec
-from switchyard.harness.watch import COMPILE_CEILING_S, RAM_STOP_PCT, RunWatch, WatchHooks
+from switchyard.harness.watch import (
+    BUILD_GUARD_PCT,
+    COMPILE_CEILING_S,
+    RAM_STOP_PCT,
+    RELEASE_POLL_S,
+    RELEASE_TOLERANCE_BYTES,
+    RELEASE_WAIT_S,
+    BuildGuard,
+    RunWatch,
+    WatchHooks,
+    read_bytes,
+)
 from switchyard.receipt import ReceiptError, load_jsonl, validate_row
 from switchyard.harness.timing import Slot, TimingError, aba_call, schedule, schedule_aba, summarize
 
@@ -110,6 +123,19 @@ def dry_run(spec_path: Path, repo: Path) -> str:
         slots = _slots(spec)
         lines.append(f"slots: {len(slots)}")
         lines.append(f"order: {spec.get('order', 'interleaved')}")
+        if spec.get("order") == "blocked":
+            lines.append("blocks: " + ", ".join(f"{block['id']} ({len(block['arms'])} arms)" for block in spec["blocks"]))
+            lines.append(
+                f"between blocks: unload, then used RAM within {RELEASE_TOLERANCE_BYTES // 2**30} GiB of the "
+                f"run's start (waits up to {RELEASE_WAIT_S:g} s, else the run stops)"
+            )
+            lines.append(f"a build is refused when used RAM plus its build step would pass {BUILD_GUARD_PCT}% of total")
+            drift = spec.get("drift_block")
+            if drift:
+                lines.append(
+                    f"drift block {drift['id']}: {len(drift['arms'])} arms of {drift['repeat_of']} repeated "
+                    f"{drift['repeats']} times, descriptive rows kept out of the table"
+                )
         lines.append(f"compile_cache: {spec['compile_cache']}")
         lines.append(f"rest_s: {spec['rest_s']}{REST_CONDITIONAL_NOTE}")
         lines.append(
@@ -202,10 +228,21 @@ def run_interleaved(
     spec_rel = spec_path.resolve().relative_to(repo.resolve()).as_posix()
     _guard_flags(spec, grant, npu_session, cpu_window)
     arms = {arm["id"]: arm for arm in spec["arms"]}
-    slots = _slots(spec)
+    blocked = spec.get("order") == "blocked"
+    if blocked:
+        arms.update(_drift_arms(spec))
+        plan = _block_plan(spec)
+    else:
+        plan = [(None, [], _slots(spec))]
+    slots = [(slot, block_id) for block_id, _ids, block_slots in plan for slot in block_slots]
+    block_arms = {block_id: ids for block_id, ids, _slots_of in plan}
+    block_of = {arm_id: block_id for block_id, ids in block_arms.items() for arm_id in ids}
     needed: dict[str, int] = {}
-    for slot in slots:
+    for slot, _block_id in slots:
         needed[slot.step_id] = needed.get(slot.step_id, 0) + 1
+    refused: dict[str, str] = {}
+    stop_all = False
+    baseline_used: int | None = None
     records: list[dict] = []
     seen: dict[str, int] = {}
     finished: list[str] = []
@@ -238,6 +275,9 @@ def run_interleaved(
         )
     marker.entered = True
     marker.restart(_iso(started_at))  # before any adapter is touched
+    build_guard = BuildGuard(hooks) if blocked else None
+    if blocked:
+        baseline_used = read_bytes(hooks.used_sampler)
 
     def _run_notes() -> str:
         extra = "not run: " + ", ".join(skipped) if skipped else ""
@@ -252,10 +292,36 @@ def run_interleaved(
         warm = min(ceiling, max(60.0, 3.0 * cold_call)) if cold_call is not None else ceiling
         return {"bound_s": {"cold": ceiling, "warm": warm}, "cold_call_s": cold_call}
 
+    def _blocked_extra(arm_id: str) -> dict:
+        """What a blocked run records on every row: the block and the build guard; a drift row also its ratio."""
+
+        if not blocked:
+            return {}
+        extra: dict = {"blocked": {"block_id": block_of[arm_id], "build_guard_pct": BUILD_GUARD_PCT}}
+        origin = arms[arm_id].get("drift_of")
+        if origin is not None:
+            now = _summary(records, arm_id).throughput
+            before = _summary(records, origin).throughput if origin in finished else None
+            extra["drift_of"] = origin
+            extra["drift"] = {
+                "of": origin,
+                "warm_throughput": now,
+                "original_warm_throughput": before,
+                "ratio": now / before if now is not None and before else None,
+            }
+        return extra
+
+    def _mark_descriptive(row: dict, arm_id: str) -> dict:
+        if arms[arm_id].get("drift_of") is not None:
+            row["descriptive"] = True
+            validate_row(row)
+        return row
+
     def _finished_row(arm_id: str, *, partial: bool, gone: set[str]) -> dict:
         extra = _extra_settings(spec, arms[arm_id], records, run_id, gone, cache_report)
         extra.update(_prompt_counts(arms[arm_id], prompt_cache))
         extra.update(_bound_settings(arm_id))
+        extra.update(_blocked_extra(arm_id))
         extra["cpu_percent_max"] = _cpu_percent_max(records, arm_id)
         genai = _genai_summary(records, arm_id)
         if genai:
@@ -278,12 +344,13 @@ def run_interleaved(
         if partial:
             row["partial"] = True
             validate_row(row)
-        return row
+        return _mark_descriptive(row, arm_id)
 
     def _capability_row(arm_id: str, *, partial: bool, gone: set[str]) -> dict:
         extra = _extra_settings(spec, arms[arm_id], [], run_id, gone, cache_report)
         extra.update(_prompt_counts(arms[arm_id], prompt_cache))
         extra.update(_bound_settings(arm_id))
+        extra.update(_blocked_extra(arm_id))
         extra["cpu_percent_max"] = _cpu_percent_max(records, arm_id)
         outcome = capability[arm_id]
         evidence = rejections.get(arm_id)
@@ -293,7 +360,7 @@ def run_interleaved(
         elif evidence is not None:
             compile_ms = evidence.get("compile_ms")
             extra["rejection"] = {key: value for key, value in evidence.items() if key != "compile_ms"}
-        return device_lost_row(
+        row = device_lost_row(
             spec_id=spec["id"],
             arm=arms[arm_id],
             repeats=spec["repeats"],
@@ -308,6 +375,7 @@ def run_interleaved(
             partial=partial,
             compile_ms=compile_ms,
         )
+        return _mark_descriptive(row, arm_id)
 
     def _aborted_row(arm_id: str, *, gone: set[str]) -> dict:
         """The partial record of an arm the abort stopped mid-schedule."""
@@ -316,6 +384,7 @@ def run_interleaved(
         extra = _extra_settings(spec, arm, records, run_id, gone, cache_report)
         extra.update(_prompt_counts(arm, prompt_cache))
         extra.update(_bound_settings(arm_id))
+        extra.update(_blocked_extra(arm_id))
         extra["cpu_percent_max"] = _cpu_percent_max(records, arm_id)
         genai = _genai_summary(records, arm_id)
         if genai:
@@ -348,18 +417,19 @@ def run_interleaved(
         )
         row["aborted"] = True
         validate_row(row)
-        return row
+        return _mark_descriptive(row, arm_id)
 
     def _rows(*, partial: bool, gone: set[str]) -> list[dict]:
         rows = [_finished_row(arm_id, partial=partial, gone=gone) for arm_id in finished]
         rows.extend(_capability_row(arm_id, partial=partial, gone=gone) for arm_id in capability)
         if aborted is not None and partial:
-            for arm in spec["arms"]:
-                arm_id = arm["id"]
-                if arm_id in finished or arm_id in capability:
+            for arm_id, arm in arms.items():
+                if arm_id in finished or arm_id in capability or arm_id in refused:
                     continue
                 in_progress = halted_by_watch and current is not None and current.step_id == arm_id
-                if not in_progress and not any(record["step_id"] == arm_id for record in records):
+                # a stop between blocks leaves the later blocks' arms unfinished: they get rows too
+                unreached = stop_all and arm.get("drift_of") is None
+                if not in_progress and not unreached and not any(record["step_id"] == arm_id for record in records):
                     continue
                 rows.append(_aborted_row(arm_id, gone=gone))
         window = {"start": _iso(started_at), "end": _iso(wall())}
@@ -439,16 +509,80 @@ def run_interleaved(
     def _note(slot: Slot) -> None:
         skipped.append(_label(slot))
 
+    def _refuse_block(block_id: str) -> None:
+        """A build was refused for memory headroom: the block's unfinished arms are not run."""
+
+        gone_ids = [
+            arm_id
+            for arm_id in block_arms[block_id]
+            if arm_id not in finished and arm_id not in capability and arm_id not in refused
+        ]
+        for arm_id in gone_ids:
+            refused[arm_id] = "memory headroom"
+            skipped.append(f"{arm_id} (memory headroom)")
+        records[:] = [row for row in records if row["step_id"] not in gone_ids]
+
+    def _released() -> bool:
+        """Used RAM back within the tolerance of the run's start, waiting up to RELEASE_WAIT_S."""
+
+        if baseline_used is None:
+            return True
+        deadline = hooks.clock() + RELEASE_WAIT_S
+        while True:
+            used = read_bytes(hooks.used_sampler)
+            if used is None or used <= baseline_used + RELEASE_TOLERANCE_BYTES:
+                return True
+            if hooks.clock() >= deadline:
+                return False
+            hooks.sleep(RELEASE_POLL_S)
+
+    def _end_block(block_id: str) -> None:
+        """Flush the block's rows, unload what it used, and prove the memory came back or stop the run."""
+
+        nonlocal aborted, stop_all
+        flush()
+        used_arms: dict[str, dict] = {}
+        for arm_id in block_arms[block_id]:
+            used_arms[arm_id] = arms[arm_id]
+            companion_id = arms[arm_id].get("companion")
+            if companion_id:
+                used_arms[companion_id] = arms[companion_id]
+        _unload(adapters, used_arms)
+        gc.collect()
+        if _released():
+            return
+        error = f"memory not released after block {block_id}"
+        with state_lock:
+            aborted = {"step": f"block {block_id} end", "error": error}
+            stop_all = True
+            flush()
+        raise RunnerError(error)
+
     for adapter in adapters.values():
         attach = getattr(adapter, "attach_compile_tracker", None)
         if callable(attach):
             attach(tracker)
+        attach_build_guard = getattr(adapter, "attach_build_guard", None)
+        if build_guard is not None and callable(attach_build_guard):
+            attach_build_guard(build_guard)
     guard.start()
+    active_block = None
     try:
         try:
-            for slot in slots:
+            for slot, block_id in slots:
+                if block_id != active_block:
+                    if active_block is not None:
+                        _end_block(active_block)
+                    active_block = block_id
                 current = slot
                 arm = arms[slot.step_id]
+                if arm["id"] in refused:
+                    continue
+                if arm.get("drift_of") is not None and arm["drift_of"] not in finished:
+                    if arm["id"] not in declined_ids:
+                        declined_ids.add(arm["id"])
+                        skipped.append(f"{arm['id']} (drift of {arm['drift_of']}, which did not finish)")
+                    continue
                 companion = _companion(arm, arms, slot)
                 if arm.get("not_run"):
                     if arm["id"] not in declined_ids:
@@ -503,6 +637,8 @@ def run_interleaved(
                             kind = "hang"
                         elif device_lost_error(error):
                             kind = "device_lost"
+                        elif isinstance(exc, BuildRefused):
+                            kind = "memory_headroom"
                         elif _is_compile_rejection(exc, error, arm):
                             kind = "compile_rejected"
                             compile_s = exc.failed_s
@@ -536,6 +672,9 @@ def run_interleaved(
                             raise RunnerError(f"step {slot.step_id} failed: {error}")
                         if kind == "device_lost":
                             _remember(arm, "device_lost")
+                            flush()
+                        elif kind == "memory_headroom":
+                            _refuse_block(block_id)
                             flush()
                         elif kind == "compile_rejected":
                             rejected_keys.add(_shape_key(arm))
@@ -844,11 +983,54 @@ def _reported_outcome(result) -> str | None:
     return None
 
 
-def _slots(spec: dict) -> list[Slot]:
+def _slots(spec: dict, arm_ids: list[str] | None = None) -> list[Slot]:
+    """The schedule. ``arm_ids`` restricts the interleave to a subset: a block's arms.
+
+    A blocked spec's whole schedule is its blocks' schedules one after another.
+    """
+
     order = spec.get("order", "interleaved")
+    if order == "blocked" and arm_ids is None:
+        return [slot for _block_id, _ids, block_slots in _block_plan(spec) for slot in block_slots]
     if order == "aba":
         return schedule_aba(spec["pairs"], warmups=spec["warmups"], repeats=spec["repeats"])
-    return schedule([arm["id"] for arm in spec["arms"]], warmups=spec["warmups"], repeats=spec["repeats"])
+    ids = arm_ids if arm_ids is not None else [arm["id"] for arm in spec["arms"]]
+    return schedule(ids, warmups=spec["warmups"], repeats=spec["repeats"])
+
+
+def _drift_id(arm_id: str) -> str:
+    return f"{arm_id}-drift"
+
+
+def _drift_arms(spec: dict) -> dict[str, dict]:
+    """The drift block's arms: the originals again under their own ids, each knowing what it repeats."""
+
+    drift = spec.get("drift_block")
+    if not drift:
+        return {}
+    by_id = {arm["id"]: arm for arm in spec["arms"]}
+    return {
+        _drift_id(arm_id): {**by_id[arm_id], "id": _drift_id(arm_id), "drift_of": arm_id}
+        for arm_id in drift["arms"]
+    }
+
+
+def _block_plan(spec: dict) -> list[tuple[str, list[str], list[Slot]]]:
+    """``(block id, arm ids, slots)`` for each block, then the drift block.
+
+    A block is the ordinary schedule over its own arms (cold once per arm,
+    warm-ups, repeats). The drift block runs the chosen arms' warm slots only: no
+    cold slot, at least one warm-up (the first call after a rebuild is not a
+    warm sample), ``repeats`` repeats.
+    """
+
+    plan = [(block["id"], list(block["arms"]), _slots(spec, list(block["arms"]))) for block in spec["blocks"]]
+    drift = spec.get("drift_block")
+    if drift:
+        ids = [_drift_id(arm_id) for arm_id in drift["arms"]]
+        warm = schedule(ids, warmups=max(1, spec["warmups"]), repeats=drift["repeats"])
+        plan.append((drift["id"], ids, [slot for slot in warm if slot.phase != "cold"]))
+    return plan
 
 
 def _request(

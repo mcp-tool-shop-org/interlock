@@ -132,12 +132,17 @@ CAPABILITY_OUTCOMES = frozenset(_UNTIMED | _COMPILE_ONLY)
 
 
 def is_speed_row(row: dict) -> bool:
-    """A capability row or a failed parity guard is recorded, and it is not a speed.
+    """A capability row, a failed parity guard or a descriptive row is recorded, and it is not a speed.
 
-    A failed guard keeps its timing. It is not an untimed outcome.
+    A failed guard keeps its timing. It is not an untimed outcome. A descriptive
+    row (a drift-block repeat) is evidence about the run and never routes.
     """
 
-    return row.get("outcome") not in CAPABILITY_OUTCOMES and row.get("parity_valid") is not False
+    return (
+        row.get("outcome") not in CAPABILITY_OUTCOMES
+        and row.get("parity_valid") is not False
+        and row.get("descriptive") is not True
+    )
 
 
 def _check_device_lost(row: dict) -> None:

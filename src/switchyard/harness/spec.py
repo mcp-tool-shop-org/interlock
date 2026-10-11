@@ -115,10 +115,69 @@ def _interleaved(data: dict) -> None:
     if cache not in {"fresh", "reuse"}:
         raise SpecError("compile_cache must be fresh or reuse")
     order = data.get("order", "interleaved")
-    if order not in {"interleaved", "aba"}:
+    if order not in {"interleaved", "aba", "blocked"}:
         raise SpecError(f"unknown order {order!r}")
     if order == "aba":
         _pairs(data, seen)
+    if order == "blocked":
+        _blocks(data, seen)
+    elif "blocks" in data or "drift_block" in data:
+        raise SpecError("blocks and drift_block belong to order: blocked")
+
+
+def _blocks(data: dict, arm_ids: set) -> None:
+    """``order: blocked``: the arms are split into blocks run one after another.
+
+    Every arm sits in exactly one block. An optional drift block repeats some
+    arms of one block at the end, as descriptive rows that never reach the table.
+    """
+
+    if "pairs" in data:
+        raise SpecError("blocked order has no pairs; pairs belong to order: aba")
+    blocks = data.get("blocks")
+    if not isinstance(blocks, list) or not blocks:
+        raise SpecError("blocked order needs at least one block")
+    block_ids: dict[str, list] = {}
+    placed: dict[str, str] = {}
+    for block in blocks:
+        if not isinstance(block, dict) or not isinstance(block.get("id"), str) or not block["id"]:
+            raise SpecError("every block needs an id")
+        if block["id"] in block_ids:
+            raise SpecError(f"duplicate block {block['id']}")
+        members = block.get("arms")
+        if not isinstance(members, list) or not members:
+            raise SpecError(f"block {block['id']} needs arms")
+        for arm_id in members:
+            if arm_id not in arm_ids:
+                raise SpecError(f"block {block['id']} names an arm that is not in the spec: {arm_id}")
+            if arm_id in placed:
+                raise SpecError(f"arm {arm_id} is in blocks {placed[arm_id]} and {block['id']}; an arm is in exactly one block")
+            placed[arm_id] = block["id"]
+        block_ids[block["id"]] = members
+    missing = sorted(arm_ids - set(placed))
+    if missing:
+        raise SpecError(f"arms in no block: {', '.join(missing)}")
+    drift = data.get("drift_block")
+    if drift is None:
+        return
+    if not isinstance(drift, dict) or not isinstance(drift.get("id"), str) or not drift["id"]:
+        raise SpecError("drift_block needs an id")
+    if drift["id"] in block_ids:
+        raise SpecError(f"drift_block id {drift['id']} repeats a block id")
+    source = drift.get("repeat_of")
+    if source not in block_ids:
+        raise SpecError("drift_block repeat_of must name a block")
+    members = drift.get("arms")
+    if not isinstance(members, list) or not members:
+        raise SpecError("drift_block needs arms")
+    for arm_id in members:
+        if arm_id not in block_ids[source]:
+            raise SpecError(f"drift_block arm {arm_id} is not in block {source}")
+    if len(set(members)) != len(members):
+        raise SpecError("drift_block names an arm twice")
+    repeats = drift.get("repeats")
+    if isinstance(repeats, bool) or not isinstance(repeats, int) or repeats < 1:
+        raise SpecError("drift_block repeats must be an integer >= 1")
 
 
 def _fill_card(data: dict) -> None:

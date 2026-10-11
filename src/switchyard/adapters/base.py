@@ -75,6 +75,15 @@ class CompileRejected(AdapterError):
         self.failed_s = failed_s
 
 
+class BuildRefused(AdapterError):
+    """The build guard refused a pipeline or model build for lack of memory headroom.
+
+    Raised before the build starts, so nothing was compiled. The harness marks the
+    block's unfinished arms not run (reason ``memory headroom``); it is not a
+    capability outcome and never reaches the routing table.
+    """
+
+
 class CompileTracker:
     """Which native compile is running, and since when.
 

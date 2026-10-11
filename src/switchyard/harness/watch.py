@@ -22,8 +22,11 @@ import os
 import sys
 import threading
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Callable
+
+from switchyard.adapters.base import BuildRefused
 
 try:  # missing psutil means the RAM guard records "unrecorded" and does nothing
     import psutil
@@ -37,6 +40,16 @@ RAM_SAMPLE_S = 2.0
 EXIT_COMPILE_TIMEOUT = 75
 EXIT_RAM_STOP = 76
 GIB = 2**30
+# Blocked order (R&D ruling 2026-10-10): between blocks the used RAM must come
+# back to within RELEASE_TOLERANCE_BYTES of the run's starting baseline, waited
+# for up to RELEASE_WAIT_S; a build is refused when used RAM plus the largest
+# build step seen for the model would cross BUILD_GUARD_PCT of total RAM.
+RELEASE_TOLERANCE_BYTES = 3 * GIB
+RELEASE_WAIT_S = 60.0
+RELEASE_POLL_S = 2.0
+BUILD_GUARD_PCT = 85
+BUILD_STEP_8B_BYTES = 12 * GIB
+BUILD_STEP_DEFAULT_BYTES = 6 * GIB
 
 
 def _system_ram_percent() -> float:
@@ -45,6 +58,14 @@ def _system_ram_percent() -> float:
 
 def _own_rss_bytes() -> int:
     return int(psutil.Process().memory_info().rss)
+
+
+def _system_used_bytes() -> int:
+    return int(psutil.virtual_memory().used)
+
+
+def _system_total_bytes() -> int:
+    return int(psutil.virtual_memory().total)
 
 
 def _exit_now(code: int) -> None:  # pragma: no cover - ends the process
@@ -59,13 +80,19 @@ def _exit_now(code: int) -> None:  # pragma: no cover - ends the process
 class WatchHooks:
     """The watcher's seams. The defaults are the real ones.
 
-    ``ram_sampler`` None means no RAM reading is possible (psutil missing).
+    ``ram_sampler`` None means no RAM reading is possible (psutil missing). The
+    same holds for ``used_sampler`` and ``total_sampler`` (bytes), which blocked
+    order reads for the release check and the build guard; ``sleep`` paces the
+    release wait.
     ``start_thread`` False lets a test drive :meth:`RunWatch.tick` itself.
     """
 
     clock: Callable[[], float] = time.monotonic
     ram_sampler: Callable[[], float] | None = _system_ram_percent if psutil is not None else None
     rss_sampler: Callable[[], int] | None = _own_rss_bytes if psutil is not None else None
+    used_sampler: Callable[[], int] | None = _system_used_bytes if psutil is not None else None
+    total_sampler: Callable[[], int] | None = _system_total_bytes if psutil is not None else None
+    sleep: Callable[[float], None] = time.sleep
     exit_fn: Callable[[int], None] = _exit_now
     interval_s: float = RAM_SAMPLE_S
     lock_wait_s: float = 10.0  # how long the watcher waits for the run's state lock before flushing without it
@@ -202,6 +229,68 @@ class RunWatch:
                 pass
         finally:
             self.hooks.exit_fn(code)
+
+
+def read_bytes(sampler: Callable[[], int] | None) -> int | None:
+    """One byte reading, or None when there is no sampler or it fails."""
+
+    if sampler is None:
+        return None
+    try:
+        return int(sampler())
+    except Exception:
+        return None
+
+
+class BuildGuard:
+    """The pre-build memory check of blocked order.
+
+    An adapter wraps each pipeline or model build in :meth:`building`. Before
+    the build it refuses (``BuildRefused``) when used RAM plus the largest build
+    step seen for that model would cross ``pct`` of total RAM; the first build of
+    a model uses a default step (12 GiB for an 8B model, else 6 GiB). Around the
+    build it measures the step: the growth of the process working set (used RAM
+    when no working-set sampler exists). With no RAM reading the guard allows
+    the build and records nothing.
+    """
+
+    def __init__(self, hooks: WatchHooks, *, pct: float = BUILD_GUARD_PCT) -> None:
+        self.hooks = hooks
+        self.pct = pct
+        self.steps: dict[str, int] = {}
+        self.refused: list[dict] = []
+
+    def step_for(self, model: str) -> int:
+        seen = self.steps.get(model)
+        if seen is not None:
+            return seen
+        return BUILD_STEP_8B_BYTES if "8b" in model.lower() else BUILD_STEP_DEFAULT_BYTES
+
+    def check(self, model: str) -> None:
+        used = read_bytes(self.hooks.used_sampler)
+        total = read_bytes(self.hooks.total_sampler)
+        if used is None or total is None:
+            return
+        step = self.step_for(model)
+        limit = total * self.pct / 100
+        if used + step > limit:
+            self.refused.append({"model": model, "used": used, "step": step, "total": total})
+            raise BuildRefused(
+                f"memory headroom: used {used / GIB:.1f} GiB plus a {step / GIB:.1f} GiB build step "
+                f"for {model} would pass {_plain(self.pct)}% of {total / GIB:.1f} GiB"
+            )
+
+    @contextmanager
+    def building(self, model: str):
+        self.check(model)
+        sampler = self.hooks.rss_sampler or self.hooks.used_sampler
+        before = read_bytes(sampler)
+        try:
+            yield
+        finally:
+            after = read_bytes(sampler)
+            if before is not None and after is not None and after > before:
+                self.steps[model] = max(self.steps.get(model, 0), after - before)
 
 
 def _plain(value: float):

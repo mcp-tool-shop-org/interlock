@@ -231,16 +231,19 @@ def import_receipt(root: Path, run_id: str) -> list[dict]:
     so a later receipt can be judged against them.
 
     Rows marked ``aborted: true`` never route: they stay in the receipt as
-    the record, and each aborted run gets one line in ``table/gaps.md``.
+    the record, and each aborted run gets one line in ``table/gaps.md``. Rows
+    marked ``descriptive: true`` (a drift block's repeats) stay in the receipt
+    and never reach the table.
     """
 
     path = root / "receipts" / f"{run_id}.jsonl"
     loaded = load_jsonl(path)
     aborted = [row for row in loaded if row.get("aborted") is True]
-    routable = [row for row in loaded if row.get("aborted") is not True]
+    descriptive = [row for row in loaded if row.get("descriptive") is True and row.get("aborted") is not True]
+    routable = [row for row in loaded if row.get("aborted") is not True and row.get("descriptive") is not True]
     rows = apply_parity(routable, references=_table_rows(root))
     rows = [for_table(row) for row in rows]
-    _dump(path, rows + aborted)
+    _dump(path, rows + descriptive + aborted)
     _append_table(root, rows)
     if aborted:
         append_aborted_runs(root, aborted)
@@ -248,11 +251,14 @@ def import_receipt(root: Path, run_id: str) -> list[dict]:
 
 
 def write_run(root: Path, run_id: str, rows: list[dict]) -> Path:
-    """Write ``receipts/<run_id>.jsonl`` and append the rows to the table."""
+    """Write ``receipts/<run_id>.jsonl`` and append the rows to the table.
+
+    A ``descriptive`` row is written to the receipt and left out of the table.
+    """
 
     stamped = apply_parity(rows, references=_table_rows(root))
     path = write_receipt(root, run_id, [for_table(row) for row in stamped])
-    _append_table(root, load_jsonl(path))
+    _append_table(root, [row for row in load_jsonl(path) if row.get("descriptive") is not True])
     return path
 
 

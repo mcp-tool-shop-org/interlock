@@ -113,6 +113,7 @@
     "parity_valid": {"type": "boolean"},
     "partial": {"type": "boolean"},
     "aborted": {"type": "boolean"},
+    "descriptive": {"type": "boolean"},
     "model_family": {"type": ["string", "null"]},
     "gpu_resident": {"type": ["boolean", "null"]},
     "cost": {

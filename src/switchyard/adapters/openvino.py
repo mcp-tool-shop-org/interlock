@@ -233,11 +233,24 @@ class OpenvinoAdapter:
         self._poisoned: set = set()  # (model, device) keys that hung once
         self._lost_devices: set = set()  # ov ids that reset this run
         self.compile_tracker = None  # the harness's watcher reads it (CompileTracker)
+        self.build_guard = None  # blocked order's pre-build memory check (BuildGuard)
 
     def attach_compile_tracker(self, tracker) -> None:
         """Let the harness watch native compiles from outside the call."""
 
         self.compile_tracker = tracker
+
+    def attach_build_guard(self, guard) -> None:
+        """Let a blocked run refuse a build that would not fit and measure each build's step."""
+
+        self.build_guard = guard
+
+    def _building(self, model: str):
+        """A context around one pipeline or model build: the pre-build check and the step measure."""
+
+        if self.build_guard is None:
+            return contextlib.nullcontext()
+        return self.build_guard.building(model)
 
     def _compiling(self, label: str):
         """A context that tells the watcher a native compile is running."""
@@ -340,12 +353,13 @@ class OpenvinoAdapter:
         entry = self._compiled.get(key)
         if entry is None:
             file = self._model_path(model, revision)
-            compiled, compile_s = self._load_compiled(file, ov_id, static, compile_config)
-            warm_reload_s = None
-            if compile_config.get("CACHE_DIR"):
-                # The realistic reload: same graph, same dir, driver cache already
-                # populated by the first compile. B_reuse is counted from this.
-                _reload, warm_reload_s = self._load_compiled(file, ov_id, static, compile_config)
+            with self._building(model):
+                compiled, compile_s = self._load_compiled(file, ov_id, static, compile_config)
+                warm_reload_s = None
+                if compile_config.get("CACHE_DIR"):
+                    # The realistic reload: same graph, same dir, driver cache already
+                    # populated by the first compile. B_reuse is counted from this.
+                    _reload, warm_reload_s = self._load_compiled(file, ov_id, static, compile_config)
             entry = {"model": compiled, "compile_s": compile_s, "warm_reload_s": warm_reload_s,
                      "warmed": False, "path": str(file)}
             self._compiled[key] = entry
@@ -754,11 +768,20 @@ def _pipeline(self, model: str, ov_id: str, compile_config: dict):
     key = _pipeline_key(model, ov_id, compile_config)
     entry = self._pipelines.get(key)
     if entry is None:
+        if self.build_guard is not None and self._pipelines:
+            # Blocked order keeps at most one generate pipeline resident: a second
+            # key inside a block (a different NPU prompt length, say) is a spec
+            # fault, not something to build on top of the first.
+            raise AdapterError(
+                f"a second generate pipeline for {model} on {ov_id} would be resident beside "
+                f"{len(self._pipelines)} already built; blocked order keeps at most one, so split the block"
+            )
         genai = self._genai_module or _real_genai_module()
         directory = _model_dir(model)
         t0 = self.clock()
-        with self._compiling(f"LLMPipeline {ov_id}"):
-            pipe = genai.LLMPipeline(str(directory), ov_id, compile_config or {})
+        with self._building(model):
+            with self._compiling(f"LLMPipeline {ov_id}"):
+                pipe = genai.LLMPipeline(str(directory), ov_id, compile_config or {})
         compile_s = self.clock() - t0
         entry = {"pipe": pipe, "warmed": False, "path": str(directory)}
         self._pipelines[key] = entry
