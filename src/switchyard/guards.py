@@ -11,7 +11,6 @@ from pathlib import Path
 from switchyard.devices import CARD_5090, CPU, IGPU, NPU
 
 HEARTBEAT_MAX_AGE_S = 60
-REST_SECONDS = 15 * 60
 
 
 class GuardError(Exception):
@@ -66,13 +65,6 @@ def require_card_empty(models: list) -> None:
         raise GuardError(f"REFUSED: {count} model(s) still on the card")
 
 
-def require_rest(elapsed_s: float, *, rest_s: float = REST_SECONDS) -> None:
-    if rest_s <= 0:
-        return
-    if elapsed_s < rest_s:
-        raise GuardError(f"REFUSED: the card has rested {elapsed_s:.0f}s of the required {rest_s:.0f}s")
-
-
 def assess_step(
     *,
     device: str,
@@ -81,7 +73,7 @@ def assess_step(
     cpu_window: str | None = None,
     cpu_heavy: bool = False,
 ) -> dict[str, str | None]:
-    """Apply the flag guards for one step. Heartbeat, card and rest are separate."""
+    """Apply the flag guards for one step. Heartbeat and card are separate."""
 
     if device == CARD_5090:
         return {

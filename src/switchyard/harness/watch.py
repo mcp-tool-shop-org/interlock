@@ -8,7 +8,10 @@ does two jobs, both from outside the native call:
 - compile bound: a compile that has run longer than the ceiling is recorded,
   the receipt is flushed, and the process ends with ``EXIT_COMPILE_TIMEOUT``;
 - RAM stop: system RAM at or above the stop percent flushes the receipt and
-  ends the process with ``EXIT_RAM_STOP``.
+  ends the process with ``EXIT_RAM_STOP``;
+- operator stop: a file ``receipts/<run_id>.stop`` flushes the receipt, closes
+  the marker with the file's first line as the reason, and ends the process
+  with ``EXIT_OPERATOR_STOP``.
 
 The runner owns what to write (the callbacks); the watcher owns when. The
 clock, the RAM and working-set samplers and the exit function are injectable,
@@ -19,11 +22,13 @@ never end the test process.
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 import threading
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Callable
 
 from switchyard.adapters.base import BuildRefused
@@ -39,6 +44,8 @@ RAM_SAMPLE_S = 2.0
 # Distinctive, non-zero, and not a signal number or a Python usage error.
 EXIT_COMPILE_TIMEOUT = 75
 EXIT_RAM_STOP = 76
+EXIT_OPERATOR_STOP = 77
+UNRECORDED = "unrecorded"
 GIB = 2**30
 # Blocked order (R&D ruling 2026-10-10): between blocks the used RAM must come
 # back to within RELEASE_TOLERANCE_BYTES of the run's starting baseline, waited
@@ -68,6 +75,52 @@ def _system_total_bytes() -> int:
     return int(psutil.virtual_memory().total)
 
 
+def read_start_state(uses_5090: bool) -> dict:
+    """Device state at run start. Recorded, never gated: a value that cannot be
+    read is ``unrecorded`` and nothing here raises."""
+
+    state: dict = {}
+    if uses_5090:
+        keys = ("gpu_temp_c", "sm_clock_mhz", "power_w", "memory_used_mib")
+        state.update({key: UNRECORDED for key in keys})
+        try:
+            out = subprocess.run(
+                [
+                    "nvidia-smi",
+                    "--query-gpu=temperature.gpu,clocks.sm,power.draw,memory.used",
+                    "--format=csv,noheader,nounits",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            parts = [item.strip() for item in out.stdout.splitlines()[0].split(",")] if out.returncode == 0 else []
+            for key, raw in zip(keys, parts):
+                try:
+                    state[key] = float(raw)
+                except ValueError:
+                    pass
+        except Exception:
+            pass
+    state.update(cpu_percent=UNRECORDED, cpu_freq_mhz=UNRECORDED, ram_pct=UNRECORDED)
+    if psutil is not None:
+        try:
+            state["cpu_percent"] = float(psutil.cpu_percent(interval=0.2))
+        except Exception:
+            pass
+        try:
+            mhz = getattr(psutil.cpu_freq(), "current", None)
+            if mhz is not None:
+                state["cpu_freq_mhz"] = float(mhz)
+        except Exception:
+            pass
+        try:
+            state["ram_pct"] = float(psutil.virtual_memory().percent)
+        except Exception:
+            pass
+    return state
+
+
 def _exit_now(code: int) -> None:  # pragma: no cover - ends the process
     try:
         sys.stdout.flush()
@@ -94,6 +147,7 @@ class WatchHooks:
     total_sampler: Callable[[], int] | None = _system_total_bytes if psutil is not None else None
     sleep: Callable[[float], None] = time.sleep
     exit_fn: Callable[[int], None] = _exit_now
+    state_sampler: Callable[[bool], dict] = read_start_state
     interval_s: float = RAM_SAMPLE_S
     lock_wait_s: float = 10.0  # how long the watcher waits for the run's state lock before flushing without it
     start_thread: bool = True
@@ -109,6 +163,8 @@ class RunWatch:
         on_compile_timeout: Callable[[dict], None],
         on_ram_stop: Callable[[str], None],
         stop_pct: float = RAM_STOP_PCT,
+        stop_file: Path | None = None,
+        on_operator_stop: Callable[[str], None] | None = None,
     ) -> None:
         self.tracker = tracker
         self.hooks = hooks
@@ -116,6 +172,8 @@ class RunWatch:
         self.stop_pct = float(stop_pct)
         self._on_compile_timeout = on_compile_timeout
         self._on_ram_stop = on_ram_stop
+        self.stop_file = stop_file
+        self._on_operator_stop = on_operator_stop
         self._lock = threading.Lock()
         self._peak_pct: float | None = None
         self._samples = 0
@@ -180,6 +238,11 @@ class RunWatch:
 
         if self._fired:
             return True
+        reason = self._operator_stop_reason()
+        if reason is not None:
+            handler = self._on_operator_stop
+            self._fire(lambda: handler(reason), EXIT_OPERATOR_STOP)
+            return True
         percent = self.sample_ram()
         self._sample_working_set()
         if percent is not None and percent >= self.stop_pct:
@@ -202,6 +265,31 @@ class RunWatch:
                 self._fire(lambda: self._on_compile_timeout(info), EXIT_COMPILE_TIMEOUT)
                 return True
         return False
+
+    def _operator_stop_reason(self) -> str | None:
+        """The reason in ``<run_id>.stop`` (first line, trimmed), or None when there is no stop file.
+
+        The file is renamed to ``.stop.done`` before the watcher acts, so it is never read twice."""
+
+        path = self.stop_file
+        if path is None or self._on_operator_stop is None:
+            return None
+        try:
+            if not path.is_file():
+                return None
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return None
+        lines = text.splitlines()
+        reason = (lines[0].strip() if lines else "") or "no reason given"
+        try:
+            os.replace(path, path.with_name(path.name + ".done"))
+        except OSError:
+            try:
+                path.unlink()
+            except OSError:
+                pass
+        return reason
 
     def _sample_working_set(self) -> None:
         """The process working set, peaked over the running compile (reset when a new one begins)."""

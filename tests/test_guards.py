@@ -5,7 +5,6 @@ import pytest
 
 from switchyard.guards import (
     HEARTBEAT_MAX_AGE_S,
-    REST_SECONDS,
     GuardError,
     assess_step,
     require_card_empty,
@@ -13,7 +12,6 @@ from switchyard.guards import (
     require_grant,
     require_heartbeat,
     require_npu_session,
-    require_rest,
 )
 
 
@@ -55,14 +53,10 @@ def test_heartbeat_uses_mtime_and_refuses_a_stale_or_missing_file(tmp_path: Path
         require_heartbeat(tmp_path / "absent", now)
 
 
-def test_card_must_be_empty_and_the_rest_is_fifteen_minutes():
+def test_card_must_be_empty():
     require_card_empty([])
     with pytest.raises(GuardError, match="1 model"):
         require_card_empty([{"name": "qwen3:8b"}])
-    require_rest(REST_SECONDS)
-    require_rest(0, rest_s=0)
-    with pytest.raises(GuardError, match="899s"):
-        require_rest(REST_SECONDS - 1)
 
 
 def test_assess_step_refuses_the_wrong_flag_and_unknown_devices():

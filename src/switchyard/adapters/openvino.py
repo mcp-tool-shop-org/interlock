@@ -628,9 +628,11 @@ def _run_generate(self, request: StepRequest, s: _Settings, resolved: dict) -> S
             "MAX_PROMPT_LEN": compile_config["MAX_PROMPT_LEN"],
             "MIN_RESPONSE_LEN": compile_config["MIN_RESPONSE_LEN"],
         }
+    prefix = _prefix_mode(s)
+    resolved["prefix_caching"] = _prefix_recorded(prefix)
     build_t0 = self.clock()
     try:
-        pipe, compile_s = self._pipeline(request.model, ov_id, compile_config)
+        pipe, compile_s = self._pipeline(request.model, ov_id, compile_config, prefix)
     except AdapterError:
         raise
     except Exception as exc:
@@ -646,7 +648,7 @@ def _run_generate(self, request: StepRequest, s: _Settings, resolved: dict) -> S
             resolved["outcome"] = "unsupported length"
             return StepResult(ok=True, resolved=resolved or None, sensors=None)
         raise AdapterError(f"the pipeline for {request.model} on {ov_id} did not build: {exc}") from exc
-    key = _pipeline_key(request.model, ov_id, compile_config)
+    key = _pipeline_key(request.model, ov_id, compile_config, prefix)
     genai = self._genai_module or _real_genai_module()
     config = genai.GenerationConfig()
     config.max_new_tokens = num_predict
@@ -764,16 +766,38 @@ def _mean(value) -> float:
     return float(getattr(value, "mean", value))
 
 
-def _pipeline_key(model: str, ov_id: str, compile_config: dict | None) -> tuple:
+def _pipeline_key(model: str, ov_id: str, compile_config: dict | None, prefix_caching: str = "default") -> tuple:
     """One pipeline per model, device and compile config. On the NPU the config
     sizes the static KV cache (MAX_PROMPT_LEN), so a pipeline built for a short
     prompt must not be reused for a longer one."""
 
-    return (model, ov_id, tuple(sorted((compile_config or {}).items())))
+    key = (model, ov_id, tuple(sorted((compile_config or {}).items())))
+    return key if prefix_caching == "default" else key + (prefix_caching,)
 
 
-def _pipeline(self, model: str, ov_id: str, compile_config: dict):
-    key = _pipeline_key(model, ov_id, compile_config)
+def _prefix_mode(s: "_Settings") -> str:
+    """``prefix_caching`` for a generate step: on, off, or default (the library's own)."""
+
+    mode = str(s.get("prefix_caching", "default")).lower()
+    return mode if mode in {"on", "off"} else "default"
+
+
+PREFIX_UNCONTROLLED = "library default (uncontrolled)"
+
+
+def _prefix_recorded(mode: str) -> str:
+    """The effective value recorded on the row. openvino_genai 2026.4.1 has no
+    switch on the stateful LLMPipeline (SchedulerConfig.enable_prefix_caching
+    exists only for the continuous-batching backend), so the default is recorded
+    as uncontrolled rather than guessed."""
+
+    if mode == "default":
+        return PREFIX_UNCONTROLLED
+    return f"{mode} (continuous-batching scheduler_config)"
+
+
+def _pipeline(self, model: str, ov_id: str, compile_config: dict, prefix_caching: str = "default"):
+    key = _pipeline_key(model, ov_id, compile_config, prefix_caching)
     entry = self._pipelines.get(key)
     if entry is None:
         if self.build_guard is not None and self._pipelines:
@@ -789,7 +813,14 @@ def _pipeline(self, model: str, ov_id: str, compile_config: dict):
         t0 = self.clock()
         with self._building(model):
             with self._compiling(f"LLMPipeline {ov_id}"):
-                pipe = genai.LLMPipeline(str(directory), ov_id, compile_config or {})
+                properties = dict(compile_config or {})
+                if prefix_caching in {"on", "off"}:
+                    # the only documented control: a scheduler_config selects the
+                    # continuous-batching backend and carries enable_prefix_caching
+                    scheduler = genai.SchedulerConfig()
+                    scheduler.enable_prefix_caching = prefix_caching == "on"
+                    properties["scheduler_config"] = scheduler
+                pipe = genai.LLMPipeline(str(directory), ov_id, properties)
         compile_s = self.clock() - t0
         entry = {"pipe": pipe, "warmed": False, "path": str(directory)}
         self._pipelines[key] = entry
@@ -849,7 +880,7 @@ def _start_session(self, request: StepRequest) -> None:
                     repo, ref = parse_model_ref(request.model)
                     n_tok = len(self._encode(self._load_tokenizer(repo, ref), str(s.get("prompt") or "hello"))[0])
                     config_map.update(_npu_genai_config(n_tok, int(s.get("num_predict", 128))))
-                pipe, _ = _pipeline(self, request.model, ov_id, config_map)
+                pipe, _ = _pipeline(self, request.model, ov_id, config_map, _prefix_mode(s))
                 config = genai.GenerationConfig()
                 config.max_new_tokens = _SESSION_NEW_TOKENS
                 while not stop.is_set():

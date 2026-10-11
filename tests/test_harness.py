@@ -122,6 +122,7 @@ def _arm(arm_id, device):
     return {
         "id": arm_id,
         "task": "generate",
+        "prompt": "The switchyard counts the same cars on every pass.",
         "device": device,
         "engine": "fake",
         "model": "qwen3:8b",
@@ -819,6 +820,8 @@ def test_a_dataset_target_is_one_prefix_per_model_and_the_counts_land_on_the_row
     arm_d = _arm("D", "CPU")
     arm_d["static_shape"] = None
     arm_d["batch"] = 1
+    for arm in (arm_a, arm_b, arm_c, arm_d):
+        arm.pop("prompt")  # the dataset builds the prompt
     spec["arms"] = [arm_a, arm_b, arm_c, arm_d]
     spec["dataset"] = {"name": "e1-fixed-prompt", "seed": "ab", "target_tokens": 4}
     counter = _Counting(
@@ -850,6 +853,7 @@ def test_the_adapter_token_counts_and_warm_reload_overwrite_the_prefix_estimate(
     arm = _arm("A", "NPU")
     arm["static_shape"] = "1x4"
     arm["batch"] = 1
+    arm.pop("prompt")  # the dataset builds the prompt
     spec["arms"] = [arm]
     spec["dataset"] = {"name": "e1-fixed-prompt", "seed": "ab", "target_tokens": 4}
     counter = _Counting(
@@ -901,7 +905,9 @@ def test_a_target_without_a_tokenizer_is_refused_before_a_step(tmp_path: Path):
     spec = _spec()
     spec["warmups"] = 0
     spec["repeats"] = 1
-    spec["arms"] = [_arm("A", "NPU")]
+    arm = _arm("A", "NPU")
+    arm.pop("prompt")  # the dataset builds the prompt
+    spec["arms"] = [arm]
     spec["dataset"] = {"name": "e1-fixed-prompt", "seed": "ab", "target_tokens": 4}
     script = Scripted({"A": [_result(1, 1)]})
     with pytest.raises(RunnerError, match="cannot count tokens"):
@@ -916,10 +922,12 @@ def test_an_empty_seed_and_a_dataset_that_is_not_a_map_are_refused_or_skipped(tm
     spec["repeats"] = 1
     arm = _arm("A", "CPU")
     arm["static_shape"] = "1x?"
+    arm.pop("prompt")
     spec["arms"] = [arm]
     spec["dataset"] = {"name": "e1-fixed-prompt", "seed": "", "target_tokens": 4}
     counter = _Counting({"A": [_result(1, 1)]})
-    with pytest.raises(RunnerError, match="prompt seed"):
+    # an empty seed is no prompt source, so the generate arm is refused at load
+    with pytest.raises(SpecError, match="has no prompt"):
         _invoke(repo, _bind(repo, spec), {"fake": counter})
     assert counter.script.calls == []
 
@@ -931,7 +939,8 @@ def test_an_empty_seed_and_a_dataset_that_is_not_a_map_are_refused_or_skipped(tm
     plain["dataset"] = "fixture"
     script = Scripted({"A": [_result(10, 1), _result(8, 1)]})
     rows = _invoke(repo2, _bind(repo2, plain), {"fake": script})
-    assert "prompt" not in script.requests[0].settings or script.requests[0].settings["prompt"] in (None, "")
+    # a dataset that is not a map is skipped; the arm's own prompt is sent
+    assert script.requests[0].settings["prompt"] == plain["arms"][0]["prompt"]
     assert "prompt_tokens" not in rows[0]["settings"]
 
 
@@ -940,7 +949,9 @@ def test_a_seed_without_a_target_is_passed_through(tmp_path: Path):
     spec = _spec()
     spec["warmups"] = 0
     spec["repeats"] = 1
-    spec["arms"] = [_arm("A", "CPU")]
+    arm = _arm("A", "CPU")
+    arm.pop("prompt")  # the seed is passed through as the prompt
+    spec["arms"] = [arm]
     spec["dataset"] = {"name": "fixture", "seed": "hello"}
     script = Scripted({"A": [_result(10, 1), _result(8, 1)]})
     rows = _invoke(repo, _bind(repo, spec), {"fake": script})
@@ -1192,7 +1203,7 @@ def test_repeats_build_a_receipt_and_keep_cold_separate(tmp_path: Path, capsys):
     assert arm_a["settings"]["grant"] == "grant-t"
     assert arm_a["settings"]["static_shape"] is None
     assert arm_a["settings"]["compile_cache"] == "reuse"
-    assert arm_a["settings"]["rest_s"] == 900
+    assert "rest_s" not in arm_a["settings"] and "rest" not in arm_a["settings"]
     assert "keep_alive" not in arm_a["settings"]
     assert arm_a["settings"]["environment"]["nvidia_driver"] == "unrecorded"
     assert arm_a["provenance"] == {"experiment_spec": "experiments/t/spec.yaml", "run_id": "run-1"}
@@ -1274,7 +1285,7 @@ def test_an_edited_spec_is_refused_and_dry_run_does_not_touch_devices(tmp_path: 
     assert "slots: 79" in e4_text
     assert "order: aba" in e4_text
     assert "compile_cache: fresh" in e4_text
-    assert "rest_s: 900" in e4_text
+    assert "rest_s" not in e4_text
     assert "abort_mib: 30500" in e5_text
     assert "spill_shared_mib: 256" in e5_text
     assert "spill_prompt_ratio: 0.5" in e5_text
@@ -1543,10 +1554,10 @@ def test_spec_rejects_a_contract_that_is_not_pre_registered(tmp_path: Path):
         validate_spec({**card, "spill_shared_mib": 512})
     with pytest.raises(SpecError, match="spill_prompt_ratio"):
         validate_spec({**card, "spill_prompt_ratio": 0.7})
-    with pytest.raises(SpecError, match="rest_s"):
-        validate_spec({**card, "rest_s": 899})
-    with pytest.raises(SpecError, match="rest_s"):
-        validate_spec({**good, "rest_s": True})
+    # rest_s is no longer read: any value, or none, is accepted
+    validate_spec({**card, "rest_s": 899})
+    validate_spec({**good, "rest_s": True})
+    validate_spec({key: value for key, value in good.items() if key != "rest_s"})
     with pytest.raises(SpecError, match="compile_cache"):
         validate_spec({key: value for key, value in good.items() if key != "compile_cache"})
     with pytest.raises(SpecError, match="unknown order"):

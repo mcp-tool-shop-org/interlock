@@ -11,6 +11,7 @@
 #   come from the Publisher. This spec does not start a device.
 # EXTERNAL_VERIFIER: n/a. R&D reviews this spec before any device time.
 
+# Amendment, 2026-10-11 (maintainer). Rest is the Publisher's scheduling decision between consecutive long runs, not a harness rule; rest_s below is no longer read.
 id: E4
 procedure: interleaved
 compile_cache: fresh

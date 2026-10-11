@@ -1,4 +1,4 @@
-"""The compile_rejected outcome (ruling on #36), the one-line gaps summary, and the conditional rest.
+"""The compile_rejected outcome (ruling on #36), the one-line gaps summary, and the absence of any harness rest.
 
 Adapters, clocks and receipts are fakes; no test touches a device or the wall clock.
 """
@@ -15,7 +15,7 @@ import pytest
 import switchyard.adapters.openvino as ovm
 from switchyard.adapters.base import AdapterError, CompileRejected, NativeBinaryRejected, compile_rejected_error
 from switchyard.harness.receipts import device_lost_row, for_table
-from switchyard.harness.runner import compiler_message, dry_run, plan_rest, run_spec
+from switchyard.harness.runner import compiler_message, dry_run, run_spec
 from switchyard.importers.gaps import aborted_run_lines, summarize_error
 from switchyard.receipt import ReceiptError, check_tree, is_speed_row, load_jsonl, validate_row
 from tests.support import row as fixture_row
@@ -292,220 +292,37 @@ def test_the_aborted_run_line_is_a_single_line():
     assert plain == "Aborted run `r1` stopped at `npu cold`: boom"
 
 
-# --- the conditional rest --------------------------------------------------
+# --- no rest in the harness (maintainer, 2026-10-11) -----------------------
 
-NOW = 1_800_000_000.0  # injected "wall" for every rest test
-
-
-def _iso(epoch):
-    return datetime.datetime.fromtimestamp(epoch, tz=datetime.timezone.utc).isoformat(timespec="seconds")
+NOW = 1_800_000_000.0
 
 
-def _prior(repo: Path, run_id, *, duration_min, ended_min_ago, device="CPU", window=True, date="2026-10-09", aborted=False):
-    """A prior switchyard receipt whose rows record the run window."""
-
-    settings = {}
-    if window is True:
-        end = NOW - ended_min_ago * 60
-        settings["run_window"] = {"start": _iso(end - duration_min * 60), "end": _iso(end)}
-    elif window:
-        settings["run_window"] = window
-    row = {
-        "id": f"X/a/{run_id}",
-        "device": device,
-        "date": date,
-        "settings": settings,
-        "provenance": {"experiment_spec": "x", "run_id": run_id},
-    }
-    if aborted:
-        row["aborted"] = True
-    folder = repo / "receipts"
-    folder.mkdir(exist_ok=True)
-    path = folder / f"{run_id}.jsonl"
-    path.write_text(json.dumps(row) + "\n", encoding="utf-8")
-    # A real receipt is written as its run ends: its file time is that end.
-    written = NOW - ended_min_ago * 60
-    os.utime(path, (written, written))
-
-
-class Sleeps:
-    def __init__(self):
-        self.clock = FakeTime()
-        self.calls = []
-
-    def sleep(self, seconds):
-        self.calls.append(seconds)
-        self.clock.sleep(seconds)
-
-
-def _run(tmp_path, *, prior=None):
+def _run(tmp_path, *, spec=None):
     repo = tmp_path / "repo"
-    spec_path = _bind(repo, _spec([_arm("A", "CPU")]))
-    if prior:
-        prior(repo)
-    sleeps = Sleeps()
+    spec_path = _bind(repo, spec or _spec([_arm("A", "CPU")]))
     fake = Fake({"A": [_result(10), _result(11), _result(12)]})
-    rows = run_spec(
-        spec_path,
-        root=repo,
-        adapters={"fake": fake},
-        date="2026-10-10",
-        sleep=sleeps.sleep,
-        clock=sleeps.clock.monotonic,
-        wall=lambda: NOW,
-    )
-    return sleeps, rows
+    rows = run_spec(spec_path, root=repo, adapters={"fake": fake}, date="2026-10-10", wall=lambda: NOW)
+    return repo, spec_path, rows
 
 
-def test_no_prior_receipt_means_no_rest(tmp_path):
-    sleeps, rows = _run(tmp_path)
-    assert sleeps.calls == []
-    rest = rows[0]["settings"]["rest"]
-    assert rest == {
-        "ran": False,
-        "reason": "no prior run on these devices",
-        "prior_run_id": None,
-        "prior_run_min": None,
-        "gap_min": None,
-        "rest_s_applied": 0.0,
-    }
-    assert rows[0]["settings"]["run_window"] == {"start": _iso(NOW), "end": _iso(NOW)}
+def test_a_run_records_no_rest_and_never_waits(tmp_path, monkeypatch):
+    import time
+
+    monkeypatch.setattr(time, "sleep", lambda s: (_ for _ in ()).throw(AssertionError("the run slept")))
+    _repo, _path, rows = _run(tmp_path)
+    assert "rest" not in rows[0]["settings"] and "rest_s" not in rows[0]["settings"]
 
 
-def test_a_40_minute_run_that_ended_10_minutes_ago_rests_5_minutes(tmp_path):
-    sleeps, rows = _run(tmp_path, prior=lambda r: _prior(r, "old", duration_min=40, ended_min_ago=10))
-    assert sleeps.calls == [300.0]
-    rest = rows[0]["settings"]["rest"]
-    assert rest["ran"] is True and rest["rest_s_applied"] == 300.0
-    assert rest["prior_run_id"] == "old"
-    assert rest["prior_run_min"] == pytest.approx(40.0) and rest["gap_min"] == pytest.approx(10.0)
+def test_an_old_spec_with_rest_s_runs_and_a_spec_without_it_is_valid(tmp_path):
+    _repo, _path, rows = _run(tmp_path)  # the fixture spec still carries rest_s: 900, ignored
+    assert rows
+    spec = _spec([_arm("A", "CPU")])
+    spec.pop("rest_s")
+    _repo, _path, rows = _run(tmp_path / "b", spec=spec)
+    assert rows
 
 
-def test_a_20_minute_prior_run_owes_no_rest(tmp_path):
-    sleeps, rows = _run(tmp_path, prior=lambda r: _prior(r, "old", duration_min=20, ended_min_ago=1))
-    assert sleeps.calls == []
-    rest = rows[0]["settings"]["rest"]
-    assert rest["ran"] is False and rest["prior_run_min"] == pytest.approx(20.0)
-
-
-def test_a_prior_run_on_other_devices_only_owes_no_rest(tmp_path):
-    sleeps, rows = _run(tmp_path, prior=lambda r: _prior(r, "gpu", duration_min=90, ended_min_ago=1, device="5090"))
-    assert sleeps.calls == []
-    assert rows[0]["settings"]["rest"]["prior_run_id"] is None
-
-
-def test_unparseable_times_rest_the_full_rest_s_with_the_reason(tmp_path):
-    for name, window in (("a", False), ("b", {"start": "yesterday", "end": "today"})):
-        sleeps, rows = _run(
-            tmp_path / name,
-            prior=lambda r, w=window: _prior(r, "old", duration_min=90, ended_min_ago=1, window=w),
-        )
-        # treated as long, measured from the file time (written 1 minute ago)
-        assert sleeps.calls == [840.0]
-        rest = rows[0]["settings"]["rest"]
-        assert rest["ran"] is True and rest["rest_s_applied"] == 840.0
-        assert rest["prior_run_id"] == "old" and "fail-safe" in rest["reason"]
-
-
-def test_unrecorded_times_owe_nothing_once_the_receipt_is_older_than_the_rest(tmp_path):
-    # Receipts from before run_window was recorded: the file time bounds the end.
-    sleeps, rows = _run(
-        tmp_path,
-        prior=lambda r: _prior(r, "old", duration_min=90, ended_min_ago=20, window=False),
-    )
-    assert sleeps.calls == []
-    rest = rows[0]["settings"]["rest"]
-    assert rest["ran"] is False and rest["rest_s_applied"] == 0.0
-    assert rest["gap_min"] == pytest.approx(20.0) and "nothing owed" in rest["reason"]
-
-
-def test_an_aborted_long_run_still_counts(tmp_path):
-    sleeps, _ = _run(tmp_path, prior=lambda r: _prior(r, "old", duration_min=60, ended_min_ago=5, aborted=True))
-    assert sleeps.calls == [600.0]
-
-
-def test_the_latest_run_decides_and_a_long_gap_is_already_rested(tmp_path):
-    def prior(repo):
-        _prior(repo, "long", duration_min=120, ended_min_ago=500, date="2026-10-08")
-        _prior(repo, "short", duration_min=10, ended_min_ago=2, date="2026-10-09")
-
-    sleeps, rows = _run(tmp_path / "a", prior=prior)
-    assert sleeps.calls == [] and rows[0]["settings"]["rest"]["prior_run_id"] == "short"
-    sleeps, rows = _run(tmp_path / "b", prior=lambda r: _prior(r, "long", duration_min=120, ended_min_ago=20 * 60))
-    assert sleeps.calls == []
-    assert rows[0]["settings"]["rest"]["ran"] is False
-    assert "nothing owed" in rows[0]["settings"]["rest"]["reason"]
-
-
-def test_plan_rest_on_an_empty_tree(tmp_path):
-    plan = plan_rest({"rest_s": 900, "arms": [{"device": "CPU"}]}, tmp_path, NOW)
-    assert plan["ran"] is False and plan["rest_s_applied"] == 0.0
-
-
-def test_the_dry_run_says_the_rest_is_conditional(tmp_path):
+def test_the_dry_run_has_no_rest_line(tmp_path):
     repo = tmp_path / "repo"
     spec_path = _bind(repo, _spec([_arm("A", "CPU")]))
-    assert "rest_s: 900 (conditional" in dry_run(spec_path, repo)
-
-
-def test_an_unrecorded_old_receipt_cannot_hide_a_long_run_that_just_ended(tmp_path):
-    # R&D's mixed case: same date, an old receipt with no window, and a 45-minute
-    # run that ended 2 minutes ago. The long run is owed 13 minutes.
-    def prior(repo):
-        _prior(repo, "e3-old", duration_min=30, ended_min_ago=180, window=False, date="2026-10-10")
-        _prior(repo, "tail-l128", duration_min=45, ended_min_ago=2, date="2026-10-10")
-
-    sleeps, rows = _run(tmp_path, prior=prior)
-    assert sleeps.calls == [780.0]
-    assert rows[0]["settings"]["rest"]["prior_run_id"] == "tail-l128"
-
-
-def test_a_receipt_that_does_not_parse_is_bounded_by_its_file_time(tmp_path):
-    def prior(repo):
-        folder = repo / "receipts"
-        folder.mkdir(exist_ok=True)
-        path = folder / "broken.jsonl"
-        path.write_text("{not json\n", encoding="utf-8")
-        os.utime(path, (NOW - 60, NOW - 60))
-
-    sleeps, rows = _run(tmp_path, prior=prior)
-    assert sleeps.calls == [840.0]
-    assert rows[0]["settings"]["rest"]["prior_run_id"] == "broken"
-
-
-def test_a_5090_spec_always_rests_in_full(tmp_path):
-    plan = plan_rest({"rest_s": 900, "arms": [{"device": "5090"}]}, tmp_path, NOW)
-    assert plan["ran"] is True and plan["rest_s_applied"] == 900.0
-    assert "card's own rule" in plan["reason"]
-
-
-def test_a_sleep_that_wakes_early_is_topped_up():
-    # Windows can wake a sleep a fraction of a second early; the 2026-10-10 tail
-    # was refused with "rested 519s of the required 519s".
-    from switchyard.harness.runner import _rest
-
-    class EarlyClock:
-        def __init__(self):
-            self.now = 0.0
-            self.calls = []
-
-        def sleep(self, seconds):
-            self.calls.append(seconds)
-            self.now += seconds * 0.9999  # wakes a hair early, in proportion
-
-        def monotonic(self):
-            return self.now
-
-    clock = EarlyClock()
-    _rest(519.24, clock.sleep, clock.monotonic)
-    assert clock.now >= 519.24
-    assert len(clock.calls) == 2 and clock.calls[0] == pytest.approx(519.24)
-
-
-def test_a_sleep_that_never_rests_is_still_refused():
-    from switchyard.guards import GuardError
-    from switchyard.harness.runner import _rest
-
-    now = [0.0]
-    with pytest.raises(GuardError, match="rested"):
-        _rest(900.0, lambda s: now.__setitem__(0, now[0] + 100.0), lambda: now[0])
+    assert "rest_s" not in dry_run(spec_path, repo)

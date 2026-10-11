@@ -14,5 +14,7 @@ compile-cache/
 
 # run-start markers (receipts/<run_id>.run.json): local state, not receipts
 receipts/*.run.json
+receipts/*.stop
+receipts/*.stop.done
 receipts/*.tmp
 table/*.tmp

@@ -1116,3 +1116,40 @@ def test_unreadable_perf_metrics_are_recorded_not_dropped(tmp_path):
     assert r.ok and r.throughput is None
     assert "perf_metrics unreadable" in r.resolved["genai"]["error"]
     assert "no metrics" in r.resolved["genai"]["throughput_error"]
+
+
+# --- prefix caching (R&D ruling 2026-10-11) -------------------------------------
+
+
+class _SchedulerGenai(FakeGenai):
+    class SchedulerConfig:
+        enable_prefix_caching = None
+
+    class LLMPipeline(FakePipeline):
+        pass
+
+
+def test_generate_default_prefix_caching_is_recorded_as_uncontrolled(tmp_path):
+    a = make_adapter(genai_module=_SchedulerGenai)
+    r = a.run(req(task="generate", model=str(tmp_path), device="CPU", prompt="hi"))
+    assert r.resolved["prefix_caching"] == ovm.PREFIX_UNCONTROLLED == "library default (uncontrolled)"
+    # nothing was added to the pipeline properties for the default
+    pipe = next(iter(a._pipelines.values()))["pipe"]
+    assert "scheduler_config" not in pipe.config
+
+
+@pytest.mark.parametrize("mode,flag", [("on", True), ("off", False)])
+def test_generate_prefix_caching_on_off_passes_a_scheduler_config(tmp_path, mode, flag):
+    a = make_adapter(genai_module=_SchedulerGenai)
+    r = a.run(req(task="generate", model=str(tmp_path), device="CPU", prompt="hi", prefix_caching=mode))
+    assert r.resolved["prefix_caching"].startswith(mode)
+    pipe = next(iter(a._pipelines.values()))["pipe"]
+    assert pipe.config["scheduler_config"].enable_prefix_caching is flag
+
+
+def test_prefix_caching_mode_keys_the_pipeline_cache(tmp_path):
+    a = make_adapter(genai_module=_SchedulerGenai)
+    a.run(req(task="generate", model=str(tmp_path), device="CPU", prompt="hi"))
+    a.run(req(task="generate", model=str(tmp_path), device="CPU", prompt="hi", prefix_caching="on"))
+    assert len(a._pipelines) == 2
+    assert ovm._prefix_mode(ovm._Settings(req(prefix_caching="bogus"))) == "default"

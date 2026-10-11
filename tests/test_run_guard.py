@@ -21,13 +21,12 @@ from switchyard.cli import main, run_report
 from switchyard.guards import GuardError
 from switchyard.harness import environment as env_capture
 from switchyard.harness import runner as runner_module
-from switchyard.harness.marker import RunMarker, marker_path, read_markers
+from switchyard.harness.marker import RunMarker, marker_path
 from switchyard.harness.receipts import device_lost_row, environment, for_table
 from switchyard.harness.runner import (
     _cache_dirs,
     _drop_caches,
     _rmtree_clearing_readonly,
-    plan_rest,
     run_interleaved,
     run_spec,
 )
@@ -417,60 +416,6 @@ def _cpu_spec():
     return _plain_spec([_plain_arm("A", "CPU")])
 
 
-def test_a_killed_run_leaves_a_marker_that_owes_rest_from_its_file_time(tmp_path):
-    _marker(tmp_path, "killed", ended_min_ago=10)
-    plan = plan_rest(_cpu_spec(), tmp_path, NOW)
-    assert plan["ran"] is True
-    assert plan["prior_run_id"] == "killed"
-    assert plan["rest_s_applied"] == pytest.approx(900 - 10 * 60)
-    assert plan["prior_run_min"] is None
-    assert "unrecorded" in plan["reason"]
-
-
-def test_a_closed_marker_of_a_twenty_minute_run_owes_nothing(tmp_path):
-    _marker(tmp_path, "short", ended_min_ago=1, duration_min=20, closed=True)
-    plan = plan_rest(_cpu_spec(), tmp_path, NOW)
-    assert plan["ran"] is False
-    assert plan["rest_s_applied"] == 0
-    assert plan["prior_run_min"] == pytest.approx(20)
-
-
-def test_a_closed_marker_of_a_long_run_owes_the_remainder(tmp_path):
-    _marker(tmp_path, "long", ended_min_ago=10, duration_min=40, closed=True)
-    plan = plan_rest(_cpu_spec(), tmp_path, NOW)
-    assert plan["rest_s_applied"] == pytest.approx(300)
-    assert plan["prior_run_min"] == pytest.approx(40)
-
-
-def test_a_marker_on_other_devices_or_the_asking_run_itself_is_ignored(tmp_path):
-    _marker(tmp_path, "npu-run", ended_min_ago=1, devices=("NPU",))
-    _marker(tmp_path, "me", ended_min_ago=0)
-    plan = plan_rest(_cpu_spec(), tmp_path, NOW, frozenset({"me"}))
-    assert plan["ran"] is False and plan["prior_run_id"] is None
-
-
-def test_an_unreadable_marker_counts_as_a_long_run(tmp_path):
-    folder = tmp_path / "receipts"
-    folder.mkdir()
-    bad = folder / "broken.run.json"
-    bad.write_text("{not json", encoding="utf-8")
-    os.utime(bad, (NOW - 60, NOW - 60))
-    plan = plan_rest(_cpu_spec(), tmp_path, NOW)
-    assert plan["prior_run_id"] == "broken"
-    assert plan["rest_s_applied"] == pytest.approx(900 - 60)
-    assert read_markers(tmp_path) == [(bad, None)]
-
-
-def test_a_run_with_a_receipt_and_a_marker_owes_the_larger_rest(tmp_path):
-    from tests.test_compile_rejected_rest import _prior
-
-    _prior(tmp_path, "both", duration_min=20, ended_min_ago=1)  # a short run: owes nothing
-    _marker(tmp_path, "both", ended_min_ago=5)  # never closed: treated as long
-    plan = plan_rest(_cpu_spec(), tmp_path, NOW)
-    assert plan["prior_run_id"] == "both"
-    assert plan["rest_s_applied"] == pytest.approx(900 - 5 * 60)
-
-
 def test_a_marker_is_not_a_receipt(tmp_path):
     _marker(tmp_path, "killed", ended_min_ago=1)
     assert receipt_paths(tmp_path) == []
@@ -526,7 +471,7 @@ def test_the_marker_is_closed_when_the_run_fails_in_order(tmp_path):
     assert json.loads(marker_path(repo, "run-1").read_text(encoding="utf-8"))["closed"] is True
 
 
-def test_run_spec_writes_the_marker_before_the_card_probe_and_not_its_own_rest(tmp_path):
+def test_run_spec_writes_the_marker_before_the_card_probe_(tmp_path):
     repo = tmp_path / "repo"
     spec_path = _bind_plain(repo, _plain_spec([_plain_arm("A", "5090")], needs={"grant": True, "npu_session": False, "cpu_window": False}))
     seen = []
@@ -538,7 +483,6 @@ def test_run_spec_writes_the_marker_before_the_card_probe_and_not_its_own_rest(t
 
     heartbeat = repo / "hb"
     heartbeat.write_text("pulse", encoding="utf-8")
-    rested = FakeTime()
     run_spec(
         spec_path,
         root=repo,
@@ -547,11 +491,9 @@ def test_run_spec_writes_the_marker_before_the_card_probe_and_not_its_own_rest(t
         date="2026-10-10",
         adapters={"fake": Probing({"A": [_result_plain(), _result_plain(), _result_plain()]})},
         heartbeat=heartbeat,
-        sleep=rested.sleep,
-        clock=rested.monotonic,
         watch=WatchHooks(ram_sampler=None, start_thread=False),
     )
-    assert seen == [True, True]
+    assert seen == [True]
 
 
 def _result_plain():
@@ -825,9 +767,7 @@ def test_a_receipt_write_is_all_or_nothing(tmp_path, monkeypatch):
     assert receipt_paths(tmp_path) == []
     assert check_tree(tmp_path) == []
     assert not (path.parent / "r.jsonl.1.2.tmp").is_dir()
-    from switchyard.harness.runner import _prior_runs
-
-    assert [run["run_id"] for run in _prior_runs(tmp_path, {"CPU"})] == ["r"]  # only the real file
+    assert [p.stem for p in path.parent.glob("*.jsonl")] == ["r"]  # only the real file
 
     # Two writers: the file is one complete text, never a mixture.
     texts = ["a" * 50_000 + "\n", "b" * 50_000 + "\n"]
