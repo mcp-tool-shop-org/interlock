@@ -174,7 +174,11 @@ def _span(readings: list[dict], key: str) -> dict | None:
 
 
 def summarize_slot(readings: list[dict]) -> dict:
-    """Min, max and mean for one slot. Top-process names only when CPU passes 30%."""
+    """Min, max and mean for one slot. Top-process names only when CPU passes 30%.
+
+    A disk counter that cannot be mapped is ``unrecorded`` with a reason.
+    It is not a quiet zero and it is not a bare null.
+    """
 
     cpu = _span(readings, "cpu_pct")
     names: list[str] = []
@@ -186,63 +190,133 @@ def summarize_slot(readings: list[dict]) -> dict:
                 if name not in names:
                     names.append(name)
     drives = [row["drive"] for row in readings if row.get("drive")]
-    return {
+    disk = _span(readings, "disk_read_mb_s")
+    reasons = [row["disk_reason"] for row in readings if row.get("disk_reason")]
+    out = {
         "samples": len(readings),
         "cpu_pct": cpu,
         "ram_pct": _span(readings, "ram_pct"),
-        "disk_read_mb_s": _span(readings, "disk_read_mb_s"),
+        "disk_read_mb_s": disk if disk is not None or not reasons else UNRECORDED,
         "top_processes": names,
         "load_drive": drives[-1] if drives else None,
     }
+    if disk is None and reasons:
+        out["disk_reason"] = reasons[-1]
+    return out
+
+
+def disk_number_script(letter: str) -> str:
+    """PowerShell that prints the disk number for one drive letter.
+
+    Windows names ``psutil`` counters ``PhysicalDrive<n>``. ``(Get-Partition |
+    Get-Disk).Number`` is that ``n``. This does not call Get-PhysicalDisk.
+    """
+
+    if len(letter) != 1 or not letter.isalpha():
+        raise OSError(f"not a drive letter: {letter!r}")
+    safe = letter.upper()
+    return (
+        f"$n = (Get-Partition -DriveLetter {safe} -ErrorAction Stop | Get-Disk).Number; "
+        "if ($null -eq $n) { throw 'no disk number' }; "
+        "[string]$n"
+    )
+
+
+def windows_disk_number(letter: str, run=None) -> int:
+    """The physical-disk number for a drive letter. Tests pass ``run`` and do not start PowerShell."""
+
+    script = disk_number_script(letter)
+    if run is None:
+        completed = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", script],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+    else:
+        completed = run(script)
+    if getattr(completed, "returncode", 1) != 0:
+        detail = (getattr(completed, "stderr", None) or getattr(completed, "stdout", None) or "disk number query failed")
+        first = str(detail).strip().splitlines()
+        raise OSError(first[0][:200] if first else "disk number query failed")
+    text = str(getattr(completed, "stdout", "") or "").strip()
+    if not text.isdigit():
+        raise OSError("disk number query did not return a number")
+    return int(text)
 
 
 class _DiskRate:
-    """Read MB/s from a cumulative counter. The first look at a drive is not a rate."""
+    """Read MB/s from the physical disk behind a drive letter.
 
-    def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
+    The first look at a disk is a baseline, not a rate. A mapping or counter
+    failure returns a reason so the receipt can say ``unrecorded``.
+    """
+
+    def __init__(self, clock: Callable[[], float] = time.monotonic, disk_number: Callable[[str], int] | None = None) -> None:
         self._clock = clock
+        self._disk_number = disk_number if disk_number is not None else windows_disk_number
         self._last: dict[str, tuple[float, int]] = {}
+        self._numbers: dict[str, int | None] = {}
+        self._reasons: dict[str, str] = {}
 
-    def mb_s(self, drive: str | None) -> float | None:
-        if not drive or drive == UNRECORDED or psutil is None:
-            return None
+    def mb_s(self, drive: str | None) -> tuple[float | None, str | None]:
+        if not drive or drive == UNRECORDED:
+            return None, None
+        letter = drive[:1].upper()
+        if not letter.isalpha():
+            return None, f"not a drive letter: {drive}"
+        if psutil is None:
+            return None, "psutil is not installed"
+        number, map_reason = self._number(letter)
+        if number is None:
+            return None, map_reason or "the drive letter could not be mapped to a physical disk"
         try:
             counters = psutil.disk_io_counters(perdisk=True) or {}
-        except Exception:
-            return None
-        key = _disk_key(counters, drive)
+        except Exception as exc:
+            return None, f"disk counters unreadable: {type(exc).__name__}"
+        key = _disk_key(counters, number)
         if key is None:
-            return None
+            return None, f"no counter named PhysicalDrive{number}"
         try:
             read = int(counters[key].read_bytes)
-        except Exception:
-            return None
+        except Exception as exc:
+            return None, f"disk counter unreadable: {type(exc).__name__}"
         now = self._clock()
         previous = self._last.get(key)
         self._last[key] = (now, read)
         if previous is None:
-            return None
+            return None, None
         elapsed = now - previous[0]
         if elapsed <= 0:
-            return None
+            return None, None
         delta = read - previous[1]
         if delta < 0:
-            return None
-        return delta / elapsed / (1024 * 1024)
+            return None, None
+        return delta / elapsed / (1024 * 1024), None
+
+    def _number(self, letter: str) -> tuple[int | None, str | None]:
+        if letter in self._numbers:
+            return self._numbers[letter], self._reasons.get(letter)
+        try:
+            number = int(self._disk_number(letter))
+        except Exception as exc:
+            reason = str(exc).strip().splitlines()
+            text = reason[0][:200] if reason else "the drive letter could not be mapped to a physical disk"
+            self._numbers[letter] = None
+            self._reasons[letter] = text
+            return None, text
+        self._numbers[letter] = number
+        return number, None
 
 
-def _disk_key(counters: dict, drive: str) -> str | None:
-    """The counter for a drive letter, or None when the platform does not key that way.
+def _disk_key(counters: dict, number: int) -> str | None:
+    """The ``PhysicalDrive<n>`` counter. A letter key is not a Windows counter."""
 
-    A missing counter stays unrecorded. It is not recorded as zero.
-    """
-
-    letter = drive[:1].upper()
-    if not letter.isalpha():
-        return None
+    wanted = f"PHYSICALDRIVE{number}"
     for key in counters:
-        label = str(key).upper().rstrip("\\")
-        if label in {letter, f"{letter}:"}:
+        label = str(key).upper().replace("\\", "").rstrip(":")
+        if label == wanted:
             return key
     return None
 
@@ -299,10 +373,12 @@ def read_slot(drive: str | None) -> dict:
             ram = float(psutil.virtual_memory().percent)
         except Exception:
             ram = None
+    rate, reason = _DISK.mb_s(drive)
     return {
         "cpu_pct": cpu,
         "ram_pct": ram,
-        "disk_read_mb_s": _DISK.mb_s(drive),
+        "disk_read_mb_s": rate,
+        "disk_reason": reason,
         "top": _top_other(3),
     }
 
@@ -332,10 +408,12 @@ class SlotProbe:
             raw = self._reader(drive) or {}
         except Exception:
             raw = {}
+        reason = raw.get("disk_reason")
         reading = {
             "cpu_pct": _number(raw.get("cpu_pct")),
             "ram_pct": _number(raw.get("ram_pct")),
             "disk_read_mb_s": _number(raw.get("disk_read_mb_s")),
+            "disk_reason": None if not reason else str(reason).strip().splitlines()[0][:200],
             "top": [str(name) for name in list(raw.get("top") or [])[:3]],
             "drive": drive,
         }

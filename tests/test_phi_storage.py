@@ -775,7 +775,7 @@ def test_the_slot_reader_skips_this_process_and_a_missing_disk(monkeypatch: pyte
             return type("Mem", (), {"percent": 22.0})()
 
         def disk_io_counters(self, perdisk=True):
-            return {"C:": Counter(self.bytes)}
+            return {"PhysicalDrive2": Counter(self.bytes)}
 
         def Process(self):
             return Me()
@@ -790,17 +790,25 @@ def test_the_slot_reader_skips_this_process_and_a_missing_disk(monkeypatch: pyte
 
     fake = FakePsutil()
     ticks = iter([0.0, 1.0])
+
+    def disk_number(letter: str) -> int:
+        if letter == "C":
+            return 2
+        raise OSError(f"no partition for {letter}")
+
     monkeypatch.setattr(watch_mod, "psutil", fake)
-    monkeypatch.setattr(watch_mod, "_DISK", watch_mod._DiskRate(clock=lambda: next(ticks)))
+    monkeypatch.setattr(watch_mod, "_DISK", watch_mod._DiskRate(clock=lambda: next(ticks), disk_number=disk_number))
     first = watch_mod.read_slot("C")
     assert first["cpu_pct"] == 15.0 and first["ram_pct"] == 22.0
-    assert first["disk_read_mb_s"] is None
+    assert first["disk_read_mb_s"] is None and first["disk_reason"] is None
     assert first["top"] == ["busy-neighbor", "second"]
     assert "switchyard" not in first["top"] and "child" not in first["top"]
     fake.bytes = 2 * 1024 * 1024
     second = watch_mod.read_slot("C")
     assert second["disk_read_mb_s"] == pytest.approx(2.0)
-    assert watch_mod.read_slot("Z")["disk_read_mb_s"] is None
+    missing = watch_mod.read_slot("Z")
+    assert missing["disk_read_mb_s"] is None
+    assert missing["disk_reason"] == "no partition for Z"
 
     class Boom:
         def cpu_percent(self, interval=None):
@@ -825,6 +833,74 @@ def test_the_slot_reader_skips_this_process_and_a_missing_disk(monkeypatch: pyte
     quiet.open()
     summary = quiet.close()
     assert summary["samples"] == 2 and summary["cpu_pct"] is None
+
+
+def test_a_physical_drive_counter_records_the_disk_rate(monkeypatch: pytest.MonkeyPatch):
+    class Counter:
+        def __init__(self, read_bytes):
+            self.read_bytes = read_bytes
+
+    class Disks:
+        def __init__(self):
+            self.bytes = 0
+
+        def disk_io_counters(self, perdisk=True):
+            return {"PhysicalDrive1": Counter(self.bytes), "C:": Counter(9_999_999)}
+
+    disks = Disks()
+    ticks = iter([0.0, 1.0, 2.0])
+    mapped: list[str] = []
+
+    def disk_number(letter: str) -> int:
+        mapped.append(letter)
+        assert letter == "E"
+        return 1
+
+    monkeypatch.setattr(watch_mod, "psutil", disks)
+    rate = watch_mod._DiskRate(clock=lambda: next(ticks), disk_number=disk_number)
+    monkeypatch.setattr(watch_mod, "_DISK", rate)
+    baseline, baseline_reason = rate.mb_s("E")
+    disks.bytes = 3 * 1024 * 1024
+    value, reason = rate.mb_s("E")
+    assert baseline is None and baseline_reason is None
+    assert value == pytest.approx(3.0) and reason is None
+    assert mapped == ["E"]
+    assert watch_mod._disk_key({"C:": object(), "PhysicalDrive1": object()}, 1) == "PhysicalDrive1"
+    assert watch_mod._disk_key({"C:": object()}, 1) is None
+
+    failed = watch_mod._DiskRate(disk_number=lambda _letter: (_ for _ in ()).throw(OSError("no disk number")))
+    nothing, why = failed.mb_s("E")
+    assert nothing is None and why == "no disk number"
+    probe = watch_mod.SlotProbe(
+        lambda drive: {"cpu_pct": 1.0, "ram_pct": 1.0, "disk_read_mb_s": None, "disk_reason": why, "top": []},
+        start_thread=False,
+    )
+    probe.set_drive("E")
+    probe.open()
+    summary = probe.close()
+    assert summary["disk_read_mb_s"] == "unrecorded"
+    assert summary["disk_reason"] == "no disk number"
+
+
+def test_the_disk_number_query_parses_a_physical_disk_number():
+    seen: dict[str, str] = {}
+
+    def run(script: str):
+        seen["script"] = script
+        return type("Completed", (), {"returncode": 0, "stdout": "2\n", "stderr": ""})()
+
+    assert watch_mod.windows_disk_number("e", run=run) == 2
+    assert "Get-Partition -DriveLetter E" in seen["script"]
+    assert "Get-Disk" in seen["script"]
+    assert "Get-PhysicalDisk" not in seen["script"]
+
+    def fail(_script: str):
+        return type("Completed", (), {"returncode": 1, "stdout": "", "stderr": "no partition\nmore"})()
+
+    with pytest.raises(OSError, match="no partition"):
+        watch_mod.windows_disk_number("E", run=fail)
+    with pytest.raises(OSError, match="not a drive letter"):
+        watch_mod.windows_disk_number("EE", run=run)
 
 
 def test_a_slot_probe_samples_during_a_call():
