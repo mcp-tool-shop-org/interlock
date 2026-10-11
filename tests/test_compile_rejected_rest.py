@@ -453,3 +453,35 @@ def test_a_5090_spec_always_rests_in_full(tmp_path):
     plan = plan_rest({"rest_s": 900, "arms": [{"device": "5090"}]}, tmp_path, NOW)
     assert plan["ran"] is True and plan["rest_s_applied"] == 900.0
     assert "card's own rule" in plan["reason"]
+
+
+def test_a_sleep_that_wakes_early_is_topped_up():
+    # Windows can wake a sleep a fraction of a second early; the 2026-10-10 tail
+    # was refused with "rested 519s of the required 519s".
+    from switchyard.harness.runner import _rest
+
+    class EarlyClock:
+        def __init__(self):
+            self.now = 0.0
+            self.calls = []
+
+        def sleep(self, seconds):
+            self.calls.append(seconds)
+            self.now += seconds * 0.9999  # wakes a hair early, in proportion
+
+        def monotonic(self):
+            return self.now
+
+    clock = EarlyClock()
+    _rest(519.24, clock.sleep, clock.monotonic)
+    assert clock.now >= 519.24
+    assert len(clock.calls) == 2 and clock.calls[0] == pytest.approx(519.24)
+
+
+def test_a_sleep_that_never_rests_is_still_refused():
+    from switchyard.guards import GuardError
+    from switchyard.harness.runner import _rest
+
+    now = [0.0]
+    with pytest.raises(GuardError, match="rested"):
+        _rest(900.0, lambda s: now.__setitem__(0, now[0] + 100.0), lambda: now[0])
