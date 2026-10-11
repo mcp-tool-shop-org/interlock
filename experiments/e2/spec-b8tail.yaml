@@ -45,6 +45,7 @@
 # capability row, never retried. The harness samples system RAM every 2 s and
 # stops cleanly at 88%.
 
+# Amendment, 2026-10-11 (maintainer). Rest is the Publisher's scheduling decision between consecutive long runs, not a harness rule; rest_s below is no longer read.
 id: E2
 procedure: interleaved
 order: blocked

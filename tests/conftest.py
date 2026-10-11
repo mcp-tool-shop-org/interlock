@@ -16,6 +16,10 @@ import switchyard.harness.runner as runner
 from switchyard.harness.watch import WatchHooks
 
 
+def _no_device_state(uses_5090: bool) -> dict:
+    return {"cpu_percent": "unrecorded", "cpu_freq_mhz": "unrecorded", "ram_pct": "unrecorded"}
+
+
 def _refuse_exit(code: int) -> None:
     raise AssertionError(f"a test reached the watcher's process exit (code {code})")
 
@@ -25,5 +29,5 @@ def _no_live_watcher(monkeypatch):
     monkeypatch.setattr(
         runner,
         "WatchHooks",
-        lambda *args, **kwargs: WatchHooks(*args, **{"start_thread": False, "exit_fn": _refuse_exit, **kwargs}),
+        lambda *args, **kwargs: WatchHooks(*args, **{"start_thread": False, "exit_fn": _refuse_exit, "state_sampler": _no_device_state, **kwargs}),
     )

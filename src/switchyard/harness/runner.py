@@ -3,8 +3,7 @@
 The command-line dry-run does not stat the heartbeat, does not call an adapter,
 and does not launch offrig. A library run with fake adapters is how the timing
 math and the receipt shape are tested. The command's real path is run_spec:
-every guard (interpreter, procedure, flag, committed blob, card state and
-rest) refuses before an adapter is built or called; then run_interleaved
+every guard (interpreter, procedure, flag, committed blob, card state) refuses before an adapter is built or called; then run_interleaved
 measures.
 
 The library run loads the spec only after the committed blob matches the
@@ -44,11 +43,10 @@ from switchyard.guards import (
     assess_step,
     require_card_empty,
     require_heartbeat,
-    require_rest,
 )
 from switchyard.harness.e5 import SearchError, fit_prompt
 from switchyard.harness.lock import require_unmodified
-from switchyard.harness.marker import RunMarker, read_markers
+from switchyard.harness.marker import RunMarker
 from switchyard.harness.receipts import (
     device_lost_row,
     environment,
@@ -95,18 +93,6 @@ PASSTHROUGH = (
 SENSOR_KEYS = ("gpu_temp_c", "sm_clock_mhz", "power_w", "shared_mib", "dedicated_mib")
 
 
-# The rest is conditional (maintainer's rule, R&D approved): it is owed only
-# when the previous run on these devices lasted longer than this.
-REST_FREE_RUN_S = 30 * 60
-# How many times _rest sleeps the remainder before proving the rest happened.
-REST_TOP_UPS = 3
-# A top-up overshoots by this much, so an early wake cannot leave a sliver unrested.
-REST_TOP_UP_PAD_S = 0.05
-REST_CONDITIONAL_NOTE = (
-    f" (conditional: owed only after a prior run on these devices longer than {REST_FREE_RUN_S // 60} min)"
-)
-
-
 class RunnerError(Exception):
     """A step failed. Later steps do not run."""
 
@@ -137,7 +123,6 @@ def dry_run(spec_path: Path, repo: Path) -> str:
                     f"{drift['repeats']} times, descriptive rows kept out of the table"
                 )
         lines.append(f"compile_cache: {spec['compile_cache']}")
-        lines.append(f"rest_s: {spec['rest_s']}{REST_CONDITIONAL_NOTE}")
         lines.append(
             f"compile ceiling: {_compile_ceiling(spec):g} s; the run stops at {RAM_STOP_PCT:g}% system RAM"
         )
@@ -149,7 +134,6 @@ def dry_run(spec_path: Path, repo: Path) -> str:
         lines.append(f"models: {len(spec['models'])}")
         lines.append(f"spill_shared_mib: {spec['spill_shared_mib']}")
         lines.append(f"spill_prompt_ratio: {spec['spill_prompt_ratio']}")
-        lines.append(f"rest_s: {spec['rest_s']}{REST_CONDITIONAL_NOTE}")
         lines.append("the sampler aborts at abort_mib and does not wait for the watchdog")
         lines.append("quant is read from /api/show at run time")
     else:
@@ -183,7 +167,6 @@ def run_interleaved(
     env: dict | None = None,
     notes: str = "",
     wall=None,
-    rest: dict | None = None,
     watch: WatchHooks | None = None,
     marker: RunMarker | None = None,
 ) -> list[dict]:
@@ -209,7 +192,7 @@ def run_interleaved(
     ``compile_rejected`` row (ruling on #36), scoped the same way and never
     retried. Every row records ``settings.run_window`` (the run's start and
     latest end, from ``wall``) so a later run can read how long this one
-    lasted, and ``settings.rest`` (the plan ``rest`` the caller computed).
+    lasted.
 
     A watcher thread guards the run from outside the main thread, which a
     native call can hold for an hour. A compile that runs past
@@ -217,7 +200,7 @@ def run_interleaved(
     system RAM at 88% aborts the run; either way the receipt is flushed and the
     process ends with a distinctive exit code (see ``switchyard.harness.watch``).
     A run-start marker, ``receipts/<run_id>.run.json``, makes a run killed from
-    outside visible to ``plan_rest``.
+    outside visible: unclosed means killed.
     """
 
     _check_run_id(run_id)
@@ -275,6 +258,8 @@ def run_interleaved(
         )
     marker.entered = True
     marker.restart(_iso(started_at))  # before any adapter is touched
+    start_state = _start_state(hooks, _uses_5090(spec))  # recorded once, before the first device contact
+    decision_metric = spec.get("decision_metric")
     build_guard = BuildGuard(hooks) if blocked else None
     if blocked:
         baseline_used = read_bytes(hooks.used_sampler)
@@ -435,8 +420,7 @@ def run_interleaved(
         window = {"start": _iso(started_at), "end": _iso(wall())}
         for row in rows:
             row["settings"]["run_window"] = window
-            if rest is not None:
-                row["settings"]["rest"] = rest
+            row["settings"]["start_state"] = start_state
             row["settings"]["ram_guard"] = guard.ram_guard()
             row["settings"]["compile_ceiling_s"] = guard.ceiling_s
         return rows
@@ -455,7 +439,7 @@ def run_interleaved(
         with state_lock:
             _flush_locked(gone=gone)
 
-    def _halt(error: str, outcome: str | None = None) -> None:
+    def _halt(error: str, outcome: str | None = None, *, operator: bool = False) -> None:
         """The watcher ends the run: record why, flush every row, bring the receipt into the table.
 
         Runs on the watcher thread while the main thread may be inside a
@@ -463,15 +447,17 @@ def run_interleaved(
         without it: a receipt that may be a row short beats none.
         """
 
-        nonlocal aborted, halted_by_watch
+        nonlocal aborted, halted_by_watch, stop_all
         held = state_lock.acquire(timeout=hooks.lock_wait_s)
         try:
             halted_by_watch = True
+            if operator:
+                stop_all = True  # every unfinished arm, started or not, gets an aborted row
             aborted = {"step": _label(current) if current is not None else "setup", "error": error}
             if outcome is not None and current is not None:
                 _remember(arms[current.step_id], outcome)
             _flush_locked()  # never blocks on the lock: the watcher must reach exit_fn
-            marker.close(_iso(wall()))  # an unclosed marker then means only "killed from outside"
+            marker.close(_iso(wall()), error if operator else None)  # unclosed means only "killed from outside"
             if (root / "receipts" / f"{run_id}.jsonl").is_file():
                 try:
                     announce_run(import_receipt(root, run_id), finished=False)
@@ -488,6 +474,9 @@ def run_interleaved(
         error = f"{info['site']} ran {info['elapsed_s']:.0f} s, over the {info['ceiling_s']:.0f} s compile ceiling"
         _halt(error, "compile_timeout")
 
+    def _on_operator_stop(reason: str) -> None:
+        _halt(f"stopped by operator: {reason}", operator=True)
+
     guard = RunWatch(
         tracker,
         hooks,
@@ -495,6 +484,8 @@ def run_interleaved(
         on_compile_timeout=_on_compile_timeout,
         on_ram_stop=_halt,
         stop_pct=RAM_STOP_PCT,
+        stop_file=root / "receipts" / f"{run_id}{STOP_SUFFIX}",
+        on_operator_stop=_on_operator_stop,
     )
 
     def _remember(arm: dict, outcome: str) -> None:
@@ -714,6 +705,14 @@ def run_interleaved(
                             if seen[slot.step_id] == needed[slot.step_id]:
                                 finished.append(slot.step_id)
                                 flush()
+                                if decision_metric and _row_path(
+                                    _finished_row(slot.step_id, partial=True, gone=removed), decision_metric
+                                ) is None:
+                                    error = f"decision metric {decision_metric} missing on {slot.step_id}"
+                                    aborted = {"step": _label(slot), "error": error}
+                                    stop_all = True
+                                    flush()
+                                    raise RunnerError(error)
                 finally:
                     if started and companion is not None:
                         _session(
@@ -1047,6 +1046,7 @@ def _request(
         prompt = _dataset_prompt(arm, spec, adapter, prompt_cache)
         if prompt is not None:
             settings["prompt"] = prompt
+    settings["prefix_caching"] = arm.get("prefix_caching", spec.get("prefix_caching"))
     settings["spec"] = spec_rel
     settings["compile_cache"] = spec.get("compile_cache")
     if cache_dir is not None:
@@ -1192,8 +1192,10 @@ def _extra_settings(
 ) -> dict:
     settings = {
         "compile_cache": spec.get("compile_cache"),
-        "rest_s": spec.get("rest_s"),
     }
+    if arm.get("task") == "generate" and arm.get("engine") == "openvino":
+        learned = _resolved(records, arm["id"]).get("prefix_caching")
+        settings["prefix_caching"] = learned if learned is not None else "library default (unknown)"
     if spec.get("compile_cache") == "fresh":
         settings["compile_cache_dir"] = f"compile-cache/{run_id}/{arm['id']}"
         settings["compile_cache_deleted"] = arm["id"] in removed
@@ -1529,174 +1531,34 @@ def _iso(epoch: float) -> str:
     return datetime.datetime.fromtimestamp(epoch, tz=datetime.timezone.utc).isoformat(timespec="seconds")
 
 
-def _parse_window(window: object) -> tuple[float, float] | None:
-    """A row's ``settings.run_window`` as (start, end) epoch seconds, or None when
-    it is missing, not ISO, naive (no zone) or runs backwards."""
+STOP_SUFFIX = ".stop"
 
-    if not isinstance(window, dict):
-        return None
+
+def _start_state(hooks, uses_5090: bool) -> dict:
+    """Device state at run start for every row's settings. Recorded, never gated."""
+
     try:
-        start = datetime.datetime.fromisoformat(window["start"])
-        end = datetime.datetime.fromisoformat(window["end"])
-    except (KeyError, TypeError, ValueError):
-        return None
-    if start.tzinfo is None or end.tzinfo is None or end < start:
-        return None
-    return start.timestamp(), end.timestamp()
+        state = hooks.state_sampler(uses_5090)
+        return state if isinstance(state, dict) else "unrecorded"
+    except Exception:
+        return "unrecorded"
+
+
+def _row_path(row: dict, path: str):
+    """A dotted field path in a row ("latency.throughput"), None when absent or null."""
+
+    value = row
+    for part in path.split("."):
+        if not isinstance(value, dict):
+            return None
+        value = value.get(part)
+    return value
 
 
 def _spec_devices(spec: dict) -> set[str]:
     devices = {arm["device"] for arm in spec["arms"]}
     devices.update(arm["companion_device"] for arm in spec["arms"] if arm.get("companion_device"))
     return devices
-
-
-def _prior_runs(root: Path, devices: set[str], skip: frozenset[str] = frozenset()) -> list[dict]:
-    """Every receipt under ``receipts/`` whose rows touch one of ``devices``,
-    and every run-start marker (``<run_id>.run.json``) that does.
-
-    Aborted runs count: their rows are in the receipt. A receipt whose rows do
-    not all carry a readable ``run_window`` (every receipt before the window was
-    recorded) comes back with ``window`` None. A closed marker carries its own
-    window; a marker never closed (a run killed before it could say so) comes
-    back with ``window`` None, measured from the marker's file time like any
-    windowless receipt. A run with both a receipt and a marker is two entries;
-    :func:`plan_rest` takes the larger rest owed. ``skip`` names run ids to leave
-    out (the run asking, whose own marker is already written).
-    """
-
-    runs = []
-    folder = root / "receipts"
-    for path in sorted(folder.glob("*.jsonl")) if folder.is_dir() else []:
-        written = path.stat().st_mtime
-        try:
-            rows = load_jsonl(path)
-        except ReceiptError:
-            runs.append({"run_id": path.stem, "date": "", "window": None, "written": written})
-            continue
-        touching = [row for row in rows if row.get("device") in devices]
-        if not touching:
-            continue
-        windows = [_parse_window((row.get("settings") or {}).get("run_window")) for row in touching]
-        window = None
-        if all(item is not None for item in windows):
-            window = (min(item[0] for item in windows), max(item[1] for item in windows))
-        run_id = (touching[0].get("provenance") or {}).get("run_id") or path.stem
-        runs.append(
-            {
-                "run_id": run_id,
-                "date": max(str(row.get("date") or "") for row in touching),
-                "window": window,
-                "written": written,
-            }
-        )
-    for path, data in read_markers(root):
-        written = path.stat().st_mtime
-        if data is None:  # unreadable: a run of unknown devices and end, so it counts
-            runs.append({"run_id": path.name.removesuffix(".run.json"), "date": "", "window": None, "written": written})
-            continue
-        run_id = data.get("run_id") if isinstance(data.get("run_id"), str) else path.name.removesuffix(".run.json")
-        if run_id in skip:
-            continue
-        marked = data.get("devices")
-        if isinstance(marked, list) and not devices.intersection(marked):
-            continue
-        window = _parse_window({"start": data.get("start"), "end": data.get("end")}) if data.get("closed") is True else None
-        runs.append({"run_id": run_id, "date": str(data.get("start") or "")[:10], "window": window, "written": written})
-    return runs
-
-
-def plan_rest(spec: dict, root: Path, now: float, skip: frozenset[str] = frozenset()) -> dict:
-    """What rest this run owes (maintainer's rule, R&D approved).
-
-    Every prior switchyard receipt that touches one of this spec's devices is
-    asked what it is owed, and the largest answer is rested:
-
-    - times readable, run longer than ``REST_FREE_RUN_S``: ``rest_s`` less the
-      time since it ended;
-    - times readable, run that long or shorter: nothing;
-    - times unreadable (receipts before ``run_window``, or a file that does not
-      parse): treated as long, measured from the file time, which is at or after
-      the run's end, so the gap can only be underestimated;
-    - an end in the future: the full ``rest_s``;
-    - a run-start marker (``receipts/<run_id>.run.json``) counts like a receipt:
-      closed, it has readable times; never closed, the run was killed from
-      outside before it could say how long it lasted, so it is treated as long
-      and measured from the marker's file time (the last flush). A run with both
-      a marker and a receipt owes the larger of the two.
-
-    In a real sequence this is "the previous run decides", since a long run is
-    always followed by its rest, but mixed receipts and date strings cannot
-    fool it. Health checks and smokes write no receipt, so they never count.
-
-    A spec that uses the 5090 always rests the full ``rest_s``: the card's own
-    rule. Other jobs on the card leave no switchyard receipt, so the receipts
-    cannot show whether the card has rested.
-    """
-
-    rest_s = float(spec.get("rest_s") or 0)
-    plan = {"ran": False, "reason": "", "prior_run_id": None, "prior_run_min": None, "gap_min": None, "rest_s_applied": 0.0}
-    if _uses_5090(spec):
-        plan.update(
-            ran=rest_s > 0,
-            reason="the card's own rule: a 5090 spec rests in full; card runs outside switchyard leave no receipt",
-            rest_s_applied=rest_s,
-        )
-        return plan
-    runs = _prior_runs(root, _spec_devices(spec), skip)
-    if not runs:
-        plan["reason"] = "no prior run on these devices"
-        return plan
-    best = None
-    for run in runs:
-        if run["window"] is None:
-            gap = now - run["written"]
-            owed = rest_s if gap < 0 else max(0.0, rest_s - gap)
-            why = f"its times are unrecorded; its receipt was last written {gap / 60:.1f} min ago (fail-safe: treated as long)"
-            duration = None
-        else:
-            start, end = run["window"]
-            duration = end - start
-            gap = now - end
-            if gap < 0:
-                owed = rest_s
-                why = "its recorded end is in the future (fail-safe)"
-            elif duration <= REST_FREE_RUN_S:
-                owed = 0.0
-                why = f"it lasted {duration / 60:.1f} min, at most {REST_FREE_RUN_S // 60}"
-            else:
-                owed = max(0.0, rest_s - gap)
-                why = f"it lasted {duration / 60:.1f} min, over {REST_FREE_RUN_S // 60}; it ended {gap / 60:.1f} min ago"
-        candidate = (owed, -gap, run, duration, gap, why)
-        if best is None or candidate[:2] > best[:2]:
-            best = candidate
-    owed, _, run, duration, gap, why = best
-    plan["prior_run_id"] = run["run_id"]
-    plan["prior_run_min"] = None if duration is None else duration / 60
-    plan["gap_min"] = gap / 60
-    plan["rest_s_applied"] = owed
-    plan["ran"] = owed > 0
-    plan["reason"] = f"prior run {run['run_id']}: {why}" + ("" if owed > 0 else "; nothing owed")
-    return plan
-
-
-def _rest(rest_s: float, sleep, clock) -> None:
-    """Sleep the planned rest before the block, then prove the rest happened."""
-
-    if rest_s <= 0:
-        return
-    start = clock()
-    # A real sleep can wake a fraction of a second early (Windows timer
-    # granularity), and the conditional rest is fractional, so top up the
-    # remainder a few times. A sleep that is genuinely broken still falls
-    # short after the top-ups and is refused below.
-    sleep(rest_s)
-    for _ in range(REST_TOP_UPS):
-        remaining = rest_s - (clock() - start)
-        if remaining <= 0:
-            break
-        sleep(remaining + REST_TOP_UP_PAD_S)
-    require_rest(clock() - start, rest_s=rest_s)
 
 
 def run_spec(
@@ -1711,8 +1573,6 @@ def run_spec(
     notes: str = "",
     adapters: dict | None = None,
     heartbeat: Path | None = None,
-    sleep=None,
-    clock=None,
     wall=None,
     python_path: str | None = None,
     watch: WatchHooks | None = None,
@@ -1721,8 +1581,7 @@ def run_spec(
 
     The order is: interpreter, spec load, procedure, token flags, the
     committed blob, the receipt-name collision, adapter construction, the
-    card heartbeat and empty-card check, the spec's rest, then heartbeat and
-    empty-card again at contact time. ``run_interleaved`` re-checks the blob
+    card heartbeat and empty-card check. ``run_interleaved`` re-checks the blob
     and flags and owns the measurement; a completed run appends its rows to
     the routing table by the harness's own design.
 
@@ -1761,10 +1620,6 @@ def run_spec(
             probe = _card_probe(adapters, spec)
             path = heartbeat_path(heartbeat)
             _card_guards(probe, path, wall())
-        rest = plan_rest(spec, root, wall(), frozenset({name}))
-        _rest(rest["rest_s_applied"], sleep or time.sleep, clock or time.monotonic)
-        if _uses_5090(spec):
-            _card_guards(probe, path, wall())
         return run_interleaved(
             adapters,
             grant=grant,
@@ -1777,7 +1632,6 @@ def run_spec(
             date=stamp,
             notes=notes,
             wall=wall,
-            rest=rest,
             watch=watch,
             marker=marker,
         )

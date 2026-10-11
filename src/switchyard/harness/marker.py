@@ -4,8 +4,8 @@ A run killed from outside (a hard kill while the main thread is stuck in a
 native call) never reaches its flush, so it leaves no receipt and the next
 run cannot tell it happened. The marker is written before any device contact,
 carries the run's start, and is updated at every flush. A closed marker is a
-run that ended in order; an unclosed one is a run of unknown end. ``plan_rest``
-reads both. A marker is local state and is not a receipt: ``switchyard check``
+run that ended in order; an unclosed one is a run killed from outside. It feeds no
+scheduling logic. A marker is local state and is not a receipt: ``switchyard check``
 skips it and ``.gitignore`` keeps it out of commits.
 """
 
@@ -46,7 +46,7 @@ class RunMarker:
         os.replace(temporary, self.path)
 
     def restart(self, start: str) -> None:
-        """The run proper begins: the start moves past any rest that was slept."""
+        """The run proper begins: the start is re-stamped."""
 
         self._data["start"] = start
         self.write()
@@ -60,9 +60,11 @@ class RunMarker:
         except OSError:
             pass
 
-    def close(self, end: str) -> None:
+    def close(self, end: str, reason: str | None = None) -> None:
         self._data["end"] = end
         self._data["closed"] = True
+        if reason is not None:
+            self._data["reason"] = reason
         try:
             self.write()
         except OSError:
@@ -75,17 +77,3 @@ class RunMarker:
             self.path.unlink()
         except OSError:
             pass
-
-
-def read_markers(root: Path) -> list[tuple[Path, dict | None]]:
-    """Every marker under ``receipts/`` as (path, data). Unreadable data is None."""
-
-    folder = root / "receipts"
-    found = []
-    for path in sorted(folder.glob(f"*{RUN_MARKER_SUFFIX}")) if folder.is_dir() else []:
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            data = None
-        found.append((path, data if isinstance(data, dict) else None))
-    return found

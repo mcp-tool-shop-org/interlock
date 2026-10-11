@@ -1,6 +1,6 @@
 """The run command's device path: every guard refuses before an adapter is called.
 
-Adapters are fakes and the spec's rest runs against a fake clock. No test in
+Adapters are fakes. No test in
 this file touches a device.
 """
 
@@ -36,6 +36,7 @@ def _arm(arm_id, device):
     return {
         "id": arm_id,
         "task": "generate",
+        "prompt": "The switchyard counts the same cars on every pass.",
         "device": device,
         "engine": "fake",
         "model": "qwen3:8b",
@@ -127,10 +128,6 @@ class FakeTime:
         return self.now
 
 
-def _no_rest_attempted(seconds: float) -> None:
-    raise AssertionError(f"the rest was attempted ({seconds}s)")
-
-
 def _result(latency=10):
     return StepResult(ok=True, latency_ms=latency)
 
@@ -153,7 +150,7 @@ def test_a_missing_grant_refuses_before_any_adapter(tmp_path: Path):
     spec_path = _bind(repo, _spec([_arm("A", "5090")], needs=NEED_GRANT))
     fake = Fake()
     with pytest.raises(GuardError, match="--grant"):
-        run_spec(spec_path, root=repo, adapters={"fake": fake}, sleep=_no_rest_attempted)
+        run_spec(spec_path, root=repo, adapters={"fake": fake})
     assert fake.calls == []
     assert fake.unloaded == []
 
@@ -163,7 +160,7 @@ def test_a_missing_npu_session_refuses_before_any_adapter(tmp_path: Path):
     spec_path = _bind(repo, _spec([_arm("A", "NPU")], needs=NEED_SESSION))
     fake = Fake()
     with pytest.raises(GuardError, match="--npu-session"):
-        run_spec(spec_path, root=repo, grant="g", adapters={"fake": fake}, sleep=_no_rest_attempted)
+        run_spec(spec_path, root=repo, grant="g", adapters={"fake": fake})
     assert fake.calls == []
 
 
@@ -172,7 +169,7 @@ def test_a_missing_cpu_window_refuses_before_any_adapter(tmp_path: Path):
     spec_path = _bind(repo, _spec([_arm("A", "CPU")], needs=NEED_WINDOW))
     fake = Fake()
     with pytest.raises(GuardError, match="--cpu-window"):
-        run_spec(spec_path, root=repo, adapters={"fake": fake}, sleep=_no_rest_attempted)
+        run_spec(spec_path, root=repo, adapters={"fake": fake})
     assert fake.calls == []
 
 
@@ -184,7 +181,7 @@ def test_an_edited_spec_refuses_before_any_adapter(tmp_path: Path):
     )
     fake = Fake()
     with pytest.raises(SpecError, match="edited after commit"):
-        run_spec(spec_path, root=repo, adapters={"fake": fake}, sleep=_no_rest_attempted)
+        run_spec(spec_path, root=repo, adapters={"fake": fake})
     assert fake.calls == []
 
 
@@ -203,7 +200,6 @@ def test_stale_heartbeat_refuses_before_the_probe(tmp_path: Path):
             grant="g",
             adapters={"fake": fake},
             heartbeat=heartbeat,
-            sleep=_no_rest_attempted,
         )
     assert fake.calls == []
 
@@ -219,25 +215,6 @@ def test_a_loaded_card_refuses(tmp_path: Path):
             grant="g",
             adapters={"fake": fake},
             heartbeat=_fresh_heartbeat(tmp_path),
-            sleep=_no_rest_attempted,
-        )
-    assert fake.calls == []
-
-
-def test_a_short_rest_refuses(tmp_path: Path):
-    repo = tmp_path / "repo"
-    spec_path = _bind(repo, _spec([_arm("A", "5090")], needs=NEED_GRANT))
-    clock = FakeTime(advance=100.0)  # the sleep lied: less than the spec's rest passed
-    fake = Fake(loaded=[])
-    with pytest.raises(GuardError, match="rested"):
-        run_spec(
-            spec_path,
-            root=repo,
-            grant="g",
-            adapters={"fake": fake},
-            heartbeat=_fresh_heartbeat(tmp_path),
-            sleep=clock.sleep,
-            clock=clock.monotonic,
         )
     assert fake.calls == []
 
@@ -248,7 +225,7 @@ def test_an_in_repo_interpreter_is_refused(tmp_path: Path):
     fake = Fake()
     bad = repo / ".venv" / "Scripts" / "python.exe"
     with pytest.raises(GuardError, match="UV_PROJECT_ENVIRONMENT"):
-        run_spec(spec_path, root=repo, adapters={"fake": fake}, python_path=str(bad), sleep=_no_rest_attempted)
+        run_spec(spec_path, root=repo, adapters={"fake": fake}, python_path=str(bad))
     assert fake.calls == []
 
 
@@ -259,7 +236,7 @@ def test_a_fill_card_spec_has_no_run_path(tmp_path: Path):
     target.write_text(E5.read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
     _commit(repo)
     with pytest.raises(GuardError, match="no run path"):
-        run_spec(target, root=repo, grant="g", adapters={"fake": Fake()}, sleep=_no_rest_attempted)
+        run_spec(target, root=repo, grant="g", adapters={"fake": Fake()})
 
 
 def test_an_existing_receipt_name_is_refused(tmp_path: Path):
@@ -276,7 +253,6 @@ def test_an_existing_receipt_name_is_refused(tmp_path: Path):
             adapters={"fake": fake},
             run_id="run-t",
             date="2026-10-10",
-            sleep=_no_rest_attempted,
         )
     assert fake.calls == []
 
@@ -284,15 +260,12 @@ def test_an_existing_receipt_name_is_refused(tmp_path: Path):
 def test_a_clean_run_writes_a_receipt_check_accepts(tmp_path: Path):
     repo = tmp_path / "repo"
     spec_path = _bind(repo, _spec([_arm("A", "CPU")]))
-    clock = FakeTime()
     fake = Fake({"A": [_result(10), _result(11), _result(12)]})
     rows = run_spec(
         spec_path,
         root=repo,
         adapters={"fake": fake},
         date="2026-10-10",
-        sleep=clock.sleep,
-        clock=clock.monotonic,
     )
     assert len(rows) == 1
     receipt = repo / "receipts" / "t-2026-10-10.jsonl"
@@ -307,7 +280,6 @@ def test_a_clean_run_writes_a_receipt_check_accepts(tmp_path: Path):
 def test_a_5090_run_proceeds_after_both_card_checks(tmp_path: Path):
     repo = tmp_path / "repo"
     spec_path = _bind(repo, _spec([_arm("A", "5090")], needs=NEED_GRANT))
-    clock = FakeTime()
     fake = Fake({"A": [_result(50), _result(51), _result(52)]}, loaded=[])
     rows = run_spec(
         spec_path,
@@ -315,8 +287,6 @@ def test_a_5090_run_proceeds_after_both_card_checks(tmp_path: Path):
         grant="g",
         adapters={"fake": fake},
         heartbeat=_fresh_heartbeat(tmp_path),
-        sleep=clock.sleep,
-        clock=clock.monotonic,
         date="2026-10-10",
         run_id="card-ok",
     )
@@ -329,7 +299,6 @@ def test_a_5090_run_proceeds_after_both_card_checks(tmp_path: Path):
 def test_a_hang_stops_the_run_and_keeps_a_partial_receipt(tmp_path: Path):
     repo = tmp_path / "repo"
     spec_path = _bind(repo, _spec([_arm("A", "CPU"), _arm("B", "CPU")]))
-    clock = FakeTime()
     adapter = Fake(
         {
             "A": [_result(10), _result(11), _result(12)],
@@ -343,8 +312,6 @@ def test_a_hang_stops_the_run_and_keeps_a_partial_receipt(tmp_path: Path):
             adapters={"fake": adapter},
             date="2026-10-10",
             run_id="hang-1",
-            sleep=clock.sleep,
-            clock=clock.monotonic,
         )
     receipt = repo / "receipts" / "hang-1.jsonl"
     assert receipt.is_file()
@@ -361,10 +328,7 @@ def test_the_command_runs_and_refuses_a_name_collision(tmp_path: Path, monkeypat
     repo = tmp_path / "repo"
     spec_path = _bind(repo, _spec([_arm("A", "CPU")]))
     fake = Fake({"A": [_result(10), _result(11), _result(12)]})
-    clock = FakeTime()
     monkeypatch.setattr("switchyard.harness.runner.for_engine", lambda engine: fake)
-    monkeypatch.setattr("time.sleep", clock.sleep)
-    monkeypatch.setattr("time.monotonic", clock.monotonic)
     assert main(["run", str(spec_path), "--root", str(repo), "--run-id", "cli-run"]) == 0
     assert (repo / "receipts" / "cli-run.jsonl").is_file()
     assert main(["run", str(spec_path), "--root", str(repo), "--run-id", "cli-run"]) == 1

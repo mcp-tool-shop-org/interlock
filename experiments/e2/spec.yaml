@@ -103,6 +103,7 @@
 # applied only after a run of over 30 minutes on the same devices that ended
 # less than rest_s ago (maintainer, 2026-10-10).
 
+# Amendment, 2026-10-11 (maintainer). Rest is the Publisher's scheduling decision between consecutive long runs, not a harness rule; rest_s below is no longer read.
 id: E2
 procedure: interleaved
 compile_cache: fresh
