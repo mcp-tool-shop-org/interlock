@@ -108,3 +108,63 @@ def test_a_list_of_rows_and_a_non_object_are_both_handled(tmp_path: Path):
     assert check_tree(tmp_path) == []
     (receipts / "nope.json").write_text("1", encoding="utf-8")
     assert any("nope.json" in problem for problem in check_tree(tmp_path))
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_privacy_check_refuses_home_paths_hostnames_and_token_shapes():
+    for planted in ("/home/" + "someone/receipt.json", "/Users/" + "someone/receipt.json"):
+        homed = row()
+        homed["notes"] = planted
+        with pytest.raises(ReceiptError, match="home-directory"):
+            validate_row(homed)
+
+    remote = row()
+    remote["notes"] = "10.1.2.3"
+    with pytest.raises(ReceiptError, match="hostname"):
+        validate_row(remote)
+    named = row()
+    named["notes"] = "http://gpu-box.local/api"
+    with pytest.raises(ReceiptError, match="hostname"):
+        validate_row(named)
+
+    for prefix in ("hf" + "_", "sk" + "-", "ghp" + "_"):
+        token = row()
+        token["notes"] = prefix + "example"
+        with pytest.raises(ReceiptError, match="token-shaped"):
+            validate_row(token)
+
+    hex_secret = row()
+    hex_secret["settings"]["api_token"] = "0123456789abcdef" * 3
+    with pytest.raises(ReceiptError, match="token-shaped"):
+        validate_row(hex_secret)
+    b64_secret = row()
+    b64_secret["settings"]["client_secret"] = ("ab" * 16) + "+/=="
+    with pytest.raises(ReceiptError, match="token-shaped"):
+        validate_row(b64_secret)
+
+
+def test_privacy_check_allows_loopback_a_commit_sha_and_a_filename():
+    allowed = row()
+    allowed["notes"] = "http://127.0.0.1:11434 and localhost. See tail-c.log. The figure is cost.seconds."
+    allowed["notes"] += "0123456789abcdef" * 4
+    validate_row(allowed)
+    assert len(row()["provenance"]["commit_sha"]) >= 32
+    validate_row(row())
+
+
+def test_check_reports_a_privacy_hit_in_a_receipt(tmp_path: Path):
+    receipts = tmp_path / "receipts"
+    receipts.mkdir()
+    planted = row()
+    planted["notes"] = "10.1.2.3"
+    (receipts / "planted.json").write_text(json.dumps(planted), encoding="utf-8")
+    problems = check_tree(tmp_path)
+    assert len(problems) == 1
+    assert "hostname" in problems[0]
+    assert "planted.json" in problems[0]
+
+
+def test_committed_receipts_and_table_rows_pass_the_privacy_check():
+    assert check_tree(ROOT) == []

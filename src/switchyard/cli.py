@@ -54,7 +54,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="switchyard", description="Route a job from measured receipts.")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    check = sub.add_parser("check", help="validate every receipt in the repository")
+    check = sub.add_parser(
+        "check",
+        help="validate every receipt and table row, including the privacy check",
+    )
     check.add_argument("--root", type=Path, default=Path("."))
     check.set_defaults(func=_cmd_check)
 

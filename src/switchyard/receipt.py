@@ -1,8 +1,9 @@
 """Routing-row schema and the repository check.
 
 ``switchyard check`` is green when the repository has no receipts yet.
-Every receipt that is present has to validate, and none may carry a
-home-directory path.
+Every receipt and every table row has to validate. None may carry a
+home-directory path, a hostname other than ``127.0.0.1`` or ``localhost``,
+or a token-shaped value.
 """
 
 from __future__ import annotations
@@ -18,6 +19,39 @@ from switchyard.families import FamilyError, family_of
 
 RUN_MARKER_SUFFIX = ".run.json"
 _HOME = re.compile(r"(?i)(?:[A-Za-z]:[\\/]+Users[\\/]|[\\/]Users[\\/]|[\\/]home[\\/])")
+_LOOPBACK = frozenset({"localhost", "127.0.0.1", "::1"})
+_HOST_SUFFIXES = frozenset(
+    {
+        "com",
+        "net",
+        "org",
+        "io",
+        "ai",
+        "co",
+        "dev",
+        "app",
+        "cloud",
+        "sh",
+        "local",
+        "lan",
+        "internal",
+        "home",
+        "arpa",
+        "localdomain",
+        "invalid",
+        "test",
+        "example",
+        "edu",
+        "gov",
+    }
+)
+_IPV4 = re.compile(r"(?<!\d)(?:\d{1,3}\.){3}\d{1,3}(?!\d)")
+_URL_HOST = re.compile(r"(?i)\b(?:https?|wss?)://(\[[^\]]+\]|[^/\s:]+)")
+_FQDN = re.compile(r"(?<![A-Za-z0-9_\\/])(?:[A-Za-z0-9-]+\.)+([A-Za-z]{2,})(?![A-Za-z0-9_])")
+_TOKEN_PREFIX = re.compile(r"(?<![A-Za-z0-9])(?:hf_|sk-|ghp_)[A-Za-z0-9]")
+_SECRET_FIELD = re.compile(r"(?i)(?:^|_)(?:key|token|secret|password|passwd)(?:$|_)")
+_LONG_HEX = re.compile(r"(?<![A-Za-z0-9])[0-9a-fA-F]{32,}(?![A-Za-z0-9])")
+_LONG_B64 = re.compile(r"(?<![A-Za-z0-9+/])[A-Za-z0-9+/]{32,}={0,2}(?![A-Za-z0-9+/])")
 _VALIDATOR: Draft202012Validator | None = None
 
 
@@ -168,18 +202,55 @@ def _check_device_lost(row: dict) -> None:
         raise ReceiptError(f"{row['id']}: a {outcome} row has no timing")
 
 
-def _reject_home_paths(value: object, where: str = "$") -> None:
+def _reject_home_paths(value: object, where: str = "$", field: str | None = None) -> None:
+    """Refuse a home path, a non-loopback hostname, or a token-shaped value."""
+
     if isinstance(value, str):
         if _HOME.search(value):
             raise ReceiptError(f"home-directory path in {where}")
+        host = _forbidden_host(value)
+        if host is not None:
+            raise ReceiptError(f"hostname {host} in {where}")
+        if _token_shaped(value, field):
+            raise ReceiptError(f"token-shaped value in {where}")
         return
     if isinstance(value, dict):
         for key, item in value.items():
-            _reject_home_paths(item, f"{where}.{key}")
+            _reject_home_paths(item, f"{where}.{key}", str(key))
         return
     if isinstance(value, list):
         for index, item in enumerate(value):
-            _reject_home_paths(item, f"{where}[{index}]")
+            _reject_home_paths(item, f"{where}[{index}]", field)
+
+
+def _forbidden_host(text: str) -> str | None:
+    for match in _IPV4.finditer(text):
+        ip = match.group(0)
+        parts = ip.split(".")
+        if any(not part.isdigit() or int(part) > 255 for part in parts):
+            continue
+        if ip not in _LOOPBACK:
+            return ip
+    for match in _URL_HOST.finditer(text):
+        raw = match.group(1)
+        host = raw[1:-1] if raw.startswith("[") and raw.endswith("]") else raw
+        if host.casefold() not in _LOOPBACK:
+            return host
+    for match in _FQDN.finditer(text):
+        name = match.group(0)
+        if match.group(1).lower() not in _HOST_SUFFIXES:
+            continue
+        if name.casefold() not in _LOOPBACK:
+            return name
+    return None
+
+
+def _token_shaped(value: str, field: str | None) -> bool:
+    if _TOKEN_PREFIX.search(value):
+        return True
+    if field is None or _SECRET_FIELD.search(field) is None:
+        return False
+    return _LONG_HEX.search(value) is not None or _LONG_B64.search(value) is not None
 
 
 def _check_interval(row: dict, metric: dict) -> None:
