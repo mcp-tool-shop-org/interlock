@@ -229,14 +229,24 @@ def test_an_in_repo_interpreter_is_refused(tmp_path: Path):
     assert fake.calls == []
 
 
-def test_a_fill_card_spec_has_no_run_path(tmp_path: Path):
+def test_a_fill_card_run_refuses_a_missing_heartbeat_before_the_adapter(tmp_path: Path):
     repo = tmp_path / "repo"
     target = repo / "experiments" / "e5" / "spec.yaml"
     target.parent.mkdir(parents=True)
     target.write_text(E5.read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
     _commit(repo)
-    with pytest.raises(GuardError, match="no run path"):
-        run_spec(target, root=repo, grant="g", adapters={"fake": Fake()})
+    fake = Fake()
+    missing = tmp_path / "no-heartbeat"
+    with pytest.raises(GuardError, match="watchdog heartbeat"):
+        run_spec(
+            target,
+            root=repo,
+            grant="g",
+            adapters={"ollama": fake},
+            heartbeat=missing,
+        )
+    assert fake.calls == []
+    assert fake.unloaded == []
 
 
 def test_an_existing_receipt_name_is_refused(tmp_path: Path):

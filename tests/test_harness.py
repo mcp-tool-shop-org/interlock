@@ -1300,7 +1300,7 @@ def test_an_edited_spec_is_refused_and_dry_run_does_not_touch_devices(tmp_path: 
         require_unmodified(repo, spec)
 
 
-def test_the_command_dry_runs_and_refuses_to_start_a_device(tmp_path: Path):
+def test_the_command_dry_runs_and_refuses_to_start_a_device(tmp_path: Path, monkeypatch):
     from switchyard.cli import main
 
     repo = tmp_path / "repo"
@@ -1308,6 +1308,7 @@ def test_the_command_dry_runs_and_refuses_to_start_a_device(tmp_path: Path):
     target.parent.mkdir(parents=True)
     target.write_text(E5.read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
     _commit(repo)
+    monkeypatch.setenv("WATCHDOG_HEARTBEAT", str(tmp_path / "no-heartbeat"))
     assert main(["run", str(target), "--dry-run", "--root", str(repo)]) == 0
     assert main(["run", str(target), "--root", str(repo), "--grant", "g"]) == 1
     assert main(["run", str(target), "--root", str(repo)]) == 1

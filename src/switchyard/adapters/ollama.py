@@ -255,14 +255,16 @@ class OllamaAdapter:
             return StepResult(ok=False, error=str(payload["error"]))
         total_ns = payload.get("total_duration")
         latency = (total_ns / 1_000_000) if isinstance(total_ns, int) else None
+        prompt_ns = payload.get("prompt_eval_duration")
         return StepResult(
             ok=True,
             latency_ms=latency,
             throughput=_rate(payload.get("eval_count"), payload.get("eval_duration")),
             throughput_unit="tok/s",
-            prompt_tok_s=_rate(payload.get("prompt_eval_count"), payload.get("prompt_eval_duration")),
+            prompt_tok_s=_rate(payload.get("prompt_eval_count"), prompt_ns),
             output=payload.get("response"),
             resolved=resolved or None,
+            prompt_eval_duration_ns=prompt_ns if isinstance(prompt_ns, int) and not isinstance(prompt_ns, bool) else None,
         )
 
     def unload(self, model: str, device: str | None = None) -> None:
