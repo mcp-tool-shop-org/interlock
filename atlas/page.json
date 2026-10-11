@@ -20,8 +20,8 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 6,
-      "changed": 18,
+      "added": 2,
+      "changed": 25,
       "moved": 0,
       "parts": 4,
       "removed": 0
@@ -29,43 +29,39 @@
     "items": [
       {
         "kind": "unassigned",
-        "sentence": "receipts/e2-b8tail-2026-10-11.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.",
+        "sentence": "receipts/e3-ref-2026-10-11b.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.",
         "subjects": [
-          "receipts/e2-b8tail-2026-10-11.jsonl"
+          "receipts/e3-ref-2026-10-11b.jsonl"
         ]
-      },
-      {
-        "kind": "unassigned",
-        "sentence": "receipts/e3-2026-10-10b.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.",
-        "subjects": [
-          "receipts/e3-2026-10-10b.jsonl"
-        ]
-      },
-      {
-        "kind": "unassigned",
-        "sentence": "receipts/e3-2026-10-11.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.",
-        "subjects": [
-          "receipts/e3-2026-10-11.jsonl"
-        ]
-      },
-      {
-        "kind": "unassigned",
-        "sentence": "And 1 more new file that belongs to no part.",
-        "subjects": []
       },
       {
         "kind": "counts",
-        "sentence": "6 files added and 18 changed content, across 4 parts.",
+        "sentence": "2 files added and 25 changed content, across 4 parts.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "0b8d38bf02f12b50a98f031a051bbba8b7a193be",
-      "generatedAt": "2026-10-11T02:02:20.998Z"
+      "commit": "09958db268d34ef978999aa570242398b5c963b1",
+      "generatedAt": "2026-10-11T04:45:43.232Z"
     },
     "unchanged": false
   },
   "changesTogether": [
+    {
+      "a": "src/switchyard/adapters/openvino.py",
+      "b": "tests/test_openvino_adapter.py",
+      "either": 18,
+      "partLabels": [
+        "src",
+        "tests"
+      ],
+      "parts": [
+        "src",
+        "tests"
+      ],
+      "relation": "b-imports-a",
+      "shared": 14
+    },
     {
       "a": "src/switchyard/harness/receipts.py",
       "b": "src/switchyard/receipt.py",
@@ -82,9 +78,9 @@
       "shared": 7
     },
     {
-      "a": "src/switchyard/adapters/openvino.py",
-      "b": "tests/test_openvino_adapter.py",
-      "either": 17,
+      "a": "src/switchyard/harness/runner.py",
+      "b": "tests/test_harness.py",
+      "either": 16,
       "partLabels": [
         "src",
         "tests"
@@ -94,7 +90,7 @@
         "tests"
       ],
       "relation": "b-imports-a",
-      "shared": 13
+      "shared": 9
     },
     {
       "a": "src/switchyard/adapters/base.py",
@@ -125,31 +121,16 @@
       ],
       "relation": "inside",
       "shared": 5
-    },
-    {
-      "a": "src/switchyard/harness/receipts.py",
-      "b": "tests/test_harness.py",
-      "either": 13,
-      "partLabels": [
-        "src",
-        "tests"
-      ],
-      "parts": [
-        "src",
-        "tests"
-      ],
-      "relation": "b-imports-a",
-      "shared": 7
     }
   ],
   "changesTogetherNote": [
     "Confidence is low: fewer than 25 source files reach 10 revisions in the window.",
-    "Window: 180 days; a pair counts from 3 shared commits, since 4 source files reach 10 revisions; the floor rises to 10 when 25 do."
+    "Window: 180 days; a pair counts from 3 shared commits, since 5 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 0,
-  "commit": "09958db268d34ef978999aa570242398b5c963b1",
+  "commit": "e4547dd845bd591726eb12f0b88b4d015be17fa6",
   "defaultBranch": "main",
-  "derived": "7 parts, mostly Python (52 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.",
+  "derived": "7 parts, mostly Python (53 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.",
   "doors": [
     {
       "checks": [],
@@ -164,7 +145,7 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 15
+          "files": 16
         },
         {
           "boundary": "src",
@@ -220,13 +201,13 @@
   "edges": [],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-11T04:45:43.232Z",
+  "generatedAt": "2026-10-11T05:39:28.798Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
-    "2 writes and 3 reads use paths built at run time and are not named here.",
-    "4 writes and 19 reads go to a path their caller passes, not to this repository.",
+    "3 writes and 3 reads use paths built at run time and are not named here.",
+    "4 writes and 17 reads go to a path their caller passes, not to this repository.",
     "3 reads go to the directory the command is run in (receipts/), not to this repository.",
-    "16 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 13 more.",
+    "17 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 14 more.",
     "Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window."
   ],
   "mainDoor": ".github/workflows/ci.yml",
@@ -252,11 +233,11 @@
   "startReason": "This path follows switchyard (a command people run) from its entry, since CI runs only tests.",
   "summary": "switchyard routes each job to a model, engine and device from a receipt-backed table.",
   "summaryFrom": "person",
-  "testFiles": 15,
+  "testFiles": 16,
   "testedBy": {
-    "src": 14
+    "src": 15
   },
-  "unnamedWrites": 2,
+  "unnamedWrites": 3,
   "unread": [],
   "unreadFiles": 0,
   "unreadNote": [],
