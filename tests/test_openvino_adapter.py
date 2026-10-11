@@ -92,15 +92,25 @@ class FakeCore:
         return FakeCompiled()
 
 
+class MeanStd:
+    """openvino_genai's MeanStdPair: the timing getters return this, not a float."""
+
+    def __init__(self, mean, std=0.0):
+        self.mean = mean
+        self.std = std
+
+
 class FakePerf:
+    # Mirrors the real PerfMetrics: timings and throughput are MeanStdPair,
+    # token counts are plain ints. A fake returning floats hid E3's lost counters.
     def get_ttft(self):
-        return 12.5
+        return MeanStd(12.5)
 
     def get_tpot(self):
-        return 3.0
+        return MeanStd(3.0)
 
     def get_throughput(self):
-        return 33.0
+        return MeanStd(33.0)
 
     def get_num_input_tokens(self):
         return 7
@@ -1074,3 +1084,35 @@ def test_onnx_hub_download_stays_single_file(tmp_path, monkeypatch):
     assert path.name == "model.onnx"
     # the failed .xml probe fetched no weights; the .onnx artifact stands alone
     assert calls == ["openvino_model.xml", "model.onnx"]
+
+
+def test_generate_records_counters_from_meanstd_pairs(tmp_path):
+    # E3 2026-10-11: float(MeanStdPair) raised inside a bare except, so every row
+    # lost ttft, tpot and throughput without a trace.
+    a = make_adapter()
+    r = a.run(req(task="generate", model=str(tmp_path), device="CPU", num_predict=16, prompt="hi"))
+    assert r.throughput == pytest.approx(33.0)
+    genai = r.resolved["genai"]
+    assert genai["ttft_ms"] == pytest.approx(12.5) and genai["tpot_ms"] == pytest.approx(3.0)
+
+
+def test_unreadable_perf_metrics_are_recorded_not_dropped(tmp_path):
+    class BrokenPerf(FakePerf):
+        def get_ttft(self):
+            raise RuntimeError("no metrics")
+
+        def get_throughput(self):
+            raise RuntimeError("no metrics")
+
+    class BrokenGenai(FakeGenai):
+        class LLMPipeline(FakePipeline):
+            def generate(self, prompt, config=None):
+                out = super().generate(prompt, config)
+                out.perf_metrics = BrokenPerf()
+                return out
+
+    a = make_adapter(genai_module=BrokenGenai)
+    r = a.run(req(task="generate", model=str(tmp_path), device="CPU", num_predict=16, prompt="hi"))
+    assert r.ok and r.throughput is None
+    assert "perf_metrics unreadable" in r.resolved["genai"]["error"]
+    assert "no metrics" in r.resolved["genai"]["throughput_error"]

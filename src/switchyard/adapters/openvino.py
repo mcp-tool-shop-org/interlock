@@ -683,21 +683,22 @@ def _run_generate(self, request: StepRequest, s: _Settings, resolved: dict) -> S
     resolved.update(revision=parse_model_ref(request.model)[1] or "unrecorded")
     try:
         resolved["genai"] = {
-            "ttft_ms": float(perf.get_ttft()),
-            "tpot_ms": float(perf.get_tpot()),
+            "ttft_ms": _mean(perf.get_ttft()),
+            "tpot_ms": _mean(perf.get_tpot()),
             "input_tokens": int(perf.get_num_input_tokens()),
             "generated_tokens": int(perf.get_num_generated_tokens()),
         }
-    except Exception:
-        pass
+    except Exception as exc:
+        # recorded, never silent: E3's first blocked run lost every counter here
+        resolved["genai"] = {"error": f"perf_metrics unreadable: {type(exc).__name__}: {exc}"}
     if s.get("thinking_level") is not None:
         resolved["thinking_level"] = s.get("thinking_level")
     first = not self._pipelines[key].get("warmed")
     throughput = None
     try:
-        throughput = float(perf.get_throughput())
-    except Exception:
-        pass
+        throughput = _mean(perf.get_throughput())
+    except Exception as exc:
+        resolved.setdefault("genai", {})["throughput_error"] = f"{type(exc).__name__}: {exc}"
     kwargs = dict(
         ok=True,
         latency_ms=call_s * 1000,
@@ -754,6 +755,13 @@ def _model_dir(model: str) -> Path:
         return Path(snapshot_download(repo, revision=ref))
     except Exception as exc:
         raise AdapterError(f"the model {model} could not be fetched: {exc}") from exc
+
+
+def _mean(value) -> float:
+    """A genai timing as a float. PerfMetrics getters return a MeanStdPair
+    (``.mean``, ``.std``) for timings and throughput; a plain number passes."""
+
+    return float(getattr(value, "mean", value))
 
 
 def _pipeline_key(model: str, ov_id: str, compile_config: dict | None) -> tuple:
