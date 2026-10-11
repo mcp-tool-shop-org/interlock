@@ -82,7 +82,9 @@
 # (descriptive), rest_s (conditional), call_ceiling_s and compile_cache reuse.
 
 # Amendment, 2026-10-11 (maintainer). Rest is the Publisher's scheduling decision between consecutive long runs, not a harness rule; rest_s below is no longer read.
-# Amendment, 2026-10-11 (maintainer, R&D ruling). decision_metric: latency.throughput. Every finished arm must report decode tok/s; the first finished arm without it stops the run.
+# Amendment, 2026-10-11 (maintainer, R&D ruling), added after the run, for future runs: decision_metric:
+# latency.throughput. Every finished arm must report decode tok/s; the first finished arm without it stops
+# the run. It was not pre-registered for e3-2026-10-11b and changes nothing that run measured.
 id: E3
 procedure: interleaved
 order: blocked

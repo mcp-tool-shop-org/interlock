@@ -24,7 +24,10 @@
 # between consecutive long runs, not a harness rule (maintainer, 2026-10-11).
 
 id: E3-REF
+# Amendment, 2026-10-11 (R&D). decision_metric: latency.throughput. e3-ref has no gate, but its ratio
+# uses decode tok/s only, so the first finished arm without it stops the run (the first run's rates were null).
 procedure: interleaved
+decision_metric: latency.throughput
 compile_cache: reuse
 question: >
   How fast is qwen3:8b on the 5090 through Ollama at the 1024-token prompt,
