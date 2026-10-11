@@ -85,6 +85,12 @@ def generate_body(request: StepRequest) -> dict:
     return body
 
 
+def _num_predict_rejected(message: str) -> bool:
+    """True when the server refused a zero-token count and a one-token retry can stand in."""
+
+    return "num_predict" in message.lower()
+
+
 def context_length(payload: dict) -> int:
     """The one ``*.context_length`` value in ``/api/show`` ``model_info``."""
 
@@ -142,6 +148,66 @@ class OllamaAdapter:
         else:
             self.transport = transport
         self.device = device
+
+    def count_tokens(
+        self,
+        model: str,
+        text: str,
+        *,
+        settings: dict | None = None,
+        device: str | None = None,
+    ) -> int:
+        """How many tokens this served model assigns to ``text``.
+
+        One ``/api/generate`` with ``raw`` true, so the template is not counted,
+        and ``num_predict`` 0, so the call does not produce a completion. The
+        count is ``prompt_eval_count``. When the server refuses 0, the same
+        call is retried with ``num_predict`` 1. Load options in ``settings``
+        (context, thinking, keep_alive) are the measurement's, so the count
+        and the measurement name the same load. This does not unload. The
+        harness unloads afterwards when the count would leave the model resident.
+        """
+
+        refuse_cloud(model)
+        merged = dict(settings or {})
+        merged["prompt"] = text
+        merged["num_predict"] = 0
+        request = StepRequest(
+            step_id="count",
+            task="generate",
+            model=model,
+            device=device or self.device,
+            engine="ollama",
+            settings=merged,
+        )
+        request, _resolved = self._resolve(request)
+        url = url_for(request.device)
+        body = generate_body(request)
+        body["raw"] = True
+        body["truncate"] = False
+        body["options"]["num_predict"] = 0
+        payload = self._count_payload(url, body)
+        count = payload.get("prompt_eval_count")
+        if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+            raise AdapterError("Ollama did not report prompt_eval_count")
+        return count
+
+    def _count_payload(self, url: str, body: dict) -> dict:
+        payload = self.transport("POST", f"{url}/api/generate", body)
+        if not isinstance(payload, dict):
+            raise AdapterError("Ollama returned a non-object")
+        error = payload.get("error")
+        if error and body["options"]["num_predict"] == 0 and _num_predict_rejected(str(error)):
+            retried = dict(body)
+            retried["options"] = dict(body["options"])
+            retried["options"]["num_predict"] = 1
+            payload = self.transport("POST", f"{url}/api/generate", retried)
+            if not isinstance(payload, dict):
+                raise AdapterError("Ollama returned a non-object")
+            error = payload.get("error")
+        if error:
+            raise AdapterError(str(error))
+        return payload
 
     def show(self, model: str, device: str | None = None) -> dict:
         refuse_cloud(model)

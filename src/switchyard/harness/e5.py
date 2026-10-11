@@ -111,6 +111,80 @@ def fit_prompt(seed: str, target_tokens: int, count_tokens) -> str:
     return block[:low]
 
 
+def _word_cuts(text: str) -> list[int]:
+    """Ends of each word, and of the whitespace that follows it.
+
+    A cut is an index into ``text``. The prefix ``text[:cut]`` ends on a word
+    boundary, so the trim never splits a word.
+    """
+
+    cuts: list[int] = []
+    index = 0
+    length = len(text)
+    while index < length:
+        while index < length and text[index].isspace():
+            index += 1
+        if index >= length:
+            break
+        while index < length and not text[index].isspace():
+            index += 1
+        cuts.append(index)
+        space = index
+        while space < length and text[space].isspace():
+            space += 1
+        if space != index:
+            cuts.append(space)
+        index = space
+    return cuts
+
+
+def _as_count(value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise SearchError("the token count must be a non-negative integer")
+    return value
+
+
+def fit_prompt_words(seed: str, target_tokens: int, count_tokens) -> tuple[str, int, str]:
+    """Repeat the whole seed, then trim on word boundaries.
+
+    The prefix counts as exactly ``target_tokens`` when a word boundary lands
+    on that count. Otherwise it is the shortest word-prefix whose count is
+    still at least the target. The result is ``(prefix, count, fit)`` where
+    ``fit`` is ``exact`` or ``shortest_at_or_above``.
+
+    A longer prefix is assumed to count as at least as many tokens, the same
+    assumption :func:`fit_prompt` makes for characters. This trim is the Ollama
+    dataset rule. Engines with a local tokenizer keep :func:`fit_prompt`.
+    """
+
+    if not isinstance(seed, str) or not seed.strip():
+        raise SearchError("a prompt seed is required")
+    if isinstance(target_tokens, bool) or not isinstance(target_tokens, int) or target_tokens < 1:
+        raise SearchError("a prompt needs at least one token")
+    block = seed
+    counted = _as_count(count_tokens(block))
+    while counted < target_tokens:
+        block += seed
+        if len(block) > 1_000_000:
+            raise SearchError("the seed never reaches the token target")
+        counted = _as_count(count_tokens(block))
+    cuts = _word_cuts(block)
+    low = 0
+    high = len(cuts) - 1
+    best_text, best_count = block, counted
+    while low < high:
+        mid = (low + high) // 2
+        text = block[: cuts[mid]]
+        number = _as_count(count_tokens(text))
+        if number >= target_tokens:
+            high = mid
+            best_text, best_count = text, number
+        else:
+            low = mid + 1
+    fit = "exact" if best_count == target_tokens else "shortest_at_or_above"
+    return best_text, best_count, fit
+
+
 def search(
     *,
     default_ctx: int,
