@@ -16,8 +16,8 @@ The receipt schema, the routing table, and the harness came first. `switchyard r
 
 The routing table holds 502 rows from committed receipts. A few of the answers it already gives:
 
-- **A small model runs well on the Intel side.** Phi decodes at about 20–22 tokens/s on the CPU and the iGPU, and about 15 tokens/s on the NPU, at a 1024-token prompt with thinking off. That leaves the 5090 free for bigger work.
-- **An 8B model doesn't belong on the Intel side.** Qwen3-8B decodes at about 10–12 tokens/s on the CPU, iGPU and NPU. On the 5090 it decodes at about 208–211 tokens/s. Ask for 15 tokens/s with the 5090 busy, and `switchyard route` refuses and names the experiment behind the gap.
+- **A small model runs well on the Intel side.** Phi-3.5-mini decodes at about 20–22 tokens/s on the CPU and the iGPU, and about 15 tokens/s on the NPU, at a 1024-token prompt with thinking off. That leaves the 5090 free for bigger work.
+- **An 8B model doesn't belong on the Intel side.** At the same 1024-token prompt with thinking off, Qwen3-8B decodes at about 10–12 tokens/s on the CPU, iGPU and NPU. On the 5090 it decodes at about 208 tokens/s with thinking off and 211 with it on. Ask for 15 tokens/s with the 5090 busy, and the router refuses and names the experiment behind the gap: `switchyard route --task generate --model qwen3-8b --min-tok-s 15 --busy 5090`.
 - **Some shapes don't run at all.** The NPU rejected Qwen3-Embedding at 512-token inputs, both one at a time and in batches of 8. Those rows are kept as capability findings, never ranked as slow candidates.
 
 Those figures are the decode rates recorded in the E3 and e3-ref receipts. The run notes are in [experiments/e3/run-notes-2026-10-10-11.md](experiments/e3/run-notes-2026-10-10-11.md). `switchyard route` ranks by the worst repeat, not the median, so its choices are more cautious than these summaries.
@@ -89,7 +89,7 @@ A remote suggestion includes an `offrig_plan` object. switchyard does not call `
 
 ## Run an experiment
 
-Every experiment is pre-registered: its spec under `experiments/<id>/spec.yaml` is committed, with the question, the decision it feeds, the arms, the dataset, the metrics and the stop rules, before any device time. A rule is never changed after results are seen. A dated amendment is allowed only before the run.
+Every experiment is pre-registered: its spec under `experiments/<id>/spec.yaml` is committed, with the question, the decision it feeds, the arms, the dataset, the metrics and the stop rules, before any device time. `switchyard run` refuses a spec that was edited after its commit, and records the spec's blob in the receipt. By practice, a rule is not changed after results are seen; a dated amendment comes before the run whose results count, and a run set aside as void is recorded as such.
 
 ```
 switchyard run experiments/e4/spec.yaml --dry-run
