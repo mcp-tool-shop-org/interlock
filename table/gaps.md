@@ -3,6 +3,8 @@
 This is the experiment backlog. A cell is open when the table has no row that fills it.
 Imported rows: 456.
 
+The inventory below was rendered at 456 rows and was not regenerated. `switchyard route` does not rewrite this file, and this change does not re-run `switchyard import`. The E1–E4 cells in that inventory are stale against the table on disk. The router section at the bottom is the one that describes what `switchyard route` can and cannot answer.
+
 Ladder rows are imported from rnd at 08ca419f647a3ed69ee645610eaa1c7f35f40f91. Difficulty length quartiles are not imported. Tier rows are. Chain and ladder rows with no pins.quote_rule are quote rule 1 by the pre-#47 inference. B's planted-error judge row is imported from aspire-si at 3b05eab928894311993ffa3af2075fef39cccce6. That commit has B's receipts only. The 3b judge-control receipts are a later pin.
 
 ## Why E1–E4 are open
@@ -87,3 +89,16 @@ No open cell. This experiment's candidates are filled.
 - Aborted run `e3-2026-10-10b` stopped at `qwen3-8b-npu-l1024 cold`: pipeline sized for l256 reused (MAX_PROMPT_LEN 310 < 958 tokens); fixed in #45
 - Aborted run `e3-2026-10-10c` (no receipt; hard kill at 89.2% RAM): every pipeline resident under the interleaved order; replaced by order: blocked (#48, #49)
 - Aborted run `e3-2026-10-11` (hard kill after the Phi blocks): genai counters lost as MeanStdPair (fixed in #50); its 9 Phi rows carry no throughput and are evidence only
+
+## Router v0 (2026-10-11)
+
+What `switchyard route` refuses for lack of data, and which experiment would fill it.
+
+- TTFT routing needs rows that record `settings.prefix_caching`. The harness records it from #53 onward. E3 predates that, and none of the 502 committed rows carry the field. Unset means unknown, not a shared cache mode. The importer was not changed in this PR.
+- Quote rule 2 has no committed receipt. A verify route that asks for it refuses, and the experiment is `unregistered`.
+- No `runpod:` row is in the table. A remote suggestion is a shape the policy can return. It is not a measured receipt.
+- Qwen3-8B generate with the 5090 busy and a tok/s floor of 15 refuses. The best Intel conservative bound is about 12.01 tok/s (E3, iGPU, l256, thinking low). The experiment that fills the floor is E3. The 5090 reference (E3-REF) meets 15 and is removed by `--busy` before the floor is applied, so the closest miss is an E3 Intel row.
+- Qwen3-Embedding on the NPU at 512 is excluded, not ranked. `E2/qwen3emb-npu-l512-b1` is `native_binary_rejected`. `E2/qwen3emb-npu-l512-b8` is `compile_rejected`. The l128 row that passed (about 598 ms warm) is a different cell and is not one of those codes.
+- CPU Phi at l1024, thinking off, has a worst repeat near 7.04 tok/s and a median near 20.4. CPU Phi needs a quiet-window rerun before its bound is trusted. v0 does not trim that outlier. For that cell the iGPU bound is the choice, and the NPU (about 15.13) is the runner-up on the bound, because the CPU bound collapses.
+- There is no 5090 Phi row. The same Phi request without `--busy` still chooses the iGPU and says there is no 5090 row.
+- The 8×2048 compile hang has no receipt row. It stays an aborted run above, not a routing candidate.

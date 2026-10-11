@@ -24,6 +24,7 @@ switchyard = "switchyard.cli:main"
 
 [dependency-groups]
 dev = [
+    "hypothesis==6.168.5",
     "pytest==8.4.2",
     "pytest-cov==7.0.0",
 ]

@@ -1,0 +1,1 @@
+offrig_plan inputSchema at 8f2a94af0c354a2952ec099beac8fc90d8f11ffb, captured 2026-10-11 from offrig-mcp tools/list (tool offrig_plan, field inputSchema). PlanArgs in crates/offrig-mcp/src/main.rs is identical at that pin and at HEAD; the running side-car answered tools/list.

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "required": ["profile", "max_hours"],
+  "type": "object",
+  "properties": {
+    "profile": {
+      "description": "Profile name from offrig's config: small, medium or frontier.",
+      "type": "string"
+    },
+    "max_hours": {
+      "description": "The most hours this session may run. The plan is priced at this worst case.",
+      "type": "number",
+      "format": "double"
+    },
+    "note": {
+      "description": "What the session is for, kept with the plan.",
+      "type": ["string", "null"],
+      "default": null
+    },
+    "max_price_hr": {
+      "description": "The most the pod may cost, in total $/hr for all its GPUs (the figure\noffrig_offers prints). Offers above it are left out of the plan, which also keeps\nit off the pricier fallback cards, and the worst case is priced from\nmin(max_price_hr, the dearest listed price left) instead of the profile's top.",
+      "type": ["number", "null"],
+      "format": "double",
+      "default": null
+    },
+    "no_fallback": {
+      "description": "Rent only the profile's first GPU family, never the fallback cards. The two RTX\nPRO 6000 Blackwell editions count as one family; other cards are each their own.\nRefused if that family has none free.",
+      "type": ["boolean", "null"],
+      "default": null
+    },
+    "wait_minutes": {
+      "description": "How many minutes the launch may keep retrying when the plan's GPUs have no\ncapacity, renting nothing while it waits. Stored with the plan. Default: the\nprofile's wait (the job profile waits 20 minutes). 0 fails at once. The wait is\ncut to the time the plan has left (less a five-minute reserve), so it never\noutlasts the plan's deadline, and waiting does not add to the worst case.",
+      "type": ["integer", "null"],
+      "format": "uint32",
+      "minimum": 0,
+      "default": null
+    },
+    "container_disk_gb": {
+      "description": "The pod's container disk in GB, replacing the profile's `container_disk_gb` for\nthis plan (1 to 2000). The container disk is local to the host and usually far\nfaster than /workspace, which can be a slow network filesystem. It is not part of\nthe plan's worst case: offrig prices GPU time only.",
+      "type": ["integer", "null"],
+      "format": "uint32",
+      "minimum": 0,
+      "default": null
+    }
+  }
+}

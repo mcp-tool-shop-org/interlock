@@ -8,7 +8,7 @@ You give it a task (embed, rerank, NLI, verify, generate) and the constraints th
 
 What this program is allowed to touch is in the [threat model](#threat-model).
 
-The router itself comes last. The work before it is a receipt schema, a routing table built from receipts the studio already has, and a harness that pre-registers an experiment before any device time is spent.
+The receipt schema, the routing table, and the harness came first. `switchyard route` reads that table. It does not spend device time.
 
 ## What it will not do
 
@@ -49,15 +49,31 @@ switchyard touches local devices and local HTTP, and the network only to downloa
 - Ollama calls, when a run is actually started, go to `127.0.0.1:11434` (the 5090) or `127.0.0.1:11490` (CPU). Cloud model tags are refused.
 - OpenVINO runs, when a run is actually started, use `NPU`, `CPU`, or the Intel iGPU (vendor `0x8086` and `INTEGRATED`). They never select `GPU.1`.
 - A 5090 step without `--grant` does not start. An NPU or iGPU step without `--npu-session` does not start.
-- The 5090 path checks that the VRAM watchdog heartbeat is at most 60 seconds old, that no model is loaded, and that the card has rested 15 minutes since the previous model. The heartbeat file is not opened. Only its modified time is read.
+- The 5090 path checks that the VRAM watchdog heartbeat is at most 60 seconds old and that no model is loaded. The heartbeat file is not opened. Only its modified time is read.
 - Nothing here listens on a port.
 - switchyard does not rent a GPU, set a spending cap, or open offrig's database. A remote price enters only as a dated snapshot file.
 
 ## Layout
 
-`devices` is the allow-list. `guards` is the grant, the session, the heartbeat, the empty card and the rest. `receipt` is the schema and `switchyard check`. `importers` rebuilds `table/routing.jsonl` from pinned receipts. `switchyard table` prints that table, filtered by task or device. `table/gaps.md` is the experiment backlog. The harness and the advisory router land on later branches.
+`devices` is the allow-list. `guards` is the grant, the session, the heartbeat and the empty card. `receipt` is the schema and `switchyard check`. `importers` rebuilds `table/routing.jsonl` from pinned receipts. `switchyard table` prints that table, filtered by task or device. `table/gaps.md` is the experiment backlog. The harness runs a committed spec. `switchyard route` reads that table and does not touch a device.
 
 The build brief and the four feedback notes it names are snapshotted in `docs/handoff/`. The copy in the studio memory store stays authoritative.
+
+## Route
+
+`switchyard route` answers from `table/routing.jsonl`. It does not start a device, read a ledger, or call offrig.
+
+```
+switchyard route --task generate --model Phi --thinking off --ctx 1024 --busy 5090
+```
+
+`--model` matches a substring of the repo or tag. Hyphens and colons are ignored, so `Qwen3-8B` matches `qwen3:8b`. `--min-tok-s` is the floor on the minimum repeat-slot decode rate. A refusal names that floor `min_tok_s`. `--budget-left-usd` is an input, like `--busy`. A remote row whose worst case exceeds it is a runner-up. With no flag, a remote suggestion is marked budget unchecked. `--as-of` defaults to today. The policy itself does not read the clock.
+
+Generate ranks by the lowest repeat-slot decode tok/s. Every other task ranks by the highest repeat-slot latency, or by the maximum claim-wall when the row has no repeat slots. The margin is the gap between those conservative bounds, never a median. Ties leave the 5090 free. A row older than 30 days is stale. A row marked provisional, or with fewer than two repeats, is provisional. Both stay eligible and are flagged.
+
+`native_binary_rejected`, `compile_rejected`, `compile_timeout`, `hang` and `device_lost` are listed under excluded, with those codes. They are not candidates. When no row meets the constraints the command exits 1 and names the constraint that emptied the set. It does not fall back. `--json` prints a document valid against `src/switchyard/schema/route-decision.v1.json`. `--max-ttft-ms` refuses unless every compared row records the same `settings.prefix_caching` (`on`, `off`, or `default`). Unset means unknown.
+
+A remote suggestion includes an `offrig_plan` object. switchyard does not call `offrig_plan` or `offrig_launch`, and it does not spend. See `docs/offrig-integration.md`.
 
 ## Develop
 
