@@ -589,11 +589,14 @@ def test_a_short_call_still_has_two_readings(tmp_path: Path):
     assert all(sample["top_processes"] == [] for sample in samples)
 
 
-def test_the_disk_counter_follows_the_load_drive(tmp_path: Path):
+def test_the_disk_counter_follows_the_load_drive(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     snap = tmp_path / "snap"
     snap.mkdir()
     (snap / "openvino_model.xml").write_text("<xml/>", encoding="utf-8")
-    letter = drive_letter(snap)
+    # CI has no Windows drive letter. The adapter must pass drive_letter's
+    # answer through, so a stand-in letter fails the test if it is ignored.
+    letter = "D"
+    monkeypatch.setattr(ov_mod, "drive_letter", lambda _path: letter)
     seen: list = []
 
     def download(repo, revision):
