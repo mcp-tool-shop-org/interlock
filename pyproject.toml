@@ -1,7 +1,7 @@
 [project]
 name = "switchyard"
 version = "0.1.0"
-description = "Device-aware model router. Each job is sent to a model, engine and device named by a receipt."
+description = "Prototype. Device-aware model router. Each job is sent to a model, engine and device named by a receipt."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 license = "MIT"

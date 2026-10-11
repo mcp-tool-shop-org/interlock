@@ -10,6 +10,17 @@ def test_check_is_green_on_an_empty_root(tmp_path: Path, capsys):
     assert "0 receipt(s), ok" in capsys.readouterr().out
 
 
+def test_host_port_check_is_opt_in(tmp_path: Path, capsys):
+    receipts = tmp_path / "receipts"
+    receipts.mkdir()
+    planted = row()
+    planted["notes"] = "myrig:11434"
+    (receipts / "planted.json").write_text(json.dumps(planted), encoding="utf-8")
+    assert main(["check", "--root", str(tmp_path)]) == 0
+    assert main(["check", "--root", str(tmp_path), "--host-port"]) == 1
+    assert "hostname" in capsys.readouterr().err
+
+
 def test_check_fails_on_a_bad_receipt(tmp_path: Path, capsys):
     receipts = tmp_path / "receipts"
     receipts.mkdir()
