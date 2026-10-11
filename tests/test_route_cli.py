@@ -62,6 +62,9 @@ def test_route_help_names_the_constraints(capsys):
         "compile_timeout",
         "hang",
         "device_lost",
+        "parity_invalid",
+        "any recorded thinking level",
+        "unintended",
         "excluded",
     ):
         assert needle in text

@@ -109,6 +109,23 @@ def test_a_capability_rejected_row_never_changes_the_decision(rows, code):
 
 @_QUIET
 @given(rows=_generate_rows())
+def test_a_parity_invalid_row_never_changes_the_decision(rows):
+    request = ask(task="generate")
+    before = decide(rows, request)
+    extra = measured("parity/extra", "NPU", parity=False, throughput=10_000)
+    after = decide([*rows, extra], request)
+    assert {key: value for key, value in after.document.items() if key != "excluded"} == {
+        key: value for key, value in before.document.items() if key != "excluded"
+    }
+    assert {"id": extra["id"], "code": "parity_invalid"} in after.document["excluded"]
+    assert all(item["id"] != extra["id"] for item in after.document.get("runners_up", []))
+    other_task = measured("parity/embed", "CPU", task="embed", parity=False, throughput=10_000)
+    untouched = decide([*rows, other_task], request)
+    assert untouched.document == before.document
+
+
+@_QUIET
+@given(rows=_generate_rows())
 def test_busy_on_the_chosen_device_never_returns_that_device(rows):
     request = ask(task="generate")
     chosen = decide(rows, request)
@@ -287,6 +304,53 @@ def test_identity_constraints_name_the_miss():
     assert isinstance(chosen, Decision)
     assert chosen.document["device"] == "iGPU"
     assert chosen.document["runners_up"][0]["constraint"] == "thinking"
+
+
+def test_thinking_on_matches_any_level_and_keeps_the_recorded_one():
+    low = measured("low-arm", "iGPU", throughput=4, thinking="low", repo="phi:mini")
+    turned = measured("on-arm", "CPU", throughput=3, thinking="on", repo="phi:mini")
+    off = measured("off-arm", "NPU", throughput=100, thinking="off", repo="phi:mini")
+    blank = measured("unset", "CPU", throughput=100, thinking=None, repo="phi:mini")
+    card = measured("card", "5090", throughput=50, thinking="low", repo="phi:mini")
+    chosen = decide([low, turned, off, blank, card], ask(model="Phi", thinking="On"))
+    assert isinstance(chosen, Decision)
+    assert chosen.document["receipts"] == ["card"]
+    assert chosen.document["settings"]["thinking_level"] == "low"
+    assert "no 5090 row" not in chosen.document["notes"]
+    reasons = {item["id"]: item["constraint"] for item in chosen.document["runners_up"]}
+    assert reasons["low-arm"] != "thinking"
+    assert reasons["on-arm"] != "thinking"
+    assert reasons["off-arm"] == "thinking"
+    assert reasons["unset"] == "thinking"
+    exact = decide([low, turned], ask(thinking="low"))
+    assert isinstance(exact, Decision)
+    assert exact.document["receipts"] == ["low-arm"]
+    assert exact.document["settings"]["thinking_level"] == "low"
+    assert exact.document["runners_up"][0]["constraint"] == "thinking"
+    named = decide([low, measured("high-arm", "CPU", throughput=80, thinking="high")], ask(thinking="high"))
+    assert isinstance(named, Decision)
+    assert named.document["receipts"] == ["high-arm"]
+    assert named.document["settings"]["thinking_level"] == "high"
+    intel = measured("intel", "iGPU", throughput=4, thinking="off", repo="phi:mini")
+    quiet = decide([intel, card], ask(model="Phi", thinking="off"))
+    assert isinstance(quiet, Decision)
+    assert quiet.document["device"] == "iGPU"
+    assert quiet.document["notes"] == ["no 5090 row"]
+
+
+def test_parity_invalid_is_excluded_and_a_capability_code_wins():
+    good = measured("keep", "CPU", throughput=8, parity=True)
+    missing = measured("open", "iGPU", throughput=6)
+    bad = measured("bad", "NPU", throughput=1000, parity=False)
+    both = measured("both", "CPU", throughput=1000, outcome="hang", parity=False)
+    stranger = measured("stranger", "NPU", throughput=1000, parity=False, repo="other/model")
+    other = measured("other-task", "NPU", task="embed", throughput=1000, parity=False)
+    chosen = decide([good, missing, bad, both, stranger, other], ask(model="Phi"))
+    assert isinstance(chosen, Decision)
+    assert chosen.document["receipts"] == ["keep"]
+    codes = {item["id"]: item["code"] for item in chosen.document["excluded"]}
+    assert codes == {"bad": "parity_invalid", "both": "hang"}
+    assert all(item["id"] not in codes for item in chosen.document["runners_up"])
 
 
 def test_quality_and_latency_floors_name_the_gap():

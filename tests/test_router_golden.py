@@ -158,6 +158,87 @@ def test_qwen_floor_15_busy_5090_refuses_naming_e3(capsys):
     assert_decision(open_doc)
 
 
+def test_qwen3_8b_thinking_on_keeps_e3_low_and_the_e3_ref_on_arm(capsys):
+    rows = [
+        row
+        for row in load_table()
+        if row.get("task") == "generate"
+        and row.get("outcome") is None
+        and (
+            "qwen3-8b" in row["model"]["repo_or_tag"].casefold()
+            or "qwen3:8b" in row["model"]["repo_or_tag"].casefold()
+        )
+    ]
+    by_id = {row["id"]: row for row in rows}
+    low = [
+        "E3/qwen3-8b-cpu-l256-think/e3-2026-10-11b",
+        "E3/qwen3-8b-cpu-l1024-think/e3-2026-10-11b",
+        "E3/qwen3-8b-cpu-l4096-think/e3-2026-10-11b",
+        "E3/qwen3-8b-igpu-l256-think/e3-2026-10-11b",
+        "E3/qwen3-8b-igpu-l1024-think/e3-2026-10-11b",
+        "E3/qwen3-8b-igpu-l4096-think/e3-2026-10-11b",
+        "E3/qwen3-8b-npu-l256-think/e3-2026-10-11b",
+        "E3/qwen3-8b-npu-l1024-think/e3-2026-10-11b",
+        "E3/qwen3-8b-npu-l4096-think/e3-2026-10-11b",
+    ]
+    on_arm = "E3-REF/ref-5090-qwen3-8b-thinkon/e3-ref-2026-10-11b"
+    found_low = {row_id for row_id, row in by_id.items() if row["settings"]["thinking_level"] == "low"}
+    assert found_low == set(low)
+    assert by_id[on_arm]["settings"]["thinking_level"] == "on"
+
+    code, document, err = invoke(capsys, "--task", "generate", "--model", "Qwen3-8B", "--thinking", "on")
+    assert err == ""
+    assert code == 0
+    assert_decision(document)
+    seen = set(document["receipts"]) | {item["id"] for item in document["runners_up"]}
+    assert set(low) <= seen
+    assert on_arm in seen
+    for item in document["runners_up"]:
+        if item["id"] in low or item["id"] == on_arm:
+            assert item["constraint"] != "thinking"
+        if by_id.get(item["id"], {}).get("settings", {}).get("thinking_level") == "off":
+            assert item["constraint"] == "thinking"
+    winner = by_id[document["receipts"][0]]
+    assert document["settings"]["thinking_level"] == winner["settings"]["thinking_level"]
+
+    busy_code, busy, busy_err = invoke(
+        capsys,
+        "--task", "generate",
+        "--model", "Qwen3-8B",
+        "--thinking", "on",
+        "--busy", "5090",
+    )
+    assert busy_err == ""
+    assert busy_code == 0
+    assert_decision(busy)
+    assert busy["receipts"][0] in low
+    assert busy["settings"]["thinking_level"] == "low"
+    assert busy["settings"]["thinking_level"] == by_id[busy["receipts"][0]]["settings"]["thinking_level"]
+    busy_reasons = {item["id"]: item["constraint"] for item in busy["runners_up"]}
+    assert busy_reasons[on_arm] == "busy"
+
+
+def test_nomic_l2048_parity_invalid_is_excluded_not_ranked(capsys):
+    missed = "E1/nomic-npu-l2048-b1/e1-intel-2026-10-09-rerun2"
+    code, document, err = invoke(capsys, "--task", "embed", "--model", "nomic-embed-text")
+    assert err == ""
+    assert code == 1
+    assert document["code"] == "no_candidate"
+    excluded = {item["id"]: item["code"] for item in document["excluded"]}
+    assert excluded[missed] == "parity_invalid"
+    assert sum(item_code == "parity_invalid" for item_code in excluded.values()) == 1
+    assert document["closest"]["id"] != missed
+
+    code, document, err = invoke(capsys, "--task", "embed")
+    assert err == ""
+    assert code == 0
+    assert_decision(document)
+    excluded = {item["id"]: item["code"] for item in document["excluded"]}
+    assert excluded[missed] == "parity_invalid"
+    ranked = set(document["receipts"]) | {item["id"] for item in document["runners_up"]}
+    assert missed not in ranked
+
+
 def test_qwen3_embedding_npu_512_is_excluded_not_ranked(capsys):
     code, document, err = invoke(
         capsys,

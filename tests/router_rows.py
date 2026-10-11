@@ -32,6 +32,7 @@ def measured(
     worst=None,
     plan=None,
     slots="repeat",
+    parity=None,
 ):
     settings = {}
     if thinking is not None:
@@ -91,4 +92,6 @@ def measured(
     }
     if outcome:
         row["outcome"] = outcome
+    if parity is not None:
+        row["parity_valid"] = parity
     return row

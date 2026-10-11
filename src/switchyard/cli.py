@@ -22,8 +22,10 @@ constraints:
                      (on, off, or default). Unset means unknown.
   --ctx N            exact measured length when the row id has lN. A row with
                      num_ctx and no lN tag qualifies when num_ctx is at least N.
-  --thinking         exact settings.thinking_level. off, on, or a budget such
-                     as low. on does not match low.
+  --thinking         family of settings.thinking_level. off matches only off.
+                     on matches any recorded thinking level. low, medium and
+                     high match exactly when named. The decision keeps the
+                     row's exact level.
   --busy DEVICE      repeatable. An input. switchyard does not read a ledger,
                      the watchdog, or /api/ps.
   --budget-left-usd  An input, like --busy. A remote row whose worst case
@@ -34,8 +36,9 @@ constraints:
 A row with no repeat spread is not ranked on that metric. The margin is the
 gap between conservative bounds, never a median. Capability rows
 (native_binary_rejected, compile_rejected, compile_timeout, hang,
-device_lost) are listed under excluded and are not candidates. No row meets
-the constraints: exit 1 and a structured error. It does not fall back.
+device_lost) and a row with parity_valid false (parity_invalid) are listed
+under excluded and are not candidates. No row meets the constraints: exit 1
+and a structured error. It does not fall back.
 """
 
 
@@ -87,11 +90,17 @@ def main(argv: list[str] | None = None) -> int:
         epilog=_ROUTE_EPILOG,
     )
     route.add_argument("--task", required=True, choices=sorted(TASKS))
-    route.add_argument("--model", help="substring of the model repo or tag; hyphens and colons are ignored")
+    route.add_argument(
+        "--model",
+        help="substring of the model repo or tag; hyphens and colons are ignored. A short substring can match an unintended repo. The matched model is printed",
+    )
     route.add_argument("--max-latency-ms", type=float)
     route.add_argument("--max-ttft-ms", type=float)
     route.add_argument("--ctx", type=int)
-    route.add_argument("--thinking", help="exact thinking level: off, on, or a budget such as low")
+    route.add_argument(
+        "--thinking",
+        help="thinking family: off matches only off; on matches any recorded level; low, medium and high match exactly when named",
+    )
     route.add_argument("--busy", action="append", default=None, metavar="DEVICE")
     route.add_argument("--quote-rule", type=int)
     route.add_argument("--num-predict", type=int)

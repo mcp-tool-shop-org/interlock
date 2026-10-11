@@ -79,7 +79,8 @@
               "compile_rejected",
               "compile_timeout",
               "hang",
-              "device_lost"
+              "device_lost",
+              "parity_invalid"
             ]
           }
         }

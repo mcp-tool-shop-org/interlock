@@ -27,7 +27,14 @@ They stay eligible.
 
 Capability rows (``native_binary_rejected``, ``compile_rejected``,
 ``compile_timeout``, ``hang``, ``device_lost``) are excluded, with those
-codes, and never ranked.
+codes, and never ranked. A row with ``parity_valid`` false is excluded the
+same way, code ``parity_invalid``. When a row is both, the capability code
+is the one shown. Missing ``parity_valid`` stays eligible.
+
+``thinking`` matches a family. ``off`` matches only ``off``. ``on`` matches
+any recorded thinking level. ``low``, ``medium`` and ``high`` match exactly
+when the request names one. The decision's settings keep the row's exact
+level.
 
 TTFT (``--max-ttft-ms``) is refused unless every row that would be compared
 records the same known ``settings.prefix_caching`` (``on``, ``off``, or
@@ -103,6 +110,10 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
         if outcome in EXCLUDED_OUTCOMES and _task_model(row, request):
             excluded.append({"id": str(row["id"]), "code": str(outcome)})
         elif outcome in EXCLUDED_OUTCOMES:
+            continue
+        elif row.get("parity_valid") is False and _task_model(row, request):
+            excluded.append({"id": str(row["id"]), "code": "parity_invalid"})
+        elif row.get("parity_valid") is False:
             continue
         else:
             pool.append(row)
@@ -241,7 +252,7 @@ def _any_5090(pool: Sequence[Mapping], request: Request) -> bool:
             continue
         if not _task_model(row, request):
             continue
-        if request.thinking is not None and _thinking(row) != request.thinking:
+        if request.thinking is not None and not _thinking_matches(_thinking(row), request.thinking):
             continue
         if request.ctx is not None and not _meets_ctx(row, request.ctx):
             continue
@@ -271,7 +282,7 @@ def _runners(pool: Sequence[Mapping], winner: Mapping, ranked: list[Mapping], re
 
 
 def _why(row: Mapping, winner: Mapping, request: Request) -> tuple[str, str]:
-    if request.thinking is not None and _thinking(row) != request.thinking:
+    if request.thinking is not None and not _thinking_matches(_thinking(row), request.thinking):
         return "thinking", f"thinking {_thinking(row)} does not match {request.thinking}"
     if request.ctx is not None and not _meets_ctx(row, request.ctx):
         recorded = _length_tag(row)
@@ -451,7 +462,7 @@ def _keeps(row: Mapping, request: Request, constraint: str, limit: object) -> bo
     if constraint == "model":
         return _model_matches(row, request.model)
     if constraint == "thinking":
-        return _thinking(row) == limit
+        return _thinking_matches(_thinking(row), str(limit))
     if constraint == "ctx":
         return _meets_ctx(row, int(limit))  # type: ignore[arg-type]
     if constraint == "quote_rule":
@@ -686,6 +697,21 @@ def _norm(name: str) -> str:
 def _thinking(row: Mapping) -> str | None:
     value = (row.get("settings") or {}).get("thinking_level")
     return str(value) if isinstance(value, str) else None
+
+
+def _thinking_matches(recorded: str | None, requested: str) -> bool:
+    """``off`` matches only ``off``. ``on`` matches any recorded thinking level.
+
+    ``low``, ``medium`` and ``high`` match exactly when the request names one.
+    A missing level matches nothing. The decision keeps the row's exact level.
+    """
+
+    if recorded is None:
+        return False
+    want, have = requested.casefold(), recorded.casefold()
+    if want == "on":
+        return have != "off"
+    return have == want
 
 
 def _quote_rule(row: Mapping) -> int | None:
