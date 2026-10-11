@@ -2,6 +2,8 @@
 
 <img src="assets/logo/switchyard-wordmark.png" width="560" alt="switchyard: a rail crossing routing jobs to devices">
 
+> **Prototype, 0.1.x.** switchyard is advisory only: it suggests a model, engine and device, and it never serves traffic. Every number in it was measured on one rig (Intel Core Ultra 9 285K with its NPU and iGPU, plus an RTX 5090). Treat its routes as that rig's evidence, not a general benchmark.
+
 A rail switchyard sends each car onto the right track. This one sends each job to a model, an engine and a device.
 
 You give it a task (embed, rerank, NLI, verify, generate) and the constraints that matter (quality, latency, context, thinking level). It answers with a model, an engine, a device and the settings, and it shows the receipt behind every number. OpenVINO's AUTO and HETERO plugins can pick a device once you have already picked the model. Nothing in that stack picks the model. That gap is the product.
@@ -9,6 +11,16 @@ You give it a task (embed, rerank, NLI, verify, generate) and the constraints th
 What this program is allowed to touch is in the [threat model](#threat-model).
 
 The receipt schema, the routing table, and the harness came first. `switchyard route` reads that table. It does not spend device time.
+
+## What the table says today
+
+The routing table holds 502 rows from committed receipts. A few of the answers it already gives:
+
+- **A small model runs well on the Intel side.** Phi decodes at about 20–22 tokens/s on the CPU and the iGPU, and about 15 tokens/s on the NPU, at a 1024-token prompt with thinking off. That leaves the 5090 free for bigger work.
+- **An 8B model doesn't belong on the Intel side.** Qwen3-8B decodes at about 10–12 tokens/s on the CPU, iGPU and NPU. On the 5090 it decodes at about 208–211 tokens/s. Ask for 15 tokens/s with the 5090 busy, and `switchyard route` refuses and names the experiment behind the gap.
+- **Some shapes don't run at all.** The NPU rejected Qwen3-Embedding at 512-token inputs, both one at a time and in batches of 8. Those rows are kept as capability findings, never ranked as slow candidates.
+
+Those figures are the decode rates recorded in the E3 and e3-ref receipts. The run notes are in [experiments/e3/run-notes-2026-10-10-11.md](experiments/e3/run-notes-2026-10-10-11.md). `switchyard route` ranks by the worst repeat, not the median, so its choices are more cautious than these summaries.
 
 ## What it will not do
 
@@ -33,7 +45,7 @@ The NPU is exclusive. A 5090 step runs only inside a Publisher grant. The runner
 
 A routing row names the task, the model (repo or tag, revision or digest, quantisation, licence), the engine and its version, the device, the settings, and the quality and latency it measured. Quality metrics carry their own `n`, interval and dataset hash. Latency keeps cold and warm apart. A single run is marked provisional. The row points at the source receipt and the commit it was imported from, or at an experiment spec and a run id.
 
-A run can also record a capability row instead of a speed. `device_lost` and `hang` carry no timing. `native_binary_rejected` — the device compiled the model and refused the native binary at execute — keeps only the compile time as evidence, and is scoped to the model, device and static shape: only arms with that identical key are marked not run, and the device's other shapes still run. All three are provisional and never count as speeds. An arm that an abort stopped mid-schedule is kept in its receipt marked `aborted: true`, with the slots actually completed; the routing table refuses aborted rows, and `table/gaps.md` lists the aborted run. A watcher thread guards every run from outside the main thread: a native compile that runs past `compile_ceiling_s` (default 900 s) is recorded as a `compile_timeout` capability row, and system RAM at 88% aborts the run; both flush the receipt first and end the process with exit code 75 (compile timeout) or 76 (RAM stop). Every run also writes `receipts/<run_id>.run.json` before it touches a device (git-ignored, not a receipt), so a run killed from outside still owes its rest.
+A run can also record a capability row instead of a speed. `device_lost` and `hang` carry no timing. `native_binary_rejected` — the device compiled the model and refused the native binary at execute — keeps only the compile time as evidence, and is scoped to the model, device and static shape: only arms with that identical key are marked not run, and the device's other shapes still run. All three are provisional and never count as speeds. An arm that an abort stopped mid-schedule is kept in its receipt marked `aborted: true`, with the slots actually completed; the routing table refuses aborted rows, and `table/gaps.md` lists the aborted run. A watcher thread guards every run from outside the main thread: a native compile that runs past `compile_ceiling_s` (default 900 s) is recorded as a `compile_timeout` capability row, and system RAM at 88% aborts the run; both flush the receipt first and end the process with exit code 75 (compile timeout) or 76 (RAM stop). Every run also writes `receipts/<run_id>.run.json` before it touches a device (git-ignored, not a receipt), so a run killed from outside still leaves a record that it started. To stop a run cleanly from outside, create `receipts/<run_id>.stop`: the watcher flushes the receipt and exits with code 77.
 
 ```
 switchyard check
@@ -74,6 +86,17 @@ Generate ranks by the lowest repeat-slot decode tok/s. Every other task ranks by
 `native_binary_rejected`, `compile_rejected`, `compile_timeout`, `hang`, `device_lost` and a row with `parity_valid` false (`parity_invalid`) are listed under excluded, with those codes. They are not candidates. A capability outcome is the code shown when the row is also parity-invalid. When no row meets the constraints the command exits 1 and names the constraint that emptied the set. It does not fall back. `--json` prints a document valid against `src/switchyard/schema/route-decision.v1.json`. `--max-ttft-ms` refuses unless every compared row records the same `settings.prefix_caching` (`on`, `off`, or `default`). Unset means unknown.
 
 A remote suggestion includes an `offrig_plan` object. switchyard does not call `offrig_plan` or `offrig_launch`, and it does not spend. See `docs/offrig-integration.md`.
+
+## Run an experiment
+
+Every experiment is pre-registered: its spec under `experiments/<id>/spec.yaml` is committed, with the question, the decision it feeds, the arms, the dataset, the metrics and the stop rules, before any device time. A rule is never changed after results are seen. A dated amendment is allowed only before the run.
+
+```
+switchyard run experiments/e4/spec.yaml --dry-run
+switchyard run experiments/e4/spec.yaml --grant "<grant text>" --npu-session "<session>"
+```
+
+`--dry-run` prints the plan and the guards a real run would need, and starts nothing. A real run needs the flags its devices call for: `--grant` for the 5090, `--npu-session` for the NPU or iGPU, and `--cpu-window` for a CPU-heavy leg. It writes one receipt under `receipts/`. `switchyard import` then rebuilds `table/` from the committed receipts, and `switchyard check` validates them.
 
 ## Develop
 
