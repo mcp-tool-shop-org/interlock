@@ -63,6 +63,11 @@ def validate_spec(data: object) -> dict:
         isinstance(ceiling, bool) or not isinstance(ceiling, (int, float)) or ceiling < 60
     ):
         raise SpecError("call_ceiling_s must be a number of at least 60")
+    compile_ceiling = data.get("compile_ceiling_s")
+    if compile_ceiling is not None and (
+        isinstance(compile_ceiling, bool) or not isinstance(compile_ceiling, (int, float)) or compile_ceiling < 60
+    ):
+        raise SpecError("compile_ceiling_s must be a number of at least 60")
     _choice_rule(data)
     return data
 

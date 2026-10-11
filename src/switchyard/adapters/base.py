@@ -17,6 +17,9 @@ that load. It is not ``unload``.
 
 from __future__ import annotations
 
+import threading
+import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -70,6 +73,37 @@ class CompileRejected(AdapterError):
     def __init__(self, message: str, *, failed_s: float | None = None) -> None:
         super().__init__(message)
         self.failed_s = failed_s
+
+
+class CompileTracker:
+    """Which native compile is running, and since when.
+
+    A native ``compile_model`` cannot be interrupted from Python, so the
+    harness watches it from another thread. An adapter brackets each compile
+    with :meth:`compiling`; the watcher reads :meth:`active`. Thread-safe. A
+    compile that never returns stays ``active`` until the process ends.
+    """
+
+    def __init__(self, clock=None) -> None:
+        self.clock = clock or time.monotonic
+        self._lock = threading.Lock()
+        self._active: tuple[str, float] | None = None
+
+    @contextmanager
+    def compiling(self, label: str):
+        with self._lock:
+            self._active = (label, self.clock())
+        try:
+            yield
+        finally:
+            with self._lock:
+                self._active = None
+
+    def active(self) -> tuple[str, float] | None:
+        """``(label, started)`` of the running compile, or ``None``."""
+
+        with self._lock:
+            return self._active
 
 
 @dataclass(frozen=True)

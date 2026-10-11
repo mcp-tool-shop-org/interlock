@@ -59,6 +59,7 @@ and is likewise ignored.
 
 from __future__ import annotations
 
+import contextlib
 import gc
 import threading
 import time
@@ -231,6 +232,19 @@ class OpenvinoAdapter:
         self._session: dict | None = None
         self._poisoned: set = set()  # (model, device) keys that hung once
         self._lost_devices: set = set()  # ov ids that reset this run
+        self.compile_tracker = None  # the harness's watcher reads it (CompileTracker)
+
+    def attach_compile_tracker(self, tracker) -> None:
+        """Let the harness watch native compiles from outside the call."""
+
+        self.compile_tracker = tracker
+
+    def _compiling(self, label: str):
+        """A context that tells the watcher a native compile is running."""
+
+        if self.compile_tracker is None:
+            return contextlib.nullcontext()
+        return self.compile_tracker.compiling(label)
 
     def count_tokens(self, model: str, text: str) -> int:
         """Tokens of ``text`` on this model's tokenizer, special tokens included.
@@ -317,7 +331,8 @@ class OpenvinoAdapter:
             except Exception as exc:
                 raise AdapterError(f"the static shape {batch}x{length} does not fit {file.name}: {exc}") from exc
         t0 = self.clock()
-        compiled = core.compile_model(graph, ov_id, config or {})
+        with self._compiling(f"compile_model {ov_id}"):
+            compiled = core.compile_model(graph, ov_id, config or {})
         return compiled, self.clock() - t0
 
     def _embedder(self, model: str, revision: str | None, ov_id: str, static: tuple[int, int] | None, compile_config: dict) -> dict:
@@ -742,7 +757,8 @@ def _pipeline(self, model: str, ov_id: str, compile_config: dict):
         genai = self._genai_module or _real_genai_module()
         directory = _model_dir(model)
         t0 = self.clock()
-        pipe = genai.LLMPipeline(str(directory), ov_id, compile_config or {})
+        with self._compiling(f"LLMPipeline {ov_id}"):
+            pipe = genai.LLMPipeline(str(directory), ov_id, compile_config or {})
         compile_s = self.clock() - t0
         entry = {"pipe": pipe, "warmed": False, "path": str(directory)}
         self._pipelines[key] = entry

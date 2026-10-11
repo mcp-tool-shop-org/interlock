@@ -2,8 +2,9 @@
 
 OpenVINO and the Intel stack come from installed distribution metadata.
 The NPU value is the Intel AI Boost driver version from the OS driver store.
-A missing fact stays ``unrecorded``. Power plan, Ollama, the NVIDIA driver,
-and the CUDA backend are not read here.
+The Intel "Shared GPU/NPU Memory Override" is read, read-only, from the Intel
+adapter's registry key. A missing fact stays ``unrecorded``. Power plan,
+Ollama, the NVIDIA driver, and the CUDA backend are not read here.
 """
 
 from __future__ import annotations
@@ -106,3 +107,55 @@ def _read_npu_driver() -> str:
     if completed.returncode != 0:
         return UNRECORDED
     return driver_version_from_lines(completed.stdout.splitlines())
+
+
+_DISPLAY_CLASS = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
+# Where the Intel Graphics Software override lands: a percent of system RAM the
+# iGPU and NPU may pin. Found on the Robot rig as 57 (36.1 GB of 63 GB).
+_OVERRIDE_SUBKEY = "GMM"
+_OVERRIDE_VALUE = "GpuSystemMemoryPinninglimit"
+
+
+def igpu_shared_memory_override(reader=None) -> str:
+    """The Intel "Shared GPU/NPU Memory Override", as ``"<n>%"``, or ``unrecorded``.
+
+    Read-only. ``reader`` is a test seam: a zero-argument callable returning the
+    percent as a number or ``None``. Any failure to read is ``unrecorded``,
+    never an error.
+    """
+
+    try:
+        percent = (reader or _read_override_percent)()
+    except Exception:
+        return UNRECORDED
+    if isinstance(percent, bool) or not isinstance(percent, (int, float)) or not 0 < percent <= 100:
+        return UNRECORDED
+    return f"{percent:g}%"
+
+
+def _read_override_percent():
+    if sys.platform != "win32":
+        return None
+    import winreg  # pragma: no cover - Windows only
+
+    found = set()  # pragma: no cover
+    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, _DISPLAY_CLASS) as cls:  # pragma: no cover
+        index = 0
+        while True:
+            try:
+                name = winreg.EnumKey(cls, index)
+            except OSError:
+                break
+            index += 1
+            if not name.isdigit():
+                continue
+            try:
+                with winreg.OpenKey(cls, name) as adapter:
+                    provider = str(winreg.QueryValueEx(adapter, "ProviderName")[0])
+                    if "intel" not in provider.lower():
+                        continue
+                    with winreg.OpenKey(adapter, _OVERRIDE_SUBKEY) as gmm:
+                        found.add(int(winreg.QueryValueEx(gmm, _OVERRIDE_VALUE)[0]))
+            except (OSError, ValueError):
+                continue
+    return found.pop() if len(found) == 1 else None  # pragma: no cover

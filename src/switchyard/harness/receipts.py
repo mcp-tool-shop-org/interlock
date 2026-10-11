@@ -7,6 +7,8 @@ The row is validated before it is written.
 from __future__ import annotations
 
 import json
+import os
+import threading
 from pathlib import Path
 
 from switchyard.harness import environment as env_capture
@@ -39,8 +41,8 @@ def _blank_latency() -> dict:
 def environment(**overrides) -> dict:
     """The receipt environment. A passed field replaces the captured one.
 
-    OpenVINO, the Intel package stack, and the NPU driver are read when this
-    process can see them. Power plan and ``ollama_ps`` stay ``unrecorded``.
+    OpenVINO, the Intel package stack, the NPU driver and the Intel shared
+    memory override are read when this process can see them. Power plan and ``ollama_ps`` stay ``unrecorded``.
     """
 
     base = {
@@ -51,6 +53,7 @@ def environment(**overrides) -> dict:
         "ollama_ps": UNRECORDED,
         "packages": env_capture.package_versions(),
         "cuda_backend": UNRECORDED,
+        "igpu_shared_memory_override": env_capture.igpu_shared_memory_override(),
     }
     base.update(overrides)
     return base
@@ -149,8 +152,8 @@ def device_lost_row(
     """A capability row: a hang, a device loss, or a refused graph or binary.
 
     No timing, and no retry. ``outcome`` is ``device_lost``, ``hang``,
-    ``native_binary_rejected`` or ``compile_rejected``. All four tell the table
-    that this device cannot do the setting. ``partial`` stays on while the run is still open.
+    ``native_binary_rejected``, ``compile_rejected`` or ``compile_timeout``. All
+    five tell the table that this device cannot do the setting. ``partial`` stays on while the run is still open.
     A rejection carries ``compile_ms``: the compile finished, the execute did
     not. The other outcomes have no timing; a ``compile_rejected`` row's time
     to failure is under ``settings.rejection``.
@@ -186,7 +189,7 @@ def for_table(row: dict) -> dict:
     """The table copy of a receipt row.
 
     A capability row (``device_lost``, ``hang``, ``native_binary_rejected``,
-    ``compile_rejected``) cannot carry a speed. Timing and artifacts are stripped, and the note says
+    ``compile_rejected``, ``compile_timeout``) cannot carry a speed. Timing and artifacts are stripped, and the note says
     the device cannot do the setting. A refused native binary keeps its
     compile time: the compile is evidence, the execute never happened.
     """
@@ -370,4 +373,25 @@ def _append_table(root: Path, rows: list[dict]) -> None:
 
 def _dump(path: Path, rows: list[dict]) -> None:
     text = "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows)
-    path.write_text(text, encoding="utf-8")
+    write_atomic(path, text)
+
+
+def write_atomic(path: Path, text: str) -> None:
+    """Write ``text`` to ``path`` all-or-nothing.
+
+    The watcher can end the process mid-write, and the main thread may be
+    writing the same receipt. Each writer fills its own temp file in the same
+    folder (``<name>.<pid>.<thread>.tmp``) and ``os.replace`` swaps it in, so a
+    reader sees the old file or the new one, never a mixture.
+    """
+
+    temporary = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    try:
+        temporary.write_text(text, encoding="utf-8")
+        os.replace(temporary, path)
+    except BaseException:
+        try:
+            temporary.unlink()
+        except OSError:
+            pass
+        raise

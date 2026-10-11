@@ -109,7 +109,7 @@
     "repeats": {"type": "integer", "minimum": 1},
     "provisional": {"type": "boolean"},
     "provenance": {"$ref": "#/$defs/provenance"},
-    "outcome": {"type": "string", "enum": ["device_lost", "hang", "native_binary_rejected", "compile_rejected"]},
+    "outcome": {"type": "string", "enum": ["device_lost", "hang", "native_binary_rejected", "compile_rejected", "compile_timeout"]},
     "parity_valid": {"type": "boolean"},
     "partial": {"type": "boolean"},
     "aborted": {"type": "boolean"},

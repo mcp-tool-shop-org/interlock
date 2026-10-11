@@ -1950,7 +1950,7 @@ def test_an_interleaved_companion_starts_on_measure_slots_only(tmp_path: Path):
     repo3 = tmp_path / "units"
     with pytest.raises(TimingError, match="throughput unit"):
         _invoke(repo3, _bind(repo3, mixed), {"fake": script})
-    assert not (repo3 / "receipts").exists()
+    assert not list((repo3 / "receipts").glob("*.jsonl"))  # the run-start marker may exist; no receipt does
 
 
 def test_companion_device_is_guarded_even_when_no_arm_measures_it():

@@ -241,7 +241,31 @@ def test_the_compile_rejected_row_validates_and_carries_no_timing():
 def test_the_error_summary_prefers_the_compiler_message():
     line = summarize_error(COMPILE_REJECTED)
     assert "\n" not in line
-    assert line.endswith("Compiler returned msg: Target buffer size '2048' does not match source buffer size '256'")
+    assert line == (
+        "Compiler returned msg: Target buffer size '2048' does not match source buffer size '256' "
+        "(ZE_RESULT_ERROR_INVALID_NULL_POINTER, 0x78000007)"
+    )
+
+
+def test_the_error_summary_leads_with_the_compiler_message_so_the_cut_keeps_the_cause():
+    padded = "Exception from " + "x" * 400 + ":\nCompiler returned msg:\nTarget buffer size '2048' does not match"
+    assert summarize_error(padded).startswith("Compiler returned msg: Target buffer size '2048'")
+    same_line = "ZE_RESULT_ERROR_INVALID_NULL_POINTER 0x78000007\n[NPU_VCL] Compiler returned msg: bad graph"
+    assert summarize_error(same_line) == (
+        "Compiler returned msg: bad graph (ZE_RESULT_ERROR_INVALID_NULL_POINTER, 0x78000007)"
+    )
+    assert summarize_error("Compiler returned msg: only words") == "Compiler returned msg: only words"
+    assert summarize_error("Compiler returned msg:") == "Compiler returned msg:"
+    [line] = aborted_run_lines(
+        [
+            fixture_row(
+                aborted=True,
+                provenance={"experiment_spec": "x", "run_id": "r1"},
+                settings={"abortion": {"stop_step": "npu cold", "error": padded}},
+            )
+        ]
+    )
+    assert "Target buffer size '2048'" in line
 
 
 def test_the_error_summary_falls_back_to_the_level_zero_line_then_the_last_line():
