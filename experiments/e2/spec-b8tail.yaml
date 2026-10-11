@@ -25,8 +25,37 @@
 # over 30 minutes on the same devices that ended less than rest_s ago
 # (maintainer, 2026-10-10).
 
+# Amendment, 2026-10-10, after e2-b8tail-2026-10-10d (R&D rulings; harness #47 and #48).
+#
+# Run note. e2-b8tail-2026-10-10d at main 3b27e6a ran qwen3emb-npu-l128-b8's
+# cold (compile finished 20:05:51, blob 1,225,998,470 B), then
+# qwen3emb-npu-l2048-b8's compile_model ran about 70 minutes, wrote 0 bytes to
+# its cache, and grew the process to 35.3 GB (8,117 CPU-seconds; system RAM 85.8%
+# at 21:15). CTRL+C could not land inside the native compile; the process was
+# hard-killed at 21:18:22 and no receipt was written. It is an abort, not a
+# capability result: l2048-b8 has had its one try, "inconclusive: the compile
+# did not finish", and is not run again.
+#
+# Order. The interleaved order tied the arms' fates together: l128-b8's
+# repeats waited on l2048-b8's cold twice. order: blocked replaces it, one
+# block per arm, so each arm's cold and repeats finish and flush before the
+# next compiles. Only qwen3emb-npu-l128-b8 runs, one complete try.
+#
+# Bounds. compile_ceiling_s is 900: a compile past it is a compile_timeout
+# capability row, never retried. The harness samples system RAM every 2 s and
+# stops cleanly at 88%.
+
 id: E2
 procedure: interleaved
+order: blocked
+compile_ceiling_s: 900
+blocks:
+  - id: npu-l128-b8
+    arms: [qwen3emb-npu-l128-b8]
+  - id: npu-l512-b8
+    arms: [qwen3emb-npu-l512-b8]
+  - id: npu-l2048-b8
+    arms: [qwen3emb-npu-l2048-b8]
 compile_cache: fresh
 question: >
   The batch-8 tail of E2. The NPU arms with batch > 1 run here, in one final
@@ -129,6 +158,7 @@ arms:
     static_shape: "8x512"
     measure: latency_ms
   - id: qwen3emb-npu-l2048-b8
+    not_run: had its one try in e2-b8tail-2026-10-10d; the compile did not finish in 70 min (inconclusive, issue #36)
     task: embed
     device: NPU
     engine: openvino
