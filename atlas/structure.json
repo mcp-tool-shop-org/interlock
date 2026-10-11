@@ -105,6 +105,10 @@
         {
           "hash": "256842b46e6e60f8232cf23167957b6ab0c419578c5b6ca1eec6cd3b5e8f5a7a",
           "path": "docs/handoff/switchyard-router-buildout-handoff.md"
+        },
+        {
+          "hash": "7029f03a1209158e84c73e5960a24440255fb285fcaa93d94a0a85003231a33f",
+          "path": "docs/offrig-integration.md"
         }
       ],
       "globs": [
@@ -213,7 +217,7 @@
           "path": "LICENSE"
         },
         {
-          "hash": "d33afb8f09cdace13ff6466f87e9253faccf8c0cc73cf513564d7bad66a49c16",
+          "hash": "23cdea7a81d7de50cb01c1d6f8ac2695494a97bc1eb465b6d6113d28145b6404",
           "path": "README.md"
         },
         {
@@ -221,11 +225,11 @@
           "path": "codecov.yml"
         },
         {
-          "hash": "65a66cd5a0134ec59d3ea4293019368efc2cb75b4a7c509010684916344b02d1",
+          "hash": "2db787e69f660d51840a6dc48248afdde9e3fe244c17638df27abd29706f7f2b",
           "path": "pyproject.toml"
         },
         {
-          "hash": "82986516c265b8ead061c2b4bd9cb64350aed9a8f44892068d11d56c1c92eace",
+          "hash": "8519b6a794ba7362807ba2121eeaa9718ddce621c7f1f3872ce965191c5f31ff",
           "path": "uv.lock"
         }
       ],
@@ -802,21 +806,48 @@
           ],
           "failurePaths": [
             {
+              "in": "main",
+              "kind": "except",
+              "line": 48
+            },
+            {
+              "in": "_take_min_metrics",
+              "kind": "raise",
+              "line": 118
+            },
+            {
+              "in": "_take_min_metrics",
+              "kind": "except",
+              "line": 122
+            },
+            {
+              "in": "_take_min_metrics",
+              "kind": "raise",
+              "line": 123
+            },
+            {
               "in": "_cmd_run",
               "kind": "except",
-              "line": 160
+              "line": 241
+            },
+            {
+              "in": "_cmd_route",
+              "kind": "except",
+              "line": 266
             }
           ],
-          "hash": "eb81d5aaecc76507925761aa24c29cb06ad06656bd511b308d5fb326b4b8937c",
+          "hash": "f0ed0df9e97c16eb8c6d25c87349a7c94599b46ade734988872e5f345fc23baf",
           "importOrder": [
             "src/switchyard/receipt.py",
+            "src/switchyard/tasks.py",
             "src/switchyard/importers/assemble.py",
             "src/switchyard/importers/gaps.py",
             "src/switchyard/importers/pins.py",
             "src/switchyard/adapters/base.py",
             "src/switchyard/guards.py",
             "src/switchyard/harness/runner.py",
-            "src/switchyard/harness/spec.py"
+            "src/switchyard/harness/spec.py",
+            "src/switchyard/router/policy.py"
           ],
           "importsFiles": [
             "src/switchyard/adapters/base.py",
@@ -826,21 +857,39 @@
             "src/switchyard/importers/assemble.py",
             "src/switchyard/importers/gaps.py",
             "src/switchyard/importers/pins.py",
-            "src/switchyard/receipt.py"
+            "src/switchyard/receipt.py",
+            "src/switchyard/router/policy.py",
+            "src/switchyard/tasks.py"
           ],
           "path": "src/switchyard/cli.py",
           "sequences": [
             {
               "calls": [
                 {
-                  "line": 52,
+                  "line": 89,
+                  "name": "TASKS",
+                  "passed": true,
+                  "target": {
+                    "file": "src/switchyard/tasks.py"
+                  }
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "main"
+            },
+            {
+              "calls": [
+                {
+                  "line": 133,
                   "name": "check_tree",
                   "target": {
                     "file": "src/switchyard/receipt.py"
                   }
                 },
                 {
-                  "line": 170,
+                  "line": 341,
                   "name": "receipt_paths",
                   "target": {
                     "file": "src/switchyard/receipt.py"
@@ -848,7 +897,7 @@
                   "via": "_count_rows"
                 },
                 {
-                  "line": 172,
+                  "line": 343,
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/switchyard/receipt.py"
@@ -864,7 +913,7 @@
             {
               "calls": [
                 {
-                  "line": 67,
+                  "line": 148,
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/switchyard/receipt.py"
@@ -879,21 +928,21 @@
             {
               "calls": [
                 {
-                  "line": 85,
+                  "line": 166,
                   "name": "import_receipts",
                   "target": {
                     "file": "src/switchyard/importers/assemble.py"
                   }
                 },
                 {
-                  "line": 90,
+                  "line": 171,
                   "name": "load_candidates",
                   "target": {
                     "file": "src/switchyard/importers/gaps.py"
                   }
                 },
                 {
-                  "line": 99,
+                  "line": 180,
                   "name": "render_gaps",
                   "target": {
                     "file": "src/switchyard/importers/gaps.py"
@@ -909,14 +958,14 @@
               "calls": [
                 {
                   "branch": "args.dry_run",
-                  "line": 149,
+                  "line": 230,
                   "name": "dry_run",
                   "target": {
                     "file": "src/switchyard/harness/runner.py"
                   }
                 },
                 {
-                  "line": 151,
+                  "line": 232,
                   "name": "run_spec",
                   "target": {
                     "file": "src/switchyard/harness/runner.py"
@@ -931,14 +980,55 @@
             {
               "calls": [
                 {
-                  "line": 170,
+                  "line": 331,
+                  "name": "read_text",
+                  "target": null,
+                  "via": "_load_jsonl"
+                },
+                {
+                  "line": 270,
+                  "name": "Request",
+                  "target": {
+                    "file": "src/switchyard/router/policy.py"
+                  }
+                },
+                {
+                  "line": 284,
+                  "name": "decide",
+                  "target": {
+                    "file": "src/switchyard/router/policy.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_cmd_route"
+            },
+            {
+              "calls": [
+                {
+                  "line": 331,
+                  "name": "read_text",
+                  "target": null
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_load_jsonl"
+            },
+            {
+              "calls": [
+                {
+                  "line": 341,
                   "name": "receipt_paths",
                   "target": {
                     "file": "src/switchyard/receipt.py"
                   }
                 },
                 {
-                  "line": 172,
+                  "line": 343,
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/switchyard/receipt.py"
@@ -4182,6 +4272,316 @@
           ]
         },
         {
+          "hash": "6a71c838b67b002e179a0708f143459ae11c1d7bd89280f9fb5af25cb60e1526",
+          "importsFiles": [
+            "src/switchyard/router/policy.py"
+          ],
+          "path": "src/switchyard/router/__init__.py"
+        },
+        {
+          "entry": "decide",
+          "entryRule": 4,
+          "exports": [
+            "decide",
+            "decode_bound",
+            "experiment_of",
+            "latency_bound_ms",
+            "prefix_mode",
+            "quality_bound",
+            "ttft_bound_ms"
+          ],
+          "failurePaths": [
+            {
+              "in": "_is_stale",
+              "kind": "except",
+              "line": 645
+            }
+          ],
+          "hash": "140ed6a3f079ac69f11b2cd217ca812586559f6106c47a1c9cd022ba15710935",
+          "path": "src/switchyard/router/policy.py",
+          "sequences": [
+            {
+              "calls": [
+                {
+                  "line": 672,
+                  "name": "casefold",
+                  "target": null,
+                  "via": "_model_matches"
+                },
+                {
+                  "branch": "constraint.startswith(\"min:\")",
+                  "line": 683,
+                  "name": "casefold",
+                  "target": null,
+                  "via": "_norm"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "decide"
+            },
+            {
+              "calls": [
+                {
+                  "line": 672,
+                  "name": "casefold",
+                  "target": null,
+                  "via": "_model_matches"
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_document"
+            },
+            {
+              "calls": [
+                {
+                  "line": 672,
+                  "name": "casefold",
+                  "target": null,
+                  "via": "_model_matches"
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_any_5090"
+            },
+            {
+              "calls": [
+                {
+                  "line": 672,
+                  "name": "casefold",
+                  "target": null,
+                  "via": "_model_matches"
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_runners"
+            },
+            {
+              "calls": [
+                {
+                  "line": 683,
+                  "name": "casefold",
+                  "target": null,
+                  "via": "_norm"
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_why"
+            },
+            {
+              "calls": [
+                {
+                  "branch": "constraint.startswith(\"min:\") and isinstance(limit, (int, f…",
+                  "line": 683,
+                  "name": "casefold",
+                  "target": null,
+                  "via": "_norm"
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_empty"
+            },
+            {
+              "calls": [
+                {
+                  "branch": "constraint.startswith(\"min:\") and isinstance(limit, (int, f…",
+                  "line": 683,
+                  "name": "casefold",
+                  "target": null,
+                  "via": "_norm"
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_closest"
+            },
+            {
+              "calls": [
+                {
+                  "line": 683,
+                  "name": "casefold",
+                  "target": null,
+                  "via": "_norm"
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_closest_short"
+            },
+            {
+              "calls": [
+                {
+                  "branch": "constraint == \"model\"",
+                  "line": 672,
+                  "name": "casefold",
+                  "target": null,
+                  "via": "_model_matches"
+                },
+                {
+                  "branch": "constraint.startswith(\"min:\")",
+                  "line": 683,
+                  "name": "casefold",
+                  "target": null,
+                  "via": "_norm"
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_split"
+            },
+            {
+              "calls": [
+                {
+                  "branch": "constraint == \"model\"",
+                  "line": 672,
+                  "name": "casefold",
+                  "target": null,
+                  "via": "_model_matches"
+                },
+                {
+                  "branch": "constraint.startswith(\"min:\")",
+                  "line": 683,
+                  "name": "casefold",
+                  "target": null,
+                  "via": "_norm"
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_keeps"
+            },
+            {
+              "calls": [
+                {
+                  "branch": "constraint.startswith(\"min:\")",
+                  "line": 683,
+                  "name": "casefold",
+                  "target": null,
+                  "via": "_norm"
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_public_constraint"
+            },
+            {
+              "calls": [
+                {
+                  "line": 683,
+                  "name": "casefold",
+                  "target": null,
+                  "via": "_norm"
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_meets_min"
+            },
+            {
+              "calls": [
+                {
+                  "line": 683,
+                  "name": "casefold",
+                  "target": null,
+                  "via": "_norm"
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_floor_bound"
+            },
+            {
+              "calls": [
+                {
+                  "line": 683,
+                  "name": "casefold",
+                  "target": null,
+                  "via": "_norm"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "quality_bound"
+            },
+            {
+              "calls": [
+                {
+                  "line": 672,
+                  "name": "casefold",
+                  "target": null,
+                  "via": "_model_matches"
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_task_model"
+            },
+            {
+              "calls": [
+                {
+                  "line": 672,
+                  "name": "casefold",
+                  "target": null
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_model_matches"
+            },
+            {
+              "calls": [
+                {
+                  "line": 679,
+                  "name": "casefold",
+                  "target": null
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_alnum"
+            },
+            {
+              "calls": [
+                {
+                  "line": 683,
+                  "name": "casefold",
+                  "target": null
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_norm"
+            }
+          ]
+        },
+        {
+          "hash": "cd4d08fb4f4c2908c4d4027e262707061354a25b7808f68c8e7538af6433c69a",
+          "path": "src/switchyard/schema/route-decision.v1.json"
+        },
+        {
           "hash": "be546aed0470bb774c9069eec5d9bc5da6a6c67fc8edb0ac7b1c9c71b8f0c16c",
           "path": "src/switchyard/schema/routing-row.schema.json"
         },
@@ -4221,7 +4621,7 @@
       "origin": "authored",
       "outsidePlaces": [
         {
-          "reads": 17,
+          "reads": 18,
           "where": [
             "caller"
           ],
@@ -4235,13 +4635,13 @@
           "writes": 0
         }
       ],
-      "outsideReads": 20,
+      "outsideReads": 21,
       "outsideWrites": 4,
       "role": "code",
       "testRunners": [
         "pytest"
       ],
-      "testedBy": 15,
+      "testedBy": 18,
       "unresolvedSites": 0
     },
     {
@@ -4260,6 +4660,21 @@
           ],
           "path": "tests/conftest.py",
           "testFramework": "pytest"
+        },
+        {
+          "hash": "349d0f623b24d65972ef427a68292ef7456e25313f5ccd1591f45ce01e1444dd",
+          "path": "tests/fixtures/README.md"
+        },
+        {
+          "hash": "e188cc8c4c15916caa783d6417d64d2ff0b9d6d6155fafd468331667af80b40e",
+          "path": "tests/fixtures/offrig-plan-input.8f2a94a.json"
+        },
+        {
+          "exports": [
+            "measured"
+          ],
+          "hash": "88de0fdea174684ea904b3e3e518ba57eb2eceb855d0743f15ad156c81087ccf",
+          "path": "tests/router_rows.py"
         },
         {
           "exports": [
@@ -4760,6 +5175,79 @@
         },
         {
           "exports": [
+            "row",
+            "test_an_unknown_task_is_a_usage_error",
+            "test_route_busy_does_not_leak_into_the_next_call",
+            "test_route_help_names_the_constraints",
+            "test_route_json_validates_and_a_floor_refuses",
+            "test_route_prints_a_decision_for_a_person",
+            "test_route_refuses_a_missing_table",
+            "test_route_refuses_on_stderr_when_a_person_is_reading",
+            "test_route_rejects_a_bad_date_and_a_bad_floor",
+            "write_table"
+          ],
+          "hash": "dcc9dc2b721fab340c40305fef9dd75f75d65a5e8a5bc4d947c657360eec90f2",
+          "importsFiles": [
+            "src/switchyard/cli.py"
+          ],
+          "path": "tests/test_route_cli.py",
+          "testFramework": "pytest"
+        },
+        {
+          "exports": [
+            "assert_decision",
+            "invoke",
+            "load_table",
+            "test_golden_decision_validates_against_route_decision_schema",
+            "test_phi_l1024_busy_5090_picks_igpu_from_bounds",
+            "test_phi_without_busy_picks_igpu_and_says_no_5090_row",
+            "test_qwen3_embedding_npu_512_is_excluded_not_ranked",
+            "test_qwen_floor_15_busy_5090_refuses_naming_e3",
+            "test_ttft_on_the_committed_table_refuses_unset_prefix_caching",
+            "test_verify_quote_rule_2_refuses_unregistered"
+          ],
+          "hash": "200e3938765bca4697ecc0d0aff0bed4fcf3c3513325d4ada619525559213a09",
+          "importsFiles": [
+            "src/switchyard/cli.py",
+            "src/switchyard/router/policy.py"
+          ],
+          "path": "tests/test_router_golden.py"
+        },
+        {
+          "exports": [
+            "ask",
+            "test_a_capability_rejected_row_never_changes_the_decision",
+            "test_a_remote_without_a_plan_cannot_win",
+            "test_a_synthetic_5090_phi_row_wins_when_one_exists",
+            "test_bounds_ignore_cold_slots_medians_and_a_missing_spread",
+            "test_busy_on_the_chosen_device_never_returns_that_device",
+            "test_ctx_is_an_exact_length_and_num_ctx_is_a_window",
+            "test_excluded_codes_are_listed_and_a_different_task_is_not",
+            "test_experiment_of_reads_the_spec_directory_only",
+            "test_identity_constraints_name_the_miss",
+            "test_mismatched_5090_rows_and_thin_runners_are_named",
+            "test_model_labels_and_the_alnum_match",
+            "test_quality_and_latency_floors_name_the_gap",
+            "test_remote_over_budget_is_a_runner_up",
+            "test_remote_within_budget_is_marked_within",
+            "test_remote_without_budget_is_unchecked_and_validates_offrig_plan",
+            "test_stale_and_provisional_are_flags_not_filters",
+            "test_the_policy_does_not_read_the_clock_or_a_file",
+            "test_ties_leave_the_5090_free_and_then_the_lower_id",
+            "test_tightening_a_constraint_never_yields_a_strictly_better_choice",
+            "test_ttft_mixed_prefix_caching_refuses",
+            "test_ttft_with_one_known_mode_uses_the_repeat_slot_max"
+          ],
+          "hash": "bd797ff40f4e85d7c2985065095578917902fdf776a33e8a723aeb3c5a3c9114",
+          "importsFiles": [
+            "src/switchyard/router/policy.py",
+            "tests/router_rows.py"
+          ],
+          "path": "tests/test_router_policy.py",
+          "testFramework": "pytest"
+        },
+        {
+          "exports": [
             "test_a_compile_past_the_ceiling_writes_the_receipt_while_still_blocked_and_ends_the_process",
             "test_a_compile_timeout_row_is_an_untimed_capability_row",
             "test_a_compile_under_the_ceiling_does_nothing",
@@ -4975,7 +5463,7 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 16
+          "files": 20
         },
         {
           "boundary": "src",
@@ -4984,7 +5472,7 @@
             "file": "src/switchyard/harness/runner.py",
             "from": "tests/conftest.py"
           },
-          "files": 35
+          "files": 36
         }
       ],
       "readers": [],
@@ -5015,7 +5503,7 @@
         {
           "config": "pyproject.toml",
           "coverage": true,
-          "files": 16,
+          "files": 20,
           "job": "test",
           "runner": "pytest",
           "step": "Test"
@@ -5084,7 +5572,7 @@
         {
           "boundary": "src",
           "depth": 0,
-          "files": 31
+          "files": 32
         }
       ],
       "readers": [],
@@ -5122,8 +5610,8 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "e4547dd845bd591726eb12f0b88b4d015be17fa6",
-    "tracked": 107
+    "commit": "3de07c66264c122c6d20e181bcf2c62ba1e25d55",
+    "tracked": 117
   },
   "landings": [
     {
@@ -5140,6 +5628,18 @@
     {
       "readers": [
         {
+          "by": "tests/test_router_policy.py",
+          "call": "literal",
+          "confidence": "ast",
+          "fromTests": true
+        }
+      ],
+      "target": "experiments",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
           "by": "tests/test_harness.py",
           "call": "literal",
           "confidence": "ast",
@@ -5147,6 +5647,42 @@
         }
       ],
       "target": "experiments/e1/spec.yaml",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "tests/test_router_policy.py",
+          "call": "literal",
+          "confidence": "ast",
+          "fromTests": true
+        }
+      ],
+      "target": "experiments/e3-ref/spec.yaml",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "tests/router_rows.py",
+          "call": "literal",
+          "confidence": "ast",
+          "fromTests": true
+        },
+        {
+          "by": "tests/test_route_cli.py",
+          "call": "literal",
+          "confidence": "ast",
+          "fromTests": true
+        },
+        {
+          "by": "tests/test_router_policy.py",
+          "call": "literal",
+          "confidence": "ast",
+          "fromTests": true
+        }
+      ],
+      "target": "experiments/e3/spec.yaml",
       "writers": []
     },
     {
@@ -5175,7 +5711,7 @@
   "overlaps": [],
   "submodules": [],
   "symlinks": [],
-  "testFiles": 16,
+  "testFiles": 22,
   "unassigned": [
     {
       "hash": "be418720d26ab2999db6b0a7e07f4f2d6532c8c35f3c2d5329f9ce506b82109f",
@@ -5234,7 +5770,7 @@
       "path": "table/candidates.json"
     },
     {
-      "hash": "6d0232b65982aaa45949045721914058d6b279e96ed2c1fabc03be147784e85b",
+      "hash": "bd83c7cf66e07205498aa304b5a32d082835032f6e81e3a77024071b07d464b1",
       "path": "table/gaps.md"
     },
     {

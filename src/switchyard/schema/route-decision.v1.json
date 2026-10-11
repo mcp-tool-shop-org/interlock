@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "switchyard/route-decision/v1",
+  "title": "switchyard route decision v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "task",
+    "model",
+    "engine",
+    "device",
+    "settings",
+    "receipts",
+    "margin",
+    "runners_up",
+    "excluded",
+    "flags",
+    "notes",
+    "budget"
+  ],
+  "properties": {
+    "version": {"const": 1},
+    "task": {"type": "string", "minLength": 1},
+    "model": {"type": "string", "minLength": 1},
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "minLength": 1}
+      }
+    },
+    "device": {"type": "string", "minLength": 1},
+    "settings": {"type": "object"},
+    "receipts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "margin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metric", "direction", "bound", "next_bound", "delta", "next_id"],
+      "properties": {
+        "metric": {"type": "string", "minLength": 1},
+        "direction": {"enum": ["higher", "lower"]},
+        "bound": {"type": "number"},
+        "next_bound": {"type": ["number", "null"]},
+        "delta": {"type": ["number", "null"]},
+        "next_id": {"type": ["string", "null"]}
+      }
+    },
+    "runners_up": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "constraint", "reason"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "constraint": {"type": "string", "minLength": 1},
+          "reason": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "excluded": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "code"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "code": {
+            "enum": [
+              "native_binary_rejected",
+              "compile_rejected",
+              "compile_timeout",
+              "hang",
+              "device_lost",
+              "parity_invalid"
+            ]
+          }
+        }
+      }
+    },
+    "flags": {
+      "type": "array",
+      "items": {"enum": ["stale", "provisional"]}
+    },
+    "notes": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "budget": {"enum": ["unchecked", "within", "not_applicable"]},
+    "offrig_plan": {"type": "object"},
+    "worst_case_usd": {"type": "number"}
+  }
+}
