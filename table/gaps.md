@@ -83,3 +83,7 @@ No open cell. This experiment's candidates are filled.
 - Aborted run `e2-2026-10-10b` stopped at `qwen3emb-cpu-l2048-b8 warmup 0`: hang: no result within 60 s; arm inconclusive, device pair poisoned for the run
 - Aborted run `e2-b8tail-2026-10-10c` stopped at `qwen3emb-npu-l512-b8 cold`: Compilation failed. Level0 pfnCreate2 result: ZE_RESULT_ERROR_INVALID_NULL_POINTER, code 0x78000007 - pointer argument may not be nullptr . [NPU_VCL] Compiler returned msg: Target buffer size '2048' … (re-recorded as compile_rejected under ruling #36)
 
+- Aborted run `e2-b8tail-2026-10-10d` (no receipt; hard kill): `qwen3emb-npu-l2048-b8` compile_model ran about 70 min, 0 bytes, 35.3 GB working set; inconclusive, had its try (see experiments/e3/run-notes-2026-10-10-11.md)
+- Aborted run `e3-2026-10-10b` stopped at `qwen3-8b-npu-l1024 cold`: pipeline sized for l256 reused (MAX_PROMPT_LEN 310 < 958 tokens); fixed in #45
+- Aborted run `e3-2026-10-10c` (no receipt; hard kill at 89.2% RAM): every pipeline resident under the interleaved order; replaced by order: blocked (#48, #49)
+- Aborted run `e3-2026-10-11` (hard kill after the Phi blocks): genai counters lost as MeanStdPair (fixed in #50); its 9 Phi rows carry no throughput and are evidence only
