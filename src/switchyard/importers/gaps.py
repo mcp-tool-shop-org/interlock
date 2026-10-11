@@ -9,6 +9,7 @@ while embed rows have speed but no cold/warm split.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from switchyard.receipt import is_speed_row
@@ -18,8 +19,9 @@ def summarize_error(error: object) -> str:
     """One line for a possibly multi-line exception.
 
     OpenVINO errors lead with a stack of "Exception from src" lines and
-    carry the cause late. Prefer the compiler's message (the line holding
-    ``Compiler returned msg`` joined with the next non-empty line), else the
+    carry the cause late. Prefer the compiler's message, led by its own words
+    so the 200-character cut keeps the cause, then the code:
+    ``Compiler returned msg: <message> (ZE_RESULT_..., 0x...)``. Else the
     Level Zero result line (``ZE_RESULT_``), else the last non-empty line.
     """
 
@@ -29,11 +31,30 @@ def summarize_error(error: object) -> str:
     for index, line in enumerate(lines):
         if "Compiler returned msg" in line:
             following = lines[index + 1] if index + 1 < len(lines) else ""
-            return f"{line} {following}".strip()
+            return _compiler_line(line, following, str(error))
     for line in lines:
         if "ZE_RESULT_" in line:
             return line
     return lines[-1]
+
+
+def _compiler_line(line: str, following: str, error: str) -> str:
+    """``Compiler returned msg: <message> (<ZE_RESULT_...>, <0x code>)``.
+
+    The message is the text after the marker on its line, else the next line.
+    The Level Zero name and hex code are taken from anywhere in the error, so
+    the cause leads and the 200-character cut cannot take it.
+    """
+
+    _, _, tail = line.partition("Compiler returned msg")
+    message = tail.lstrip(": 	").strip() or following.strip()
+    if not message:
+        return line
+    ze = re.search(r"ZE_RESULT_\w+", error)
+    code = re.search(r"0x[0-9a-fA-F]+", error)
+    codes = ", ".join(match.group(0) for match in (ze, code) if match)
+    suffix = f" ({codes})" if codes else ""
+    return f"Compiler returned msg: {message}{suffix}"
 
 
 def aborted_run_lines(rows: list[dict]) -> list[str]:

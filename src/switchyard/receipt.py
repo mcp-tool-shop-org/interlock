@@ -16,6 +16,7 @@ from jsonschema.exceptions import ValidationError
 
 from switchyard.families import FamilyError, family_of
 
+RUN_MARKER_SUFFIX = ".run.json"
 _HOME = re.compile(r"(?i)(?:[A-Za-z]:[\\/]+Users[\\/]|[\\/]Users[\\/]|[\\/]home[\\/])")
 _VALIDATOR: Draft202012Validator | None = None
 
@@ -84,7 +85,8 @@ def receipt_paths(root: Path) -> list[Path]:
     paths: list[Path] = []
     receipts = root / "receipts"
     if receipts.is_dir():
-        paths.extend(sorted(receipts.rglob("*.json")))
+        # <run_id>.run.json is the run-start marker, not a receipt.
+        paths.extend(sorted(path for path in receipts.rglob("*.json") if not path.name.endswith(RUN_MARKER_SUFFIX)))
     table = root / "table" / "routing.jsonl"
     if table.is_file():
         paths.append(table)
@@ -122,7 +124,7 @@ _TIMING = (
     "first_call_ms",
     "compile_warm_reload_ms",
 )
-_UNTIMED = frozenset({"device_lost", "hang", "compile_rejected"})
+_UNTIMED = frozenset({"device_lost", "hang", "compile_rejected", "compile_timeout"})
 # The compile finished and the device refused the native binary at execute.
 # Such a row keeps the compile time and nothing else.
 _COMPILE_ONLY = frozenset({"native_binary_rejected"})
@@ -141,7 +143,7 @@ def is_speed_row(row: dict) -> bool:
 def _check_device_lost(row: dict) -> None:
     """A capability row says the device cannot do the setting. It is not a speed.
 
-    ``device_lost``, ``hang`` and ``compile_rejected`` carry no timing. ``native_binary_rejected``
+    ``device_lost``, ``hang``, ``compile_rejected`` and ``compile_timeout`` carry no timing. ``native_binary_rejected``
     keeps the compile time only: the compile finished, the execute did not.
     """
 

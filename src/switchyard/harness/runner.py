@@ -17,7 +17,9 @@ import datetime
 import os
 import re
 import shutil
+import stat
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -27,6 +29,7 @@ from switchyard.adapters.base import (
     AdapterError,
     CompileRejected,
     NativeBinaryRejected,
+    CompileTracker,
     StepRequest,
     compile_rejected_error,
 )
@@ -43,6 +46,7 @@ from switchyard.guards import (
 )
 from switchyard.harness.e5 import SearchError, fit_prompt
 from switchyard.harness.lock import require_unmodified
+from switchyard.harness.marker import RunMarker, read_markers
 from switchyard.harness.receipts import (
     device_lost_row,
     environment,
@@ -52,6 +56,7 @@ from switchyard.harness.receipts import (
     write_run,
 )
 from switchyard.harness.spec import load_spec
+from switchyard.harness.watch import COMPILE_CEILING_S, RAM_STOP_PCT, RunWatch, WatchHooks
 from switchyard.receipt import ReceiptError, load_jsonl, validate_row
 from switchyard.harness.timing import Slot, TimingError, aba_call, schedule, schedule_aba, summarize
 
@@ -107,6 +112,9 @@ def dry_run(spec_path: Path, repo: Path) -> str:
         lines.append(f"order: {spec.get('order', 'interleaved')}")
         lines.append(f"compile_cache: {spec['compile_cache']}")
         lines.append(f"rest_s: {spec['rest_s']}{REST_CONDITIONAL_NOTE}")
+        lines.append(
+            f"compile ceiling: {_compile_ceiling(spec):g} s; the run stops at {RAM_STOP_PCT:g}% system RAM"
+        )
         lines.append("cold is measured once per arm and kept out of the warm percentiles")
         lines.append(f"band: {spec['band']}")
     elif spec["procedure"] == "fill-card":
@@ -150,6 +158,8 @@ def run_interleaved(
     notes: str = "",
     wall=None,
     rest: dict | None = None,
+    watch: WatchHooks | None = None,
+    marker: RunMarker | None = None,
 ) -> list[dict]:
     """Run a committed spec.
 
@@ -174,10 +184,18 @@ def run_interleaved(
     retried. Every row records ``settings.run_window`` (the run's start and
     latest end, from ``wall``) so a later run can read how long this one
     lasted, and ``settings.rest`` (the plan ``rest`` the caller computed).
+
+    A watcher thread guards the run from outside the main thread, which a
+    native call can hold for an hour. A compile that runs past
+    ``compile_ceiling_s`` (default 15 min) becomes one ``compile_timeout`` row;
+    system RAM at 88% aborts the run; either way the receipt is flushed and the
+    process ends with a distinctive exit code (see ``switchyard.harness.watch``).
+    A run-start marker, ``receipts/<run_id>.run.json``, makes a run killed from
+    outside visible to ``plan_rest``.
     """
 
     _check_run_id(run_id)
-    require_unmodified(repo, spec_path)
+    blob = require_unmodified(repo, spec_path)
     spec = load_spec(spec_path)
     if spec["procedure"] != "interleaved":
         raise RunnerError("run_interleaved only runs an interleaved spec")
@@ -203,12 +221,23 @@ def run_interleaved(
     cold_calls: dict[str, float] = {}
     declined_ids: set[str] = set()
     captured = env if env is not None else environment()
-    cache_dirs = _cache_dirs(spec, root, run_id, arms)
+    cache_report: dict = {"cleared": set(), "failures": {}}
+    cache_dirs = _cache_dirs(spec, root, run_id, arms, cache_report["cleared"])
     prompt_cache: dict[str, tuple[str, int]] = {}
     removed: set[str] = set()
     imported = False
     wall = wall or time.time
     started_at = wall()
+    hooks = watch or WatchHooks()
+    tracker = CompileTracker(hooks.clock)
+    state_lock = threading.RLock()  # the main loop's mutations and the watcher's flush
+    halted_by_watch = False
+    if marker is None:
+        marker = RunMarker(
+            root, run_id, spec_rel=spec_rel, spec_blob=blob, devices=_spec_devices(spec), start=_iso(started_at)
+        )
+    marker.entered = True
+    marker.restart(_iso(started_at))  # before any adapter is touched
 
     def _run_notes() -> str:
         extra = "not run: " + ", ".join(skipped) if skipped else ""
@@ -224,7 +253,7 @@ def run_interleaved(
         return {"bound_s": {"cold": ceiling, "warm": warm}, "cold_call_s": cold_call}
 
     def _finished_row(arm_id: str, *, partial: bool, gone: set[str]) -> dict:
-        extra = _extra_settings(spec, arms[arm_id], records, run_id, gone)
+        extra = _extra_settings(spec, arms[arm_id], records, run_id, gone, cache_report)
         extra.update(_prompt_counts(arms[arm_id], prompt_cache))
         extra.update(_bound_settings(arm_id))
         extra["cpu_percent_max"] = _cpu_percent_max(records, arm_id)
@@ -252,14 +281,16 @@ def run_interleaved(
         return row
 
     def _capability_row(arm_id: str, *, partial: bool, gone: set[str]) -> dict:
-        extra = _extra_settings(spec, arms[arm_id], [], run_id, gone)
+        extra = _extra_settings(spec, arms[arm_id], [], run_id, gone, cache_report)
         extra.update(_prompt_counts(arms[arm_id], prompt_cache))
         extra.update(_bound_settings(arm_id))
         extra["cpu_percent_max"] = _cpu_percent_max(records, arm_id)
         outcome = capability[arm_id]
         evidence = rejections.get(arm_id)
         compile_ms = None
-        if evidence is not None:
+        if evidence is not None and outcome == "compile_timeout":
+            extra["compile_timeout"] = dict(evidence)
+        elif evidence is not None:
             compile_ms = evidence.get("compile_ms")
             extra["rejection"] = {key: value for key, value in evidence.items() if key != "compile_ms"}
         return device_lost_row(
@@ -282,7 +313,7 @@ def run_interleaved(
         """The partial record of an arm the abort stopped mid-schedule."""
 
         arm = arms[arm_id]
-        extra = _extra_settings(spec, arm, records, run_id, gone)
+        extra = _extra_settings(spec, arm, records, run_id, gone, cache_report)
         extra.update(_prompt_counts(arm, prompt_cache))
         extra.update(_bound_settings(arm_id))
         extra["cpu_percent_max"] = _cpu_percent_max(records, arm_id)
@@ -327,7 +358,8 @@ def run_interleaved(
                 arm_id = arm["id"]
                 if arm_id in finished or arm_id in capability:
                     continue
-                if not any(record["step_id"] == arm_id for record in records):
+                in_progress = halted_by_watch and current is not None and current.step_id == arm_id
+                if not in_progress and not any(record["step_id"] == arm_id for record in records):
                     continue
                 rows.append(_aborted_row(arm_id, gone=gone))
         window = {"start": _iso(started_at), "end": _iso(wall())}
@@ -335,13 +367,58 @@ def run_interleaved(
             row["settings"]["run_window"] = window
             if rest is not None:
                 row["settings"]["rest"] = rest
+            row["settings"]["ram_guard"] = guard.ram_guard()
         return rows
 
     def flush(*, gone: set[str] | None = None) -> None:
         used = removed if gone is None else gone
-        rows = _rows(partial=True, gone=used)
-        if rows:
-            write_receipt(root, run_id, rows)
+        with state_lock:
+            guard.sample_ram()  # the peak is current at every flush
+            rows = _rows(partial=True, gone=used)
+            if rows:
+                write_receipt(root, run_id, rows)
+            marker.touch(_iso(wall()))
+
+    def _halt(error: str, outcome: str | None = None) -> None:
+        """The watcher ends the run: record why, flush every row, bring the receipt into the table.
+
+        Runs on the watcher thread while the main thread may be inside a
+        native call. It waits for the state lock a few seconds, then goes on
+        without it: a receipt that may be a row short beats none.
+        """
+
+        nonlocal aborted, halted_by_watch
+        held = state_lock.acquire(timeout=10)
+        try:
+            halted_by_watch = True
+            aborted = {"step": _label(current) if current is not None else "setup", "error": error}
+            if outcome is not None and current is not None:
+                _remember(arms[current.step_id], outcome)
+            flush()
+            if (root / "receipts" / f"{run_id}.jsonl").is_file():
+                try:
+                    announce_run(import_receipt(root, run_id), finished=False)
+                except Exception:
+                    pass  # the receipt is written; the table import is the later step
+        finally:
+            if held:
+                state_lock.release()
+
+    def _on_compile_timeout(info: dict) -> None:
+        arm = arms[current.step_id] if current is not None else None
+        if arm is not None:
+            rejections[arm["id"]] = _compile_timeout_evidence(arm, info, run_id, captured)
+        error = f"{info['site']} ran {info['elapsed_s']:.0f} s, over the {info['ceiling_s']:.0f} s compile ceiling"
+        _halt(error, "compile_timeout")
+
+    guard = RunWatch(
+        tracker,
+        hooks,
+        ceiling_s=_compile_ceiling(spec),
+        on_compile_timeout=_on_compile_timeout,
+        on_ram_stop=_halt,
+        stop_pct=RAM_STOP_PCT,
+    )
 
     def _remember(arm: dict, outcome: str) -> None:
         """Record a hang or a device loss. Partial samples from this arm are discarded."""
@@ -355,6 +432,11 @@ def run_interleaved(
     def _note(slot: Slot) -> None:
         skipped.append(_label(slot))
 
+    for adapter in adapters.values():
+        attach = getattr(adapter, "attach_compile_tracker", None)
+        if callable(attach):
+            attach(tracker)
+    guard.start()
     try:
         try:
             for slot in slots:
@@ -439,52 +521,53 @@ def run_interleaved(
                                 kind = "device_lost"
                             else:
                                 kind = "fail"
-                    if kind == "hang":
-                        aborted = {"step": _label(slot), "error": error}
-                        _remember(arm, "hang")
-                        flush()
-                        raise RunnerError(f"step {slot.step_id} failed: {error}")
-                    if kind == "device_lost":
-                        _remember(arm, "device_lost")
-                        flush()
-                    elif kind == "compile_rejected":
-                        rejected_keys.add(_shape_key(arm))
-                        rejections[arm["id"]] = _compile_rejection_evidence(
-                            arm, error, compile_s, run_id, captured
-                        )
-                        _remember(arm, "compile_rejected")
-                        flush()
-                    elif kind == "native_binary_rejected":
-                        rejected_keys.add(_shape_key(arm))
-                        rejections[arm["id"]] = _rejection_evidence(
-                            arm, error, compile_s, cache_dirs, run_id, captured
-                        )
-                        _remember(arm, "native_binary_rejected")
-                        flush()
-                    elif kind == "not run":
-                        off_devices.add(arm["device"])
-                        _note(slot)
-                    elif kind == "fail":
-                        aborted = {"step": _label(slot), "error": error}
-                        flush()
-                        raise RunnerError(f"step {slot.step_id} failed: {error}")
-                    else:
-                        records.append(
-                            _record(
-                                slot,
-                                result,
-                                bound,
-                                cold_calls.get(arm["id"]),
-                                {"slot_start": cpu_start, "slot_end": cpu_end},
-                            )
-                        )
-                        if slot.phase == "cold" and result.latency_ms is not None:
-                            cold_calls[arm["id"]] = result.latency_ms / 1000
-                        executed_ok.add(_shape_key(arm))
-                        seen[slot.step_id] = seen.get(slot.step_id, 0) + 1
-                        if seen[slot.step_id] == needed[slot.step_id]:
-                            finished.append(slot.step_id)
+                    with state_lock:
+                        if kind == "hang":
+                            aborted = {"step": _label(slot), "error": error}
+                            _remember(arm, "hang")
                             flush()
+                            raise RunnerError(f"step {slot.step_id} failed: {error}")
+                        if kind == "device_lost":
+                            _remember(arm, "device_lost")
+                            flush()
+                        elif kind == "compile_rejected":
+                            rejected_keys.add(_shape_key(arm))
+                            rejections[arm["id"]] = _compile_rejection_evidence(
+                                arm, error, compile_s, run_id, captured
+                            )
+                            _remember(arm, "compile_rejected")
+                            flush()
+                        elif kind == "native_binary_rejected":
+                            rejected_keys.add(_shape_key(arm))
+                            rejections[arm["id"]] = _rejection_evidence(
+                                arm, error, compile_s, cache_dirs, run_id, captured
+                            )
+                            _remember(arm, "native_binary_rejected")
+                            flush()
+                        elif kind == "not run":
+                            off_devices.add(arm["device"])
+                            _note(slot)
+                        elif kind == "fail":
+                            aborted = {"step": _label(slot), "error": error}
+                            flush()
+                            raise RunnerError(f"step {slot.step_id} failed: {error}")
+                        else:
+                            records.append(
+                                _record(
+                                    slot,
+                                    result,
+                                    bound,
+                                    cold_calls.get(arm["id"]),
+                                    {"slot_start": cpu_start, "slot_end": cpu_end},
+                                )
+                            )
+                            if slot.phase == "cold" and result.latency_ms is not None:
+                                cold_calls[arm["id"]] = result.latency_ms / 1000
+                            executed_ok.add(_shape_key(arm))
+                            seen[slot.step_id] = seen.get(slot.step_id, 0) + 1
+                            if seen[slot.step_id] == needed[slot.step_id]:
+                                finished.append(slot.step_id)
+                                flush()
                 finally:
                     if started and companion is not None:
                         _session(
@@ -498,7 +581,9 @@ def run_interleaved(
                         )
         finally:
             _unload(adapters, arms)
-            removed.update(_drop_caches(cache_dirs))
+            gone, failures = _drop_caches(cache_dirs)
+            removed.update(gone)
+            cache_report["failures"].update(failures)
         rows = _rows(partial=False, gone=removed)
         if rows:
             write_run(root, run_id, rows)
@@ -513,12 +598,16 @@ def run_interleaved(
             }
         raise
     finally:
-        receipt = root / "receipts" / f"{run_id}.jsonl"
-        if not imported and (receipt.is_file() or aborted is not None):
-            flush(gone=removed)
-            if receipt.is_file():
-                written = import_receipt(root, run_id)
-                announce_run(written, finished=False)
+        guard.stop()
+        try:
+            receipt = root / "receipts" / f"{run_id}.jsonl"
+            if not imported and (receipt.is_file() or aborted is not None):
+                flush(gone=removed)
+                if receipt.is_file():
+                    written = import_receipt(root, run_id)
+                    announce_run(written, finished=False)
+        finally:
+            marker.close(_iso(wall()))
 
 
 def hang_error(error: str | None) -> bool:
@@ -556,6 +645,13 @@ def native_binary_rejected_error(error: str | None) -> bool:
 
 
 CALL_CEILING_DEFAULT = 600.0
+
+
+def _compile_ceiling(spec: dict) -> float:
+    """The bound on one native compile (R&D ruling 2026-10-10): 15 minutes unless the spec says."""
+
+    value = spec.get("compile_ceiling_s")
+    return COMPILE_CEILING_S if value is None else float(value)
 
 
 def _call_ceiling(spec: dict) -> float:
@@ -681,6 +777,21 @@ def _compile_rejection_evidence(
         "npu_driver": env.get("npu_firmware") or "unrecorded",
         "openvino": env.get("openvino") or "unrecorded",
         "time_to_failure_s": failed_s,
+        "run_id": run_id,
+        "shape": {"batch": arm.get("batch"), "static_shape": arm.get("static_shape")},
+    }
+
+
+def _compile_timeout_evidence(arm: dict, info: dict, run_id: str, env: dict) -> dict:
+    """What the compile-timeout row records: how long, against what ceiling, how big the process grew."""
+
+    peak = info.get("peak_working_set_gb")
+    return {
+        "elapsed_s": info["elapsed_s"],
+        "ceiling_s": info["ceiling_s"],
+        "peak_working_set_gb": None if peak is None else round(peak, 2),
+        "npu_driver": env.get("npu_firmware") or "unrecorded",
+        "openvino": env.get("openvino") or "unrecorded",
         "run_id": run_id,
         "shape": {"batch": arm.get("batch"), "static_shape": arm.get("static_shape")},
     }
@@ -887,7 +998,9 @@ def _genai_summary(records: list[dict], arm_id: str) -> dict:
     return out
 
 
-def _extra_settings(spec: dict, arm: dict, records: list[dict], run_id: str, removed: set[str]) -> dict:
+def _extra_settings(
+    spec: dict, arm: dict, records: list[dict], run_id: str, removed: set[str], cache_report: dict | None = None
+) -> dict:
     settings = {
         "compile_cache": spec.get("compile_cache"),
         "rest_s": spec.get("rest_s"),
@@ -895,6 +1008,11 @@ def _extra_settings(spec: dict, arm: dict, records: list[dict], run_id: str, rem
     if spec.get("compile_cache") == "fresh":
         settings["compile_cache_dir"] = f"compile-cache/{run_id}/{arm['id']}"
         settings["compile_cache_deleted"] = arm["id"] in removed
+        if cache_report is not None:
+            settings["compile_cache_cleared_at_start"] = arm["id"] in cache_report["cleared"]
+            failures = cache_report["failures"].get(arm["id"])
+            if failures:
+                settings["compile_cache_delete_failures"] = failures
     if spec.get("order") == "aba":
         calls = []
         for pair in spec.get("pairs", []):
@@ -1025,24 +1143,79 @@ def _static_length(shape: object) -> int | None:
     return value if value > 0 else None
 
 
-def _cache_dirs(spec: dict, root: Path, run_id: str, arms: dict) -> dict[str, Path]:
+def _cache_dirs(
+    spec: dict, root: Path, run_id: str, arms: dict, cleared: set[str] | None = None
+) -> dict[str, Path]:
+    """The per-arm cache directories of a ``compile_cache: fresh`` spec, each EMPTY.
+
+    A directory left from an earlier try of the same run id is deleted first
+    and the arm is added to ``cleared``. One that cannot be emptied refuses the
+    run here, before any device is touched: a "fresh" arm on a warm cache would
+    measure a reload.
+    """
+
     if spec.get("compile_cache") != "fresh":
         return {}
     dirs = {}
     for arm_id in arms:
         path = root / "compile-cache" / run_id / arm_id
+        if path.is_dir() and any(path.iterdir()):
+            failures = _rmtree_clearing_readonly(path)
+            if path.is_dir() and any(path.iterdir()):
+                detail = f": {failures[0]}" if failures else ""
+                raise GuardError(
+                    f"REFUSED: compile-cache/{run_id}/{arm_id} is not empty and could not be cleared{detail}. "
+                    "A fresh-cache arm must start on an empty directory; delete it and run again."
+                )
+            if cleared is not None:
+                cleared.add(arm_id)
         path.mkdir(parents=True, exist_ok=True)
         dirs[arm_id] = path
     return dirs
 
 
-def _drop_caches(cache_dirs: dict[str, Path]) -> set[str]:
+DELETE_FAILURES_KEPT = 10
+
+
+def _rmtree_clearing_readonly(path: Path) -> list[str]:
+    """Delete a directory tree. A read-only file (every OpenVINO cache blob on
+    Windows is one) has its attribute cleared and the delete retried. What still
+    cannot be deleted is returned as short lines, relative to ``path``, and never raised."""
+
+    failures: list[str] = []
+
+    def onexc(func, target, exc) -> None:
+        try:
+            os.chmod(target, stat.S_IWRITE)
+            func(target)
+        except OSError as err:
+            try:
+                name = Path(target).relative_to(path).as_posix()
+            except ValueError:
+                name = Path(target).name
+            failures.append(f"{name}: {type(err).__name__}: {err.strerror or 'failed'}")
+
+    shutil.rmtree(path, onexc=onexc)
+    if len(failures) > DELETE_FAILURES_KEPT:
+        extra = len(failures) - DELETE_FAILURES_KEPT
+        failures = failures[:DELETE_FAILURES_KEPT] + [f"and {extra} more"]
+    return failures
+
+
+def _drop_caches(cache_dirs: dict[str, Path]) -> tuple[set[str], dict[str, list[str]]]:
+    """Delete each arm's cache. Returns the arms now gone and, per arm, why a delete failed."""
+
     gone = set()
+    failures: dict[str, list[str]] = {}
     for arm_id, path in cache_dirs.items():
-        shutil.rmtree(path, ignore_errors=True)
+        problems = _rmtree_clearing_readonly(path) if path.exists() else []
         if not path.exists():
             gone.add(arm_id)
-    return gone
+        elif not problems:
+            problems = ["the directory is still there after the delete"]
+        if problems:
+            failures[arm_id] = problems
+    return gone, failures
 
 
 def _check_run_id(run_id: str) -> None:
@@ -1189,12 +1362,18 @@ def _spec_devices(spec: dict) -> set[str]:
     return devices
 
 
-def _prior_runs(root: Path, devices: set[str]) -> list[dict]:
-    """Every receipt under ``receipts/`` whose rows touch one of ``devices``.
+def _prior_runs(root: Path, devices: set[str], skip: frozenset[str] = frozenset()) -> list[dict]:
+    """Every receipt under ``receipts/`` whose rows touch one of ``devices``,
+    and every run-start marker (``<run_id>.run.json``) that does.
 
     Aborted runs count: their rows are in the receipt. A receipt whose rows do
     not all carry a readable ``run_window`` (every receipt before the window was
-    recorded) comes back with ``window`` None.
+    recorded) comes back with ``window`` None. A closed marker carries its own
+    window; a marker never closed (a run killed before it could say so) comes
+    back with ``window`` None, measured from the marker's file time like any
+    windowless receipt. A run with both a receipt and a marker is two entries;
+    :func:`plan_rest` takes the larger rest owed. ``skip`` names run ids to leave
+    out (the run asking, whose own marker is already written).
     """
 
     runs = []
@@ -1222,10 +1401,23 @@ def _prior_runs(root: Path, devices: set[str]) -> list[dict]:
                 "written": written,
             }
         )
+    for path, data in read_markers(root):
+        written = path.stat().st_mtime
+        if data is None:  # unreadable: a run of unknown devices and end, so it counts
+            runs.append({"run_id": path.name.removesuffix(".run.json"), "date": "", "window": None, "written": written})
+            continue
+        run_id = data.get("run_id") if isinstance(data.get("run_id"), str) else path.name.removesuffix(".run.json")
+        if run_id in skip:
+            continue
+        marked = data.get("devices")
+        if isinstance(marked, list) and not devices.intersection(marked):
+            continue
+        window = _parse_window({"start": data.get("start"), "end": data.get("end")}) if data.get("closed") is True else None
+        runs.append({"run_id": run_id, "date": str(data.get("start") or "")[:10], "window": window, "written": written})
     return runs
 
 
-def plan_rest(spec: dict, root: Path, now: float) -> dict:
+def plan_rest(spec: dict, root: Path, now: float, skip: frozenset[str] = frozenset()) -> dict:
     """What rest this run owes (maintainer's rule, R&D approved).
 
     Every prior switchyard receipt that touches one of this spec's devices is
@@ -1237,7 +1429,12 @@ def plan_rest(spec: dict, root: Path, now: float) -> dict:
     - times unreadable (receipts before ``run_window``, or a file that does not
       parse): treated as long, measured from the file time, which is at or after
       the run's end, so the gap can only be underestimated;
-    - an end in the future: the full ``rest_s``.
+    - an end in the future: the full ``rest_s``;
+    - a run-start marker (``receipts/<run_id>.run.json``) counts like a receipt:
+      closed, it has readable times; never closed, the run was killed from
+      outside before it could say how long it lasted, so it is treated as long
+      and measured from the marker's file time (the last flush). A run with both
+      a marker and a receipt owes the larger of the two.
 
     In a real sequence this is "the previous run decides", since a long run is
     always followed by its rest, but mixed receipts and date strings cannot
@@ -1257,7 +1454,7 @@ def plan_rest(spec: dict, root: Path, now: float) -> dict:
             rest_s_applied=rest_s,
         )
         return plan
-    runs = _prior_runs(root, _spec_devices(spec))
+    runs = _prior_runs(root, _spec_devices(spec), skip)
     if not runs:
         plan["reason"] = "no prior run on these devices"
         return plan
@@ -1329,6 +1526,7 @@ def run_spec(
     clock=None,
     wall=None,
     python_path: str | None = None,
+    watch: WatchHooks | None = None,
 ) -> list[dict]:
     """Run a committed interleaved spec. Every refusal lands before device contact.
 
@@ -1338,6 +1536,10 @@ def run_spec(
     empty-card again at contact time. ``run_interleaved`` re-checks the blob
     and flags and owns the measurement; a completed run appends its rows to
     the routing table by the harness's own design.
+
+    The run-start marker is written right after the receipt-name check, before
+    the first adapter or card probe; a refusal before ``run_interleaved`` takes
+    over removes it, so a run that never started cannot owe a rest.
     """
 
     _refuse_repo_interpreter(root, Path(python_path or sys.executable))
@@ -1347,34 +1549,49 @@ def run_spec(
             f"REFUSED: a {spec['procedure']!r} spec has no run path; this command runs interleaved specs"
         )
     check_flags(spec, grant, npu_session, cpu_window)
-    require_unmodified(root, spec_path)
+    blob = require_unmodified(root, spec_path)
     stamp = date or datetime.date.today().isoformat()
     name = run_id or f"{spec['id'].lower()}-{stamp}"
     receipt = root / "receipts" / f"{name}.jsonl"
     if receipt.exists():
         raise GuardError(f"REFUSED: receipts/{name}.jsonl already exists; pass --run-id for another name")
-    if adapters is None:
-        adapters = real_adapters(spec)
-    if _uses_5090(spec):
-        probe = _card_probe(adapters, spec)
-        path = heartbeat_path(heartbeat)
-        _card_guards(probe, path, (wall or time.time)())
     wall = wall or time.time
-    rest = plan_rest(spec, root, wall())
-    _rest(rest["rest_s_applied"], sleep or time.sleep, clock or time.monotonic)
-    if _uses_5090(spec):
-        _card_guards(probe, path, (wall or time.time)())
-    return run_interleaved(
-        adapters,
-        grant=grant,
-        npu_session=npu_session,
-        cpu_window=cpu_window,
-        root=root,
-        repo=root,
-        spec_path=spec_path,
-        run_id=name,
-        date=stamp,
-        notes=notes,
-        wall=wall,
-        rest=rest,
+    marker = RunMarker(
+        root,
+        name,
+        spec_rel=spec_path.resolve().relative_to(root.resolve()).as_posix(),
+        spec_blob=blob,
+        devices=_spec_devices(spec),
+        start=_iso(wall()),
     )
+    marker.write()
+    try:
+        if adapters is None:
+            adapters = real_adapters(spec)
+        if _uses_5090(spec):
+            probe = _card_probe(adapters, spec)
+            path = heartbeat_path(heartbeat)
+            _card_guards(probe, path, wall())
+        rest = plan_rest(spec, root, wall(), frozenset({name}))
+        _rest(rest["rest_s_applied"], sleep or time.sleep, clock or time.monotonic)
+        if _uses_5090(spec):
+            _card_guards(probe, path, wall())
+        return run_interleaved(
+            adapters,
+            grant=grant,
+            npu_session=npu_session,
+            cpu_window=cpu_window,
+            root=root,
+            repo=root,
+            spec_path=spec_path,
+            run_id=name,
+            date=stamp,
+            notes=notes,
+            wall=wall,
+            rest=rest,
+            watch=watch,
+            marker=marker,
+        )
+    finally:
+        if not marker.entered:
+            marker.discard()

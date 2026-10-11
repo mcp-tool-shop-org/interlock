@@ -1,18 +1,16 @@
 # switchyard: how it works
 
-Mapped at 2026-10-10 from commit 7012d07 by Atlas 1.24.0.
+Mapped at 2026-10-11 from commit 3b27e6a by Atlas 1.24.0.
 
 ## What this is
 
 switchyard routes each job to a model, engine and device from a receipt-backed table. (written by a person)
 
-7 parts, mostly Python (46 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.
+7 parts, mostly Python (47 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.
 
-## What changed since 2026-10-10 (d174259)
+## What changed since 2026-10-10 (7012d07)
 
-- receipts/e2-2026-10-10c.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
-- receipts/e2-b8tail-2026-10-10c.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
-- 3 files added and 12 changed content, across 4 parts.
+Nothing structural changed since 2026-10-10; 1 file added and 21 changed content.
 
 ## What comes in
 
@@ -39,15 +37,15 @@ CI writes nothing this map can see.
 
 ## What tends to change together
 
-- **src/switchyard/adapters/openvino.py** and **tests/test_openvino_adapter.py** changed together in 10 of 11 commits, and the tests part imports the src part.
-- **src/switchyard/harness/runner.py** and **tests/test_harness.py** changed together in 6 of 10 commits, and the tests part imports the src part.
-- **src/switchyard/harness/receipts.py** and **tests/test_harness.py** changed together in 5 of 9 commits, and the tests part imports the src part.
-- **tests/test_importers.py** and **tests/test_task_scope.py** changed together in 5 of 9 commits, inside the tests part.
-- **src/switchyard/importers/gaps.py** and **tests/test_importers.py** changed together in 4 of 8 commits, and the tests part imports the src part.
+- **src/switchyard/adapters/openvino.py** and **tests/test_openvino_adapter.py** changed together in 12 of 14 commits, and the tests part imports the src part.
+- **src/switchyard/harness/receipts.py** and **src/switchyard/receipt.py** changed together in 5 of 7 commits, inside the src part.
+- **src/switchyard/importers/gaps.py** and **src/switchyard/receipt.py** changed together in 4 of 7 commits, inside the src part.
+- **src/switchyard/harness/receipts.py** and **tests/test_harness.py** changed together in 6 of 11 commits, and the tests part imports the src part.
+- **src/switchyard/harness/runner.py** and **tests/test_harness.py** changed together in 7 of 13 commits, and the tests part imports the src part.
 
 Confidence is low: fewer than 25 source files reach 10 revisions in the window.
 
-Window: 180 days; a pair counts from 3 shared commits, since 2 source files reach 10 revisions; the floor rises to 10 when 25 do.
+Window: 180 days; a pair counts from 3 shared commits, since 4 source files reach 10 revisions; the floor rises to 10 when 25 do.
 
 ## What no test touches
 
@@ -78,8 +76,9 @@ Read those in order to follow one run of switchyard end to end. This path follow
 ## What this map cannot see
 
 - 1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.
+- 2 imports could not be resolved: `src/switchyard/harness/runner.py` imports `switchyard.harness.marker`, which is no module on its import path and no declared dependency; `src/switchyard/harness/runner.py` imports `switchyard.harness.watch`, which is no module on its import path and no declared dependency.
 - 2 reads use paths built at run time and are not named here.
-- 4 writes and 13 reads go to a path their caller passes, not to this repository.
+- 4 writes and 16 reads go to a path their caller passes, not to this repository.
 - 3 reads go to the directory the command is run in (receipts/), not to this repository.
 - 12 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 9 more.
 - Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window.
