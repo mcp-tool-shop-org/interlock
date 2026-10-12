@@ -29,6 +29,7 @@ import math
 import re
 import os
 import shutil
+import stat
 import subprocess
 import threading
 import time
@@ -839,11 +840,26 @@ def _make_cache(root: Path, run_id: str, arm_id: str) -> str:
     return path.relative_to(root).as_posix()
 
 
-def _delete_caches(root: Path, relative: list[str]) -> None:
+def _clear_readonly(function, path, _exc) -> None:
+    # OpenVINO writes compiled blobs read-only; on Windows rmtree then fails with WinError 5.
+    os.chmod(path, stat.S_IWRITE)
+    function(path)
+
+
+def _delete_caches(root: Path, relative: list[str]) -> list[str]:
+    """Remove the run's compile caches. A cache that won't go is reported, never raised:
+    a cleanup failure must not cost the receipt."""
+
+    failed = []
     for rel in relative:
         path = root / rel
-        if path.exists():
-            shutil.rmtree(path)
+        if not path.exists():
+            continue
+        try:
+            shutil.rmtree(path, onexc=_clear_readonly)
+        except OSError as exc:
+            failed.append(f"{rel}: {exc}")
+    return failed
 
 
 def _write_series(path: Path, clocks: list, power: list) -> None:
@@ -1454,9 +1470,11 @@ def run_block(spec: dict, seams, *, root: Path, run_id: str, repo: Path, git: di
         aborted = True
         raise
     finally:
-        _delete_caches(root, caches)
+        cache_failures = _delete_caches(root, caches)
         if started and running is not None:
             header = _header(spec, seams, repo, running, caches, prompt, aborted=aborted, git=recorded)
+            if cache_failures:
+                header["compile_cache_cleanup_failed"] = cache_failures
             _write_jsonl(receipt, [header, *rows])
     return rows
 
