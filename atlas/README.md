@@ -1,6 +1,6 @@
-# switchyard: how it works
+# interlock: how it works
 
-Mapped at 2026-10-12 from commit 0d6e916 by Atlas 1.24.0.
+Mapped at 2026-10-12 from commit 9b2b9ac by Atlas 1.24.0.
 
 ## What this is
 
@@ -8,10 +8,13 @@ switchyard routes each job to a model, engine and device from a receipt-backed t
 
 7 parts, mostly Python (81 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.
 
-## What changed since 2026-10-12 (83145db)
+## What changed since 2026-10-12 (0d6e916)
 
-- receipts/ is now also read by tests/test_run_lifecycle.py.
-- 3 files added and 9 changed content, across 4 parts.
+- receipts/e4b-block-2-series/5090-igpu-0-alone-after-5090-alone.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
+- receipts/e4b-block-2-series/5090-igpu-0-alone-before-5090-alone.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
+- receipts/e4b-block-2-series/5090-igpu-0-paired-5090-with-igpu.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
+- And 61 more new files that belong to no part.
+- 64 files added and 3 changed content, across 3 parts.
 
 ## What comes in
 
@@ -82,7 +85,7 @@ Read those in order to follow one run of switchyard end to end. This path follow
 - 3 writes and 4 reads use paths built at run time and are not named here.
 - 12 writes and 37 reads go to a path their caller passes, not to this repository.
 - 3 reads go to the directory the command is run in (receipts/), not to this repository.
-- 19 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 16 more.
+- 83 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 80 more.
 - Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window.
 
 Regenerate with `npx --yes @dogfood-lab/atlas map`.
