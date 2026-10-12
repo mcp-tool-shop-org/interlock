@@ -49,6 +49,12 @@ from pathlib import Path
 from typing import Callable
 
 from switchyard.adapters.base import AdapterError, StepRequest
+from switchyard.ollama_supervisor import (
+    ServerFingerprint,
+    SupervisorStop,
+    failure_kind,
+    retry_budget,
+)
 from switchyard.adapters.ollama import (
     COUNT_TIMEOUT_NOTE,
     UNLOAD_TIMEOUT_NOTE,
@@ -70,6 +76,7 @@ from switchyard.harness.receipts import write_receipt
 from switchyard.receipt import validate_row
 
 UNRECORDED = "unrecorded"
+INCONCLUSIVE = "the step is inconclusive"
 ABORT_ERROR = "card memory reached abort_mib"
 PREDICTED_OVER = "predicted_over"
 UNLOAD_SETTLE_S = 10.0
@@ -101,6 +108,15 @@ class _NoBound(Exception):
 
 class _UnloadTimeout(Exception):
     """The unload did not return. The model may still be resident."""
+
+
+class _Repairable(Exception):
+    """A transport, timeout, or 5xx. The supervisor hears about it between steps."""
+
+    def __init__(self, kind: str, error: str) -> None:
+        super().__init__(error)
+        self.kind = kind
+        self.error = error
 
 
 @dataclass
@@ -751,6 +767,85 @@ def _stuck_note(ctx: int | None, reading: int | None) -> str:
     return f"{window} stayed at {reading} MiB after the unload"
 
 
+def _sync_restarts(supervisor, marker) -> None:
+    """Every committed restart lands on the run marker, including one that stops the run."""
+
+    if supervisor is None or marker is None:
+        return
+    have = marker.restart_records()
+    for record in supervisor.restarts:
+        data = record.as_dict()
+        if data not in have:
+            marker.note_restart(data)
+            have.append(data)
+
+
+def _strip_measurement(row: dict) -> None:
+    """A step that failed across a restart keeps no window, peak, or rate."""
+
+    settings = row.setdefault("settings", {})
+    for key in (
+        "limit",
+        "search_calls",
+        "prompt_tokens",
+        "prompt_token_method",
+        "prompt_token_search",
+        "prompt_token_cold",
+        "dedicated_mib",
+        "aborted_windows",
+        "after_unload_mib",
+        "predicted_over",
+        "weights_mib",
+        "one_window_bound",
+    ):
+        settings.pop(key, None)
+    for key in ("max_resident_ctx", "peak_mib", "ttft_ms", "decode_tok_s", "prompt_tok_s", "shared_mib"):
+        settings[key] = None
+    row.pop("gpu_resident", None)
+    row["latency"] = _blank_latency(None)
+    row["aborted"] = True
+
+
+def _stamp_restarts(rows: list[dict], marker) -> None:
+    records = marker.restart_records() if marker is not None else []
+    if not records:
+        return
+    for row in rows:
+        row.setdefault("settings", {})["ollama_restarts"] = records
+        validate_row(row)
+
+
+def _resume_fill(supervisor, marker, entry, repair, spec, retries, row) -> str | None:
+    """Between models. None keeps the old abort path. A restart does not keep this row's window."""
+
+    if supervisor is None or not repair:
+        return None
+    kind, error = repair[-1]
+    model = entry["model"]
+    try:
+        decision = supervisor.after_failure(url_for("5090"), model=model, kind=kind)
+    except SupervisorStop as exc:
+        _sync_restarts(supervisor, marker)
+        marker.note_failure(model, error)
+        row["notes"] = _join(str(exc), row.get("notes") or "")
+        _strip_measurement(row)
+        return "stop"
+    _sync_restarts(supervisor, marker)
+    marker.note_failure(model, error)
+    if decision.action != "restarted" or decision.record is None:
+        row["notes"] = _join(decision.note or error, row.get("notes") or "")
+        _strip_measurement(row)
+        return "stop"
+    used = retries.get(model, 0)
+    if used < retry_budget(spec):
+        retries[model] = used + 1
+        return "retry"
+    if INCONCLUSIVE not in (row.get("notes") or ""):
+        row["notes"] = _join(INCONCLUSIVE, row.get("notes") or "")
+    _strip_measurement(row)
+    return "next"
+
+
 def run_fill_card(
     spec: dict,
     *,
@@ -765,19 +860,27 @@ def run_fill_card(
     wall,
     marker,
     notes: str = "",
+    supervisor=None,
 ) -> list[dict]:
     """Measure each roster model. Unload at the end of the model and on any exit."""
 
     _refuse_confirm_num_predict(spec.get("confirm_num_predict", 1))
     rows: list[dict] = []
     stop_note = None
+    retries: dict[str, int] = {}
+    index = 0
+    models = list(spec["models"])
     try:
-        for entry in spec["models"]:
+        while index < len(models):
+            entry = models[index]
             require_grant(grant, uses_5090=True)
             require_heartbeat(heartbeat, wall())
             adapter = _ollama(adapters)
             require_card_empty(adapter.loaded_models())
             marker.entered = True
+            repair: list[tuple[str, str]] = []
+            if supervisor is not None:
+                supervisor.begin_measurement()
             try:
                 row = _measure_model(
                     spec,
@@ -789,19 +892,40 @@ def run_fill_card(
                     run_id=run_id,
                     date=date,
                     notes=notes,
+                    supervisor=supervisor,
+                    repair=repair,
                 )
             finally:
                 extra = _unload(adapter, entry["model"])
+                if supervisor is not None:
+                    supervisor.end_measurement()
             if extra and extra not in (row.get("notes") or ""):
                 row["notes"] = _join(row.get("notes") or "", extra)
                 row["aborted"] = True
+            if extra and supervisor is not None:
+                unload_kind = failure_kind(extra)
+                if unload_kind:
+                    repair.append((unload_kind, extra))
+            resumed = _resume_fill(supervisor, marker, entry, repair, spec, retries, row)
+            if resumed == "stop":
+                rows.append(row)
+                stop_note = row.get("notes") or "fill-card step failed"
+                break
+            if resumed == "retry":
+                continue
+            if resumed == "next":
+                rows.append(row)
+                index += 1
+                continue
             rows.append(row)
             if row.get("aborted"):
                 stop_note = row.get("notes") or "fill-card step failed"
                 break
+            index += 1
     finally:
         try:
             if rows:
+                _stamp_restarts(rows, marker)
                 write_receipt(root, run_id, rows)
         finally:
             if marker.entered:
@@ -855,6 +979,8 @@ def _measure_model(
     run_id: str,
     date: str,
     notes: str,
+    supervisor=None,
+    repair: list | None = None,
 ) -> dict:
     model = entry["model"]
     version = _text(seams.ollama_version())
@@ -877,6 +1003,44 @@ def _measure_model(
         return _row(spec, entry, **kwargs)
 
     baseline = _optional_int(seams.card_mib())
+
+    def _kind(error: str) -> str | None:
+        if supervisor is None:
+            return None
+        return failure_kind(error)
+
+    def _remember(flash_value: str, kv_value: str) -> None:
+        """The first good reading. A preset fingerprint is left alone."""
+
+        if supervisor is None or supervisor.recorded is not None:
+            return
+        if not version or version == UNRECORDED:
+            return
+        supervisor.remember(
+            ServerFingerprint(
+                version=version,
+                cuda_backend=cuda,
+                flash_attention=flash_value or UNRECORDED,
+                kv_cache_type=kv_value or UNRECORDED,
+                baseline_mib=baseline,
+                model=model,
+            )
+        )
+
+    def _inconclusive(error: str, **extra) -> dict:
+        return row(
+            grant=grant,
+            spec_rel=spec_rel,
+            run_id=run_id,
+            date=date,
+            notes=_join(_join(INCONCLUSIVE, error), notes),
+            aborted=True,
+            version=version,
+            driver=driver,
+            cuda=cuda,
+            baseline=baseline,
+            **extra,
+        )
     if baseline is not None and baseline >= spec["abort_mib"]:
         return row(
             grant=grant,
@@ -897,18 +1061,25 @@ def _measure_model(
         flash = str(facts["flash_attention"])
         kv = str(facts["kv_cache_type"])
     except AdapterError as exc:
+        error = str(exc)
+        kind = _kind(error)
+        _remember(UNRECORDED, UNRECORDED)
+        if kind and repair is not None:
+            repair.append((kind, error))
+            return _inconclusive(error)
         return row(
             grant=grant,
             spec_rel=spec_rel,
             run_id=run_id,
             date=date,
-            notes=_join(str(exc), notes),
+            notes=_join(error, notes),
             aborted=True,
             version=version,
             driver=driver,
             cuda=cuda,
             baseline=baseline,
         )
+    _remember(flash, kv)
 
     num_predict = _refuse_confirm_num_predict(spec.get("confirm_num_predict", 1))
     fraction = float(spec["confirm_prompt_fraction"])
@@ -991,6 +1162,9 @@ def _measure_model(
                 raise _CountRefused(COUNT_TIMEOUT_NOTE) from exc
             if sampler.over:
                 raise _WindowOver()
+            kind = _kind(str(exc))
+            if kind:
+                raise _Repairable(kind, str(exc))
             raise
         if sampler.over:
             raise _WindowOver()
@@ -1010,6 +1184,9 @@ def _measure_model(
                 if sampler.over:
                     aborted.append(ctx)
                     return _over(sampler.peak)
+                kind = _kind(str(exc))
+                if kind:
+                    raise _Repairable(kind, str(exc))
                 return Observation(False, sampler.peak, error=str(exc))
             if _count_leaves_loaded(entry.get("keep_alive")):
                 stop_if_unload_timed_out()
@@ -1022,6 +1199,9 @@ def _measure_model(
                 if sampler.over:
                     aborted.append(ctx)
                     return _over(sampler.peak)
+                kind = _kind(str(exc))
+                if kind:
+                    raise _Repairable(kind, str(exc))
                 return Observation(False, sampler.peak, error=str(exc))
             if cold_tokens != tokens:
                 if _count_leaves_loaded(entry.get("keep_alive")):
@@ -1051,12 +1231,19 @@ def _measure_model(
             if sampler.over:
                 aborted.append(ctx)
                 return _over(sampler.peak)
+            kind = _kind(str(exc))
+            if kind:
+                raise _Repairable(kind, str(exc))
             return Observation(False, sampler.peak, error=str(exc))
         if sampler.over:
             aborted.append(ctx)
             return _over(sampler.peak)
         if not result.ok:
-            return Observation(False, sampler.peak, error=result.error or "generate failed")
+            error = result.error or "generate failed"
+            kind = _kind(error)
+            if kind:
+                raise _Repairable(kind, error)
+            return Observation(False, sampler.peak, error=error)
         resident, size, vram = _residency(adapter.loaded_models(), model)
         if size is not None and vram is not None:
             sizes[ctx] = (size, vram, resident)
@@ -1126,6 +1313,17 @@ def _measure_model(
             shared_growth_mib=spec["spill_shared_mib"],
             prompt_ratio=spec["spill_prompt_ratio"],
             max_ctx=search_cap,
+        )
+    except _Repairable as exc:
+        if repair is not None:
+            repair.append((exc.kind, exc.error))
+        return _inconclusive(
+            exc.error,
+            quant=quant,
+            default_ctx=default_ctx,
+            flash=flash,
+            kv=kv,
+            ggml=ggml,
         )
     except SearchError as exc:
         return row(

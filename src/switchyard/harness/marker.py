@@ -70,6 +70,29 @@ class RunMarker:
         except OSError:
             pass
 
+    def note_restart(self, record: dict) -> None:
+        """One Ollama restart. This is run metadata, not a routing row."""
+
+        self._data.setdefault("restarts", []).append(record)
+        try:
+            self.write()
+        except OSError:
+            pass
+
+    def note_failure(self, step: str, error: str) -> None:
+        """The step that was in flight. It is inconclusive, never a pass."""
+
+        self._data.setdefault("failed_steps", []).append(
+            {"step": step, "error": error, "inconclusive": True}
+        )
+        try:
+            self.write()
+        except OSError:
+            pass
+
+    def restart_records(self) -> list:
+        return list(self._data.get("restarts") or [])
+
     def discard(self) -> None:
         """The run was refused before it touched a device: it never happened."""
 

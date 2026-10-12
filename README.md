@@ -98,6 +98,18 @@ switchyard run experiments/e4/spec.yaml --grant "<grant text>" --npu-session "<s
 
 `--dry-run` prints the plan and the guards a real run would need, and starts nothing. A real run needs the flags its devices call for: `--grant` for the 5090, `--npu-session` for the NPU or iGPU, and `--cpu-window` for a CPU-heavy leg. It writes one receipt under `receipts/`. `switchyard import` then rebuilds `table/` from the committed receipts, and `switchyard check` validates them.
 
+## When Ollama hangs
+
+`switchyard ollama-health` asks `GET /api/version` on `127.0.0.1:11434` (the 5090 server) and `127.0.0.1:11490` (the CPU-only server). A port is healthy when that answer arrives within 5 seconds. The command prints one line per port and exits 1 if either is down.
+
+A real `switchyard run` restarts a local Ollama only between steps, and only after a step failed with a transport error, a timeout that is a real hang, or a 5xx while the server is down. Down means three failed health checks, two seconds apart. A request that passed its own deadline is a hang only when health then fails, or `/api/ps` does not show the model making progress. A long prompt whose version still answers, and whose model is still listed, is not a hang. A 118k-token prompt is not killed for being slow.
+
+The restart stops the process listening on that port and no other process. The other port's server stays up. The tray app stays up unless it is the listener. `ollama serve` is started detached, with `OLLAMA_HOST` on that port and the CUDA backend, flash-attention, and KV-cache values the run recorded. On Windows the binary is `%LOCALAPPDATA%\Programs\Ollama\ollama.exe`. switchyard does not sign in. If the server is not healthy within 60 seconds, or the card is not back at its baseline, the run stops and says a person has to start Ollama.
+
+At most two restarts a run. The Ollama version and the CUDA backend, flash attention, and KV cache type must match what the run recorded. A change stops the run. Each restart is written on the run marker and on `settings.ollama_restarts`: when, which port, why (`down` or `hung`), the old and new pids, the time to healthy, and the version. The step that was in flight is inconclusive, never a pass. It is tried again only when the spec sets `retry`. A measurement taken across a restart is not kept.
+
+`--dry-run` prints this policy and does not contact either port.
+
 ## Develop
 
 The environment is its own, at `E:/AI/envs/switchyard`, Python 3.12. It does not share the NPU environment. OpenVINO 2026.4.1 is the `intel` extra, pinned to the same versions as that environment. Tests do not need it.
