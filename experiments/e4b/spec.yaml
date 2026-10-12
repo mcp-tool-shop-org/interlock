@@ -16,6 +16,10 @@
 #   come from the Publisher. This spec does not start a device.
 # EXTERNAL_VERIFIER: n/a. R&D reviews this spec before any device time.
 
+# Amended 2026-10-12 after R&D's review on #77 (Publisher): a 7.5 MHz clock
+# step, with the tolerance and steady band set from a pilot; the Hodges-Lehmann
+# estimate with an exact Wilcoxon interval; short_decode refusal; the companion
+# started before the warm-up; per-triplet d_i notation.
 # Drafted 2026-10-12 (Kimi, at the Publisher's request, R&D to confirm), after
 # E4 run 7 (valid, inconclusive; every alone spread over the half-band). E4 is
 # not amended and run 7's verdict stands. E4b replaces E4's global alone-spread
@@ -26,8 +30,10 @@
 # the stop rules; repeats: 5 becomes repeats: 10 with one pre-registered
 # extension to 15 (one repeat is one A-B-A triplet per pair); the 5090 measured
 # decode num_predict 128 becomes 1024 so the measured call outlives clock ramp;
-# the decision becomes the median log-ratio d_i with a BCa bootstrap 90% CI
-# against the +/-0.10 band, not-free on both sides; Wilcoxon signed-rank is
+# the decision becomes the Hodges-Lehmann estimate of the log-ratio d_i with
+# its exact Wilcoxon 90% interval against the +/-0.10 band, not-free on both
+# sides (R&D review on #77: a bootstrap of a median at n=10 is lumpy, and BCa's
+# acceleration is degenerate for a median); a bootstrap interval is
 # recorded as a footnote and never decides. A missing sm_clock or power reading
 # refused nothing in E4; here it refuses the slot. CPU performance is read by
 # typeperf, not psutil (psutil reports a constant nominal 3700 MHz on Windows).
@@ -50,15 +56,16 @@ question: >
 decision: >
   One repeat is one A-B-A triplet per pair, and the triplet is the unit of
   analysis. For triplet i the effect is
-  d_i = ln(B_i) - ln(mean(A_i, A_i+1)). That is the paired slot's measured
-  value against the mean of its two neighbouring alone slots, on the log
+  d_i = ln(B_i) - ln(mean(A_i_before, A_i_after)). That is the paired slot's
+  measured value against the mean of its own triplet's alone-before and
+  alone-after slots (never a chain shared with the next triplet), on the log
   scale. The 5090 comparison is server-reported decode tokens per second
   (eval_count / eval_duration), not wall clock; there a slower pair is a
   negative d_i. The NPU and iGPU comparison is warm latency per call; there a
-  slower pair is a positive d_i. The estimate is the median of the d_i with
-  its 90% confidence interval from a BCa bootstrap of 50000 resamples at the
-  pre-registered seed; if BCa is undefined on a degenerate resample, the
-  percentile interval of the same resamples is the pre-registered fallback.
+  slower pair is a positive d_i. The estimate is the Hodges-Lehmann estimate
+  of the d_i (the median of the Walsh averages) with its exact Wilcoxon
+  signed-rank 90% confidence interval, which is distribution-free and exact at
+  10 or 15 triplets and needs no seed.
   The router may schedule the pair freely only when the whole interval lies
   inside the band, +/-0.10 on the log scale (0.905x to 1.105x). A consistent
   speed-up shows coupling, so the pair is not free when the whole interval
@@ -66,7 +73,7 @@ decision: >
   the 10-triplet interval straddles a bound, one extension to 15 triplets is
   allowed, run immediately in the same grant window under the identical
   protocol, and the verdict is computed on the 15; extension_used is on the
-  receipt. A Wilcoxon signed-rank over the d_i is recorded as a footnote and
+  receipt. A percentile bootstrap interval of the median d_i is recorded as a footnote and
   is never part of the decision. A slot that fails a refusal rule is re-run
   once, in place; two refusals in one pair make that pair inconclusive, and
   an inconclusive pair is not a pass.
@@ -75,17 +82,24 @@ warmups: 0
 repeats: 10
 extension_repeats: 15
 estimator:
-  statistic: median
+  statistic: hodges-lehmann
   ci: 0.90
-  method: bca
-  resamples: 50000
-  seed: 20261012
-  fallback: percentile
-footnote: wilcoxon-signed-rank
+  method: exact-wilcoxon-signed-rank
+footnote: percentile-bootstrap-of-the-median (50000 resamples, seed 20261012); never decides
 flank_tol: null
 measurement:
-  clock_step_mhz: 15
-  clock_tolerance_steps: 2
+  clock_step_mhz: 7.5
+  clock_tolerance_mhz: null
+  steady_band_mhz: null
+  pilot: >
+    Before the first E4b block, under a grant: 5090-alone, about 20 measured
+    calls at num_predict 1024 with the per-slot warm-up. clock_tolerance_mhz
+    (the within-call clocks.sm range that refuses a slot) and steady_band_mhz
+    (the steady rule's band around the running maximum) are each set to the
+    pilot's 95th percentile within-call range, rounded up to a 7.5 MHz step,
+    by committed amendment before any E4b block. The pilot also shows the
+    prompt yields full-length decodes; if it doesn't, a counting prompt is
+    pre-registered by amendment. Pilot rows are not E4b rows.
   steady_samples: 10
   steady_sample_ms: 200
   warmup_min_s: 3
@@ -139,7 +153,7 @@ stop_rules:
     measured call.
   - Until-steady rule. During the 5090 warm-up the harness samples clocks.sm
     every steady_sample_ms. Steady is steady_samples consecutive samples each
-    within clock_step_mhz of the warm-up's running maximum. If not steady at
+    within steady_band_mhz of the warm-up's running maximum (set from the pilot). If not steady at
     the end of the warm-up, the warm-up repeats once (warmup_max_attempts);
     still unsteady refuses the slot as clock_not_steady. The measured call
     starts within call_gap_max_s of the last steady sample. Clock locking is
@@ -148,8 +162,9 @@ stop_rules:
     triplets run cooler than late ones; the neighbouring-alone comparison
     absorbs slow drift and the refusal rules absorb fast changes.
   - Slot refusals, each recorded with its reason. A recorded load_duration_s
-    above 1.0 is a reload. A clocks.sm range above clock_tolerance_steps clock
-    steps inside the measured call. A missing sm_clock_mhz or power_w reading
+    above 1.0 is a reload. A clocks.sm range above clock_tolerance_mhz (set from the pilot)
+    inside the measured call. A 5090 call whose eval_count is below its
+    num_predict is short_decode and refused. A missing sm_clock_mhz or power_w reading
     (gpu_temp_c may still be null). clock_not_steady. An NPU or iGPU call whose
     truncated_tokens is not 0 or 1 on its 1x256 static shape. A refused slot is
     re-run once, in place, inside its triplet. Two refusals in one pair make
@@ -161,8 +176,9 @@ stop_rules:
   - Decode rate is the server's eval_count / eval_duration. Prompt rate is
     prompt_eval_count / prompt_eval_duration and is recorded, not the gate for
     this experiment.
-  - The harness owns the companion session. It starts the companion arm, runs
-    the paired slot, then stops the session. Stop is an unload; keep_alive 0
+  - The harness owns the companion session. In a paired slot the order is: start
+    the companion, warm up (the companion is already running during the
+    warm-up), measure, then stop the companion session. Stop is an unload; keep_alive 0
     for Ollama, the Intel lane's unload for OpenVINO. The companion 5090 load
     is the 5090-alone arm's generate run back to back for the paired slot's
     duration. The companion NPU load is bge-base embedding at 1x256, and the
@@ -182,7 +198,7 @@ stop_rules:
     records the start line (command, environment, flags) and the /api/version
     reply at start and at stop. The harness stops the process tree at block end
     and on abort. A port that will not bind refuses the run. Before the server
-    starts, the card is verified empty (no compute apps, VRAM within the
+    starts, the card is verified empty (VRAM within the
     recorded desktop idle band).
   - Per-slot SM clock and power come from the named gpu_probe and are sampled
     every steady_sample_ms through every measured 5090 call. A missing reading
@@ -205,8 +221,8 @@ stop_rules:
   - The receipt records, per slot. The raw value, load_duration_s,
     truncated_tokens on Intel calls, the clock and power series path, the CPU
     counter readings, and the refusal reason when refused. Per pair it records
-    the d_i list, the median, the 90% interval, the verdict, the Wilcoxon
-    statistic and p as a footnote, and extension_used.
+    the d_i list, the Hodges-Lehmann estimate, the exact 90% interval, the
+    verdict, the bootstrap footnote, and extension_used.
 probes:
   - id: igpu-after-cpu-burn
     task: nli
