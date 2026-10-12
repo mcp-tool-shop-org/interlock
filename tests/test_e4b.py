@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import math
+import os
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -19,6 +21,7 @@ from switchyard.harness.e4b import (
     IntelLane,
     PILOT_CALLS,
     build_live_seams,
+    card_models_at_ceiling,
     collect_series,
     dry_text,
     generate_loop,
@@ -28,7 +31,9 @@ from switchyard.harness.e4b import (
     parse_nvidia_smi,
     parse_typeperf,
     pilot_destination,
+    ollama_pin,
     pilot_summary,
+    prove_owned_server,
     read_git,
     read_nvml,
     refusal_reason,
@@ -63,6 +68,8 @@ from switchyard.harness.ollama_serve import (
     assert_port_free,
     get_json,
     pin_install,
+    read_log_segment,
+    receipt_environment,
     resolve_pin,
     start_line,
     stop_process_tree,
@@ -74,6 +81,8 @@ ROOT = Path(__file__).resolve().parents[1]
 E4B = ROOT / "experiments" / "e4b" / "spec.yaml"
 E4 = ROOT / "experiments" / "e4" / "spec.yaml"
 E5 = ROOT / "experiments" / "e5" / "spec.yaml"
+PIN = "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41"
+CUDA_LINE = "load_backend: loaded CUDA backend from cuda_v13\n"
 
 
 def _measurement(**overrides):
@@ -99,6 +108,7 @@ def _arm(arm_id, device, *, companion=None, companion_device=None):
         "device": device,
         "engine": "ollama" if device == "5090" else "openvino",
         "model": "qwen3:8b" if device == "5090" else arm_id,
+        "revision_or_digest": PIN if device == "5090" else "unrecorded",
         "task": "generate" if device == "5090" else "embed",
         "num_predict": 1024 if device == "5090" else None,
         "measure": "decode_tok_s" if device == "5090" else "latency_ms",
@@ -197,6 +207,8 @@ class _Server:
                 "OLLAMA_HOST": "127.0.0.1:11441",
                 "OLLAMA_MODELS": "models",
                 "OLLAMA_DEBUG": "1",
+                "PATH": r"C:\Windows\System32",
+                "SYSTEMROOT": r"C:\Windows",
             },
             version_start={"version": "0.35.1"},
             version_stop=None,
@@ -245,7 +257,30 @@ def _seams(server, call, *, companion=None, resamples=20):
     seams.sleep = lambda seconds: seams.sleeps.append(seconds)
     seams.now = lambda: 0.0
     seams.start_threads = lambda count: seams.threads.append(count)
-    seams.probe = lambda method, path: seams.probes.append((method, path)) or {"models": []}
+    heartbeat = Path(tempfile.mkdtemp(prefix="e4b-heartbeat-")) / "heartbeat"
+    heartbeat.write_text("ok", encoding="utf-8")
+    seams.heartbeat = heartbeat
+    seams.wall = time.time
+    seams.card_models = lambda: []
+    seams.log_segment = lambda: CUDA_LINE
+
+    def probe(method, path):
+        seams.probes.append((method, path))
+        if path == "/api/ps":
+            return {
+                "models": [
+                    {
+                        "name": "qwen3:8b",
+                        "model": "qwen3:8b",
+                        "size": 100,
+                        "size_vram": 100,
+                        "digest": PIN,
+                    }
+                ]
+            }
+        return {"version": "0.35.1"}
+
+    seams.probe = probe
     seams.load_resident = lambda: seams.loads.append("load")
     seams.unload_resident = lambda: seams.loads.append("unload")
     seams.count_tokens = lambda text: len(text.split())
@@ -382,6 +417,7 @@ def test_block_records_the_estimate_and_keeps_the_burn_out_of_the_verdict(tmp_pa
     assert header["git_sha"] == "abc123"
     assert header["clean_tree"] is True
     assert header["environment"]["OLLAMA_HOST"] == "127.0.0.1:11441"
+    assert set(header["environment"]) == {"OLLAMA_HOST", "OLLAMA_MODELS", "OLLAMA_DEBUG"}
     assert "11434" not in header["environment"]["OLLAMA_HOST"]
     assert "11490" not in "".join(header["environment"].values())
     assert header["version_start"]["version"] == "0.35.1"
@@ -390,7 +426,12 @@ def test_block_records_the_estimate_and_keeps_the_burn_out_of_the_verdict(tmp_pa
     assert "not gated" in header["vram_note"]
     assert header["aborted"] is False
     assert seams.loads == ["load", "unload"]
-    assert seams.probes == [("GET", "/api/version"), ("GET", "/api/ps"), ("GET", "/api/version")]
+    assert seams.probes == [
+        ("GET", "/api/version"),
+        ("GET", "/api/ps"),
+        ("GET", "/api/ps"),
+        ("GET", "/api/version"),
+    ]
     assert server.stopped is True
     assert not (tmp_path / "table").exists()
     for pair in (row for row in rows if row["kind"] == "e4b-pair"):
@@ -837,7 +878,7 @@ def test_run_owned_server_lifecycle(tmp_path: Path):
     assert len(pin.cuda_sha256) == 64
     with pytest.raises(ServeError, match="executable"):
         pin_install(tmp_path / "missing.exe", models)
-    argv, env = start_line(pin)
+    argv, env = start_line(pin, base={})
     assert argv == [str(exe), "serve"]
     assert env["OLLAMA_HOST"] == "127.0.0.1:11441"
     assert env["OLLAMA_DEBUG"] == "1"
@@ -979,6 +1020,9 @@ def test_live_seams_post_only_to_11441(tmp_path: Path, monkeypatch):
     assert seen[0][1] == "http://127.0.0.1:11441/api/generate"
     assert seen[0][2]["options"]["num_predict"] == 1024
     seams.probe("GET", "/api/version")
+    seams.load_resident()
+    assert seen[-1][2]["keep_alive"] == -1
+    assert seen[-1][2]["options"]["num_predict"] == 1
     seams.unload_resident()
     assert seen[-1][2]["keep_alive"] == 0
     assert "companion" not in seen[-1][2]
@@ -1172,3 +1216,284 @@ def test_dry_text_with_an_amended_tolerance_names_the_number():
     assert "clock_tolerance_mhz: 7.5" in text
     assert "steady_band_mhz: 7.5" in text
     assert "heartbeat not read" in text
+
+
+def _fresh_pin(tmp_path: Path):
+    exe = tmp_path / "ollama.exe"
+    exe.write_bytes(b"exe")
+    models = tmp_path / "models"
+    models.mkdir()
+    library = exe.parent / "lib" / "ollama" / "cuda_v13" / "ggml-cuda.dll"
+    library.parent.mkdir(parents=True)
+    library.write_bytes(b"cuda")
+    return pin_install(exe, models)
+
+
+def _stale_heartbeat(path: Path) -> Path:
+    path.write_text("old", encoding="utf-8")
+    stamp = time.time() - 10_000
+    os.utime(path, (stamp, stamp))
+    return path
+
+
+def _resident_ps(*, size=100, vram=100, digest=PIN):
+    return {
+        "models": [
+            {"name": "qwen3:8b", "model": "qwen3:8b", "size": size, "size_vram": vram, "digest": digest}
+        ]
+    }
+
+
+def test_the_spawned_environment_is_inherited_without_ollama_or_llama_arg(tmp_path: Path):
+    pin = _fresh_pin(tmp_path)
+    base = {
+        "SYSTEMROOT": r"C:\Windows",
+        "PATH": r"C:\Windows\System32",
+        "LOCALAPPDATA": r"C:\AppData\Local",
+        "TEMP": r"C:\Temp",
+        "OLLAMA_HOST": "127.0.0.1:11434",
+        "OLLAMA_MODELS": r"D:\other-models",
+        "OLLAMA_DEBUG": "0",
+        "OLLAMA_KEEP_ALIVE": "0",
+        "LLAMA_ARG_N_GPU_LAYERS": "0",
+    }
+    argv, env = start_line(pin, base=base)
+    assert argv == [pin.exe, "serve"]
+    assert env["SYSTEMROOT"] == base["SYSTEMROOT"]
+    assert env["PATH"] == base["PATH"]
+    assert env["LOCALAPPDATA"] == base["LOCALAPPDATA"]
+    assert env["TEMP"] == base["TEMP"]
+    assert env["OLLAMA_HOST"] == "127.0.0.1:11441"
+    assert env["OLLAMA_MODELS"] == pin.models_dir
+    assert env["OLLAMA_DEBUG"] == "1"
+    assert "OLLAMA_KEEP_ALIVE" not in env
+    assert "LLAMA_ARG_N_GPU_LAYERS" not in env
+    assert not any(key.upper().startswith("LLAMA_ARG_") for key in env)
+    recorded = {"OLLAMA_HOST", "OLLAMA_MODELS", "OLLAMA_DEBUG"}
+    assert not any(key.upper().startswith("OLLAMA_") and key not in recorded for key in env)
+    seen = {}
+
+    def popen(argv, **kwargs):
+        seen["env"] = kwargs["env"]
+        return SimpleNamespace(pid=1)
+
+    spawn_ollama(argv, env, tmp_path / "child.log", popen=popen, system="posix")
+    assert seen["env"]["PATH"] == base["PATH"]
+    assert seen["env"]["SYSTEMROOT"] == base["SYSTEMROOT"]
+    assert "LLAMA_ARG_N_GPU_LAYERS" not in seen["env"]
+    assert set(receipt_environment(env)) == recorded
+    folded = start_line(pin, base={"ollama_host": "127.0.0.1:11434", "PATH": "kept"})
+    assert folded[1]["OLLAMA_HOST"] == "127.0.0.1:11441"
+    assert "ollama_host" not in folded[1]
+
+
+def test_a_cpu_backend_line_refuses_the_block_and_the_pilot(tmp_path: Path):
+    def call(arm, *, num_predict, measured, kind, prompt):
+        raise AssertionError("the block ran after a bad backend")
+
+    for pilot in (False, True):
+        root = tmp_path / ("pilot" if pilot else "block")
+        root.mkdir()
+        log = root / "server.log"
+        old = "load_backend: loaded CUDA backend from cuda_v13\n"
+        log.write_text(old, encoding="utf-8")
+        spawned = {"n": 0}
+
+        def spawn(argv, environment, log_path, _spawned=spawned):
+            _spawned["n"] += 1
+            with log_path.open("a", encoding="utf-8") as handle:
+                handle.write("load_backend: loaded CPU backend from cpu\n")
+            return SimpleNamespace(pid=7)
+
+        pin = _fresh_pin(root)
+        server = Server(
+            pin,
+            opener=lambda method, url: {"version": "0.35.1"},
+            spawn=spawn,
+            stop_tree=lambda pid: None,
+            log_path=log,
+            bind=lambda host, port: None,
+        )
+        seams = _seams(server, call)
+        del seams.log_segment
+        spec = _spec([PAIRS[0]])
+        with pytest.raises(E4bError, match="cuda_v13"):
+            if pilot:
+                run_pilot(spec, seams, root=root, run_id="cpu", repo=root, calls=1)
+            else:
+                run_block(spec, seams, root=root, run_id="cpu", repo=root)
+        assert spawned["n"] == 1
+        segment = read_log_segment(log, len(old.encode("utf-8")))
+        assert "cuda_v13" not in segment
+        assert "CPU" in segment
+        assert read_log_segment(root / "missing.log", 0) == ""
+        assert read_log_segment(log, 10**9) == ""
+        assert seams.calls == []
+
+
+def test_partial_residency_refuses_the_block_and_the_pilot(tmp_path: Path):
+    def call(arm, *, num_predict, measured, kind, prompt):
+        raise AssertionError("the block ran on a partial load")
+
+    for pilot in (False, True):
+        root = tmp_path / ("pilot" if pilot else "block")
+        server = _Server()
+        seams = _seams(server, call)
+
+        def probe(method, path, _seams=seams):
+            _seams.probes.append((method, path))
+            if path == "/api/ps":
+                return _resident_ps(size=100, vram=40)
+            return {"version": "0.35.1"}
+
+        seams.probe = probe
+        spec = _spec([PAIRS[0]])
+        with pytest.raises(E4bError, match="size_vram"):
+            if pilot:
+                run_pilot(spec, seams, root=root, run_id="partial", repo=root, calls=1)
+            else:
+                run_block(spec, seams, root=root, run_id="partial", repo=root)
+        assert server.events[0] == "start"
+        assert seams.calls == []
+
+
+def test_a_digest_mismatch_refuses_the_block_and_the_pilot(tmp_path: Path):
+    def call(arm, *, num_predict, measured, kind, prompt):
+        raise AssertionError("the block ran on the wrong digest")
+
+    for pilot in (False, True):
+        root = tmp_path / ("pilot" if pilot else "block")
+        server = _Server()
+        seams = _seams(server, call)
+
+        def probe(method, path, _seams=seams):
+            _seams.probes.append((method, path))
+            if path == "/api/ps":
+                return _resident_ps(digest="ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
+            return {"version": "0.35.1"}
+
+        seams.probe = probe
+        spec = _spec([PAIRS[0]])
+        with pytest.raises(E4bError, match="digest"):
+            if pilot:
+                run_pilot(spec, seams, root=root, run_id="digest", repo=root, calls=1)
+            else:
+                run_block(spec, seams, root=root, run_id="digest", repo=root)
+        assert server.events[0] == "start"
+        assert seams.calls == []
+    spec = _spec(PAIRS)
+    prove_owned_server(spec, segment=CUDA_LINE, ps=_resident_ps(digest="sha256:" + PIN))
+    with pytest.raises(E4bError, match="size_vram"):
+        prove_owned_server(spec, segment=CUDA_LINE, ps={"models": []})
+    with pytest.raises(E4bError, match="cuda_v13"):
+        prove_owned_server(spec, segment="weights came from cuda_v13\n", ps=_resident_ps())
+    with pytest.raises(E4bError, match="size_vram"):
+        prove_owned_server(spec, segment=CUDA_LINE, ps=_resident_ps(size=True, vram=True))
+    lone = {"id": "other-5090", "device": "5090", "model": "qwen3:8b", "revision_or_digest": PIN}
+    prove_owned_server({"arms": [lone]}, segment=CUDA_LINE, ps=_resident_ps())
+    with pytest.raises(E4bError, match="no 5090"):
+        ollama_pin({"arms": [{"device": "NPU"}]})
+    with pytest.raises(E4bError, match="no model"):
+        ollama_pin({"arms": [{"id": "5090-alone", "device": "5090", "model": ""}]})
+    with pytest.raises(E4bError, match="no digest"):
+        ollama_pin({"arms": [{"id": "5090-alone", "device": "5090", "model": "qwen3:8b", "revision_or_digest": "unrecorded"}]})
+    prove_owned_server(
+        spec,
+        segment=CUDA_LINE,
+        ps={"models": [{"model": "qwen3:8b", "size": 100, "size_vram": 100, "digest": PIN}]},
+    )
+
+
+def test_a_dead_heartbeat_refuses_the_block_and_the_pilot_before_spawn(tmp_path: Path, monkeypatch):
+    def call(arm, *, num_predict, measured, kind, prompt):
+        raise AssertionError("a dead heartbeat still ran")
+
+    for pilot in (False, True):
+        root = tmp_path / ("pilot" if pilot else "block")
+        server = _Server()
+        seams = _seams(server, call)
+        seams.heartbeat = _stale_heartbeat(tmp_path / f"stale-{pilot}")
+        seams.wall = time.time
+        spec = _spec([PAIRS[0]])
+        with pytest.raises(GuardError, match="heartbeat"):
+            if pilot:
+                run_pilot(spec, seams, root=root, run_id="stale", repo=root, calls=1)
+            else:
+                run_block(spec, seams, root=root, run_id="stale", repo=root)
+        assert server.events == []
+
+    fresh = tmp_path / "fresh-heartbeat"
+    fresh.write_text("ok", encoding="utf-8")
+    monkeypatch.setattr("switchyard.harness.runner.heartbeat_path", lambda: fresh)
+
+    def ok_call(arm, *, num_predict, measured, kind, prompt):
+        return _clean(arm, num_predict=num_predict, kind=kind)
+
+    server = _Server()
+    seams = _seams(server, ok_call)
+    del seams.heartbeat
+    del seams.wall
+    run_block(_spec([PAIRS[0]]), seams, root=tmp_path / "default-heartbeat", run_id="default-hb", repo=tmp_path)
+    assert server.events[0] == "start"
+
+
+def test_a_card_that_is_not_empty_refuses_the_block_and_the_pilot_before_spawn(tmp_path: Path):
+    def call(arm, *, num_predict, measured, kind, prompt):
+        raise AssertionError("a loaded card still ran")
+
+    for pilot in (False, True):
+        root = tmp_path / ("pilot" if pilot else "block")
+        server = _Server()
+        seams = _seams(server, call)
+        seams.card_models = lambda: [{"name": "qwen3:8b"}]
+        spec = _spec([PAIRS[0]])
+        with pytest.raises(GuardError, match="still on the card"):
+            if pilot:
+                run_pilot(spec, seams, root=root, run_id="card", repo=root, calls=1)
+            else:
+                run_block(spec, seams, root=root, run_id="card", repo=root)
+        assert server.events == []
+    seams = _seams(_Server(), call)
+    seams.card_models = lambda: "not-a-list"
+    with pytest.raises(GuardError, match="still on the card"):
+        run_block(_spec([PAIRS[0]]), seams, root=tmp_path / "unreadable", run_id="unreadable", repo=tmp_path)
+    missing = _seams(_Server(), call)
+    del missing.card_models
+    with pytest.raises(GuardError, match="still on the card"):
+        run_pilot(_spec([PAIRS[0]]), missing, root=tmp_path / "no-card", run_id="no-card", repo=tmp_path, calls=1)
+    assert card_models_at_ceiling(lambda: 4096, ceiling=4096) == []
+    assert card_models_at_ceiling(lambda: 4097, ceiling=4096) == [4097]
+    assert card_models_at_ceiling(lambda: None, ceiling=4096) == [None]
+    assert card_models_at_ceiling(lambda: True, ceiling=4096) == [True]
+    exe_root = tmp_path / "live"
+    exe_root.mkdir()
+    pin_root = _fresh_pin(exe_root)
+
+    def listener(cmd):
+        return json.dumps({"exe": pin_root.exe, "models_dir": pin_root.models_dir})
+
+    spec = _spec([PAIRS[0]])
+    seams = build_live_seams(
+        exe_root,
+        "ceiling",
+        spec,
+        pilot=True,
+        run=listener,
+        bind=lambda host, port: None,
+        card_mib=lambda: 100,
+        transport=lambda method, url, body=None: {"version": "0.35.1"},
+        opener=lambda method, url: {"version": "0.35.1"},
+    )
+    assert seams.card_models() == []
+    busy = build_live_seams(
+        exe_root,
+        "busy",
+        spec,
+        pilot=True,
+        run=listener,
+        bind=lambda host, port: None,
+        card_mib=lambda: 5000,
+        transport=lambda method, url, body=None: {"version": "0.35.1"},
+        opener=lambda method, url: {"version": "0.35.1"},
+    )
+    assert busy.card_models() == [5000]

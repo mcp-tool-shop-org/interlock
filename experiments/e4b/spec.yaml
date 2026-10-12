@@ -20,6 +20,9 @@
 # step, with the tolerance and steady band set from a pilot; the Hodges-Lehmann
 # estimate with an exact Wilcoxon interval; short_decode refusal; the companion
 # started before the warm-up; per-triplet d_i notation.
+# Amended 2026-10-12 (R&D review of the harness on #80, Publisher): a 5090
+# companion stops its generate loop and stays loaded until block end, while
+# the NPU and iGPU companions stop and unload.
 # Drafted 2026-10-12 (Kimi, at the Publisher's request, R&D to confirm), after
 # E4 run 7 (valid, inconclusive; every alone spread over the half-band). E4 is
 # not amended and run 7's verdict stands. E4b replaces E4's global alone-spread

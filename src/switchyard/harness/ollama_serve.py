@@ -48,6 +48,8 @@ class Running:
     version_start: dict
     version_stop: dict | None = None
     process: object | None = None
+    log_path: Path | None = None
+    log_offset: int = 0
 
 
 def sha256_file(path: Path) -> str:
@@ -91,16 +93,53 @@ def assert_port_free(host: str, port: int, *, opener=socket.socket) -> None:
             close()
 
 
-def start_line(pin: Pin, *, host: str = HOST, port: int = PORT) -> tuple[list[str], dict[str, str]]:
-    """The command and the environment the receipt records. Logging is on."""
+RECORDED_ENV = ("OLLAMA_HOST", "OLLAMA_MODELS", "OLLAMA_DEBUG")
 
-    argv = [pin.exe, "serve"]
-    environment = {
-        "OLLAMA_HOST": f"{host}:{port}",
-        "OLLAMA_MODELS": pin.models_dir,
-        "OLLAMA_DEBUG": "1",
-    }
-    return argv, environment
+
+def _stripped_key(key: str) -> bool:
+    """``OLLAMA_*`` and ``LLAMA_ARG_*`` come from this start, not the parent."""
+
+    folded = key.upper()
+    return folded.startswith("OLLAMA_") or folded.startswith("LLAMA_ARG_")
+
+
+def start_line(
+    pin: Pin,
+    *,
+    host: str = HOST,
+    port: int = PORT,
+    base: dict[str, str] | None = None,
+) -> tuple[list[str], dict[str, str]]:
+    """The child command and the environment it actually receives.
+
+    ``base`` is the process environment when omitted. Every ``OLLAMA_*`` and
+    ``LLAMA_ARG_*`` key is removed, then the recorded host, models directory
+    and debug flag are set. The receipt keeps only those three.
+    """
+
+    source = os.environ if base is None else base
+    environment = {key: value for key, value in source.items() if not _stripped_key(key)}
+    environment["OLLAMA_HOST"] = f"{host}:{port}"
+    environment["OLLAMA_MODELS"] = pin.models_dir
+    environment["OLLAMA_DEBUG"] = "1"
+    return [pin.exe, "serve"], environment
+
+
+def receipt_environment(environment: dict) -> dict[str, str]:
+    """The start line's recorded variables. Inherited keys stay on the child."""
+
+    return {key: environment[key] for key in RECORDED_ENV if key in environment}
+
+
+def read_log_segment(path: Path, offset: int) -> str:
+    """Text written after ``offset``. Lines from before this start are excluded."""
+
+    if not path.is_file():
+        return ""
+    data = path.read_bytes()
+    if offset < 0 or offset > len(data):
+        return ""
+    return data[offset:].decode("utf-8", errors="replace")
 
 
 def refuse_shared_url(url: str) -> None:
@@ -195,6 +234,7 @@ class Server:
         self._bind(self.host, self.port)
         argv, environment = start_line(self.pin, host=self.host, port=self.port)
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
+        offset = self.log_path.stat().st_size if self.log_path.is_file() else 0
         process = self.spawn(argv, environment, self.log_path)
         self.running = Running(
             pin=self.pin,
@@ -202,6 +242,8 @@ class Server:
             environment=environment,
             version_start={},
             process=process,
+            log_path=self.log_path,
+            log_offset=offset,
         )
         try:
             self.running.version_start = get_json(self._url("/api/version"), self.opener)

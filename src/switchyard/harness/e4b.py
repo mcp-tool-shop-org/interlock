@@ -7,6 +7,12 @@ or a shared Ollama port unless a caller builds the live seams and runs them.
 The 5090 companion is a generate loop. Stopping that loop does not unload
 qwen3. The model loads once at block start and unloads once, with keep_alive 0,
 at block end. An unload in the middle would reload it and refuse the next slot.
+
+The run-owned server inherits the process environment with every OLLAMA_* and
+LLAMA_ARG_* key removed, then the recorded host, models directory and debug
+flag. Before it starts, the watchdog heartbeat and an empty card are required.
+After the first load, the run refuses unless this start's log names cuda_v13,
+size_vram equals size, and the digest matches the spec pin.
 """
 
 from __future__ import annotations
@@ -20,7 +26,7 @@ import threading
 import time
 from pathlib import Path
 
-from switchyard.guards import require_grant, require_npu_session
+from switchyard.guards import require_card_empty, require_grant, require_heartbeat, require_npu_session
 from switchyard.harness.e4b_stats import bootstrap_median, decide, effect
 from switchyard.harness.e5 import fit_prompt
 from switchyard.harness.ollama_serve import (
@@ -29,6 +35,8 @@ from switchyard.harness.ollama_serve import (
     SHARED_PORTS,
     assert_port_free,
     get_json,
+    read_log_segment,
+    receipt_environment,
     resolve_pin,
     stop_process_tree,
 )
@@ -272,6 +280,120 @@ def read_git(repo: Path, run) -> dict:
     sha = _out(["git", "-C", repo.as_posix(), "rev-parse", "HEAD"]).strip()
     porcelain = _out(["git", "-C", repo.as_posix(), "status", "--porcelain"])
     return {"git_sha": sha, "clean_tree": porcelain.strip() == ""}
+
+
+def card_models_at_ceiling(read_mib, *, ceiling: int) -> list:
+    """A one-item list when the card is above the idle ceiling or cannot be read.
+
+    The list is what :func:`require_card_empty` refuses. Nothing here opens
+    11434 or 11490. ``vram_mib_at_start`` stays a recording, not this gate.
+    """
+
+    reading = read_mib()
+    if isinstance(reading, bool) or not isinstance(reading, int) or reading > ceiling:
+        return [reading]
+    return []
+
+
+def ollama_pin(spec: dict) -> tuple[str, str]:
+    """The 5090 model's name and the spec's digest pin."""
+
+    chosen = None
+    for arm in spec.get("arms") or []:
+        if not isinstance(arm, dict) or arm.get("device") != "5090":
+            continue
+        if arm.get("id") == "5090-alone":
+            chosen = arm
+            break
+        if chosen is None:
+            chosen = arm
+    if chosen is None:
+        raise E4bError("E4b has no 5090 arm to pin")
+    model = chosen.get("model")
+    digest = chosen.get("revision_or_digest")
+    if not isinstance(model, str) or not model:
+        raise E4bError("the 5090 arm has no model")
+    if not isinstance(digest, str) or not digest.strip() or digest.strip() == "unrecorded":
+        raise E4bError("the 5090 arm has no digest pin")
+    return model, digest.strip()
+
+
+def _digest_hex(value) -> str:
+    if not isinstance(value, str):
+        return ""
+    token = value.strip().lower()
+    prefix = "sha256:"
+    if token.startswith(prefix):
+        token = token[len(prefix):]
+    return token
+
+
+def segment_names_cuda_v13(segment: str) -> bool:
+    """True when a ``load_backend`` line in this start's segment names ``cuda_v13``."""
+
+    for line in segment.splitlines():
+        if "load_backend" in line and "cuda_v13" in line:
+            return True
+    return False
+
+
+def _ps_entry(ps: dict, model: str) -> dict | None:
+    models = ps.get("models") if isinstance(ps, dict) else None
+    if not isinstance(models, list):
+        return None
+    for entry in models:
+        if isinstance(entry, dict) and (entry.get("name") == model or entry.get("model") == model):
+            return entry
+    return None
+
+
+def prove_owned_server(spec: dict, *, segment: str, ps: dict) -> None:
+    """Refuse unless this start is cuda_v13, fully resident, and the pinned digest."""
+
+    if not segment_names_cuda_v13(segment):
+        raise E4bError("REFUSED: the server log does not show cuda_v13 in its load_backend line")
+    model, pin = ollama_pin(spec)
+    entry = _ps_entry(ps, model)
+    size = None if entry is None else entry.get("size")
+    vram = None if entry is None else entry.get("size_vram")
+    if isinstance(size, bool) or isinstance(vram, bool) or not isinstance(size, int) or not isinstance(vram, int) or vram != size:
+        raise E4bError("REFUSED: the first load is not fully resident; size_vram must equal size")
+    if _digest_hex(entry.get("digest")) != _digest_hex(pin):
+        raise E4bError("REFUSED: the model digest does not match the spec pin")
+
+
+def _require_ready(seams) -> None:
+    """Heartbeat, then an empty card. Both run before the server is spawned."""
+
+    path = getattr(seams, "heartbeat", None)
+    if path is None:
+        from switchyard.harness.runner import heartbeat_path
+
+        path = heartbeat_path()
+    wall = getattr(seams, "wall", None)
+    now = wall() if callable(wall) else time.time()
+    require_heartbeat(Path(path), now)
+    card = getattr(seams, "card_models", None)
+    models = card() if callable(card) else ["unreadable"]
+    if not isinstance(models, list):
+        models = ["unreadable"]
+    require_card_empty(models)
+
+
+def _log_text(seams, running) -> str:
+    reader = getattr(seams, "log_segment", None)
+    if callable(reader):
+        return str(reader())
+    path = getattr(running, "log_path", None)
+    if path is None:
+        path = getattr(seams, "log_path", None)
+    if path is None:
+        return ""
+    return read_log_segment(Path(path), int(getattr(running, "log_offset", 0) or 0))
+
+
+def _require_owned_server(spec: dict, seams, running) -> None:
+    prove_owned_server(spec, segment=_log_text(seams, running), ps=seams.probe("GET", "/api/ps"))
 
 
 def note_vram(read) -> dict:
@@ -926,7 +1048,7 @@ def _header(spec, seams, repo, running, caches, prompt, *, aborted: bool) -> dic
         "git_sha": git.get("git_sha"),
         "clean_tree": git.get("clean_tree"),
         "argv": list(getattr(running, "argv", []) or []),
-        "environment": dict(getattr(running, "environment", {}) or {}),
+        "environment": receipt_environment(dict(getattr(running, "environment", {}) or {})),
         "version_start": getattr(running, "version_start", None),
         "version_stop": getattr(running, "version_stop", None),
         "caches": caches,
@@ -964,13 +1086,15 @@ def run_block(spec: dict, seams, *, root: Path, run_id: str, repo: Path) -> list
     aborted = False
     running = None
     prompt = ""
+    _require_ready(seams)
     try:
         with seams.server as running:
             started = True
             _probe(seams, "GET", "/api/version")
             _probe(seams, "GET", "/api/ps")
-            seams.load_resident()
             try:
+                seams.load_resident()
+                _require_owned_server(spec, seams, running)
                 body = execute_block(spec, seams, root=root, run_id=run_id)
                 rows = _rows_of(body)
                 prompt = body["prompt"]
@@ -1017,11 +1141,13 @@ def run_pilot(spec: dict, seams, *, root: Path, run_id: str, repo: Path, calls: 
     ranges = []
     full = []
     warm_short = 0
+    _require_ready(seams)
     with seams.server as running:
         _probe(seams, "GET", "/api/version")
         _probe(seams, "GET", "/api/ps")
-        seams.load_resident()
         try:
+            seams.load_resident()
+            _require_owned_server(spec, seams, running)
             for _index in range(calls):
                 warm = warm_5090(seams, arm, prompt, measurement, enforce=False)
                 if not warm["attempts"] or float(warm["attempts"][-1].get("elapsed_s") or 0) + 1e-9 < float(measurement["warmup_min_s"]):
@@ -1050,7 +1176,7 @@ def run_pilot(spec: dict, seams, *, root: Path, run_id: str, repo: Path, calls: 
         "git_sha": git.get("git_sha"),
         "clean_tree": git.get("clean_tree"),
         "argv": list(getattr(running, "argv", []) or []),
-        "environment": dict(getattr(running, "environment", {}) or {}),
+        "environment": receipt_environment(dict(getattr(running, "environment", {}) or {})),
         "version_start": getattr(running, "version_start", None),
         "version_stop": getattr(running, "version_stop", None),
     }
@@ -1349,7 +1475,7 @@ class IntelLane:
         }
 
 
-def build_live_seams(root: Path, run_id: str, spec: dict, *, pilot: bool, run=None, popen=None, transport=None, opener=None, sample=None, cpu=None, intel=None, sampler=threaded_sample, vram=None, git_run=None, bind=None):
+def build_live_seams(root: Path, run_id: str, spec: dict, *, pilot: bool, run=None, popen=None, transport=None, opener=None, sample=None, cpu=None, intel=None, sampler=threaded_sample, vram=None, git_run=None, bind=None, card_mib=None):
     """Wire the run-owned server. Every external call is injectable; the defaults are the live ones."""
 
     from switchyard.harness.ollama_serve import Server
@@ -1374,6 +1500,10 @@ def build_live_seams(root: Path, run_id: str, spec: dict, *, pilot: bool, run=No
         bind=assert_port_free if bind is None else bind,
     )
     model = next(arm["model"] for arm in spec["arms"] if arm["id"] == "5090-alone")
+    from switchyard.adapters.record_fixtures import IDLE_CEILING_MIB, read_card_mib
+    from switchyard.harness.runner import heartbeat_path
+
+    read_mib = card_mib if card_mib is not None else read_card_mib
     stop_event = threading.Event()
     latest: dict = {}
     latest_lock = threading.Lock()
@@ -1469,8 +1599,15 @@ def build_live_seams(root: Path, run_id: str, spec: dict, *, pilot: bool, run=No
     seams.now = time.perf_counter
     seams.start_threads = lambda count: None
     seams.probe = lambda method, path: owned_probe(OWNED, path, _open)
-    seams.load_resident = lambda: None
+
+    def load_resident():
+        owned_generate(post, OWNED, {"model": model}, "load", 1)
+
+    seams.load_resident = load_resident
     seams.unload_resident = lambda: unload_owned(post, OWNED, model)
+    seams.heartbeat = heartbeat_path()
+    seams.wall = time.time
+    seams.card_models = lambda: card_models_at_ceiling(read_mib, ceiling=IDLE_CEILING_MIB)
     seams.count_tokens = lambda text: count_owned(post, OWNED, model, text)
     seams.git = lambda repo: read_git(repo, git_run or runner)
     seams.vram = vram
