@@ -177,7 +177,10 @@ def dry_run(spec_path: Path, repo: Path) -> str:
         lines.append("confirmation prefix counted at run time with prompt_eval_count")
         lines.append("the final prefix is counted again from a cold load")
         lines.append("an abort closes the request, then unloads, then reads the card again")
+        lines.append("closing the request does not return the memory a load already allocated")
         lines.append("a window predicted to reach abort_mib is predicted_over and is not loaded")
+        lines.append("one measured window bounds the next context from that window's share")
+        lines.append("a second window with no bound stops the row")
         lines.append("one model at a time; unloaded between models; rest is not taken here")
         lines.append("the ceiling is never loaded")
     else:

@@ -7,15 +7,23 @@ the candidate with the served model's ``prompt_eval_count``, then generates
 it with shift and truncate false.
 
 The sampler aborts at ``abort_mib``. It closes the in-flight request, then
-unloads with ``keep_alive`` 0, then reads the card once more. A window whose
-card does not fall is recorded with that note. Before a load, two measured
-windows extrapolate the next card reading; a window predicted to reach
-``abort_mib`` is ``predicted_over`` and is not loaded. The first window has
-no line yet, so it still loads. The spec ceiling is not a probe. Nothing
-here rests between models. A missing shared-memory reading or a missing
-prompt rate is a spill, which the pure search already treats as a step back.
-A confirmation prefix is counted again from a cold load, and a disagreement
-refuses the model.
+unloads with ``keep_alive`` 0, then reads the card again until it falls
+below ``abort_mib`` or about 10 seconds pass. A window whose card does not
+fall is recorded with that note. Closing the request lets the unload take
+effect and stops the decode. It does not take back memory the load has
+already allocated.
+
+Before a load, two measured windows extrapolate the next card reading. With
+one measured window, the next context is bounded by that window's share of
+the card above the idle baseline and the weight size from ``/api/tags``. A
+window predicted to reach ``abort_mib`` is ``predicted_over`` and is not
+loaded. The first window still loads. If the weight size or the baseline
+cannot be read, the second window is not loaded and the row stops. An
+aborted window is not a measurement. The spec ceiling is not a probe.
+Nothing here rests between models. A missing shared-memory reading or a
+missing prompt rate is a spill, which the pure search already treats as a
+step back. A confirmation prefix is counted again from a cold load, and a
+disagreement refuses the model.
 
 Tests pass fakes. The real nvidia-smi and counter readers run only when a
 caller builds :func:`real_fill_seams` and then calls them.
@@ -47,6 +55,8 @@ from switchyard.receipt import validate_row
 UNRECORDED = "unrecorded"
 ABORT_ERROR = "card memory reached abort_mib"
 PREDICTED_OVER = "predicted_over"
+UNLOAD_SETTLE_S = 10.0
+_SETTLE_STEP_S = 0.2
 MEMORY_ARGV = ("nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits")
 DRIVER_ARGV = ("nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader,nounits")
 CUDA_ARGV = ("nvidia-smi", "--query-gpu=cuda_version", "--format=csv,noheader,nounits")
@@ -61,6 +71,10 @@ class _WindowOver(Exception):
 
 class _CountRefused(Exception):
     """The cold re-count of a confirmation prefix disagreed with the search."""
+
+
+class _NoBound(Exception):
+    """The next window has no weight size or no baseline, so it is not loaded."""
 
 
 @dataclass
@@ -443,21 +457,73 @@ def _over(peak: int | None) -> Observation:
     return Observation(False, peak, error=ABORT_ERROR)
 
 
-def _predict_mib(measured: list[tuple[int, int]], ctx: int) -> int | None:
-    """Card MiB for ``ctx`` from the last two measured windows of this model.
-
-    One window mixes the weights with that window's cache, so it is not a
-    line yet and the caller loads it. Two windows give MiB per context token.
-    The next step rounds up when the slope climbs, so a fraction of a MiB
-    still counts as reaching ``abort_mib``.
-    """
-
+def _measured_points(measured: list[tuple[int, int]]) -> list[tuple[int, int]]:
     points: list[tuple[int, int]] = []
     for seen, mib in measured:
         if points and points[-1][0] == seen:
             points[-1] = (seen, mib)
         else:
             points.append((seen, mib))
+    return points
+
+
+def _one_window_mib(reading: int, ctx_1: int, baseline: int, weights_mib: int, ctx: int) -> int | None:
+    """Bound ``ctx`` from one measured window.
+
+    The share is the reading above the idle baseline and the weight file,
+    floored at 0. It includes compute buffers, so it overstates the cache.
+    The bound is ``reading + ceil(share * (ctx - ctx_1) / ctx_1)``.
+    """
+
+    if ctx_1 <= 0:
+        return None
+    share = reading - baseline - weights_mib
+    if share < 0:
+        share = 0
+    extra = share * (ctx - ctx_1)
+    return reading + (extra + ctx_1 - 1) // ctx_1
+
+
+def _weights_mib(adapter, model: str) -> int | None:
+    """``/api/tags`` size, rounded up to MiB. A missing tag is None."""
+
+    reader = getattr(adapter, "tag_size", None)
+    if not callable(reader):
+        return None
+    size = reader(model, "5090")
+    if isinstance(size, bool) or not isinstance(size, int) or size < 0:
+        return None
+    return (size + _MIB - 1) // _MIB
+
+
+def _settled_card(seams: FillSeams, abort_mib: int) -> int | None:
+    """Re-read until the card falls below ``abort_mib`` or about 10 s pass."""
+
+    waited = 0.0
+    reading: int | None = None
+    while True:
+        try:
+            reading = _optional_int(seams.card_mib())
+        except Exception:
+            reading = None
+        if reading is not None and reading < abort_mib:
+            return reading
+        if waited >= UNLOAD_SETTLE_S:
+            return reading
+        seams.sleep(_SETTLE_STEP_S)
+        waited += _SETTLE_STEP_S
+
+
+def _predict_mib(measured: list[tuple[int, int]], ctx: int) -> int | None:
+    """Card MiB for ``ctx`` from the last two measured windows of this model.
+
+    One window is not a line. The caller uses :func:`_one_window_mib` until a
+    second window has been measured. Two windows give MiB per context token.
+    The next step rounds up when the slope climbs, so a fraction of a MiB
+    still counts as reaching ``abort_mib``.
+    """
+
+    points = _measured_points(measured)
     if len(points) < 2:
         return None
     (left_ctx, left_mib), (right_ctx, right_mib) = points[-2], points[-1]
@@ -634,8 +700,13 @@ def _measure_model(
             ggml=ggml,
         )
 
+    try:
+        weights_mib = _weights_mib(adapter, model)
+    except (AdapterError, OSError, TypeError, ValueError, RuntimeError):
+        weights_mib = None
     aborted: list[int] = []
     predicted_over: list[int] = []
+    one_window_bound: list[tuple[int, int]] = []
     measured: list[tuple[int, int]] = []
     after_unload: list[tuple[int | None, int | None]] = []
     prompts: dict[int, tuple[int, str, int, int]] = {}
@@ -654,11 +725,7 @@ def _measure_model(
             try:
                 adapter.unload(model, "5090")
             finally:
-                try:
-                    reading = _optional_int(seams.card_mib())
-                except Exception:
-                    reading = None
-                after_unload.append((current["ctx"], reading))
+                after_unload.append((current["ctx"], _settled_card(seams, spec["abort_mib"])))
 
     sampler = CardSampler(seams, spec["abort_mib"], sample_ms, on_abort)
 
@@ -758,7 +825,15 @@ def _measure_model(
         )
 
     def probe(ctx: int, kind: str) -> Observation:
-        predicted = _predict_mib(measured, ctx)
+        points = _measured_points(measured)
+        predicted = _predict_mib(measured, ctx) if len(points) >= 2 else None
+        if len(points) == 1 and ctx != points[0][0]:
+            if weights_mib is None or baseline is None:
+                raise _NoBound("the second window had no bound")
+            predicted = _one_window_mib(points[0][1], points[0][0], baseline, weights_mib, ctx)
+            if predicted is None:
+                raise _NoBound("the second window had no bound")
+            one_window_bound.append((ctx, predicted))
         if predicted is not None and predicted >= spec["abort_mib"]:
             predicted_over.append(ctx)
             return Observation(False, predicted, error=PREDICTED_OVER)
@@ -768,7 +843,7 @@ def _measure_model(
         except _WindowOver:
             aborted.append(ctx)
             obs = _over(sampler.peak)
-        if kind == "load" and isinstance(obs.peak_mib, int):
+        if kind == "load" and isinstance(obs.peak_mib, int) and obs.error != ABORT_ERROR:
             measured.append((ctx, obs.peak_mib))
         return obs
 
@@ -803,6 +878,34 @@ def _measure_model(
             ggml=ggml,
             after_unload=after_unload,
             predicted_over=predicted_over,
+            weights_mib=weights_mib,
+            one_window_bound=one_window_bound,
+        )
+    except _NoBound as exc:
+        return _row(
+            spec,
+            entry,
+            grant=grant,
+            spec_rel=spec_rel,
+            run_id=run_id,
+            date=date,
+            notes=_join(str(exc), notes),
+            aborted=True,
+            version=version,
+            driver=driver,
+            cuda=cuda,
+            baseline=baseline,
+            quant=quant,
+            default_ctx=default_ctx,
+            flash=flash,
+            kv=kv,
+            ggml=ggml,
+            after_unload=after_unload,
+            predicted_over=predicted_over,
+            aborted_windows=aborted,
+            sample_ms=sample_ms,
+            weights_mib=weights_mib,
+            one_window_bound=one_window_bound,
         )
     except _CountRefused as exc:
         return _row(
@@ -827,6 +930,8 @@ def _measure_model(
             predicted_over=predicted_over,
             aborted_windows=aborted,
             sample_ms=sample_ms,
+            weights_mib=weights_mib,
+            one_window_bound=one_window_bound,
         )
 
     prompt_meta = prompts.get(found.max_ctx) if found.max_ctx is not None else None
@@ -866,6 +971,8 @@ def _measure_model(
         sample_ms=sample_ms,
         after_unload=after_unload,
         predicted_over=predicted_over,
+        weights_mib=weights_mib,
+        one_window_bound=one_window_bound,
     )
 
 
@@ -902,6 +1009,8 @@ def _row(
     sample_ms: int | None = None,
     after_unload: list[tuple[int | None, int | None]] | None = None,
     predicted_over: list[int] | None = None,
+    weights_mib: int | None = None,
+    one_window_bound: list[tuple[int, int]] | None = None,
 ) -> dict:
     num_predict = spec.get("confirm_num_predict", 1)
     if isinstance(num_predict, bool) or not isinstance(num_predict, int):
@@ -943,6 +1052,10 @@ def _row(
         settings["after_unload_mib"] = [{"ctx": ctx, "mib": mib} for ctx, mib in after_unload]
     if predicted_over:
         settings["predicted_over"] = list(predicted_over)
+    if weights_mib is not None:
+        settings["weights_mib"] = weights_mib
+    if one_window_bound:
+        settings["one_window_bound"] = [{"ctx": ctx, "mib": mib} for ctx, mib in one_window_bound]
     if prompt_meta is not None:
         settings["prompt_tokens"] = prompt_meta[0]
         settings["prompt_token_method"] = prompt_meta[1]

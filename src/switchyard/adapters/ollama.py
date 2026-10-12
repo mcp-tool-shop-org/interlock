@@ -10,14 +10,22 @@ Neither one is wall clock. ``think`` keeps the level string when it is not
 ``off`` or ``on``, so a later model can use low, medium, or high.
 
 The default transport sets no timeout. A caller that wants one passes
-``timeout`` on the adapter.
+``timeout`` on the adapter. ``cancel`` shuts the open socket down before the
+response is read, so a load can be closed while it is still running. Closing
+the socket does not free memory the server has already allocated.
 """
 
 from __future__ import annotations
 
+import http.client
 import json
+import select
+import socket
 import threading
-from urllib.request import Request, urlopen
+import time
+from urllib.parse import urlsplit
+
+_CANCEL_POLL_S = 0.2
 
 from switchyard.adapters.base import AdapterError, StepRequest, StepResult
 
@@ -126,16 +134,22 @@ class _Flight:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._close = None
+        self._cancelled = threading.Event()
 
     def arm(self, close) -> None:
         with self._lock:
+            self._cancelled.clear()
             self._close = close
 
     def disarm(self) -> None:
         with self._lock:
             self._close = None
 
+    def cancelled(self) -> bool:
+        return self._cancelled.is_set()
+
     def cancel(self) -> None:
+        self._cancelled.set()
         with self._lock:
             close = self._close
         if close is None:
@@ -146,6 +160,25 @@ class _Flight:
             return
 
 
+def _shutdown(conn: http.client.HTTPConnection) -> None:
+    """Shut the socket down, then close it. A bare close does not unblock a read."""
+
+    sock = getattr(conn, "sock", None)
+    if sock is not None:
+        try:
+            sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        try:
+            sock.close()
+        except OSError:
+            pass
+    try:
+        conn.close()
+    except OSError:
+        pass
+
+
 def default_transport(
     method: str,
     url: str,
@@ -153,26 +186,67 @@ def default_transport(
     timeout: float | None = None,
     flight: _Flight | None = None,
 ) -> dict:
+    """POST or GET over ``http.client``, armed before the response is read.
+
+    The closer is armed before ``getresponse``. During a non-streaming
+    generate that is the whole load: the server sends no bytes until it is
+    finished, so a closer armed only after the headers arrive never fires.
+    The closer shuts the socket down. Windows leaves a blocked ``recv``
+    running after that, so the wait is sliced and stops when cancel was asked.
+    """
+
+    parts = urlsplit(url)
+    if parts.scheme != "http" or not parts.hostname:
+        raise AdapterError("Ollama transport only opens local http")
+    path = parts.path or "/"
+    if parts.query:
+        path = f"{path}?{parts.query}"
     data = None if body is None else json.dumps(body).encode("utf-8")
-    request = Request(url, data=data, method=method)
-    if data is not None:
-        request.add_header("Content-Type", "application/json")
-    if timeout is None:
-        with urlopen(request) as response:
-            return _read_response(response, flight)
-    with urlopen(request, timeout=timeout) as response:
-        return _read_response(response, flight)
-
-
-def _read_response(response, flight: _Flight | None) -> dict:
-    closer = getattr(response, "close", None)
-    if flight is not None and callable(closer):
-        flight.arm(closer)
+    headers = {"Content-Type": "application/json"} if data is not None else {}
+    conn = http.client.HTTPConnection(parts.hostname, parts.port or 80, timeout=timeout)
     try:
-        return json.loads(response.read().decode("utf-8"))
+        if flight is not None:
+            flight.arm(lambda: _shutdown(conn))
+        conn.request(method, path, body=data, headers=headers)
+        if flight is not None and getattr(conn, "sock", None) is not None:
+            _wait_for_reply(conn, flight, timeout)
+        response = conn.getresponse()
+        payload = json.loads(response.read().decode("utf-8"))
+    except AdapterError:
+        raise
+    except (OSError, http.client.HTTPException, json.JSONDecodeError):
+        raise AdapterError("the request was closed")
     finally:
         if flight is not None:
             flight.disarm()
+        try:
+            conn.close()
+        except OSError:
+            pass
+    return payload
+
+
+def _wait_for_reply(conn: http.client.HTTPConnection, flight: _Flight, timeout: float | None) -> None:
+    """Return when the socket is readable, or raise once cancel has been asked."""
+
+    deadline = None if timeout is None else time.monotonic() + timeout
+    while True:
+        if flight.cancelled():
+            raise AdapterError("the request was closed")
+        if deadline is not None and time.monotonic() >= deadline:
+            raise AdapterError("the request was closed")
+        sock = getattr(conn, "sock", None)
+        if sock is None:
+            raise AdapterError("the request was closed")
+        slice_s = _CANCEL_POLL_S
+        if deadline is not None:
+            slice_s = min(slice_s, max(0.0, deadline - time.monotonic()))
+        try:
+            readable, _, _ = select.select([sock], [], [], slice_s)
+        except (OSError, ValueError):
+            raise AdapterError("the request was closed")
+        if readable:
+            return
 
 
 def _rate(count: object, duration_ns: object) -> float | None:
@@ -195,7 +269,11 @@ class OllamaAdapter:
         self.device = device
 
     def cancel(self) -> None:
-        """Close the in-flight request. The unload comes after this returns."""
+        """Close the in-flight request so the unload can take effect.
+
+        This does not free memory the load has already allocated. The unload
+        is what asks the server to drop the model.
+        """
 
         self._flight.cancel()
         closer = getattr(self.transport, "cancel", None)
@@ -261,6 +339,29 @@ class OllamaAdapter:
         if error:
             raise AdapterError(str(error))
         return payload
+
+    def tag_size(self, model: str, device: str | None = None) -> int | None:
+        """The model's ``size`` from ``/api/tags``, in bytes. Missing is None."""
+
+        refuse_cloud(model)
+        url = url_for(device or self.device)
+        payload = self.transport("GET", f"{url}/api/tags", None)
+        if not isinstance(payload, dict):
+            return None
+        models = payload.get("models")
+        if not isinstance(models, list):
+            return None
+        for item in models:
+            if not isinstance(item, dict):
+                continue
+            label = item.get("name") or item.get("model")
+            if not isinstance(label, str) or (label != model and not label.startswith(model + ":")):
+                continue
+            size = item.get("size")
+            if isinstance(size, bool) or not isinstance(size, int) or size < 0:
+                return None
+            return size
+        return None
 
     def show(self, model: str, device: str | None = None) -> dict:
         refuse_cloud(model)

@@ -112,7 +112,7 @@ def _fresh(tmp_path: Path) -> Path:
 
 
 class _Transport:
-    def __init__(self, seams, *, show_error=None, explode=False, spill_shared=False, spill_prompt=False, missing_shared=False, missing_prompt=False, abort_at=None, stick=False, linear=None, cold_disagrees=False):
+    def __init__(self, seams, *, show_error=None, explode=False, spill_shared=False, spill_prompt=False, missing_shared=False, missing_prompt=False, abort_at=None, stick=False, linear=None, cold_disagrees=False, omit_tags=False, tag_bytes=None, busy_mib=20000, hide_baseline=False, settle_high=0):
         self.seams = seams
         self.show_error = show_error
         self.explode = explode
@@ -124,6 +124,13 @@ class _Transport:
         self.stick = stick
         self.linear = linear
         self.cold_disagrees = cold_disagrees
+        self.omit_tags = omit_tags
+        self.tag_bytes = 16_000 * 1024 * 1024 if tag_bytes is None else tag_bytes
+        self.busy_mib = busy_mib
+        self.hide_baseline = hide_baseline
+        self.settle_high = settle_high
+        self.settle_reads = 0
+        self.shown = None
         self.calls = []
         self.unloads = []
         self.abort_unloads = []
@@ -139,6 +146,11 @@ class _Transport:
         if self.stick and self.seams is not None and self.seams.over:
             return 30500
         if not self.state["busy"]:
+            if self.hide_baseline:
+                return None
+            if self.settle_high and self.unloads and self.settle_reads < self.settle_high:
+                self.settle_reads += 1
+                return 30500
             return 1500
         ctx = self.state["ctx"]
         if self.abort_at is not None and isinstance(ctx, int) and ctx >= self.abort_at:
@@ -146,7 +158,7 @@ class _Transport:
         if self.linear is not None and isinstance(ctx, int):
             base, per_ctx = self.linear
             return base + per_ctx * ctx
-        return 20000
+        return self.busy_mib
 
     def shared_mib(self):
         if self.missing_shared and self.state["confirm"]:
@@ -165,7 +177,14 @@ class _Transport:
             if self.loaded is None:
                 return {"models": []}
             return {"models": [self.loaded]}
+        if url.endswith("/api/tags"):
+            if self.omit_tags:
+                return {"models": []}
+            name = self.shown or "qwen3:8b"
+            return {"models": [{"name": name, "size": self.tag_bytes}]}
         if url.endswith("/api/show"):
+            if isinstance(body, dict) and isinstance(body.get("model"), str):
+                self.shown = body["model"]
             if self.trace is not None:
                 self.trace.append("show")
             if self.show_error:
@@ -283,6 +302,8 @@ def test_a_clean_search_records_the_confirmed_window(tmp_path: Path):
     assert row["settings"]["prompt_tokens"] == 100000
     assert row["settings"]["prompt_token_search"] == 100000
     assert row["settings"]["prompt_token_cold"] == 100000
+    assert row["settings"]["weights_mib"] == 16000
+    assert {"ctx": 8192, "mib": 22500} in row["settings"]["one_window_bound"]
     assert row["gpu_resident"] is True
     assert row["model"]["size"] == row["model"]["size_vram"] == 1000
     assert row["model_family"] == "qwen"
@@ -346,6 +367,64 @@ def test_a_doubling_step_predicted_over_is_skipped_and_the_first_window_still_lo
     assert 31200 not in ctxs
     assert row["settings"]["max_resident_ctx"] not in row["settings"]["predicted_over"]
     assert row["settings"]["max_resident_ctx"] == 10240
+
+
+def test_one_measured_window_skips_a_doubling_with_less_than_one_cache_of_room(tmp_path: Path):
+    """Window 1 leaves less than one cache of room, so the doubling is predicted_over."""
+
+    weights = 1000 * 1024 * 1024
+    transport = _Transport(None, busy_mib=28000, tag_bytes=weights)
+    seams = _seams(transport)
+    _repo, rows = _run(tmp_path, transport, seams=seams)
+    row = rows[0]
+    ctxs = _ctxs(transport)
+    reading, baseline, ctx_1 = 28000, 1500, 4096
+    share = reading - baseline - 1000
+
+    def bound(ctx: int) -> int:
+        extra = share * (ctx - ctx_1)
+        return reading + (extra + ctx_1 - 1) // ctx_1
+
+    assert row["settings"]["weights_mib"] == 1000
+    assert row["settings"]["max_resident_ctx"] == 4096
+    assert {"ctx": 8192, "mib": bound(8192)} in row["settings"]["one_window_bound"]
+    assert bound(8192) >= 30500
+    assert 8192 in row["settings"]["predicted_over"]
+    assert 6144 in row["settings"]["predicted_over"]
+    assert 8192 not in ctxs
+    assert 6144 not in ctxs
+    assert 31200 not in ctxs
+    assert all(ctx == 4096 for ctx in ctxs)
+
+
+def test_a_missing_weight_size_stops_before_the_second_window(tmp_path: Path):
+    transport = _Transport(None, omit_tags=True)
+    seams = _seams(transport)
+    with pytest.raises(RunnerError, match="the second window had no bound"):
+        _run(tmp_path, transport, seams=seams)
+    ctxs = _ctxs(transport)
+    assert 4096 in ctxs
+    assert 8192 not in ctxs
+
+
+def test_a_missing_baseline_stops_before_the_second_window(tmp_path: Path):
+    transport = _Transport(None, hide_baseline=True)
+    seams = _seams(transport)
+    with pytest.raises(RunnerError, match="the second window had no bound"):
+        _run(tmp_path, transport, seams=seams)
+    ctxs = _ctxs(transport)
+    assert 4096 in ctxs
+    assert 8192 not in ctxs
+
+
+def test_a_card_that_falls_while_the_unload_settles_is_not_noted(tmp_path: Path):
+    transport = _Transport(None, abort_at=8192, settle_high=3)
+    seams = _seams(transport)
+    _repo, rows = _run(tmp_path, transport, seams=seams)
+    row = rows[0]
+    assert {"ctx": 8192, "mib": 1500} in row["settings"]["after_unload_mib"]
+    assert "after the unload" not in row["notes"]
+    assert transport.settle_reads == 3
 
 
 def test_a_cold_recount_mismatch_refuses_the_confirmation(tmp_path: Path):
@@ -503,6 +582,9 @@ def test_dry_run_names_the_confirmation_count(monkeypatch):
     assert "abort_mib: 30500" in text
     assert "ceiling_mib: 31200" in text
     assert "quant is read from /api/show at run time" in text
+    assert "closing the request does not return the memory a load already allocated" in text
+    assert "one measured window bounds the next context from that window's share" in text
+    assert "a second window with no bound stops the row" in text
     assert "heartbeat not read; adapters not called" in text
     assert "devices not started (--dry-run)" in text
     assert "rest_s" not in text
