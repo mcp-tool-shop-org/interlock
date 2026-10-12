@@ -93,6 +93,7 @@ PASSTHROUGH = (
     "prompt",
     "shift",
     "truncate",
+    "dynamic_shape",
     "temperature",
     "quant",
     "hf_cache",

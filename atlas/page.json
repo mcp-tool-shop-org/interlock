@@ -20,37 +20,30 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 17,
-      "changed": 19,
+      "added": 0,
+      "changed": 5,
       "moved": 0,
-      "parts": 4,
+      "parts": 3,
       "removed": 0
     },
     "items": [
       {
         "kind": "landing",
-        "sentence": "tests/fixtures/ollama/ is now read by scripts/record_ollama_fixtures.py.",
+        "sentence": "experiments/e4/spec.yaml is now read by tests/test_openvino_adapter.py.",
         "subjects": [
-          "tests/fixtures/ollama/",
-          "scripts/record_ollama_fixtures.py"
-        ]
-      },
-      {
-        "kind": "unassigned",
-        "sentence": "receipts/e4-2026-10-12.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.",
-        "subjects": [
-          "receipts/e4-2026-10-12.jsonl"
+          "experiments/e4/spec.yaml",
+          "tests/test_openvino_adapter.py"
         ]
       },
       {
         "kind": "counts",
-        "sentence": "17 files added and 19 changed content, across 4 parts.",
+        "sentence": "5 files changed content, across 3 parts.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "ca8b5f9dbd096bcbae9676d75005c3cc024bf83e",
-      "generatedAt": "2026-10-12T04:53:00.616Z"
+      "commit": "b3c6b90c455225370660b99a6a815cfa89690fd0",
+      "generatedAt": "2026-10-12T08:09:11.679Z"
     },
     "unchanged": false
   },
@@ -73,7 +66,7 @@
     {
       "a": "src/switchyard/adapters/openvino.py",
       "b": "tests/test_openvino_adapter.py",
-      "either": 20,
+      "either": 21,
       "partLabels": [
         "src",
         "tests"
@@ -83,12 +76,12 @@
         "tests"
       ],
       "relation": "b-imports-a",
-      "shared": 16
+      "shared": 17
     },
     {
       "a": "src/switchyard/harness/receipts.py",
       "b": "src/switchyard/receipt.py",
-      "either": 11,
+      "either": 12,
       "partLabels": [
         "src",
         "src"
@@ -133,10 +126,10 @@
   ],
   "changesTogetherNote": [
     "Confidence is low: fewer than 25 source files reach 10 revisions in the window.",
-    "Window: 180 days; a pair counts from 3 shared commits, since 6 source files reach 10 revisions; the floor rises to 10 when 25 do."
+    "Window: 180 days; a pair counts from 3 shared commits, since 7 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 0,
-  "commit": "b3c6b90c455225370660b99a6a815cfa89690fd0",
+  "commit": "84c48effb6a2fed294ad11def43e0521b95cb4a7",
   "defaultBranch": "main",
   "derived": "7 parts, mostly Python (71 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.",
   "doors": [
@@ -209,7 +202,7 @@
   "edges": [],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-12T08:09:11.679Z",
+  "generatedAt": "2026-10-12T12:22:43.980Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "3 writes and 4 reads use paths built at run time and are not named here.",

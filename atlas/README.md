@@ -1,6 +1,6 @@
 # switchyard: how it works
 
-Mapped at 2026-10-12 from commit b3c6b90 by Atlas 1.24.0.
+Mapped at 2026-10-12 from commit 84c48ef by Atlas 1.24.0.
 
 ## What this is
 
@@ -8,11 +8,10 @@ switchyard routes each job to a model, engine and device from a receipt-backed t
 
 7 parts, mostly Python (71 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.
 
-## What changed since 2026-10-12 (ca8b5f9)
+## What changed since 2026-10-12 (b3c6b90)
 
-- tests/fixtures/ollama/ is now read by scripts/record_ollama_fixtures.py.
-- receipts/e4-2026-10-12.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
-- 17 files added and 19 changed content, across 4 parts.
+- experiments/e4/spec.yaml is now read by tests/test_openvino_adapter.py.
+- 5 files changed content, across 3 parts.
 
 ## What comes in
 
@@ -40,14 +39,14 @@ CI writes nothing this map can see.
 ## What tends to change together
 
 - **src/switchyard/harness/fill.py** and **tests/test_fill_card_live.py** changed together in 5 of 5 commits, and the tests part imports the src part.
-- **src/switchyard/adapters/openvino.py** and **tests/test_openvino_adapter.py** changed together in 16 of 20 commits, and the tests part imports the src part.
-- **src/switchyard/harness/receipts.py** and **src/switchyard/receipt.py** changed together in 7 of 11 commits, inside the src part.
+- **src/switchyard/adapters/openvino.py** and **tests/test_openvino_adapter.py** changed together in 17 of 21 commits, and the tests part imports the src part.
+- **src/switchyard/harness/receipts.py** and **src/switchyard/receipt.py** changed together in 7 of 12 commits, inside the src part.
 - **src/switchyard/adapters/ollama.py** and **src/switchyard/harness/fill.py** changed together in 4 of 7 commits, inside the src part.
 - **src/switchyard/adapters/ollama.py** and **tests/test_fill_card_live.py** changed together in 4 of 7 commits, and the tests part imports the src part.
 
 Confidence is low: fewer than 25 source files reach 10 revisions in the window.
 
-Window: 180 days; a pair counts from 3 shared commits, since 6 source files reach 10 revisions; the floor rises to 10 when 25 do.
+Window: 180 days; a pair counts from 3 shared commits, since 7 source files reach 10 revisions; the floor rises to 10 when 25 do.
 
 ## What no test touches
 

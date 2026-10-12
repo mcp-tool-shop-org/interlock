@@ -94,6 +94,8 @@ def measured_row(
     for key in ("prompt_tokens", "truncated_tokens", "token_type_ids_fed"):
         if learned.get(key) is not None:
             settings[key] = learned[key]
+    if learned.get("dynamic_shape") is True or arm.get("dynamic_shape") is True:
+        settings["dynamic_shape"] = True
     latency = {
         "cold_ms": summary.cold_ms,
         "warm_p50_ms": summary.warm_p50_ms,
