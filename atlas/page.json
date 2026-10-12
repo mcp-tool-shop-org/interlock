@@ -20,74 +20,48 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 42,
-      "changed": 40,
-      "moved": 23,
-      "parts": 7,
-      "removed": 37
+      "added": 64,
+      "changed": 0,
+      "moved": 0,
+      "parts": 0,
+      "removed": 0
     },
     "items": [
       {
-        "kind": "door",
-        "sentence": "Release (.github/workflows/release.yml) is a new door. It starts when a release is published; or by hand. It checks src/interlock/.",
+        "kind": "unassigned",
+        "sentence": "receipts/e4b-block-2-series/5090-igpu-0-alone-after-5090-alone.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.",
         "subjects": [
-          ".github/workflows/release.yml",
-          "src/interlock/"
+          "receipts/e4b-block-2-series/5090-igpu-0-alone-after-5090-alone.jsonl"
         ]
       },
       {
-        "kind": "door",
-        "sentence": "interlock (pyproject.toml) is a new command. It runs src/interlock/cli.py.",
+        "kind": "unassigned",
+        "sentence": "receipts/e4b-block-2-series/5090-igpu-0-alone-before-5090-alone.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.",
         "subjects": [
-          "pyproject.toml",
-          "src/interlock/cli.py"
+          "receipts/e4b-block-2-series/5090-igpu-0-alone-before-5090-alone.jsonl"
         ]
       },
       {
-        "kind": "door",
-        "sentence": "switchyard (pyproject.toml) is no longer a command.",
+        "kind": "unassigned",
+        "sentence": "receipts/e4b-block-2-series/5090-igpu-0-paired-5090-with-igpu.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.",
         "subjects": [
-          "pyproject.toml"
+          "receipts/e4b-block-2-series/5090-igpu-0-paired-5090-with-igpu.jsonl"
         ]
       },
       {
-        "kind": "landing",
-        "sentence": "CHANGELOG.md is now read by tests/test_old_name.py.",
-        "subjects": [
-          "CHANGELOG.md",
-          "tests/test_old_name.py"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": "docs/handoff/ is now read by tests/test_old_name.py.",
-        "subjects": [
-          "docs/handoff/",
-          "tests/test_old_name.py"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": "experiments/ is now also read by tests/test_old_name.py.",
-        "subjects": [
-          "experiments/",
-          "tests/test_old_name.py"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": "And 9 more new writers and readers of places.",
+        "kind": "unassigned",
+        "sentence": "And 61 more new files that belong to no part.",
         "subjects": []
       },
       {
         "kind": "counts",
-        "sentence": "42 files added, 37 removed, 23 moved and 40 changed content, across 7 parts.",
+        "sentence": "64 files added.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "0d6e91613a740788c5187791a641571cc3e1a8e4",
-      "generatedAt": "2026-10-12T20:25:58.283Z"
+      "commit": "3d00a1103ebd9904feed4845000c43b065c39874",
+      "generatedAt": "2026-10-12T21:54:33.359Z"
     },
     "unchanged": false
   },
@@ -174,7 +148,7 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 8 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 1,
-  "commit": "3d00a1103ebd9904feed4845000c43b065c39874",
+  "commit": "64ff92401747dfe1559afb423208d4a49fadae17",
   "defaultBranch": "main",
   "derived": "7 parts, mostly Python (84 files). Work enters through 3 doors; the busiest is CI, which reaches 2 parts. It publishes to PyPI. People run interlock.",
   "doors": [
@@ -277,13 +251,13 @@
   "edges": [],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-12T21:54:33.359Z",
+  "generatedAt": "2026-10-12T22:06:37.583Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "3 writes and 4 reads use paths built at run time and are not named here.",
     "12 writes and 37 reads go to a path their caller passes, not to this repository.",
     "3 reads go to the directory the command is run in (receipts/), not to this repository.",
-    "19 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 16 more.",
+    "83 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 80 more.",
     "Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window."
   ],
   "mainDoor": ".github/workflows/ci.yml",

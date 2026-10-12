@@ -213,8 +213,8 @@
         "path": "assets/logo/switchyard_64.png"
       },
       {
-        "commits": 24,
-        "lines": 594,
+        "commits": 26,
+        "lines": 653,
         "path": "atlas/README.md"
       },
       {
@@ -223,18 +223,18 @@
         "path": "atlas/boundaries.yaml"
       },
       {
-        "commits": 24,
-        "lines": 1768,
+        "commits": 26,
+        "lines": 1972,
         "path": "atlas/page.json"
       },
       {
-        "commits": 24,
-        "lines": 4192,
+        "commits": 26,
+        "lines": 5134,
         "path": "atlas/statistics.json"
       },
       {
-        "commits": 24,
-        "lines": 26326,
+        "commits": 26,
+        "lines": 29290,
         "path": "atlas/structure.json"
       },
       {
@@ -716,6 +716,326 @@
         "commits": 1,
         "lines": 7,
         "path": "receipts/e4-2026-10-12.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-igpu-0-alone-after-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-igpu-0-alone-before-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 22,
+        "path": "receipts/e4b-block-2-series/5090-igpu-0-paired-5090-with-igpu.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-igpu-1-alone-after-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-igpu-1-alone-before-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-igpu-1-paired-5090-with-igpu.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-igpu-2-alone-after-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-igpu-2-alone-before-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 24,
+        "path": "receipts/e4b-block-2-series/5090-igpu-2-paired-5090-with-igpu.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-igpu-3-alone-after-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-igpu-3-alone-before-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 24,
+        "path": "receipts/e4b-block-2-series/5090-igpu-3-paired-5090-with-igpu.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-igpu-4-alone-after-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-igpu-4-alone-before-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 24,
+        "path": "receipts/e4b-block-2-series/5090-igpu-4-paired-5090-with-igpu.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 24,
+        "path": "receipts/e4b-block-2-series/5090-igpu-5-alone-after-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-igpu-5-alone-before-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 24,
+        "path": "receipts/e4b-block-2-series/5090-igpu-5-paired-5090-with-igpu.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 24,
+        "path": "receipts/e4b-block-2-series/5090-igpu-6-alone-after-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-igpu-6-alone-before-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 24,
+        "path": "receipts/e4b-block-2-series/5090-igpu-6-paired-5090-with-igpu.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-igpu-7-alone-after-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 24,
+        "path": "receipts/e4b-block-2-series/5090-igpu-7-alone-before-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 24,
+        "path": "receipts/e4b-block-2-series/5090-igpu-7-paired-5090-with-igpu.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-igpu-8-alone-after-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-igpu-8-alone-before-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 24,
+        "path": "receipts/e4b-block-2-series/5090-igpu-8-paired-5090-with-igpu.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-igpu-9-alone-after-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-igpu-9-alone-before-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 24,
+        "path": "receipts/e4b-block-2-series/5090-igpu-9-paired-5090-with-igpu.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-npu-0-alone-after-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-npu-0-alone-before-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 24,
+        "path": "receipts/e4b-block-2-series/5090-npu-0-paired-5090-with-npu.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-npu-1-alone-after-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-npu-1-alone-before-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 24,
+        "path": "receipts/e4b-block-2-series/5090-npu-1-paired-5090-with-npu.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-npu-2-alone-after-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 24,
+        "path": "receipts/e4b-block-2-series/5090-npu-2-alone-before-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 24,
+        "path": "receipts/e4b-block-2-series/5090-npu-2-paired-5090-with-npu.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-npu-3-alone-after-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-npu-3-alone-before-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-npu-3-paired-5090-with-npu.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-npu-4-alone-after-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 24,
+        "path": "receipts/e4b-block-2-series/5090-npu-4-alone-before-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-npu-4-paired-5090-with-npu.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 24,
+        "path": "receipts/e4b-block-2-series/5090-npu-5-alone-after-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 24,
+        "path": "receipts/e4b-block-2-series/5090-npu-5-alone-before-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 24,
+        "path": "receipts/e4b-block-2-series/5090-npu-5-paired-5090-with-npu.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-npu-6-alone-after-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-npu-6-alone-before-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-npu-6-paired-5090-with-npu.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-npu-7-alone-after-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-npu-7-alone-before-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-npu-7-paired-5090-with-npu.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-npu-8-alone-after-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-npu-8-alone-before-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 24,
+        "path": "receipts/e4b-block-2-series/5090-npu-8-paired-5090-with-npu.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-npu-9-alone-after-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-npu-9-alone-before-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/5090-npu-9-paired-5090-with-npu.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 24,
+        "path": "receipts/e4b-block-2-series/cold-0-cold-5090-alone.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 23,
+        "path": "receipts/e4b-block-2-series/cold-0-cold-5090-with-igpu.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 24,
+        "path": "receipts/e4b-block-2-series/cold-0-cold-5090-with-npu.jsonl"
+      },
+      {
+        "commits": 1,
+        "lines": 22,
+        "path": "receipts/e4b-block-2.jsonl"
       },
       {
         "commits": 3,
@@ -1278,51 +1598,51 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-10-12T21:54:33.359Z",
+  "generatedAt": "2026-10-12T22:06:37.583Z",
   "generatedFrom": {
-    "commit": "3d00a1103ebd9904feed4845000c43b065c39874"
+    "commit": "64ff92401747dfe1559afb423208d4a49fadae17"
   },
   "pairs": [
     {
       "a": "atlas/README.md",
       "b": "atlas/page.json",
-      "either": 23,
-      "shared": 23,
+      "either": 24,
+      "shared": 24,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/statistics.json",
-      "either": 23,
-      "shared": 23,
+      "either": 24,
+      "shared": 24,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/structure.json",
-      "either": 23,
-      "shared": 23,
+      "either": 24,
+      "shared": 24,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/statistics.json",
-      "either": 23,
-      "shared": 23,
+      "either": 24,
+      "shared": 24,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/structure.json",
-      "either": 23,
-      "shared": 23,
+      "either": 24,
+      "shared": 24,
       "strength": 1
     },
     {
       "a": "atlas/statistics.json",
       "b": "atlas/structure.json",
-      "either": 23,
-      "shared": 23,
+      "either": 24,
+      "shared": 24,
       "strength": 1
     },
     {
@@ -1418,7 +1738,7 @@
     }
   ],
   "parameters": {
-    "appliedChangesetLimit": 42.25,
+    "appliedChangesetLimit": 50,
     "changeset": 50,
     "changesetFraction": 0.25,
     "cohesionDrop": 0.2,
@@ -1427,16 +1747,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-10-12T17:53:50-04:00",
-    "inScopeFiles": 169,
+    "headDate": "2026-10-12T18:06:24-04:00",
+    "inScopeFiles": 233,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 88,
+    "qualifyingCommits": 89,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-04-15T21:53:50.000Z",
+    "since": "2026-04-15T22:06:24.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",

@@ -1,6 +1,6 @@
 # interlock: how it works
 
-Mapped at 2026-10-12 from commit 3d00a11 by Atlas 1.24.0.
+Mapped at 2026-10-12 from commit 64ff924 by Atlas 1.24.0.
 
 ## What this is
 
@@ -8,16 +8,13 @@ interlock routes each job to a model, engine and device from a receipt-backed ta
 
 7 parts, mostly Python (84 files). Work enters through 3 doors; the busiest is CI, which reaches 2 parts. It publishes to PyPI. People run interlock.
 
-## What changed since 2026-10-12 (0d6e916)
+## What changed since 2026-10-12 (3d00a11)
 
-- Release (.github/workflows/release.yml) is a new door. It starts when a release is published; or by hand. It checks src/interlock/.
-- interlock (pyproject.toml) is a new command. It runs src/interlock/cli.py.
-- switchyard (pyproject.toml) is no longer a command.
-- CHANGELOG.md is now read by tests/test_old_name.py.
-- docs/handoff/ is now read by tests/test_old_name.py.
-- experiments/ is now also read by tests/test_old_name.py.
-- And 9 more new writers and readers of places.
-- 42 files added, 37 removed, 23 moved and 40 changed content, across 7 parts.
+- receipts/e4b-block-2-series/5090-igpu-0-alone-after-5090-alone.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
+- receipts/e4b-block-2-series/5090-igpu-0-alone-before-5090-alone.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
+- receipts/e4b-block-2-series/5090-igpu-0-paired-5090-with-igpu.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
+- And 61 more new files that belong to no part.
+- 64 files added.
 
 ## What comes in
 
@@ -91,7 +88,7 @@ Read those in order to follow one run of interlock end to end. This path follows
 - 3 writes and 4 reads use paths built at run time and are not named here.
 - 12 writes and 37 reads go to a path their caller passes, not to this repository.
 - 3 reads go to the directory the command is run in (receipts/), not to this repository.
-- 19 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 16 more.
+- 83 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 80 more.
 - Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window.
 
 Regenerate with `npx --yes @dogfood-lab/atlas map`.
