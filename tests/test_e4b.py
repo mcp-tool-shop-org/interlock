@@ -19,13 +19,21 @@ from switchyard.guards import GuardError
 from switchyard.harness.e4b import (
     E4bError,
     IntelLane,
+    GENERATE_TIMEOUT_S,
     PILOT_CALLS,
+    PILOT_CLOCK_RULE,
+    PILOT_MIN_GOOD,
+    PROBE_TIMEOUT_S,
+    CpuBurn,
+    LiveGpuSample,
     build_live_seams,
     card_models_at_ceiling,
     collect_series,
     dry_text,
     generate_loop,
     is_steady,
+    live_sample_cpu,
+    live_sample_gpu,
     note_vram,
     owned_generate,
     parse_nvidia_smi,
@@ -33,6 +41,7 @@ from switchyard.harness.e4b import (
     pilot_destination,
     ollama_pin,
     pilot_summary,
+    _header,
     prove_owned_server,
     read_git,
     read_nvml,
@@ -63,6 +72,8 @@ from switchyard.harness.e4b_stats import (
 )
 from switchyard.harness.ollama_serve import (
     LISTENER_SCRIPT,
+    READY_INTERVAL_S,
+    READY_TIMEOUT_S,
     Server,
     ServeError,
     assert_port_free,
@@ -74,6 +85,7 @@ from switchyard.harness.ollama_serve import (
     start_line,
     stop_process_tree,
 )
+from switchyard.adapters.record_fixtures import read_card_mib
 from switchyard.harness.spec import SpecError, load_spec, validate_spec
 from switchyard.harness.timing import percentile
 
@@ -951,16 +963,23 @@ def test_run_owned_server_lifecycle(tmp_path: Path):
     def fail_open(method, url):
         raise ServeError("down")
 
+    def spawn_dead(argv, environment, log_path):
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        with log_path.open("ab") as handle:
+            handle.write(b"child exited before bind\n")
+        return SimpleNamespace(pid=42, poll=lambda: 1)
+
     dead = Server(
         pin,
         opener=fail_open,
-        spawn=spawn,
+        spawn=spawn_dead,
         stop_tree=lambda pid: killed.append(pid),
         log_path=tmp_path / "logs" / "dead.log",
         bind=lambda host, port: None,
     )
-    with pytest.raises(ServeError):
+    with pytest.raises(ServeError, match="exited before") as exited:
         dead.start()
+    assert "child exited before bind" in str(exited.value)
     assert killed == [42, 42]
     commands = []
     stop_process_tree(9, system="nt", run=lambda cmd, check=False: commands.append(cmd))
@@ -1051,7 +1070,7 @@ def test_live_seams_post_only_to_11441(tmp_path: Path, monkeypatch):
         def read(self):
             return b'{"version": "0.35.1"}'
 
-    monkeypatch.setattr("urllib.request.urlopen", lambda request: Response())
+    monkeypatch.setattr("urllib.request.urlopen", lambda request, timeout=None: Response())
     assert urllib_exchange("GET", "http://127.0.0.1:11441/api/version")["version"] == "0.35.1"
 
 
@@ -1497,3 +1516,240 @@ def test_a_card_that_is_not_empty_refuses_the_block_and_the_pilot_before_spawn(t
         opener=lambda method, url: {"version": "0.35.1"},
     )
     assert busy.card_models() == [5000]
+
+
+def test_the_pilot_counts_its_prompt_only_once_the_owned_server_is_up(tmp_path: Path):
+    # Live 2026-10-12: the pilot counted on 11441 before starting it, and the count was refused (WinError 10061).
+    spec = _spec([PAIRS[0]])
+    server = _Server()
+
+    def call(arm, *, num_predict, measured, kind, prompt):
+        payload = _clean(arm, num_predict=num_predict, kind=kind)
+        if kind == "measure":
+            payload["clocks_mhz"] = [2000.0, 2000.0]
+            payload["eval_count"] = 1024
+        return payload
+
+    seams = _seams(server, call)
+    counted = []
+
+    def count(text):
+        assert "start" in server.events, "the prompt was counted before the run-owned server started"
+        counted.append(text)
+        return len(text.split())
+
+    seams.count_tokens = count
+    run_pilot(spec, seams, root=tmp_path, run_id="pilot-order", repo=tmp_path, calls=PILOT_CALLS)
+    assert counted
+
+
+def test_the_owned_server_waits_out_the_first_refused_version_calls(tmp_path: Path):
+    pin = _fresh_pin(tmp_path)
+    tries = {"n": 0}
+    slept = []
+
+    def opener(method, url):
+        assert method == "GET"
+        assert url == "http://127.0.0.1:11441/api/version"
+        tries["n"] += 1
+        if tries["n"] < 3:
+            raise OSError("10061")
+        return {"version": "0.35.1"}
+
+    clock = {"t": 0.0}
+
+    def now():
+        return clock["t"]
+
+    def sleep(seconds):
+        slept.append(seconds)
+        clock["t"] += seconds
+
+    killed = []
+    server = Server(
+        pin,
+        opener=opener,
+        spawn=lambda argv, environment, log_path: SimpleNamespace(pid=7),
+        stop_tree=lambda pid: killed.append(pid),
+        log_path=tmp_path / "wait.log",
+        bind=lambda host, port: None,
+        sleep=sleep,
+        now=now,
+    )
+    running = server.start()
+    assert running.version_start == {"version": "0.35.1"}
+    assert tries["n"] == 3
+    assert slept == [READY_INTERVAL_S, READY_INTERVAL_S]
+    assert READY_TIMEOUT_S == 30
+    assert killed == []
+
+
+def test_the_owned_server_stops_when_version_never_answers(tmp_path: Path):
+    pin = _fresh_pin(tmp_path)
+    clock = {"t": 0.0}
+
+    def now():
+        return clock["t"]
+
+    def sleep(seconds):
+        clock["t"] += seconds
+
+    killed = []
+    server = Server(
+        pin,
+        opener=lambda method, url: (_ for _ in ()).throw(OSError("10061")),
+        spawn=lambda argv, environment, log_path: SimpleNamespace(pid=8),
+        stop_tree=lambda pid: killed.append(pid),
+        log_path=tmp_path / "never.log",
+        bind=lambda host, port: None,
+        sleep=sleep,
+        now=now,
+    )
+    with pytest.raises(ServeError, match="within 30"):
+        server.start()
+    assert killed == [8]
+    assert clock["t"] >= READY_TIMEOUT_S
+
+
+def test_one_missing_pilot_clock_is_recorded_and_seventeen_good_calls_refuse(tmp_path: Path):
+    spec = _spec([PAIRS[0]])
+    state = {"n": 0}
+
+    def call(arm, *, num_predict, measured, kind, prompt):
+        payload = _clean(arm, num_predict=num_predict, kind=kind)
+        if kind != "measure":
+            return payload
+        state["n"] += 1
+        payload["eval_count"] = 1024
+        payload["sample_interval_s"] = 0.2
+        if state["n"] == 1:
+            payload["clocks_mhz"] = [2000.0, None]
+        else:
+            payload["clocks_mhz"] = [2000.0, 2010.0]
+        return payload
+
+    document = run_pilot(spec, _seams(_Server(), call), root=tmp_path, run_id="one-miss", repo=tmp_path, calls=PILOT_CALLS)
+    assert document["missing_calls"] == 1
+    assert document["good_calls"] == PILOT_CALLS - 1
+    assert document["calls"] == PILOT_CALLS
+    assert document["pilot_clock_rule"] == PILOT_CLOCK_RULE
+    assert document["sample_interval_s"] == pytest.approx(0.2)
+    assert len(document["ranges_mhz"]) == PILOT_CALLS - 1
+
+    short = tmp_path / "few"
+    state["n"] = 0
+
+    def too_few(arm, *, num_predict, measured, kind, prompt):
+        payload = _clean(arm, num_predict=num_predict, kind=kind)
+        if kind == "measure":
+            state["n"] += 1
+            if state["n"] <= PILOT_CALLS - PILOT_MIN_GOOD + 1:
+                payload["clocks_mhz"] = [None]
+        return payload
+
+    with pytest.raises(E4bError, match="at least 18"):
+        run_pilot(spec, _seams(_Server(), too_few), root=short, run_id="few", repo=short, calls=PILOT_CALLS)
+    assert not (short / "pilot-e4b" / "few.json").exists()
+
+
+def test_a_generate_timeout_and_a_probe_timeout_are_refusals(monkeypatch):
+    def slow(request, timeout=None):
+        raise TimeoutError(timeout)
+
+    monkeypatch.setattr("urllib.request.urlopen", slow)
+    with pytest.raises(E4bError, match="GET /api/version timed out after 10"):
+        urllib_exchange("GET", "http://127.0.0.1:11441/api/version")
+    with pytest.raises(E4bError, match="POST /api/generate timed out after 300"):
+        urllib_exchange("POST", "http://127.0.0.1:11441/api/generate", {"prompt": "x"})
+    assert urllib_exchange.probe_timeout_s == PROBE_TIMEOUT_S
+    assert urllib_exchange.generate_timeout_s == GENERATE_TIMEOUT_S
+
+
+def test_the_burn_stops_when_the_slot_ends_and_when_it_raises():
+    burn = CpuBurn()
+    burn.start(1)
+    try:
+        assert burn._threads and burn._threads[0].is_alive()
+    finally:
+        burn.stop()
+    assert burn._threads == []
+
+    stopped = {"n": 0}
+
+    def start(count):
+        start.calls.append(count)
+
+    start.calls = []
+
+    def stop():
+        stopped["n"] += 1
+
+    start.stop = stop
+    with pytest.raises(E4bError, match="cannot be negative"):
+        run_burn(
+            target_utility=-1,
+            duration_s=1,
+            sample_utility=lambda: 0,
+            sample_performance=lambda: 0,
+            sleep=lambda seconds: None,
+            start_threads=start,
+        )
+    assert stopped["n"] == 1
+    assert live_sample_cpu.live is True
+
+
+def test_live_sample_gpu_records_nvml_then_smi(monkeypatch):
+    record_nvml = type("R", (), {"probe": None, "intervals": []})()
+    monkeypatch.setattr("switchyard.harness.e4b.read_nvml", lambda library: (1500.0, 80.0))
+    assert live_sample_gpu(record_nvml) == (1500.0, 80.0)
+    assert record_nvml.probe == "nvml"
+
+    record_smi = type("R", (), {"probe": None, "intervals": []})()
+
+    def no_nvml(library):
+        raise RuntimeError("nvml down")
+
+    monkeypatch.setattr("switchyard.harness.e4b.read_nvml", no_nvml)
+    monkeypatch.setattr("switchyard.harness.e4b.smi_query", lambda run: "1800, 40")
+    assert live_sample_gpu(record_smi) == (1800.0, 40.0)
+    assert record_smi.probe == "smi"
+
+
+def test_the_block_receipt_carries_the_server_config_and_the_probe(tmp_path: Path):
+    line = 'time=t msg="server config" env="map[OLLAMA_FLASH_ATTENTION:true OLLAMA_KV_CACHE_TYPE:q8_0]"'
+    running = SimpleNamespace(argv=["ollama", "serve"], environment={}, version_start={}, version_stop=None)
+    record = type("R", (), {"probe": "smi", "intervals": [0.21, 0.25]})()
+    seams = SimpleNamespace(
+        git=lambda repo: {"git_sha": "a" * 40, "clean_tree": True},
+        vram=lambda: 12,
+        log_segment=lambda: line + "\n" + "load_backend: loaded CUDA backend from cuda_v13\n",
+        sample_record=record,
+    )
+    header = _header(_spec([PAIRS[0]]), seams, tmp_path, running, [], "prompt", aborted=False)
+    assert header["flash_attention"] == "true"
+    assert header["kv_cache_type"] == "q8_0"
+    assert header["server_config_line"] == line
+    assert header["gpu_probe"] == "smi"
+    assert header["sample_interval_s"] == pytest.approx(0.23)
+
+
+def test_live_seams_are_not_stubs(tmp_path: Path, monkeypatch):
+    pin = _fresh_pin(tmp_path)
+    monkeypatch.setattr("switchyard.harness.e4b.resolve_pin", lambda run: pin)
+
+    class FakeServer:
+        def __init__(self, *args, **kwargs):
+            self.kwargs = kwargs
+
+    monkeypatch.setattr("switchyard.harness.ollama_serve.Server", FakeServer)
+    seams = build_live_seams(tmp_path, "live-defaults", _spec([PAIRS[0]]), pilot=True)
+    assert isinstance(seams.sample_gpu, LiveGpuSample)
+    assert seams.sample_gpu.live is True
+    assert seams.sample_cpu is live_sample_cpu
+    assert isinstance(getattr(seams.start_threads, "__self__", None), CpuBurn)
+    assert seams.vram is read_card_mib
+    assert seams.probe_timeout_s == PROBE_TIMEOUT_S == 10
+    assert seams.generate_timeout_s == GENERATE_TIMEOUT_S == 300
+    assert seams.transport is urllib_exchange
+    assert seams.transport.probe_timeout_s == 10
+    assert seams.transport.generate_timeout_s == 300

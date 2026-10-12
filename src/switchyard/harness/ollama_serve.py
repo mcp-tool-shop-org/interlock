@@ -8,7 +8,9 @@ sha256 of ``lib/ollama/cuda_v13/ggml-cuda.dll`` beside the executable.
 The process tree is stopped at block end and on abort.
 
 Nothing here contacts a GPU. The live listener command is data until a caller
-runs it.
+runs it. After spawn, ``start`` polls ``GET /api/version`` every 0.25 s for up
+to 30 s. If the child exits first, the run stops with the tail of this start's
+log.
 """
 
 from __future__ import annotations
@@ -19,6 +21,7 @@ import os
 import re
 import socket
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -28,6 +31,8 @@ HOST = "127.0.0.1"
 PORT = 11441
 SHARED_PORTS = frozenset({11434, 11490})
 CUDA_RELATIVE = Path("lib") / "ollama" / "cuda_v13" / "ggml-cuda.dll"
+READY_TIMEOUT_S = 30
+READY_INTERVAL_S = 0.25
 
 
 class ServeError(Exception):
@@ -146,6 +151,25 @@ def read_log_segment(path: Path, offset: int) -> str:
     return data[offset:].decode("utf-8", errors="replace")
 
 
+def log_tail(path: Path | None, offset: int, *, lines: int = 20) -> str:
+    """The last lines of this start's segment. Older bytes are not included."""
+
+    if path is None:
+        return ""
+    segment = read_log_segment(path, offset)
+    kept = segment.splitlines()[-lines:]
+    return "\n".join(kept)
+
+
+def _process_exited(process: object) -> bool:
+    """True when the child has a return code. A process with no poll stays running."""
+
+    poll = getattr(process, "poll", None)
+    if callable(poll):
+        return poll() is not None
+    return getattr(process, "returncode", None) is not None
+
+
 def refuse_shared_url(url: str) -> None:
     port = urlsplit(url).port
     if port in SHARED_PORTS:
@@ -219,7 +243,22 @@ class Server:
     ``stop``; the two names stay apart so the method can call the killer.
     """
 
-    def __init__(self, pin: Pin, *, host: str = HOST, port: int = PORT, opener, spawn, stop_tree, log_path: Path, bind=assert_port_free):
+    def __init__(
+        self,
+        pin: Pin,
+        *,
+        host: str = HOST,
+        port: int = PORT,
+        opener,
+        spawn,
+        stop_tree,
+        log_path: Path,
+        bind=assert_port_free,
+        sleep=time.sleep,
+        now=time.monotonic,
+        ready_timeout_s: float = READY_TIMEOUT_S,
+        ready_interval_s: float = READY_INTERVAL_S,
+    ):
         self.pin = pin
         self.host = host
         self.port = port
@@ -227,6 +266,10 @@ class Server:
         self.spawn = spawn
         self._stop_tree = stop_tree
         self._bind = bind
+        self._sleep = sleep
+        self._now = now
+        self._ready_timeout_s = ready_timeout_s
+        self._ready_interval_s = ready_interval_s
         self.log_path = log_path
         self.running: Running | None = None
         self._stopped = False
@@ -249,15 +292,40 @@ class Server:
             log_path=self.log_path,
             log_offset=offset,
         )
-        try:
-            self.running.version_start = get_json(self._url("/api/version"), self.opener)
-        except Exception:
+        deadline = self._now() + self._ready_timeout_s
+        while True:
+            if _process_exited(process):
+                self._abandon("the owned server exited before GET /api/version answered")
             try:
-                self.stop()
+                self.running.version_start = get_json(self._url("/api/version"), self.opener)
+                return self.running
             except Exception:
-                pass
-            raise
-        return self.running
+                if _process_exited(process):
+                    self._abandon("the owned server exited before GET /api/version answered")
+                if self._now() >= deadline:
+                    self._abandon(
+                        "the owned server did not answer GET /api/version "
+                        f"within {self._ready_timeout_s:g} s"
+                    )
+                self._sleep(self._ready_interval_s)
+
+    def _abandon(self, message: str) -> None:
+        """Kill the tree and raise. The version probe in ``stop`` must not hide this message."""
+
+        running = self.running
+        tail = ""
+        if running is not None:
+            tail = log_tail(running.log_path, running.log_offset)
+            if not self._stopped:
+                self._stopped = True
+                pid = getattr(running.process, "pid", None)
+                if pid is not None:
+                    try:
+                        self._stop_tree(pid)
+                    except Exception:
+                        pass
+        text = message if not tail else f"{message}\n{tail}"
+        raise ServeError(text)
 
     def probe_ps(self) -> dict:
         if self.running is None:

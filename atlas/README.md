@@ -1,17 +1,16 @@
 # switchyard: how it works
 
-Mapped at 2026-10-12 from commit 495c875 by Atlas 1.23.0.
+Mapped at 2026-10-12 from commit 8082da9 by Atlas 1.23.0.
 
 ## What this is
 
 switchyard routes each job to a model, engine and device from a receipt-backed table. (written by a person)
 
-7 parts, mostly Python (77 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.
+7 parts, mostly Python (78 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.
 
-## What changed since 2026-10-12 (876d293)
+## What changed since 2026-10-12 (495c875)
 
-- receipts/ is now read by tests/test_e4b.py.
-- 5 files added and 7 changed content, across 4 parts.
+Nothing structural changed since 2026-10-12; 1 file added and 12 changed content.
 
 ## What comes in
 
@@ -38,8 +37,8 @@ CI writes nothing this map can see.
 
 ## What tends to change together
 
-- **src/switchyard/harness/fill.py** and **tests/test_fill_card_live.py** changed together in 5 of 6 commits, and the tests part imports the src part.
 - **src/switchyard/adapters/openvino.py** and **tests/test_openvino_adapter.py** changed together in 17 of 22 commits, and the tests part imports the src part.
+- **src/switchyard/harness/fill.py** and **tests/test_fill_card_live.py** changed together in 5 of 7 commits, and the tests part imports the src part.
 - **src/switchyard/harness/receipts.py** and **src/switchyard/receipt.py** changed together in 7 of 12 commits, inside the src part.
 - **src/switchyard/harness/runner.py** and **tests/test_harness.py** changed together in 14 of 26 commits, and the tests part imports the src part.
 - **src/switchyard/adapters/ollama.py** and **tests/test_fill_card_live.py** changed together in 4 of 8 commits, and the tests part imports the src part.

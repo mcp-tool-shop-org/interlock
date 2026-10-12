@@ -20,49 +20,26 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 5,
-      "changed": 7,
+      "added": 1,
+      "changed": 12,
       "moved": 0,
       "parts": 4,
       "removed": 0
     },
     "items": [
       {
-        "kind": "landing",
-        "sentence": "receipts/ is now read by tests/test_e4b.py.",
-        "subjects": [
-          "receipts/",
-          "tests/test_e4b.py"
-        ]
-      },
-      {
         "kind": "counts",
-        "sentence": "5 files added and 7 changed content, across 4 parts.",
+        "sentence": "Nothing structural changed since 2026-10-12; 1 file added and 12 changed content.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "876d29310b2643cf3ecea4b8348f1da3a1b0c9b8",
-      "generatedAt": "2026-10-12T13:09:01.338Z"
+      "commit": "495c87593528741acd02bcb27db5df5002fcac3d",
+      "generatedAt": "2026-10-12T13:39:50.050Z"
     },
-    "unchanged": false
+    "unchanged": true
   },
   "changesTogether": [
-    {
-      "a": "src/switchyard/harness/fill.py",
-      "b": "tests/test_fill_card_live.py",
-      "either": 6,
-      "partLabels": [
-        "src",
-        "tests"
-      ],
-      "parts": [
-        "src",
-        "tests"
-      ],
-      "relation": "b-imports-a",
-      "shared": 5
-    },
     {
       "a": "src/switchyard/adapters/openvino.py",
       "b": "tests/test_openvino_adapter.py",
@@ -77,6 +54,21 @@
       ],
       "relation": "b-imports-a",
       "shared": 17
+    },
+    {
+      "a": "src/switchyard/harness/fill.py",
+      "b": "tests/test_fill_card_live.py",
+      "either": 7,
+      "partLabels": [
+        "src",
+        "tests"
+      ],
+      "parts": [
+        "src",
+        "tests"
+      ],
+      "relation": "b-imports-a",
+      "shared": 5
     },
     {
       "a": "src/switchyard/harness/receipts.py",
@@ -129,9 +121,9 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 8 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 0,
-  "commit": "495c87593528741acd02bcb27db5df5002fcac3d",
+  "commit": "8082da93e054b9c85e2ce7e405508ede439ad66c",
   "defaultBranch": "main",
-  "derived": "7 parts, mostly Python (77 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.",
+  "derived": "7 parts, mostly Python (78 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.",
   "doors": [
     {
       "checks": [],
@@ -146,7 +138,7 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 27
+          "files": 28
         },
         {
           "boundary": "src",
@@ -202,7 +194,7 @@
   "edges": [],
   "engine": "1.23.0",
   "generated": [],
-  "generatedAt": "2026-10-12T13:39:50.050Z",
+  "generatedAt": "2026-10-12T18:03:13.713Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "3 writes and 4 reads use paths built at run time and are not named here.",
@@ -234,9 +226,9 @@
   "startReason": "This path follows switchyard (a command people run) from its entry, since CI runs only tests.",
   "summary": "switchyard routes each job to a model, engine and device from a receipt-backed table.",
   "summaryFrom": "person",
-  "testFiles": 45,
+  "testFiles": 46,
   "testedBy": {
-    "src": 25
+    "src": 26
   },
   "unnamedWrites": 3,
   "unread": [],
