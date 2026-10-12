@@ -22,6 +22,9 @@ from switchyard.harness.fill import MEMORY_ARGV, parse_mib
 
 RECORD_TIMEOUT_S = 15.0
 IDLE_CEILING_MIB = 4096
+# Same bound as the fill-card settle: the card does not fall the instant keep_alive is 0.
+SETTLE_S = 10.0
+SETTLE_STEP_S = 0.2
 
 # Calls that can leave a model resident are followed by an unload and a fresh baseline check.
 _LOADS = frozenset(
@@ -156,13 +159,15 @@ def record_fixtures(
     grant: str | None,
     heartbeat: Path,
     now: float,
+    sleep=None,
 ) -> list[Path]:
     """Write one JSON file per case under ``out_dir/<ollama-version>/``.
 
     ``transport(method, url, body, timeout)`` returns a dict, or None when the
     call does not answer. ``card_mib()`` is the card reading in MiB. The grant
     and the heartbeat are checked before any request. The first request is the
-    empty-card probe.
+    empty-card probe. After a load, the unload is sent before the card is
+    checked again, and a refusal still sends that unload.
     """
 
     if timeout <= 0:
@@ -207,38 +212,89 @@ def record_fixtures(
         path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8", newline="\n")
         written[case.name] = path
 
+    pause = time.sleep if sleep is None else sleep
+    resident = False
+
     def baseline_again() -> None:
+        """Immediate check. Used only before the first load, when the card should already be idle."""
+
         refuse_unless_baseline([], card_mib(), ceiling=ceiling)
         again = transport("GET", f"{host}/api/ps", None, timeout)
         loaded = again.get("models") if isinstance(again, dict) else ["unreadable"]
         _require_empty(loaded)
 
-    def unload() -> None:
+    def send_unload() -> None:
         payload = transport("POST", f"{host}/api/generate", _unload_body(model), timeout)
         if payload is None:
             raise RecordError("the unload timed out; the model may still be resident")
-        baseline_again()
+
+    def settle() -> None:
+        """Poll after the unload. Refuse only once the settle bound has passed."""
+
+        waited = 0.0
+        while True:
+            reading = card_mib()
+            again = transport("GET", f"{host}/api/ps", None, timeout)
+            models = again.get("models") if isinstance(again, dict) else None
+            card_ok = isinstance(reading, int) and not isinstance(reading, bool) and reading <= ceiling
+            empty = isinstance(models, list) and len(models) == 0
+            if card_ok and empty:
+                return
+            if waited >= SETTLE_S:
+                refuse_unless_baseline([], reading, ceiling=ceiling)
+                _require_empty(models)
+                return
+            pause(SETTLE_STEP_S)
+            waited += SETTLE_STEP_S
+
+    def unload() -> None:
+        """Send the unload first, then wait for the card and an empty `/api/ps`."""
+
+        nonlocal resident
+        send_unload()
+        settle()
+        resident = False
+
+    def release() -> None:
+        """Best-effort unload so a refusal does not leave the model resident."""
+
+        nonlocal resident
+        if not resident:
+            return
+        resident = False
+        try:
+            transport("POST", f"{host}/api/generate", _unload_body(model), timeout)
+        except Exception:
+            return
+
+    def capture_loaded(case: Case) -> None:
+        nonlocal resident
+        resident = True
+        capture(case)
 
     quiet = [case for case in CASES if case.name not in _LOADS and case.name != _WHILE_LOADED]
-    for case in quiet:
-        capture(case)
-    baseline_again()
-
-    loaded_case = case_by_loaded()
-    capture(loaded_case)
-    capture(case_named(_WHILE_LOADED))
-    unload()
-
-    for case in CASES:
-        if case.name in written:
-            continue
-        capture(case)
-        if case.name in _LOADS:
-            unload()
-    missing = [case.name for case in CASES if case.name not in written]
-    if missing:
-        raise RecordError(f"fixtures were not written: {', '.join(missing)}")
-    return [written[case.name] for case in CASES]
+    try:
+        for case in quiet:
+            capture(case)
+        baseline_again()
+        capture_loaded(case_by_loaded())
+        capture(case_named(_WHILE_LOADED))
+        unload()
+        for case in CASES:
+            if case.name in written:
+                continue
+            if case.name in _LOADS:
+                capture_loaded(case)
+                unload()
+            else:
+                capture(case)
+        missing = [case.name for case in CASES if case.name not in written]
+        if missing:
+            raise RecordError(f"fixtures were not written: {', '.join(missing)}")
+        return [written[case.name] for case in CASES]
+    except BaseException:
+        release()
+        raise
 
 
 def case_named(name: str) -> Case:

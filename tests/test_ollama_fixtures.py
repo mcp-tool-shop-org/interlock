@@ -23,6 +23,7 @@ from switchyard.adapters.ollama_cases import (
     sent_parameters,
 )
 from switchyard.adapters.record_fixtures import (
+    SETTLE_STEP_S,
     RecordError,
     _observed,
     http_exchange,
@@ -347,3 +348,78 @@ def test_the_count_budget_names_a_prompt_length_term():
         "max_ctx": 12_000,
     }
     assert roster_timeout(Adapter(), fill) == pytest.approx(bare + 1.0)
+
+
+def _is_recorded_load(body) -> bool:
+    options = body.get("options") if isinstance(body, dict) else None
+    return (
+        isinstance(body, dict)
+        and isinstance(options, dict)
+        and options.get("num_predict") == 1
+        and "num_ctx" not in options
+        and "shift" not in body
+        and "raw" not in body
+        and "think" not in body
+        and "companion" not in body
+    )
+
+
+def test_an_unload_waits_for_the_card_to_fall(tmp_path: Path):
+    seen_load = {"yes": False}
+    highs = {"n": 0}
+    sleeps: list[float] = []
+
+    def card():
+        if not seen_load["yes"]:
+            return 100
+        highs["n"] += 1
+        return 9000 if highs["n"] <= 3 else 100
+
+    base = _recording_transport([])
+
+    def transport(method, url, body, timeout):
+        if _is_recorded_load(body):
+            seen_load["yes"] = True
+        return base(method, url, body, timeout)
+
+    written = _record(tmp_path, transport=transport, card_mib=card, sleep=lambda seconds: sleeps.append(seconds))
+    assert len(written) == len(CASES)
+    assert highs["n"] >= 4
+    assert sleeps[:3] == [SETTLE_STEP_S, SETTLE_STEP_S, SETTLE_STEP_S]
+
+
+def test_a_card_that_never_falls_refuses_after_an_unload(tmp_path: Path):
+    seen_load = {"yes": False}
+    calls = []
+    base = _recording_transport([])
+
+    def transport(method, url, body, timeout):
+        calls.append(body)
+        if _is_recorded_load(body):
+            seen_load["yes"] = True
+        return base(method, url, body, timeout)
+
+    with pytest.raises(RecordError, match="above 4096"):
+        _record(
+            tmp_path,
+            transport=transport,
+            card_mib=lambda: 9000 if seen_load["yes"] else 100,
+            sleep=lambda _seconds: None,
+        )
+    load_at = next(index for index, body in enumerate(calls) if _is_recorded_load(body))
+    assert any(isinstance(body, dict) and body.get("keep_alive") == 0 for body in calls[load_at + 1 :])
+
+
+def test_an_error_after_a_load_still_unloads(tmp_path: Path):
+    calls = []
+    base = _recording_transport([])
+
+    def transport(method, url, body, timeout):
+        calls.append(body)
+        if isinstance(body, dict) and body.get("raw") is True:
+            raise RecordError("boom")
+        return base(method, url, body, timeout)
+
+    with pytest.raises(RecordError, match="boom"):
+        _record(tmp_path, transport=transport, card_mib=lambda: 100, sleep=lambda _seconds: None)
+    assert isinstance(calls[-1], dict) and calls[-1].get("keep_alive") == 0
