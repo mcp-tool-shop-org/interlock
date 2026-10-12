@@ -1153,3 +1153,11 @@ def test_prefix_caching_mode_keys_the_pipeline_cache(tmp_path):
     a.run(req(task="generate", model=str(tmp_path), device="CPU", prompt="hi", prefix_caching="on"))
     assert len(a._pipelines) == 2
     assert ovm._prefix_mode(ovm._Settings(req(prefix_caching="bogus"))) == "default"
+
+
+def test_pool_none_takes_a_flat_logit_row():
+    # A real cross-encoder returns [batch, labels]; _infer_embed's [0] leaves one flat row (E4, 2026-10-12).
+    assert ovm.pool([0.1, -1.5, 2.0], [1, 1, 1, 0], "none") == [0.1, -1.5, 2.0]
+    assert ovm.pool([[0.1, 0.2], [0.3, 0.4]], [1, 1], "none") == [0.1, 0.2]
+    with pytest.raises(TypeError):
+        ovm.pool([0.1, 0.2], [1, 1], "mean")
