@@ -186,7 +186,7 @@ def parse_pin_json(text: str) -> dict:
 
 LISTENER_SCRIPT = r"""
 $ErrorActionPreference = 'Stop'
-$conn = @(Get-NetTCPConnection -LocalPort 11434 -State Listen)[0]
+$conn = @(Get-NetTCPConnection -LocalPort 11434 | Where-Object { $_.RemotePort -eq 0 })[0]
 $proc = Get-CimInstance Win32_Process -Filter "ProcessId=$($conn.OwningProcess)"
 $models = [Environment]::GetEnvironmentVariable('OLLAMA_MODELS', 'User')
 if (-not $models) { $models = [Environment]::GetEnvironmentVariable('OLLAMA_MODELS', 'Process') }

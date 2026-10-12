@@ -708,7 +708,9 @@ def pids_from_psutil(port: int, module) -> list[int]:
 def listening_pids(port: int, *, run=None, platform: str | None = None, psutil_module=None) -> list[int]:
     """PIDs in Listen on ``port``.
 
-    Windows asks ``Get-NetTCPConnection -LocalPort <port> -State Listen``.
+    Windows asks ``Get-NetTCPConnection -LocalPort <port>`` for the socket with no remote port.
+    It doesn't filter on ``-State Listen``: on Windows build 26340 a listening socket reports
+    state 0, so that filter finds nothing.
     Linux asks ``ss -ltnp`` and, when that names nobody, psutil.
     """
 
@@ -718,7 +720,7 @@ def listening_pids(port: int, *, run=None, platform: str | None = None, psutil_m
         script = (
             "Get-NetTCPConnection -LocalPort "
             + str(number)
-            + " -State Listen | Select-Object -ExpandProperty OwningProcess"
+            + " | Where-Object { $_.RemotePort -eq 0 } | Select-Object -ExpandProperty OwningProcess"
         )
         text = _capture(run, ["powershell", "-NoProfile", "-Command", script])
         return pids_from_windows(text or "")

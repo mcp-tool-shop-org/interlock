@@ -550,7 +550,8 @@ def _runner_pid(run) -> int | None:
     """The ollama.exe whose parent is the 11434 listener. A miss is unrecorded."""
 
     script = (
-        "$listener = Get-NetTCPConnection -LocalPort 11434 -State Listen -ErrorAction SilentlyContinue | "
+        "$listener = Get-NetTCPConnection -LocalPort 11434 -ErrorAction SilentlyContinue | "
+        "Where-Object { $_.RemotePort -eq 0 } | "
         "Select-Object -First 1 -ExpandProperty OwningProcess; "
         "if (-not $listener) { return }; "
         "Get-CimInstance Win32_Process | "
