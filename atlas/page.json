@@ -20,50 +20,24 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 64,
-      "changed": 0,
+      "added": 0,
+      "changed": 6,
       "moved": 0,
-      "parts": 0,
+      "parts": 4,
       "removed": 0
     },
     "items": [
       {
-        "kind": "unassigned",
-        "sentence": "receipts/e4b-block-2-series/5090-igpu-0-alone-after-5090-alone.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.",
-        "subjects": [
-          "receipts/e4b-block-2-series/5090-igpu-0-alone-after-5090-alone.jsonl"
-        ]
-      },
-      {
-        "kind": "unassigned",
-        "sentence": "receipts/e4b-block-2-series/5090-igpu-0-alone-before-5090-alone.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.",
-        "subjects": [
-          "receipts/e4b-block-2-series/5090-igpu-0-alone-before-5090-alone.jsonl"
-        ]
-      },
-      {
-        "kind": "unassigned",
-        "sentence": "receipts/e4b-block-2-series/5090-igpu-0-paired-5090-with-igpu.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.",
-        "subjects": [
-          "receipts/e4b-block-2-series/5090-igpu-0-paired-5090-with-igpu.jsonl"
-        ]
-      },
-      {
-        "kind": "unassigned",
-        "sentence": "And 61 more new files that belong to no part.",
-        "subjects": []
-      },
-      {
         "kind": "counts",
-        "sentence": "64 files added.",
+        "sentence": "Nothing structural changed since 2026-10-12; 6 files changed content.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "3d00a1103ebd9904feed4845000c43b065c39874",
-      "generatedAt": "2026-10-12T21:54:33.359Z"
+      "commit": "64ff92401747dfe1559afb423208d4a49fadae17",
+      "generatedAt": "2026-10-12T22:06:37.583Z"
     },
-    "unchanged": false
+    "unchanged": true
   },
   "changesTogether": [
     {
@@ -148,7 +122,7 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 8 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 1,
-  "commit": "64ff92401747dfe1559afb423208d4a49fadae17",
+  "commit": "426f10624c2f0da5d5e7777a7e6cce25a9a19fc6",
   "defaultBranch": "main",
   "derived": "7 parts, mostly Python (84 files). Work enters through 3 doors; the busiest is CI, which reaches 2 parts. It publishes to PyPI. People run interlock.",
   "doors": [
@@ -251,7 +225,7 @@
   "edges": [],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-12T22:06:37.583Z",
+  "generatedAt": "2026-10-12T23:11:46.225Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "3 writes and 4 reads use paths built at run time and are not named here.",

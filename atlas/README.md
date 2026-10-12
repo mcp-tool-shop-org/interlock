@@ -1,6 +1,6 @@
 # interlock: how it works
 
-Mapped at 2026-10-12 from commit 64ff924 by Atlas 1.24.0.
+Mapped at 2026-10-12 from commit 426f106 by Atlas 1.24.0.
 
 ## What this is
 
@@ -8,13 +8,9 @@ interlock routes each job to a model, engine and device from a receipt-backed ta
 
 7 parts, mostly Python (84 files). Work enters through 3 doors; the busiest is CI, which reaches 2 parts. It publishes to PyPI. People run interlock.
 
-## What changed since 2026-10-12 (3d00a11)
+## What changed since 2026-10-12 (64ff924)
 
-- receipts/e4b-block-2-series/5090-igpu-0-alone-after-5090-alone.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
-- receipts/e4b-block-2-series/5090-igpu-0-alone-before-5090-alone.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
-- receipts/e4b-block-2-series/5090-igpu-0-paired-5090-with-igpu.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
-- And 61 more new files that belong to no part.
-- 64 files added.
+Nothing structural changed since 2026-10-12; 6 files changed content.
 
 ## What comes in
 
