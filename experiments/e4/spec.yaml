@@ -11,6 +11,7 @@
 #   come from the Publisher. This spec does not start a device.
 # EXTERNAL_VERIFIER: n/a. R&D reviews this spec before any device time.
 
+# Amendment, 2026-10-12, after a refused live run (Publisher; R&D to confirm). The NPU compiles static shapes only, and the first live run stopped at the NPU arm with "the NPU needs a static_shape BxL". Both NPU arms get static_shape "1x256": batch 1, and the 256-token prompt this spec already fixes. Nothing else changes, and no NPU row had been measured.
 # Amendment, 2026-10-11 (maintainer). Rest is the Publisher's scheduling decision between consecutive long runs, not a harness rule; rest_s below is no longer read.
 id: E4
 procedure: interleaved
@@ -110,6 +111,7 @@ arms:
     num_predict: null
     num_ctx: null
     batch: 1
+    static_shape: "1x256"
     measure: latency_ms
     revision_note: >
       The probe receipt does not record a revision. The run records the revision
@@ -158,6 +160,7 @@ arms:
     num_predict: null
     num_ctx: null
     batch: 1
+    static_shape: "1x256"
     companion: 5090-alone
     companion_device: "5090"
     compare_to: npu-alone
