@@ -136,9 +136,17 @@ def _storage_lines(spec: dict) -> list[str]:
     return lines
 
 
-def dry_run(spec_path: Path, repo: Path) -> str:
+def dry_run(spec_path: Path, repo: Path, pilot: bool = False) -> str:
     spec = load_spec(spec_path)
+    if pilot and spec.get("id") != "E4b":
+        from switchyard.harness.e4b import E4bError
+
+        raise E4bError("--pilot is only for E4b")
     blob = require_unmodified(repo, spec_path)
+    if spec.get("id") == "E4b":
+        from switchyard.harness.e4b import dry_text
+
+        return dry_text(spec, blob, pilot=pilot)
     lines = [
         f"switchyard dry-run: {spec['id']}",
         f"spec blob: {blob}",
@@ -1979,6 +1987,8 @@ def run_spec(
     watch: WatchHooks | None = None,
     seams=None,
     supervisor=None,
+    pilot: bool = False,
+    e4b_seams=None,
 ) -> list[dict]:
     """Run a committed spec. Every refusal lands before device contact.
 
@@ -1997,6 +2007,25 @@ def run_spec(
 
     _refuse_repo_interpreter(root, Path(python_path or sys.executable))
     spec = load_spec(spec_path)
+    if spec.get("id") == "E4b":
+        from switchyard.harness.e4b import run_from_cli
+
+        return run_from_cli(
+            spec,
+            spec_path=spec_path,
+            root=root,
+            repo=root,
+            grant=grant,
+            npu_session=npu_session,
+            run_id=run_id,
+            pilot=pilot,
+            seams=e4b_seams,
+            notes=notes,
+        )
+    if pilot:
+        from switchyard.harness.e4b import E4bError
+
+        raise E4bError("--pilot is only for E4b")
     check_flags(spec, grant, npu_session, cpu_window)
     blob = require_unmodified(root, spec_path)
     stamp = date or datetime.date.today().isoformat()
