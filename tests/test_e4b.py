@@ -18,6 +18,7 @@ from switchyard.adapters.ollama import OllamaAdapter
 from switchyard.guards import GuardError
 from switchyard.harness.e4b import (
     E4bError,
+    RepeatLimit,
     IntelLane,
     GENERATE_TIMEOUT_S,
     PILOT_CALLS,
@@ -27,8 +28,10 @@ from switchyard.harness.e4b import (
     CpuBurn,
     LiveGpuSample,
     build_live_seams,
+    call_time_spent,
     card_models_at_ceiling,
     collect_series,
+    counting_prompt,
     dry_text,
     generate_loop,
     is_steady,
@@ -40,7 +43,9 @@ from switchyard.harness.e4b import (
     parse_typeperf,
     pilot_destination,
     ollama_pin,
+    perform_slot,
     pilot_summary,
+    prepare_prompt,
     _header,
     prove_owned_server,
     read_git,
@@ -356,6 +361,7 @@ def test_dry_run_names_the_e4b_rules_and_the_pilot(capsys):
         "switchyard run experiments/e4b/spec.yaml --pilot",
         "heartbeat not read; adapters not called",
         "devices not started (--dry-run)",
+        "counting sequence, shortest prefix at or above 256 tokens",
     ):
         assert phrase in text
     pilot = dry_run(E4B, ROOT, pilot=True)
@@ -370,6 +376,7 @@ def test_dry_run_names_the_e4b_rules_and_the_pilot(capsys):
         "not receipts/",
         "not the table",
         "devices not started (--dry-run)",
+        "counting sequence, shortest prefix at or above 256 tokens",
     ):
         assert phrase in pilot
     assert main(["run", str(E4B), "--dry-run", "--root", str(ROOT)]) == 0
@@ -1753,3 +1760,156 @@ def test_live_seams_are_not_stubs(tmp_path: Path, monkeypatch):
     assert seams.transport is urllib_exchange
     assert seams.transport.probe_timeout_s == 10
     assert seams.transport.generate_timeout_s == 300
+
+
+def _line_count(text: str) -> int:
+    return sum(1 for line in text.splitlines() if line)
+
+
+def test_the_counting_prompt_is_the_shortest_prefix_at_the_token_target():
+    text = counting_prompt(256, _line_count)
+    assert text == "".join(f"{n}\n" for n in range(1, 257))
+    assert _line_count(text) >= 256
+    shorter = "".join(f"{n}\n" for n in range(1, 256))
+    assert text.startswith(shorter)
+    assert _line_count(shorter) < 256
+    assert "switchyard" not in text
+    spec = _spec([PAIRS[0]])
+    spec["dataset"]["target_tokens"] = 256
+    spec["dataset"]["seed"] = "The switchyard counts the same cars on every pass. "
+    assert prepare_prompt(spec, _line_count) == text
+
+
+def test_every_arm_uses_the_same_counting_prompt(tmp_path: Path):
+    prompts = []
+
+    def call(arm, *, num_predict, measured, kind, prompt):
+        prompts.append((arm["id"], prompt))
+        return _clean(arm, num_predict=num_predict, kind=kind)
+
+    seams = _seams(_Server(), call)
+
+    def start(arm, prompt=""):
+        prompts.append((arm["id"], prompt))
+        seams.starts.append(arm["id"])
+
+    seams.start_companion = start
+    run_block(_spec([PAIRS[0]]), seams, root=tmp_path, run_id="count-prompt", repo=tmp_path)
+    assert len(prompts) > 1
+    assert len({prompt for _arm_id, prompt in prompts}) == 1
+    assert {arm_id for arm_id, _prompt in prompts} >= {"5090-alone", "5090-with-npu", "npu-alone"}
+    prompt = prompts[0][1]
+    assert prompt == "1\n2\n3\n4\n"
+    assert _line_count(prompt) >= 4
+    assert _line_count("1\n2\n3\n") < 4
+    assert "cars" not in prompt
+
+
+def test_a_repeat_limit_in_the_pilot_is_a_missing_call_and_keeps_its_time(tmp_path: Path):
+    spec = _spec([PAIRS[0]])
+    state = {"n": 0}
+
+    def call(arm, *, num_predict, measured, kind, prompt):
+        state["n"] += 1
+        if kind == "warm" and state["n"] == 1:
+            raise RepeatLimit(
+                "prediction aborted, token repeat limit reached",
+                call_time_spent(
+                    {"eval_count": 619, "eval_duration": 2_000_000_000, "load_duration": 10_000_000, "prompt_eval_duration": 50_000_000, "prompt_eval_count": 256},
+                    kind="warm",
+                    reason="token repeat limit",
+                ),
+            )
+        payload = _clean(arm, num_predict=num_predict, kind=kind)
+        payload["prompt_eval_count"] = 4
+        payload["prompt_eval_s"] = 0.05
+        payload["total_s"] = payload["load_duration_s"] + payload["prompt_eval_s"] + payload["elapsed_s"]
+        return payload
+
+    document = run_pilot(spec, _seams(_Server(), call), root=tmp_path, run_id="repeat-pilot", repo=tmp_path, calls=PILOT_CALLS)
+    assert document["missing_calls"] == 1
+    assert document["good_calls"] == PILOT_CALLS - 1
+    assert document["calls"] == PILOT_CALLS
+    failed = document["time_spent"][0]
+    assert failed["missing"] is True
+    assert failed["phases"][0]["kind"] == "warm"
+    assert failed["phases"][0]["reason"] == "token repeat limit"
+    assert failed["phases"][0]["eval_count"] == 619
+    assert failed["phases"][0]["eval_s"] == pytest.approx(2.0)
+    assert failed["phases"][0]["load_s"] == pytest.approx(0.01)
+    assert failed["phases"][0]["prompt_eval_s"] == pytest.approx(0.05)
+    kept = document["time_spent"][1]
+    assert kept["missing"] is False
+    measure = kept["phases"][-1]
+    assert measure["kind"] == "measure"
+    assert measure["load_s"] == pytest.approx(0.01)
+    assert measure["prompt_eval_s"] == pytest.approx(0.05)
+    assert measure["eval_s"] == pytest.approx(1.5)
+    assert (tmp_path / "pilot-e4b" / "repeat-pilot.json").is_file()
+
+
+def test_a_repeat_limit_in_the_block_is_a_short_decode_rerun(tmp_path: Path):
+    spec = _spec([PAIRS[0]])
+    state = {"n": 0}
+
+    def call(arm, *, num_predict, measured, kind, prompt):
+        if kind == "measure":
+            state["n"] += 1
+            if state["n"] == 1:
+                raise RepeatLimit("HTTP 500 token repeat limit reached")
+        return _clean(arm, num_predict=num_predict, kind=kind)
+
+    arm = next(item for item in spec["arms"] if item["id"] == "5090-alone")
+    slot = perform_slot(
+        _seams(_Server(), call),
+        arm,
+        arms={item["id"]: item for item in spec["arms"]},
+        prompt="1\n2\n",
+        measurement=spec["measurement"],
+        role="alone-before",
+        pair="5090-npu",
+        repeat=0,
+        root=tmp_path,
+        run_id="rerun",
+        attempts=2,
+        enforce_steady=False,
+        phase="repeat",
+    )
+    assert state["n"] == 2
+    assert slot["attempt_reasons"] == ["short_decode"]
+    assert slot["refusal"] is None
+    assert slot["refusal_events"] == 1
+    assert slot["time_spent"][0]["kind"] == "warm"
+    failed = next(item for item in slot["time_spent"] if item.get("reason") == "token repeat limit")
+    assert failed["kind"] == "measure"
+    assert slot["time_spent"][-1]["kind"] == "measure"
+    assert "reason" not in slot["time_spent"][-1]
+
+
+def test_any_other_500_stays_fatal(tmp_path: Path, monkeypatch):
+    import urllib.error
+
+    def crash(request, timeout=None):
+        body = b'{"error":"model runner crashed"}'
+        raise urllib.error.HTTPError(request.full_url, 500, "Internal Server Error", hdrs=None, fp=__import__("io").BytesIO(body))
+
+    monkeypatch.setattr("urllib.request.urlopen", crash)
+    with pytest.raises(urllib.error.HTTPError):
+        urllib_exchange("POST", "http://127.0.0.1:11441/api/generate", {"prompt": "x"})
+
+    def repeat(request, timeout=None):
+        body = b'{"error":"prediction aborted, token repeat limit reached","eval_count":619,"eval_duration":2000000000}'
+        raise urllib.error.HTTPError(request.full_url, 500, "Internal Server Error", hdrs=None, fp=__import__("io").BytesIO(body))
+
+    monkeypatch.setattr("urllib.request.urlopen", repeat)
+    with pytest.raises(RepeatLimit, match="token repeat limit") as caught:
+        urllib_exchange("POST", "http://127.0.0.1:11441/api/generate", {"prompt": "x"})
+    assert caught.value.time_spent["eval_count"] == 619
+    assert caught.value.time_spent["eval_s"] == pytest.approx(2.0)
+
+    def call(arm, *, num_predict, measured, kind, prompt):
+        raise RuntimeError("HTTP 500: model runner crashed")
+
+    with pytest.raises(RuntimeError, match="model runner crashed"):
+        run_pilot(_spec([PAIRS[0]]), _seams(_Server(), call), root=tmp_path, run_id="other-500", repo=tmp_path, calls=1)
+    assert not (tmp_path / "pilot-e4b" / "other-500.json").exists()

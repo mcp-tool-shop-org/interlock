@@ -18,6 +18,8 @@ Live seams sample the GPU through NVML, then nvidia-smi, and the CPU through
 typeperf. The burn's threads stop when the burn returns, including on abort.
 Probes time out after 10 s and a generate after 300 s. A pilot call with no
 within-call clock range is missing; the pilot needs at least 18 good calls.
+The prompt is a counting prefix, not E4's repeated sentence. A token-repeat
+500 is a short decode. Each call records how its time was spent.
 """
 
 from __future__ import annotations
@@ -34,7 +36,6 @@ from pathlib import Path
 
 from switchyard.guards import require_card_empty, require_grant, require_heartbeat, require_npu_session
 from switchyard.harness.e4b_stats import bootstrap_median, decide, effect
-from switchyard.harness.e5 import fit_prompt
 from switchyard.harness.ollama_serve import (
     HOST,
     PORT,
@@ -51,6 +52,14 @@ from switchyard.harness.timing import percentile
 
 class E4bError(Exception):
     """E4b cannot run this spec, or a slot broke a rule the receipt must show."""
+
+
+class RepeatLimit(E4bError):
+    """Ollama HTTP 500 said token repeat limit. A short decode, not a dead run."""
+
+    def __init__(self, message: str, time_spent: dict | None = None):
+        super().__init__(message)
+        self.time_spent = time_spent
 
 
 PILOT_CALLS = 20
@@ -363,17 +372,113 @@ def slot_refusal(arm: dict, result: dict, *, companion_arm: dict | None, compani
     return None
 
 
-def prepare_prompt(spec: dict, count_tokens) -> str:
-    """One prefix for every arm. The counter is the model tokenizer, injected in tests."""
+def _number(value) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
 
-    dataset = spec.get("dataset") or {}
-    seed = str(dataset.get("seed") or "")
-    target = dataset.get("target_tokens")
-    if not seed or isinstance(target, bool) or not isinstance(target, int):
+
+def call_time_spent(result: dict | None, *, kind: str, reason: str | None = None) -> dict:
+    """Where one call spent its time, in seconds.
+
+    Ollama reports nanoseconds. A result that already converted them keeps the
+    seconds. A missing slice stays null. ``kind`` is warm, measure, or
+    companion, so a warm-up that dies is not mistaken for the measured decode.
+    """
+
+    result = result if isinstance(result, dict) else {}
+    nested = result.get("time_spent") if isinstance(result.get("time_spent"), dict) else {}
+
+    def seconds(second_keys: tuple[str, ...], nanosecond_key: str) -> float | None:
+        for key in second_keys:
+            number = _number(result.get(key))
+            if number is not None:
+                return number
+        nanoseconds = _number(result.get(nanosecond_key))
+        if nanoseconds is not None:
+            return nanoseconds / 1e9
+        for key in second_keys:
+            number = _number(nested.get(key))
+            if number is not None:
+                return number
+        return None
+
+    eval_count = result.get("eval_count")
+    prompt_count = result.get("prompt_eval_count")
+    spent = {
+        "kind": kind,
+        "load_s": seconds(("load_s", "load_duration_s"), "load_duration"),
+        "prompt_eval_s": seconds(("prompt_eval_s",), "prompt_eval_duration"),
+        "eval_s": seconds(("eval_s", "elapsed_s"), "eval_duration"),
+        "total_s": seconds(("total_s",), "total_duration"),
+        "eval_count": eval_count if isinstance(eval_count, int) and not isinstance(eval_count, bool) else None,
+        "prompt_eval_count": prompt_count if isinstance(prompt_count, int) and not isinstance(prompt_count, bool) else None,
+    }
+    if reason:
+        spent["reason"] = reason
+    return spent
+
+
+def _is_repeat_limit(exc: BaseException) -> bool:
+    if isinstance(exc, RepeatLimit):
+        return True
+    return "token repeat limit" in str(exc).lower()
+
+
+def _repeat_spent(exc: BaseException, kind: str) -> dict:
+    spent = None
+    if isinstance(exc, RepeatLimit) and isinstance(exc.time_spent, dict):
+        spent = dict(exc.time_spent)
+    if spent is None:
+        spent = call_time_spent({}, kind=kind, reason="token repeat limit")
+    spent["kind"] = kind
+    spent["reason"] = "token repeat limit"
+    return spent
+
+
+def _json_object(text: str) -> dict:
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def counting_prompt(target_tokens: int, count_tokens) -> str:
+    """Shortest line-prefix of ``1\\n2\\n3\\n...`` whose count is at least the target.
+
+    The prefix one line shorter counts below the target. The cut is a whole
+    line, not a repeated seed.
+    """
+
+    if isinstance(target_tokens, bool) or not isinstance(target_tokens, int) or target_tokens < 1:
         raise E4bError("E4b fits its prompt from the dataset seed and target")
     if count_tokens is None:
         raise E4bError("E4b fits the prompt with the model tokenizer")
-    return fit_prompt(seed, target, count_tokens)
+    text = ""
+    number = 1
+    limit = max(target_tokens * 100, 10_000)
+    while number <= limit:
+        text = f"{text}{number}\n"
+        count = count_tokens(text)
+        if isinstance(count, bool) or not isinstance(count, int):
+            raise E4bError("the token count must be an integer")
+        if count >= target_tokens:
+            return text
+        number += 1
+    raise E4bError("the counting prompt never reaches the token target")
+
+
+def prepare_prompt(spec: dict, count_tokens) -> str:
+    """One counting prefix for every arm. The counter is the model tokenizer."""
+
+    dataset = spec.get("dataset") or {}
+    target = dataset.get("target_tokens")
+    if isinstance(target, bool) or not isinstance(target, int) or target < 1:
+        raise E4bError("E4b fits its prompt from the dataset seed and target")
+    if count_tokens is None:
+        raise E4bError("E4b fits the prompt with the model tokenizer")
+    return counting_prompt(target, count_tokens)
 
 
 def capture_run(args: list[str]):
@@ -639,14 +744,24 @@ def pilot_destination(root: Path, run_id: str) -> Path:
     return path
 
 
+def _prompt_line(spec: dict) -> str:
+    dataset = spec.get("dataset") if isinstance(spec.get("dataset"), dict) else {}
+    target = dataset.get("target_tokens") if isinstance(dataset, dict) else None
+    if isinstance(target, bool) or not isinstance(target, int):
+        return "prompt: counting sequence, shortest prefix at or above the token target"
+    return f"prompt: counting sequence, shortest prefix at or above {target} tokens"
+
+
 def dry_text(spec: dict, blob: str, *, pilot: bool) -> str:
     """What ``switchyard run --dry-run`` prints for E4b. No device is contacted."""
 
     measurement = spec.get("measurement") or {}
+    prompt_line = _prompt_line(spec)
     if pilot:
         lines = [
             "switchyard dry-run: E4b",
             f"spec blob: {blob}",
+            prompt_line,
             "pilot: 5090-alone only",
             f"measured calls: {PILOT_CALLS}",
             "num_predict: 1024",
@@ -672,6 +787,7 @@ def dry_text(spec: dict, blob: str, *, pilot: bool) -> str:
     lines = [
         "switchyard dry-run: E4b",
         f"spec blob: {blob}",
+        prompt_line,
         "own Ollama 127.0.0.1:11441 pinned to the 11434 install",
         "11434 and 11490 not used",
         "probes GET /api/version and GET /api/ps only",
@@ -827,71 +943,122 @@ def perform_slot(
     events = 0
     final = None
     reasons = []
+    attempt_time: list[dict] = []
     for _attempt in range(attempts):
-        if companion is not None:
-            _trace(seams, ("start_companion", companion["id"]))
-            seams.start_companion(companion, prompt=prompt)
-        cpu_start = seams.sample_cpu("performance")
-        utility = seams.sample_cpu("utility") if arm["device"] == "5090" else None
-        steady_ok = None
-        if arm["device"] == "5090":
-            warm = warm_5090(seams, arm, prompt, measurement, enforce=enforce_steady)
-            steady_ok = True if not enforce_steady else warm["ok"]
-            if enforce_steady and not warm["ok"]:
-                steady_ok = False
-        else:
-            _trace(seams, ("warm", arm["id"], arm.get("num_predict")))
-            seams.call(arm, num_predict=arm.get("num_predict"), measured=False, kind="warm", prompt=prompt)
-            warm = {"ok": True, "attempts": []}
+        started = False
+        phase_now = "start"
+        cpu_start = None
+        utility = None
+        cpu_end = None
+        warm = {"ok": False, "attempts": []}
         measured = None
-        if steady_ok is not False:
-            _trace(seams, ("measure-start", arm["id"], role))
-            measured = dict(
-                seams.call(
-                    arm,
-                    num_predict=arm.get("num_predict"),
-                    measured=True,
-                    kind="measure",
-                    prompt=prompt,
+        try:
+            if companion is not None:
+                _trace(seams, ("start_companion", companion["id"]))
+                seams.start_companion(companion, prompt=prompt)
+                started = True
+            cpu_start = seams.sample_cpu("performance")
+            utility = seams.sample_cpu("utility") if arm["device"] == "5090" else None
+            steady_ok = None
+            if arm["device"] == "5090":
+                phase_now = "warm"
+                warm = warm_5090(seams, arm, prompt, measurement, enforce=enforce_steady)
+                steady_ok = True if not enforce_steady else warm["ok"]
+                if enforce_steady and not warm["ok"]:
+                    steady_ok = False
+            else:
+                phase_now = "warm"
+                _trace(seams, ("warm", arm["id"], arm.get("num_predict")))
+                seams.call(arm, num_predict=arm.get("num_predict"), measured=False, kind="warm", prompt=prompt)
+                warm = {"ok": True, "attempts": []}
+            if steady_ok is not False:
+                phase_now = "measure"
+                _trace(seams, ("measure-start", arm["id"], role))
+                measured = dict(
+                    seams.call(
+                        arm,
+                        num_predict=arm.get("num_predict"),
+                        measured=True,
+                        kind="measure",
+                        prompt=prompt,
+                    )
                 )
-            )
-        cpu_end = seams.sample_cpu("performance")
-        report = None
-        if companion is not None:
-            kind = _stop_kind(companion)
-            _trace(seams, ("stop_companion", companion["id"], kind))
-            seams.stop_companion(companion, kind=kind)
-            report = seams.companion_report(companion)
-        if measured is None:
-            measured = {"value": None, "clocks_mhz": None, "power_w": None}
-        reason = None
-        if phase != "cold":
-            reason = slot_refusal(
-                arm,
-                measured,
-                companion_arm=companion,
-                companion=report if isinstance(report, dict) else None,
-                tolerance=tolerance,
-                steady_ok=steady_ok if arm["device"] == "5090" and enforce_steady else None,
-                num_predict=arm.get("num_predict"),
-            )
-        if reason:
-            events += 1
-            reasons.append(reason)
+            cpu_end = seams.sample_cpu("performance")
+            report = None
+            if companion is not None:
+                phase_now = "companion"
+                kind = _stop_kind(companion)
+                _trace(seams, ("stop_companion", companion["id"], kind))
+                seams.stop_companion(companion, kind=kind)
+                started = False
+                report = seams.companion_report(companion)
+            if measured is None:
+                measured = {"value": None, "clocks_mhz": None, "power_w": None}
+            reason = None
+            if phase != "cold":
+                reason = slot_refusal(
+                    arm,
+                    measured,
+                    companion_arm=companion,
+                    companion=report if isinstance(report, dict) else None,
+                    tolerance=tolerance,
+                    steady_ok=steady_ok if arm["device"] == "5090" and enforce_steady else None,
+                    num_predict=arm.get("num_predict"),
+                )
+            attempt_time.extend(_phase_times(warm, measured))
+            if reason:
+                events += 1
+                reasons.append(reason)
+                final = _slot_row(
+                    arm, role, pair, repeat, measured, reason, events, reasons, cpu_start, cpu_end, utility, root, run_id, warm, attempt_time
+                )
+                continue
             final = _slot_row(
-                arm, role, pair, repeat, measured, reason, events, reasons, cpu_start, cpu_end, utility, root, run_id, warm
+                arm, role, pair, repeat, measured, None, events, reasons, cpu_start, cpu_end, utility, root, run_id, warm, attempt_time
+            )
+            break
+        except Exception as exc:
+            if not _is_repeat_limit(exc):
+                _stop_started(seams, companion, started)
+                raise
+            _stop_started(seams, companion, started)
+            attempt_time.extend(_phase_times(warm, None))
+            attempt_time.append(_repeat_spent(exc, phase_now))
+            events += 1
+            reasons.append("short_decode")
+            if measured is None:
+                measured = {"value": None, "clocks_mhz": None, "power_w": None, "eval_count": 0}
+            final = _slot_row(
+                arm, role, pair, repeat, measured, "short_decode", events, reasons, cpu_start, cpu_end, utility, root, run_id, warm, attempt_time
             )
             continue
-        final = _slot_row(
-            arm, role, pair, repeat, measured, None, events, reasons, cpu_start, cpu_end, utility, root, run_id, warm
-        )
-        break
     if final is None:
         raise E4bError("the slot did not run")
     return final
 
 
-def _slot_row(arm, role, pair, repeat, measured, reason, events, reasons, cpu_start, cpu_end, utility, root, run_id, warm) -> dict:
+def _stop_started(seams, companion, started: bool) -> None:
+    if not started or companion is None:
+        return
+    kind = _stop_kind(companion)
+    _trace(seams, ("stop_companion", companion["id"], kind))
+    try:
+        seams.stop_companion(companion, kind=kind)
+    except Exception as exc:
+        if not _is_repeat_limit(exc):
+            raise
+
+
+def _phase_times(warm, measured) -> list[dict]:
+    rows = [call_time_spent(item, kind="warm") for item in (warm or {}).get("attempts") or []]
+    if isinstance(measured, dict) and measured.get("value") is not None or (
+        isinstance(measured, dict) and measured.get("eval_count") is not None
+    ):
+        rows.append(call_time_spent(measured, kind="measure"))
+    return rows
+
+
+def _slot_row(arm, role, pair, repeat, measured, reason, events, reasons, cpu_start, cpu_end, utility, root, run_id, warm, attempt_time=None) -> dict:
     clocks = measured.get("clocks_mhz") if isinstance(measured.get("clocks_mhz"), list) else []
     power = measured.get("power_w") if isinstance(measured.get("power_w"), list) else []
     series_rel = None
@@ -918,6 +1085,7 @@ def _slot_row(arm, role, pair, repeat, measured, reason, events, reasons, cpu_st
         "elapsed_s": measured.get("elapsed_s"),
         "series": series_rel,
         "warm_attempts": len(warm.get("attempts") or []),
+        "time_spent": list(attempt_time or []),
         "analysis": role != "cold",
     }
 
@@ -1308,6 +1476,7 @@ def run_pilot(spec: dict, seams, *, root: Path, run_id: str, repo: Path, calls: 
     warm_short = 0
     missing = 0
     call_intervals: list[float] = []
+    spent_rows: list[dict] = []
     _require_ready(seams)
     with seams.server as running:
         _probe(seams, "GET", "/api/version")
@@ -1317,20 +1486,40 @@ def run_pilot(spec: dict, seams, *, root: Path, run_id: str, repo: Path, calls: 
             _require_owned_server(spec, seams, running)
             # The prompt is counted on the run-owned server, so only once it is up and proven.
             prompt = prepare_prompt(spec, seams.count_tokens)
-            for _index in range(calls):
-                warm = warm_5090(seams, arm, prompt, measurement, enforce=False)
+            for index in range(calls):
+                try:
+                    warm = warm_5090(seams, arm, prompt, measurement, enforce=False)
+                except Exception as exc:
+                    if not _is_repeat_limit(exc):
+                        raise
+                    missing += 1
+                    spent_rows.append({"call": index, "missing": True, "phases": [_repeat_spent(exc, "warm")]})
+                    continue
                 if not warm["attempts"] or float(warm["attempts"][-1].get("elapsed_s") or 0) + 1e-9 < float(measurement["warmup_min_s"]):
                     warm_short += 1
-                measured = dict(
-                    seams.call(arm, num_predict=arm.get("num_predict"), measured=True, kind="measure", prompt=prompt)
-                )
+                try:
+                    measured = dict(
+                        seams.call(arm, num_predict=arm.get("num_predict"), measured=True, kind="measure", prompt=prompt)
+                    )
+                except Exception as exc:
+                    if not _is_repeat_limit(exc):
+                        raise
+                    missing += 1
+                    phases = [call_time_spent(item, kind="warm") for item in warm.get("attempts") or []]
+                    phases.append(_repeat_spent(exc, "measure"))
+                    spent_rows.append({"call": index, "missing": True, "phases": phases})
+                    continue
                 interval = measured.get("sample_interval_s")
                 if isinstance(interval, (int, float)) and not isinstance(interval, bool):
                     call_intervals.append(float(interval))
+                phases = [call_time_spent(item, kind="warm") for item in warm.get("attempts") or []]
+                phases.append(call_time_spent(measured, kind="measure"))
                 clocks = measured.get("clocks_mhz")
                 if _clocks_missing(clocks):
                     missing += 1
+                    spent_rows.append({"call": index, "missing": True, "reason": "missing clock", "phases": phases})
                     continue
+                spent_rows.append({"call": index, "missing": False, "phases": phases})
                 ranges.append(float(max(clocks) - min(clocks)))
                 count = measured.get("eval_count")
                 predict = arm.get("num_predict")
@@ -1363,6 +1552,7 @@ def run_pilot(spec: dict, seams, *, root: Path, run_id: str, repo: Path, calls: 
     document["calls"] = calls
     document["good_calls"] = len(ranges)
     document["missing_calls"] = missing
+    document["time_spent"] = spent_rows
     document["pilot_clock_rule"] = PILOT_CLOCK_RULE
     note = _sample_note(seams)
     if note["sample_interval_s"] is None and call_intervals:
@@ -1491,13 +1681,16 @@ def normalize_ollama(payload: dict) -> dict:
         elapsed = float(eval_ns) / 1e9
         if isinstance(eval_count, int) and not isinstance(eval_count, bool):
             value = eval_count / elapsed
-    return {
+    normalized = {
         "value": value,
         "load_duration_s": load_s,
         "eval_count": eval_count if isinstance(eval_count, int) and not isinstance(eval_count, bool) else None,
         "elapsed_s": elapsed,
         "truncated_tokens": None,
+        "prompt_eval_count": payload.get("prompt_eval_count") if isinstance(payload.get("prompt_eval_count"), int) and not isinstance(payload.get("prompt_eval_count"), bool) else None,
     }
+    normalized["time_spent"] = call_time_spent(payload, kind="generate")
+    return normalized
 
 
 def threaded_sample(invoke, sample, every_s: float, *, intervals: list | None = None) -> dict:
@@ -1583,6 +1776,7 @@ def _http_timeout(url: str) -> float:
 def urllib_exchange(method: str, url: str, body: dict | None = None) -> dict:
     """The live HTTP call. Tests pass their own transport and never reach this."""
 
+    import urllib.error
     import urllib.request
     from urllib.parse import urlsplit
 
@@ -1596,6 +1790,16 @@ def urllib_exchange(method: str, url: str, body: dict | None = None) -> dict:
     except TimeoutError as exc:
         path = urlsplit(url).path or url
         raise E4bError(f"REFUSED: {method} {path} timed out after {timeout:g} s") from exc
+    except urllib.error.HTTPError as exc:
+        raw = exc.read()
+        text = raw.decode("utf-8", errors="replace") if isinstance(raw, (bytes, bytearray)) else str(raw or "")
+        path = urlsplit(url).path or url
+        if exc.code == 500 and "token repeat limit" in text.lower():
+            raise RepeatLimit(
+                f"REFUSED: {method} {path} token repeat limit",
+                call_time_spent(_json_object(text), kind="generate", reason="token repeat limit"),
+            ) from exc
+        raise
     if not isinstance(payload, dict):
         raise E4bError("Ollama returned a non-object")
     return payload
@@ -1782,7 +1986,7 @@ def build_live_seams(root: Path, run_id: str, spec: dict, *, pilot: bool, run=No
                     generate_loop(arm, post_arm, stop_event)
                 except Exception as exc:
                     with latest_lock:
-                        latest["error"] = str(exc)
+                        latest["error"] = exc
 
             thread = threading.Thread(target=run, name="switchyard-e4b-companion", daemon=True)
             companion_thread["thread"] = thread
@@ -1808,8 +2012,11 @@ def build_live_seams(root: Path, run_id: str, spec: dict, *, pilot: bool, run=No
     def companion_report(arm) -> dict:
         if arm.get("device") == "5090" or arm.get("engine") == "ollama":
             with latest_lock:
-                if latest.get("error"):
-                    raise E4bError(str(latest["error"]))
+                error = latest.get("error")
+                if isinstance(error, BaseException):
+                    raise error
+                if error:
+                    raise E4bError(str(error))
                 return dict(latest)
         return lane.report(arm)
 
