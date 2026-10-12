@@ -178,7 +178,7 @@
           "path": "experiments/e4/spec.yaml"
         },
         {
-          "hash": "80d70a188507c8b7aaf667818761f8dd2dd79d4b7547e462a362cc8637e095c6",
+          "hash": "eb336979cbecdd8bc745d3c8a71726170f6dbaec75a75bbc752a98247cfa741f",
           "path": "experiments/e4b/spec.yaml"
         },
         {
@@ -217,7 +217,7 @@
           "path": ".python-version"
         },
         {
-          "hash": "ec81bc16b17640c5e0ca848bd54509591d894b99aeed6070cc9a84b01c326e59",
+          "hash": "acc6be5db48895290457d6ac3ca5972dcf07a92e7990a22011bcaab08c771e87",
           "path": "CHANGELOG.md"
         },
         {
@@ -708,10 +708,12 @@
         {
           "exports": [
             "build_live_seams",
+            "call_time_spent",
             "capture_run",
             "card_models_at_ceiling",
             "collect_series",
             "count_owned",
+            "counting_prompt",
             "dry_text",
             "execute_block",
             "generate_loop",
@@ -750,11 +752,10 @@
             "urllib_exchange",
             "warm_5090"
           ],
-          "hash": "f973f86659ea77857c34b0e0ec93abf5fab36fa0aea732a083e4472bc1c09840",
+          "hash": "00275d1f4218548d0d1da9f3169ab0a4d4088f3b9fcd43aa7e32866fccda2b92",
           "importOrder": [
             "src/switchyard/guards.py",
             "src/switchyard/harness/e4b_stats.py",
-            "src/switchyard/harness/e5.py",
             "src/switchyard/harness/ollama_serve.py",
             "src/switchyard/harness/timing.py",
             "src/switchyard/harness/runner.py",
@@ -770,7 +771,6 @@
             "src/switchyard/adapters/record_fixtures.py",
             "src/switchyard/guards.py",
             "src/switchyard/harness/e4b_stats.py",
-            "src/switchyard/harness/e5.py",
             "src/switchyard/harness/lock.py",
             "src/switchyard/harness/ollama_serve.py",
             "src/switchyard/harness/runner.py",
@@ -3586,7 +3586,7 @@
       "origin": "authored",
       "outsidePlaces": [
         {
-          "reads": 28,
+          "reads": 29,
           "where": [
             "caller"
           ],
@@ -3600,7 +3600,7 @@
           "writes": 0
         }
       ],
-      "outsideReads": 31,
+      "outsideReads": 32,
       "outsideWrites": 9,
       "role": "code",
       "testedBy": 26,
@@ -3870,13 +3870,17 @@
             "test_a_full_block_refuses_null_tolerances_before_heartbeat",
             "test_a_generate_timeout_and_a_probe_timeout_are_refusals",
             "test_a_refused_slot_is_rerun_once_and_two_refusals_are_inconclusive",
+            "test_a_repeat_limit_in_the_block_is_a_short_decode_rerun",
+            "test_a_repeat_limit_in_the_pilot_is_a_missing_call_and_keeps_its_time",
             "test_abort_stops_the_server_and_deletes_the_cache",
+            "test_any_other_500_stays_fatal",
             "test_block_records_the_estimate_and_keeps_the_burn_out_of_the_verdict",
             "test_companion_starts_before_warmup_and_steady_takes_a_second_attempt",
             "test_dry_run_names_the_e4b_rules_and_the_pilot",
             "test_dry_text_with_an_amended_tolerance_names_the_number",
             "test_e4b_validation_rejects_a_changed_contract",
             "test_each_refusal_rule",
+            "test_every_arm_uses_the_same_counting_prompt",
             "test_extension_runs_five_more_triplets_once",
             "test_intel_lane_reports_the_companion_truncation",
             "test_live_sample_gpu_records_nvml_then_smi",
@@ -3896,6 +3900,7 @@
             "test_the_5090_companion_report_is_the_generate_that_finished",
             "test_the_block_receipt_carries_the_server_config_and_the_probe",
             "test_the_burn_stops_when_the_slot_ends_and_when_it_raises",
+            "test_the_counting_prompt_is_the_shortest_prefix_at_the_token_target",
             "test_the_e4b_spec_loads_and_keeps_null_tolerances",
             "test_the_owned_server_stops_when_version_never_answers",
             "test_the_owned_server_waits_out_the_first_refused_version_calls",
@@ -3906,7 +3911,7 @@
             "test_unsteady_warmup_refuses_clock_not_steady",
             "test_warm_until_steady_and_a_short_warm_is_not_steady"
           ],
-          "hash": "403c9ac8290f06ff35cc81f4a656caf2313e6204a183a941f893068d955afba7",
+          "hash": "32eda41e692a26db17c5a80505b29718348aa9d2c732aa195e0cc9f15706a94d",
           "importOrder": [
             "src/switchyard/adapters/base.py",
             "src/switchyard/adapters/ollama.py",
@@ -4923,7 +4928,7 @@
   ],
   "engine": "1.23.0",
   "generatedFrom": {
-    "commit": "8082da93e054b9c85e2ce7e405508ede439ad66c",
+    "commit": "9056779144faa461f194029d59cbbb07fc6a609a",
     "tracked": 156
   },
   "landings": [
