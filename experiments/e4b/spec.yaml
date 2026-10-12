@@ -26,6 +26,12 @@
 # Amended 2026-10-12 (Publisher, #85): a pilot call with no within-call clock
 # range is missing and does not abort the rest. At least 18 good calls are
 # required; fewer is a refusal. The missing count is on the pilot document.
+# Amended 2026-10-12 (Publisher, after pilot try 4): the prompt is a counting
+# sequence (1, 2, 3, ...), the shortest prefix the tokenizer counts at 256
+# tokens or more. One shared prefix for every arm, so the 1x256 shape still
+# holds. The fit is that prefix, not a repeated seed. Sampling is unchanged.
+# E4b's rates are not comparable to E4's. Each call records how its time was
+# spent, load then prompt eval then decode, so a cut-off warm-up stays visible.
 # Drafted 2026-10-12 (Kimi, at the Publisher's request, R&D to confirm), after
 # E4 run 7 (valid, inconclusive; every alone spread over the half-band). E4 is
 # not amended and run 7's verdict stands. E4b replaces E4's global alone-spread
