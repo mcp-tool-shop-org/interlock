@@ -4,13 +4,22 @@
 
 <img src="assets/logo/interlock-wordmark.png" width="560" alt="interlock: a rail crossing routing jobs to devices">
 
-> **Prototype, 0.1.x.** interlock is advisory only: it suggests a model, engine and device, and it never serves traffic. Every number in it was measured on one rig (Intel Core Ultra 9 285K with its NPU and iGPU, plus an RTX 5090). Treat its routes as that rig's evidence, not a general benchmark.
+> **Prototype, 0.1.x: a research instrument, not a release.** The CLI, the receipt format and the experiment specs change without notice, and nothing is on PyPI yet. interlock is advisory only: it suggests a model, engine and device, and it never serves traffic. Every number in it was measured on one rig (Intel Core Ultra 9 285K with its NPU and iGPU, plus an RTX 5090). Treat its routes as that rig's evidence, not a general benchmark.
 
 Railway interlocking stops a train being routed into a conflicting path. This tool does that for devices: it sends each job to a model, an engine and a device.
 
 You give it a task (embed, rerank, NLI, verify, generate) and the constraints that matter (quality, latency, context, thinking level). It answers with a model, an engine, a device and the settings, and it shows the receipt behind every number. OpenVINO's AUTO and HETERO plugins can pick a device once you have already picked the model. Nothing in that stack picks the model. That gap is the product.
 
 ## Install
+
+Not published yet. Until the first release, install from a clone:
+
+```
+uv sync
+uv run interlock --help
+```
+
+After the first release:
 
 ```
 pip install mcptoolshop-interlock
