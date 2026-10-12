@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- The Ollama token count asks for one completion token, never zero. Ollama 0.35.1 reads `num_predict` 0 as no limit and generates until the context fills. E4's first live run (2026-10-11) sat at full card power for 12 minutes without writing a row. The zero-then-retry path is gone.
+
 ## 0.1.0 — prototype
 
 Advisory only. `switchyard route` refuses when no measured row meets the constraints. It does not fall back, serve traffic, read a ledger, or call offrig. The bound is the conservative end of the measured spread, never a median. A parity miss is excluded. `thinking off` matches only off. `thinking on` matches any recorded thinking level, and the decision keeps that level.

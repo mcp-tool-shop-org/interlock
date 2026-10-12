@@ -352,7 +352,7 @@ def test_a_clean_search_records_the_confirmed_window(tmp_path: Path):
     assert confirms and confirms[-1]["options"]["num_ctx"] == 8192
     assert confirms[-1]["shift"] is False and confirms[-1]["truncate"] is False
     assert confirms[-1]["options"]["num_predict"] == 1
-    assert any(body.get("raw") is True and body["options"]["num_predict"] == 0 for _m, _u, body in transport.calls if isinstance(body, dict))
+    assert any(body.get("raw") is True and body["options"]["num_predict"] == 1 for _m, _u, body in transport.calls if isinstance(body, dict))
     assert seams.slept == []
     assert not (repo / "table").exists()
     assert check_tree(repo) == []

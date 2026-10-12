@@ -27,6 +27,9 @@ import threading
 import time
 from urllib.parse import urlsplit
 
+# The token count asks for one completion token. Ollama reads num_predict 0 as no limit.
+COUNT_NUM_PREDICT = 1
+
 _CANCEL_POLL_S = 0.2
 UNLOAD_TIMEOUT_S = 60.0
 UNLOAD_TIMEOUT_NOTE = "the unload timed out; the model may still be resident"
@@ -98,10 +101,6 @@ def generate_body(request: StepRequest) -> dict:
     return body
 
 
-def _num_predict_rejected(message: str) -> bool:
-    """True when the server refused a zero-token count and a one-token retry can stand in."""
-
-    return "num_predict" in message.lower()
 
 
 def context_length(payload: dict) -> int:
@@ -313,9 +312,10 @@ class OllamaAdapter:
         """How many tokens this served model assigns to ``text``.
 
         One ``/api/generate`` with ``raw`` true, so the template is not counted,
-        and ``num_predict`` 0, so the call does not produce a completion. The
-        count is ``prompt_eval_count``. When the server refuses 0, the same
-        call is retried with ``num_predict`` 1. Load options in ``settings``
+        and ``num_predict`` 1, so the completion is a single token. The count is
+        ``prompt_eval_count``. ``num_predict`` 0 is never sent: Ollama 0.35.1
+        reads 0 as no limit and generates until the context fills (seen live on
+        2026-10-11, E4's first run). Load options in ``settings``
         (context, thinking, keep_alive) are the measurement's, so the count
         and the measurement name the same load. This does not unload. The
         harness unloads afterwards when the count would leave the model resident.
@@ -324,7 +324,7 @@ class OllamaAdapter:
         refuse_cloud(model)
         merged = dict(settings or {})
         merged["prompt"] = text
-        merged["num_predict"] = 0
+        merged["num_predict"] = COUNT_NUM_PREDICT
         request = StepRequest(
             step_id="count",
             task="generate",
@@ -338,7 +338,7 @@ class OllamaAdapter:
         body = generate_body(request)
         body["raw"] = True
         body["truncate"] = False
-        body["options"]["num_predict"] = 0
+        body["options"]["num_predict"] = COUNT_NUM_PREDICT
         payload = self._count_payload(url, body)
         count = payload.get("prompt_eval_count")
         if isinstance(count, bool) or not isinstance(count, int) or count < 0:
@@ -350,14 +350,6 @@ class OllamaAdapter:
         if not isinstance(payload, dict):
             raise AdapterError("Ollama returned a non-object")
         error = payload.get("error")
-        if error and body["options"]["num_predict"] == 0 and _num_predict_rejected(str(error)):
-            retried = dict(body)
-            retried["options"] = dict(body["options"])
-            retried["options"]["num_predict"] = 1
-            payload = self.transport("POST", f"{url}/api/generate", retried)
-            if not isinstance(payload, dict):
-                raise AdapterError("Ollama returned a non-object")
-            error = payload.get("error")
         if error:
             raise AdapterError(str(error))
         return payload
