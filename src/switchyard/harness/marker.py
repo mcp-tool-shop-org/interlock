@@ -79,6 +79,17 @@ class RunMarker:
         except OSError:
             pass
 
+    def note_restart_disabled(self, reason: str) -> None:
+        """The start record does not match the live server, so this run does not restart."""
+
+        if self._data.get("ollama_restart_disabled") == reason:
+            return
+        self._data["ollama_restart_disabled"] = reason
+        try:
+            self.write()
+        except OSError:
+            pass
+
     def note_failure(self, step: str, error: str) -> None:
         """The step that was in flight. It is inconclusive, never a pass."""
 

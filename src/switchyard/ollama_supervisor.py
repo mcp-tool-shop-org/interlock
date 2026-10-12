@@ -20,9 +20,12 @@ lists no model from another session.
 the argv, every ``OLLAMA_*`` and ``LLAMA_ARG_*`` variable, and the log
 file. Stdout is appended to that log. switchyard does not sign in. There
 is no ``OLLAMA_CUDA_BACKEND`` variable. The CUDA check is the sha256 of
-the loaded ``ggml-cuda`` library and the server log's ``load_backend``
-line. Flash attention and the KV cache type come from the start line and
-are read again from the log after the restart.
+the loaded ``ggml-cuda`` library and the ``load_backend`` line written
+after the spawn. At prime, the record's ``OLLAMA_*`` and ``LLAMA_ARG_*``
+set is compared with the live process environment, or with the server
+config line when that environment cannot be read. A mismatch means this
+run does not restart. After a restart the same set is read from the new
+log segment, not from the two fields alone.
 
 Tests pass fakes. The command's seams are the only ones that can spawn
 a process, and a test never calls them.
@@ -193,6 +196,9 @@ class SupervisorSeams:
     now: object = None
     wall: object = time.time
     load_start: object = None
+    process_env: object = None
+    log_size: object = None
+    log_segment: object = None
 
     def __post_init__(self) -> None:
         if self.now is None:
@@ -269,20 +275,28 @@ def ollama_env(raw: dict | None) -> dict[str, str]:
     return kept
 
 
-def environment_mismatch(recorded: ServerFingerprint, current: ServerFingerprint) -> str | None:
+def environment_mismatch(
+    recorded: ServerFingerprint,
+    current: ServerFingerprint,
+    *,
+    check_backend: bool = True,
+) -> str | None:
     """The field that moved, or None when the restart is still the same server.
 
     The driver CUDA version is not compared. A restart cannot change it, so
-    that check would always pass.
+    that check would always pass. ``check_backend`` is false when the new
+    log segment has no ``load_backend`` line yet: the line from before the
+    spawn is not a match, and the check waits for the first model load.
     """
 
-    pairs = (
+    pairs = [
         ("version", recorded.version, current.version),
         ("flash_attention", recorded.flash_attention, current.flash_attention),
         ("kv_cache_type", recorded.kv_cache_type, current.kv_cache_type),
         ("CUDA library sha", recorded.ggml_cuda_sha256, current.ggml_cuda_sha256),
-        ("backend line", recorded.backend_line, current.backend_line),
-    )
+    ]
+    if check_backend:
+        pairs.append(("backend line", recorded.backend_line, current.backend_line))
     for name, before, after in pairs:
         if before != after:
             return (
@@ -335,6 +349,157 @@ def env_from_log(text: str | None) -> dict[str, str]:
     if not isinstance(text, str) or not text:
         return {}
     return {key: value for key, value in _ENV_IN_LOG.findall(text)}
+
+
+def log_byte_size(path: str) -> int:
+    """Bytes in the server log. A missing log is empty, and the offset is zero."""
+
+    if not isinstance(path, str) or not path.strip():
+        return 0
+    try:
+        return Path(path).stat().st_size
+    except OSError:
+        return 0
+
+
+def read_log_from(path: str, offset: int) -> str:
+    """The log text written at and after ``offset``. The offset is a byte count."""
+
+    if not isinstance(path, str) or not path.strip():
+        return ""
+    start = offset if isinstance(offset, int) and not isinstance(offset, bool) and offset > 0 else 0
+    try:
+        with open(path, "rb") as handle:
+            handle.seek(start)
+            data = handle.read()
+    except OSError:
+        return ""
+    return data.decode("utf-8", errors="replace")
+
+
+def _unescape_log_value(value: str) -> str:
+    """Go's quoted server-config line writes a backslash as two."""
+
+    return value.replace("\\\\", "\\").replace('\\"', '"')
+
+
+def _parse_go_map(body: str) -> dict[str, str]:
+    """One Go ``map[k:v]`` body. A bracketed value may contain spaces."""
+
+    found: dict[str, str] = {}
+    index = 0
+    length = len(body)
+    while index < length:
+        while index < length and body[index].isspace():
+            index += 1
+        if index >= length:
+            break
+        colon = body.find(":", index)
+        if colon < 0:
+            break
+        key = body[index:colon]
+        if not key or any(char.isspace() for char in key):
+            break
+        index = colon + 1
+        if index < length and body[index] == "[":
+            depth = 1
+            index += 1
+            start = index
+            while index < length and depth:
+                if body[index] == "[":
+                    depth += 1
+                elif body[index] == "]":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                index += 1
+            found[key] = _unescape_log_value(body[start:index])
+            if index < length and body[index] == "]":
+                index += 1
+            continue
+        start = index
+        while index < length:
+            if body[index].isspace():
+                nxt = index + 1
+                while nxt < length and body[nxt].isspace():
+                    nxt += 1
+                end = nxt
+                while end < length and (body[end].isalnum() or body[end] == "_"):
+                    end += 1
+                if end > nxt and end < length and body[end] == ":":
+                    break
+            index += 1
+        found[key] = _unescape_log_value(body[start:index].rstrip())
+    return found
+
+
+def server_config_env(text: str | None) -> dict[str, str]:
+    """``OLLAMA_*`` and ``LLAMA_ARG_*`` from the last ``server config`` line.
+
+    The line is Ollama's ``env="map[...]"`` log. An older line in the same
+    file is not this server. A segment that has not logged one yet is empty.
+    """
+
+    if not isinstance(text, str) or not text:
+        return {}
+    body = ""
+    for line in text.splitlines():
+        if 'msg="server config"' not in line:
+            continue
+        mark = 'env="map['
+        start = line.find(mark)
+        if start < 0:
+            continue
+        start += len(mark)
+        end = line.rfind(']"')
+        if end < start:
+            continue
+        body = line[start:end]
+    if not body:
+        return {}
+    return ollama_env(_parse_go_map(body))
+
+
+def _env_token(key: str, value: str | None) -> str | None:
+    """Host values match with or without the ``http://`` scheme."""
+
+    if value is None:
+        return None
+    if key == "OLLAMA_HOST":
+        for prefix in ("http://", "https://"):
+            if value.startswith(prefix):
+                return value[len(prefix):]
+    return value
+
+
+def ollama_env_mismatch(expected: dict, actual: dict, *, allow_extra: bool, across_restart: bool) -> str | None:
+    """The first ``OLLAMA_*`` or ``LLAMA_ARG_*`` key that differs, or None.
+
+    ``allow_extra`` is for a process environment compared with a server
+    config line: Ollama logs defaults the process did not set. A key the
+    run was measured under still has to match. Extra keys are not ignored
+    when both sides are the same kind of record.
+    """
+
+    left = ollama_env(expected)
+    right = ollama_env(actual)
+    for key in sorted(set(left) | set(right)):
+        if allow_extra and key not in left:
+            continue
+        if _env_token(key, left.get(key)) == _env_token(key, right.get(key)):
+            continue
+        before = left.get(key)
+        after = right.get(key)
+        if across_restart:
+            return (
+                f"the Ollama environment changed across the restart ({key}: {before!r} to {after!r}); "
+                "the run stops. A restart that changes the environment is not measurement-neutral."
+            )
+        return (
+            f"the Ollama start record does not match the live server ({key}: {before!r} to {after!r}). "
+            "This run makes no restarts."
+        )
+    return None
 
 
 def file_sha256(path: str | Path) -> str:
@@ -467,7 +632,7 @@ def restart_policy_lines(config: SupervisorConfig | None = None) -> list[str]:
         "ollama restart: only 127.0.0.1:11434 is restarted; 11490 is reported and never stopped",
         "ollama restart: the grant, the heartbeat, and /api/ps are re-checked before anything is stopped",
         "ollama restart: the recorded start line is replayed, and the log is appended",
-        "ollama restart: the CUDA library sha, the backend log line, flash attention, and the KV cache type must match",
+        "ollama restart: the CUDA library sha, the backend line written after the spawn, and the full OLLAMA_* set must match",
         "ollama restart: the first measured step after a restart stays out of the warm percentiles",
         "ollama restart: the tray app is not stopped unless it owns the port",
         f"ollama restart: wait up to {chosen.restart_deadline_s:g} s to become healthy, then the card must be back at baseline",
@@ -716,6 +881,18 @@ def _load_psutil():
     return psutil
 
 
+def environ_of(pid: int, module) -> dict | None:
+    """``OLLAMA_*`` and ``LLAMA_ARG_*`` from a process table. A refused read is None."""
+
+    try:
+        env = module.Process(pid).environ()
+    except Exception:
+        return None
+    if not isinstance(env, dict):
+        return None
+    return ollama_env(env)
+
+
 def _capture(run, argv: list[str]) -> str | None:
     completed = _run(run, argv)
     if completed is None or getattr(completed, "returncode", 1) != 0:
@@ -755,6 +932,13 @@ class OllamaSupervisor:
         self.grant = grant
         self.heartbeat = None if heartbeat is None else Path(heartbeat)
         self.start = start
+        self._env_checked = False
+        self._restarts_disabled: str | None = None
+        self._measured_env: dict | None = None
+        self._measured_from_process = False
+        self.log_offset: int | None = None
+        self._backend_pending = False
+        self._segment_env: dict | None = None
 
     @property
     def recorded(self) -> ServerFingerprint | None:
@@ -766,14 +950,29 @@ class OllamaSupervisor:
         if self._recorded is None or replace:
             self._recorded = fingerprint
 
+    @property
+    def restarts_disabled(self) -> str | None:
+        """Why this run must not restart, or None when the record matches the live server."""
+
+        return self._restarts_disabled
+
+    @property
+    def backend_pending(self) -> bool:
+        """True when the new log segment has no ``load_backend`` line yet."""
+
+        return self._backend_pending
+
     def prime(self, url: str) -> None:
         """Record the server once, before a step. A down server stays unrecorded.
 
         An empty flash-attention, KV-cache, library-sha, or backend-line read
         is filled from the start line. The read after a restart is not.
+        The start record is compared with the live server here. A mismatch
+        disables restarts for the run.
         """
 
         self._ensure_start()
+        self.check_start_record(url)
         if self._recorded is not None:
             return
         try:
@@ -808,11 +1007,163 @@ class OllamaSupervisor:
             self.start = found
         return self.start
 
-    def _admit(self, url: str, model: str | None) -> None:
+    def check_start_record(self, url: str) -> str | None:
+        """Compare the start record with the live server. Once per run.
+
+        The live set is ``process_env`` when that seam can read it, and the
+        server config line otherwise. Any difference disables restarts. The
+        caller writes the reason on the marker. This does not record a
+        fingerprint and it does not stop a process.
+        """
+
+        self._compare_record(url)
+        return self._restarts_disabled
+
+    def confirm_backend(self) -> None:
+        """The ``load_backend`` line in the log segment written after the spawn.
+
+        Called after the first model load and before that sample is kept.
+        The line from before the offset is not a match. A segment that still
+        has no line stops the run.
+        """
+
+        if not self._backend_pending:
+            return
+        segment = self._segment_text()
+        line = backend_line_from_log(segment or "")
+        expected = "" if self._recorded is None else self._recorded.backend_line
+        self._backend_pending = False
+        if not line:
+            raise SupervisorStop(
+                "the new server log has no load_backend line after the first model load; "
+                "the run stops. The line from before the restart is not a match."
+            )
+        if line != expected:
+            raise SupervisorStop(
+                f"the Ollama backend line changed across the restart ({expected} to {line}); "
+                "the run stops. A restart that changes the backend is not measurement-neutral."
+            )
+
+    def _compare_record(self, url: str) -> None:
+        if self._env_checked:
+            return
+        self._ensure_start()
+        if self.start is None:
+            return
+        self._env_checked = True
+        live, from_process = self._live_env(url)
+        if live is None:
+            self._restarts_disabled = (
+                "the live Ollama environment could not be read, so this run makes no restarts. "
+                + SIGNIN_NOTE
+            )
+            return
+        self._measured_env = live
+        self._measured_from_process = from_process
+        mismatch = ollama_env_mismatch(
+            self.start.env,
+            live,
+            allow_extra=False,
+            across_restart=False,
+        )
+        if mismatch:
+            self._restarts_disabled = mismatch
+
+    def _live_env(self, url: str) -> tuple[dict | None, bool]:
+        """The live ``OLLAMA_*`` set, and whether it came from the process."""
+
+        reader = getattr(self.seams, "process_env", None)
+        if callable(reader):
+            try:
+                found = reader(url)
+            except Exception:
+                found = None
+            if isinstance(found, dict):
+                return ollama_env(found), True
+        text = self._whole_log()
+        if text:
+            logged = server_config_env(text)
+            if logged:
+                return logged, False
+        return None, False
+
+    def _whole_log(self) -> str | None:
+        if self.start is None:
+            return None
+        return self._read_segment(0)
+
+    def _segment_text(self) -> str | None:
+        if self.log_offset is None:
+            return None
+        return self._read_segment(self.log_offset)
+
+    def _read_segment(self, offset: int) -> str | None:
+        """None when this seam has no log reader. An empty string is an empty segment."""
+
+        if self.start is None or not isinstance(self.start.log_path, str) or not self.start.log_path.strip():
+            return None
+        reader = getattr(self.seams, "log_segment", None)
+        if not callable(reader):
+            return None
+        try:
+            text = reader(self.start.log_path, offset)
+        except Exception:
+            return None
+        if not isinstance(text, str):
+            return None
+        return text
+
+    def _note_offset(self) -> int | None:
+        sizer = getattr(self.seams, "log_size", None)
+        if not callable(sizer) or self.start is None:
+            return None
+        try:
+            size = sizer(self.start.log_path)
+        except Exception:
+            return 0
+        if isinstance(size, bool) or not isinstance(size, int) or size < 0:
+            return 0
+        return size
+
+    def _post_restart_fingerprint(self, url: str) -> ServerFingerprint | None:
+        """The server after the restart. The log read is the new segment only."""
+
+        try:
+            current = self.seams.environment(url)
+        except Exception:
+            return None
+        if not isinstance(current, ServerFingerprint):
+            return None
+        self._segment_env = None
+        self._backend_pending = False
+        if self.log_offset is None:
+            return current
+        segment = self._segment_text()
+        if segment is None:
+            return current
+        logged = server_config_env(segment)
+        self._segment_env = logged
+        line = backend_line_from_log(segment)
+        flash = logged.get("OLLAMA_FLASH_ATTENTION", "")
+        kv = logged.get("OLLAMA_KV_CACHE_TYPE", "")
+        if not line:
+            self._backend_pending = True
+            line = ""
+        return replace(
+            current,
+            flash_attention=flash,
+            kv_cache_type=kv,
+            backend_line=line,
+        )
+
+    def _admit(self, url: str, model: str | None, *, hung: bool) -> None:
         """Grant, heartbeat, and ``/api/ps``, the same checks as admission.
 
-        An unreadable ``/api/ps`` is not another session. A payload that names
-        a different model is, and the restart is refused before anything stops.
+        An unreadable ``/api/ps`` is not another session when the server is
+        down. During a hang, health can still answer. An unreadable ``/api/ps``
+        then refuses the restart, because another session's model would be
+        dropped without being seen. A payload that names a different model
+        is refused before anything stops.
         """
 
         try:
@@ -826,10 +1177,21 @@ class OllamaSupervisor:
             require_heartbeat(Path(self.heartbeat), float(wall()))
         except GuardError as exc:
             raise SupervisorStop(str(exc)) from exc
+        readable = True
         try:
             payload = self.seams.ps(url)
         except Exception:
             payload = None
+            readable = False
+        if payload is None:
+            readable = False
+        if hung and not readable:
+            found = self._once(url)
+            if found.ok:
+                raise SupervisorStop(
+                    "/api/ps is unreadable while the server still answers; "
+                    "a restart during a hang is refused"
+                )
         foreign = foreign_models(payload, model)
         if foreign:
             listed = ", ".join(foreign)
@@ -853,10 +1215,16 @@ class OllamaSupervisor:
         return epoch == self._epoch
 
     def keep_sample(self, epoch: int, sample: dict) -> dict | None:
-        """None when a restart has happened since ``epoch``. The caller has ended the step."""
+        """None when a restart has happened since ``epoch``. The caller has ended the step.
+
+        A backend line that was missing at the restart is read here, after the
+        model has loaded and before this sample is kept. A missing or different
+        line stops the run, and the sample is not returned.
+        """
 
         if not self.sample_stands(epoch):
             return None
+        self.confirm_backend()
         return sample
 
     def server_is_down(self, url: str) -> bool:
@@ -936,7 +1304,10 @@ class OllamaSupervisor:
                 "the run has no recorded Ollama start line, so a restart would not replay it. "
                 + SIGNIN_NOTE
             )
-        self._admit(url, model)
+        self._compare_record(url)
+        if self._restarts_disabled:
+            raise SupervisorStop(self._restarts_disabled)
+        self._admit(url, model, hung=(why == "hung"))
         argv = list(self.start.argv)
         if any("signin" in str(part).lower() for part in argv):
             raise SupervisorStop(SIGNIN_NOTE)
@@ -951,6 +1322,7 @@ class OllamaSupervisor:
         for pid in old_pids:
             self.seams.stop(pid)
         started = float(self.seams.clock())
+        self.log_offset = self._note_offset()
         try:
             new_pid = self.seams.spawn(argv, dict(self.start.env), self.start.log_path)
         except SupervisorStop as exc:
@@ -991,10 +1363,7 @@ class OllamaSupervisor:
         if baseline_note:
             self._commit(port, why, old_pids, new_pid, started, healthy_at, version, baseline_note)
             raise SupervisorStop(baseline_note)
-        try:
-            current = self.seams.environment(url)
-        except Exception:
-            current = None
+        current = self._post_restart_fingerprint(url)
         if not isinstance(current, ServerFingerprint):
             self._fail(
                 url,
@@ -1005,7 +1374,18 @@ class OllamaSupervisor:
                 version,
                 "the Ollama environment could not be read after the restart; the run stops",
             )
-        mismatch = environment_mismatch(self._recorded, current)
+        mismatch = environment_mismatch(
+            self._recorded,
+            current,
+            check_backend=not self._backend_pending,
+        )
+        if mismatch is None and self._segment_env is not None and self._measured_env is not None:
+            mismatch = ollama_env_mismatch(
+                self._measured_env,
+                self._segment_env,
+                allow_extra=self._measured_from_process,
+                across_restart=True,
+            )
         record = self._commit(
             port,
             why,
@@ -1143,6 +1523,19 @@ def real_seams(*, run=None, platform: str | None = None, popen=None, connection=
             return None
         return payload
 
+    def process_env(url: str):
+        """The listener's environment. A test that injects ``run`` has no live process."""
+
+        if run is not None:
+            return None
+        parts = urlsplit(url)
+        if parts.port is None:
+            return None
+        pids = listening_pids(parts.port, platform=system)
+        if not pids:
+            return None
+        return environ_of(pids[0], _load_psutil())
+
     return SupervisorSeams(
         health_get=health_get,
         processes=processes,
@@ -1153,4 +1546,7 @@ def real_seams(*, run=None, platform: str | None = None, popen=None, connection=
         environment=environment,
         argv=lambda: serve_argv(system),
         load_start=load_serve_start,
+        process_env=process_env,
+        log_size=log_byte_size,
+        log_segment=read_log_from,
     )

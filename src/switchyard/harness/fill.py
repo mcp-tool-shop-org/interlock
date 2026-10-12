@@ -772,6 +772,9 @@ def _sync_restarts(supervisor, marker) -> None:
 
     if supervisor is None or marker is None:
         return
+    reason = getattr(supervisor, "restarts_disabled", None)
+    if reason:
+        marker.note_restart_disabled(reason)
     have = marker.restart_records()
     for record in supervisor.restarts:
         data = record.as_dict()
@@ -871,9 +874,16 @@ def run_fill_card(
     pending_retry: set[str] = set()
     index = 0
     models = list(spec["models"])
+    record_checked = False
     try:
         while index < len(models):
             entry = models[index]
+            if supervisor is not None and not record_checked:
+                supervisor.check_start_record(url_for("5090"))
+                reason = supervisor.restarts_disabled
+                if reason:
+                    marker.note_restart_disabled(reason)
+                record_checked = True
             require_grant(grant, uses_5090=True)
             require_heartbeat(heartbeat, wall())
             adapter = _ollama(adapters)
@@ -920,6 +930,17 @@ def run_fill_card(
                 index += 1
                 continue
             if resumed is None and not row.get("aborted"):
+                if supervisor is not None:
+                    try:
+                        supervisor.confirm_backend()
+                    except SupervisorStop as exc:
+                        _sync_restarts(supervisor, marker)
+                        marker.note_failure(entry["model"], str(exc))
+                        row["notes"] = _join(str(exc), row.get("notes") or "")
+                        _strip_measurement(row)
+                        rows.append(row)
+                        stop_note = str(exc)
+                        break
                 if entry["model"] in pending_retry:
                     row["settings"]["retried"] = True
                     pending_retry.discard(entry["model"])

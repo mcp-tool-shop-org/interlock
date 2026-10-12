@@ -35,8 +35,13 @@ from switchyard.ollama_supervisor import (
     _load_psutil,
     card_mib_from_text,
     backend_line_from_log,
+    environ_of,
     environment_mismatch,
     env_from_log,
+    log_byte_size,
+    ollama_env_mismatch,
+    read_log_from,
+    server_config_env,
     failure_kind,
     file_sha256,
     foreign_models,
@@ -95,6 +100,10 @@ class World:
         self.spawn_pid = None
         self.listen_on_spawn = True
         self.argv_value = None
+        self.extra_env = {}
+        self.live_env = None
+        self.log = None
+        self.append_on_spawn = b""
         self.config = SupervisorConfig()
         self.processes = [
             Process(pid=10, name="ollama", port=11434, listening=True),
@@ -119,14 +128,16 @@ class World:
     def start_record(self) -> ServeStart:
         """The recorded start line. The log path is a string. This fake never opens it."""
 
+        env = {
+            "OLLAMA_HOST": "127.0.0.1:11434",
+            "OLLAMA_MODELS": MODELS_DIR,
+            "OLLAMA_FLASH_ATTENTION": "true",
+            "OLLAMA_KV_CACHE_TYPE": "q8_0",
+        }
+        env.update(self.extra_env)
         return ServeStart(
             argv=tuple(self.argv_value or ["ollama", "serve"]),
-            env={
-                "OLLAMA_HOST": "127.0.0.1:11434",
-                "OLLAMA_MODELS": MODELS_DIR,
-                "OLLAMA_FLASH_ATTENTION": "true",
-                "OLLAMA_KV_CACHE_TYPE": "q8_0",
-            },
+            env=env,
             log_path=LOG_PATH,
             library_path="lib/ollama/cuda_v13/ggml-cuda.dll",
             ggml_cuda_sha256=SHA,
@@ -171,7 +182,23 @@ class World:
             self.card = self.card_after_spawn
         if not self.keep_down_after_spawn:
             self.up = True
+        if self.log is not None and self.append_on_spawn:
+            self.log += self.append_on_spawn
         return pid
+
+    def process_env(self, url):
+        del url
+        if self.live_env is not None:
+            return dict(self.live_env)
+        return dict(self.start_record().env)
+
+    def log_size(self, path):
+        del path
+        return len(self.log or b"")
+
+    def log_segment(self, path, offset):
+        del path
+        return bytes(self.log or b"")[offset:].decode("utf-8", errors="replace")
 
     def card_mib(self):
         return self.card
@@ -218,6 +245,9 @@ class World:
             clock=self.clock,
             sleep=self.sleep,
             now=self.now,
+            process_env=self.process_env,
+            log_size=self.log_size if self.log is not None else None,
+            log_segment=self.log_segment if self.log is not None else None,
         )
 
 
@@ -328,6 +358,9 @@ class Script:
 
     def run(self, request):
         self.calls.append(request.step_id)
+        hook = getattr(self, "before", None)
+        if callable(hook):
+            hook(request, len(self.calls))
         item = self.failures.pop(0) if self.failures else None
         if isinstance(item, BaseException):
             raise item
@@ -347,6 +380,7 @@ def _run(tmp_path: Path, script: Script, world: World, spec: dict, run_id: str =
     repo = tmp_path / run_id
     path = _bind(repo, spec)
     supervisor = _supervisor(world)
+    world.supervisor = supervisor
     rows = run_spec(
         path,
         root=repo,
@@ -524,6 +558,166 @@ def test_the_replayed_environment_equals_the_recorded_start_line():
     assert env["OLLAMA_HOST"] == "127.0.0.1:11434"
     assert "OLLAMA_CUDA_BACKEND" not in env
     assert log_path == supervisor.start.log_path == LOG_PATH
+
+
+def _config_line(env: dict) -> bytes:
+    """One Go ``server config`` line. Values have no spaces; a list is bracketed by the caller."""
+
+    body = " ".join(f"{key}:{value}" for key, value in env.items())
+    text = f'time=2026-10-12T12:00:00Z msg="server config" env="map[{body}]"\n'
+    return text.encode("utf-8")
+
+
+def test_an_old_backend_line_before_the_offset_is_ignored(tmp_path: Path):
+    missing = tmp_path / "missing.log"
+    assert log_byte_size(str(missing)) == 0
+    assert log_byte_size("") == 0
+    assert read_log_from(str(missing), 0) == ""
+    assert read_log_from("  ", 4) == ""
+    prefix = (LINE + "\n").encode()
+    path = tmp_path / "server.log"
+    path.write_bytes(prefix + b"after\n")
+    assert log_byte_size(str(path)) == len(prefix) + len(b"after\n")
+    assert LINE not in read_log_from(str(path), len(prefix))
+
+    logged = (
+        'time=t msg="server config" env="map['
+        "OLLAMA_HOST:http://127.0.0.1:11434 "
+        "OLLAMA_EDITOR: "
+        "OLLAMA_ORIGINS:[http://localhost https://localhost] "
+        "OLLAMA_MODELS:E:\\\\AI-Models\\\\Ollama "
+        'LLAMA_ARG_FIT:]"\n'
+    )
+    parsed = server_config_env(logged)
+    assert parsed["OLLAMA_HOST"] == "http://127.0.0.1:11434"
+    assert parsed["OLLAMA_EDITOR"] == ""
+    assert parsed["OLLAMA_ORIGINS"] == "http://localhost https://localhost"
+    assert parsed["OLLAMA_MODELS"] == MODELS_DIR
+    assert parsed["LLAMA_ARG_FIT"] == ""
+    assert server_config_env("no config here") == {}
+    assert ollama_env_mismatch(
+        {"OLLAMA_HOST": "127.0.0.1:11434"},
+        {"OLLAMA_HOST": "http://127.0.0.1:11434"},
+        allow_extra=False,
+        across_restart=False,
+    ) is None
+    assert ollama_env_mismatch(
+        {"OLLAMA_HOST": "127.0.0.1:11434"},
+        {"OLLAMA_HOST": "https://127.0.0.1:11434", "OLLAMA_DEBUG": "1"},
+        allow_extra=True,
+        across_restart=True,
+    ) is None
+
+    class _Psutil:
+        class Process:
+            def __init__(self, pid):
+                self.pid = pid
+
+            def environ(self):
+                if self.pid == 3:
+                    raise PermissionError("no")
+                return {
+                    "OLLAMA_HOST": "127.0.0.1:11434",
+                    "PATH": "C:/Windows",
+                    "LLAMA_ARG_FIT": "",
+                }
+
+    assert environ_of(3, _Psutil) is None
+    assert environ_of(4, _Psutil) == {"OLLAMA_HOST": "127.0.0.1:11434", "LLAMA_ARG_FIT": ""}
+
+    world = World()
+    world.log = prefix
+    world.append_on_spawn = _config_line(world.start_record().env)
+    supervisor = _supervisor(world)
+    decision = supervisor.after_failure(URL_5090, model="qwen3:8b", kind="transport")
+    assert decision.action == "restarted"
+    assert supervisor.log_offset == len(prefix)
+    segment = world.log_segment(LOG_PATH, supervisor.log_offset)
+    assert LINE not in segment
+    assert backend_line_from_log(world.log.decode()) == LINE
+    assert supervisor.backend_pending is True
+    with pytest.raises(SupervisorStop, match="no load_backend"):
+        supervisor.confirm_backend()
+
+    different = World()
+    different.log = prefix
+    different.append_on_spawn = _config_line(different.start_record().env) + (
+        "load_backend: loaded CUDA backend from cuda_v12\n"
+    ).encode()
+    with pytest.raises(SupervisorStop, match="cuda_v12"):
+        _supervisor(different).after_failure(URL_5090, model="qwen3:8b", kind="transport")
+    assert different.stopped == [10]
+
+
+def test_no_new_backend_line_yet_is_checked_after_the_first_load_before_the_sample_is_kept(tmp_path: Path):
+    world = World()
+    world.log = (LINE + "\n").encode()
+    world.append_on_spawn = _config_line(world.start_record().env)
+
+    def before(_request, n):
+        if n == 2:
+            assert world.supervisor.backend_pending is True
+            world.log += (LINE + "\n").encode()
+
+    script = Script([AdapterError("connection refused"), 10.0])
+    script.before = before
+    spec = _interleaved([_arm("A"), _arm("B")])
+    _repo, rows, _supervisor_ran = _run(tmp_path, script, world, spec, run_id="defer-ok")
+    assert script.calls[:2] == ["A", "B"]
+    assert rows[0]["settings"]["cold_after_restart"] is True
+
+    missed = World()
+    missed.log = (LINE + "\n").encode()
+    missed.append_on_spawn = _config_line(missed.start_record().env)
+    quiet = Script([AdapterError("connection refused"), 10.0])
+    with pytest.raises(RunnerError, match="no load_backend"):
+        _run(tmp_path, quiet, missed, spec, run_id="defer-miss")
+    assert quiet.calls == ["A", "B"]
+    receipt = tmp_path / "defer-miss" / "receipts" / "defer-miss.jsonl"
+    text = receipt.read_text(encoding="utf-8") if receipt.is_file() else ""
+    assert "cold_after_restart" not in text
+    failed = _marker(tmp_path / "defer-miss", "defer-miss")["failed_steps"]
+    assert any("no load_backend" in step["error"] for step in failed)
+
+
+def test_a_mismatched_record_disables_restarts_and_records_why(tmp_path: Path):
+    spec = _interleaved([_arm("A"), _arm("B")])
+    world = World()
+    world.live_env = dict(world.start_record().env)
+    world.live_env["OLLAMA_MODELS"] = "E:\\old-models"
+    script = Script([10.0, 10.0])
+    repo, _rows, supervisor = _run(tmp_path, script, world, spec, run_id="stale-quiet")
+    assert world.stopped == []
+    assert world.spawned == []
+    assert supervisor.restarts == []
+    reason = _marker(repo, "stale-quiet")["ollama_restart_disabled"]
+    assert "OLLAMA_MODELS" in reason
+    assert "no restarts" in reason
+
+    failing = World()
+    failing.live_env = dict(failing.start_record().env)
+    failing.live_env["OLLAMA_MODELS"] = "E:\\old-models"
+    stopped = Script([AdapterError("connection refused")])
+    with pytest.raises(RunnerError, match="OLLAMA_MODELS"):
+        _run(tmp_path, stopped, failing, spec, run_id="stale-stop")
+    assert failing.stopped == []
+    assert failing.spawned == []
+    recorded = _marker(tmp_path / "stale-stop", "stale-stop")["ollama_restart_disabled"]
+    assert "OLLAMA_MODELS" in recorded
+
+
+def test_a_full_set_compare_after_a_restart_stops_the_run_when_the_set_mismatches():
+    world = World()
+    world.extra_env = {"OLLAMA_NUM_PARALLEL": "1"}
+    changed = dict(world.start_record().env)
+    changed["OLLAMA_NUM_PARALLEL"] = "4"
+    world.log = b"previous server\n"
+    world.append_on_spawn = _config_line(changed) + (LINE + "\n").encode()
+    with pytest.raises(SupervisorStop, match="OLLAMA_NUM_PARALLEL") as caught:
+        _supervisor(world).after_failure(URL_5090, model="qwen3:8b", kind="transport")
+    assert "changed across the restart" in str(caught.value)
+    assert "flash_attention" not in str(caught.value)
+    assert world.stopped == [10]
 
 
 def test_the_first_step_after_a_restart_stays_out_of_the_warm_percentiles(tmp_path: Path):
@@ -1191,7 +1385,8 @@ def _fill_down_then_next(tmp_path: Path):
     assert rows[0]["aborted"] is True
     assert rows[0]["settings"]["max_resident_ctx"] is None
     assert "inconclusive" in rows[0]["notes"]
-    assert rows[1]["settings"]["max_resident_ctx"] == 8192
+    # The fake reports a trained context of 4096. The search stops there.
+    assert rows[1]["settings"]["max_resident_ctx"] == 4096
     assert rows[0]["settings"]["ollama_restarts"][0]["why"] == "down"
     assert _marker(repo, "fill-next")["restarts"][0]["port"] == 11434
 
@@ -1204,7 +1399,8 @@ def test_fill_card_retry_cap_and_mismatch_stop_between_models(tmp_path: Path):
     assert len(retry_world.spawned) == 1
     assert len(rows) == 1
     assert rows[0].get("aborted") is not True
-    assert rows[0]["settings"]["max_resident_ctx"] == 8192
+    # The fake reports a trained context of 4096. The search stops there.
+    assert rows[0]["settings"]["max_resident_ctx"] == 4096
     assert rows[0]["settings"]["retried"] is True
     assert rows[0]["settings"]["cold_after_restart"] is True
 
@@ -1372,9 +1568,16 @@ def test_real_seams_and_the_remaining_fakes_do_not_touch_a_server(tmp_path: Path
     hung.up = True
     hung.hold_up = True
     hung.ps = lambda url: (_ for _ in ()).throw(RuntimeError("ps down"))
-    decision = _supervisor(hung).after_failure(URL_5090, model="qwen3:8b", kind="timeout")
+    with pytest.raises(SupervisorStop, match="unreadable"):
+        _supervisor(hung).after_failure(URL_5090, model="qwen3:8b", kind="timeout")
+    assert hung.stopped == []
+
+    down = World()
+    down.ps = lambda url: None
+    decision = _supervisor(down).after_failure(URL_5090, model="qwen3:8b", kind="transport")
+    assert decision.action == "restarted"
     assert decision.record is not None
-    assert decision.record.why == "hung"
+    assert decision.record.why == "down"
 
     blind = World()
     blind.card_mib = lambda: (_ for _ in ()).throw(RuntimeError("no card"))

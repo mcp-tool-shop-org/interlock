@@ -668,6 +668,9 @@ def run_interleaved(
 
         if supervisor is None:
             return
+        reason = supervisor.restarts_disabled
+        if reason:
+            marker.note_restart_disabled(reason)
         have = marker.restart_records()
         for record in supervisor.restarts:
             data = record.as_dict()
@@ -772,6 +775,9 @@ def run_interleaved(
                         ollama_url = None
                     if ollama_url is not None:
                         supervisor.prime(ollama_url)
+                        reason = supervisor.restarts_disabled
+                        if reason:
+                            marker.note_restart_disabled(reason)
                         epoch = supervisor.begin_measurement()
                 if companion is not None:
                     _session(
@@ -896,7 +902,13 @@ def run_interleaved(
                                 _finish_slot_probe(probe, adapter),
                             )
                             if epoch is not None:
-                                sample = supervisor.keep_sample(epoch, sample)
+                                try:
+                                    sample = supervisor.keep_sample(epoch, sample)
+                                except SupervisorStop as exc:
+                                    marker.note_failure(_label(slot), str(exc))
+                                    aborted = {"step": _label(slot), "error": str(exc)}
+                                    flush()
+                                    raise RunnerError(str(exc)) from exc
                             if sample is None:
                                 marker.note_failure(_label(slot), "a measurement crossed a restart")
                                 stream.note(slot, None)
