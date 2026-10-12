@@ -1860,6 +1860,96 @@ def test_cancel_unblocks_a_generate_the_server_has_not_answered(monkeypatch):
         server.server_close()
 
 
+def test_cancel_then_unload_still_ends_the_generate(monkeypatch):
+    """Cancel, then unload at once. The unload must not clear the generate's switch.
+
+    No GPU and no Ollama. The generate is still blocked when unload starts, and it
+    ends within about a second.
+    """
+
+    released = threading.Event()
+    started = threading.Event()
+
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def do_POST(self):
+            self.close_connection = True
+            length = int(self.headers.get("Content-Length", "0") or "0")
+            raw = self.rfile.read(length) if length else b""
+            try:
+                payload = json.loads(raw.decode("utf-8")) if raw else {}
+            except json.JSONDecodeError:
+                payload = {}
+            if payload.get("keep_alive") == 0:
+                body = b"{}"
+                try:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                except OSError:
+                    return
+                return
+            started.set()
+            released.wait(3)
+            body = b'{"eval_count":1,"eval_duration":1000000000}'
+            try:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except OSError:
+                return
+
+        def log_message(self, format, *args):
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    port = server.server_address[1]
+    worker = threading.Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    monkeypatch.setattr(
+        "switchyard.adapters.ollama.url_for",
+        lambda _device: f"http://127.0.0.1:{port}",
+    )
+    adapter = OllamaAdapter()
+    request = StepRequest(
+        "load-4096",
+        "generate",
+        "qwen3:8b",
+        "5090",
+        "ollama",
+        {"num_predict": 1, "num_ctx": 4096, "prompt": "alpha"},
+    )
+    outcome: dict = {}
+
+    def go():
+        try:
+            outcome["result"] = adapter.run(request)
+        except Exception as exc:
+            outcome["error"] = exc
+
+    runner = threading.Thread(target=go)
+    runner.start()
+    try:
+        assert started.wait(2)
+        cancelled_at = time.monotonic()
+        adapter.cancel()
+        adapter.unload("qwen3:8b", "5090")
+        runner.join(timeout=2)
+        assert not runner.is_alive()
+        assert time.monotonic() - cancelled_at < 1
+        assert isinstance(outcome.get("error"), AdapterError)
+        assert str(outcome["error"]) == "the request was closed"
+    finally:
+        released.set()
+        server.shutdown()
+        server.server_close()
+
+
 def test_the_run_path_refuses_an_edited_spec_before_any_adapter_call(tmp_path: Path):
     repo = tmp_path / "repo"
     spec_path = _bind(repo, _spec())

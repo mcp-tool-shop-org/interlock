@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import threading
 import time
 from pathlib import Path
 
@@ -112,7 +113,7 @@ def _fresh(tmp_path: Path) -> Path:
 
 
 class _Transport:
-    def __init__(self, seams, *, show_error=None, explode=False, spill_shared=False, spill_prompt=False, missing_shared=False, missing_prompt=False, abort_at=None, stick=False, linear=None, cold_disagrees=False, omit_tags=False, tag_bytes=None, busy_mib=20000, hide_baseline=False, settle_high=0):
+    def __init__(self, seams, *, show_error=None, explode=False, spill_shared=False, spill_prompt=False, missing_shared=False, missing_prompt=False, abort_at=None, stick=False, linear=None, cold_disagrees=False, omit_tags=False, tag_bytes=None, busy_mib=20000, hide_baseline=False, settle_high=0, self_sample=True, split_vram=False, hold_abort=False, slow_unload=0):
         self.seams = seams
         self.show_error = show_error
         self.explode = explode
@@ -129,7 +130,13 @@ class _Transport:
         self.busy_mib = busy_mib
         self.hide_baseline = hide_baseline
         self.settle_high = settle_high
+        self.self_sample = self_sample
+        self.split_vram = split_vram
+        self.hold_abort = hold_abort
+        self.slow_unload = slow_unload
         self.settle_reads = 0
+        self.events = []
+        self._release = threading.Event()
         self.shown = None
         self.calls = []
         self.unloads = []
@@ -141,6 +148,7 @@ class _Transport:
 
     def cancel(self):
         self.order.append("cancel")
+        self._release.set()
 
     def card_mib(self):
         if self.stick and self.seams is not None and self.seams.over:
@@ -151,6 +159,8 @@ class _Transport:
             if self.settle_high and self.unloads and self.settle_reads < self.settle_high:
                 self.settle_reads += 1
                 return 30500
+            if self.unloads:
+                self.events.append("settle")
             return 1500
         ctx = self.state["ctx"]
         if self.abort_at is not None and isinstance(ctx, int) and ctx >= self.abort_at:
@@ -197,6 +207,8 @@ class _Transport:
         if not isinstance(body, dict):
             return {}
         if body.get("keep_alive") == 0 and body.get("prompt") == "":
+            if self.slow_unload:
+                time.sleep(self.slow_unload)
             if self.seams.over and self.state["busy"]:
                 self.abort_unloads.append(self.state["ctx"])
             self.order.append("unload")
@@ -208,15 +220,27 @@ class _Transport:
         self.state["ctx"] = options.get("num_ctx")
         self.state["confirm"] = (not body.get("raw")) and body.get("prompt") != SEED
         self.state["busy"] = True
+        self.events.append(("load", self.state["ctx"]))
         if self.explode and not body.get("raw"):
             raise RuntimeError("generate exploded")
-        self.seams.sample()
+        holding = (
+            self.hold_abort
+            and not body.get("raw")
+            and self.abort_at is not None
+            and isinstance(self.state["ctx"], int)
+            and self.state["ctx"] >= self.abort_at
+        )
+        if self.self_sample or not holding:
+            self.seams.sample()
+        if holding:
+            self._release.wait(5)
         if body.get("raw"):
             count = 100000
             if self.cold_disagrees and self.loaded is None:
                 count = 100001
             return {"prompt_eval_count": count}
-        self.loaded = {"name": body["model"], "size": 1000, "size_vram": 1000}
+        vram = 999 if self.split_vram else 1000
+        self.loaded = {"name": body["model"], "size": 1000, "size_vram": vram}
         rate = self._rate()
         payload = {"eval_count": 1, "eval_duration": 1_000_000_000, "total_duration": 5_000_000}
         if rate is not None:
@@ -417,6 +441,55 @@ def test_a_missing_baseline_stops_before_the_second_window(tmp_path: Path):
     assert 8192 not in ctxs
 
 
+def test_a_non_positive_share_stops_before_the_second_window(tmp_path: Path):
+    """The tag is larger than the card above the baseline, so the share is not a bound."""
+
+    weights = 19000 * 1024 * 1024
+    transport = _Transport(None, tag_bytes=weights)
+    seams = _seams(transport)
+    with pytest.raises(RunnerError, match="the second window had no bound"):
+        _run(tmp_path, transport, seams=seams)
+    ctxs = _ctxs(transport)
+    assert 4096 in ctxs
+    assert 8192 not in ctxs
+
+
+def test_a_window_that_is_not_fully_resident_does_not_bound_the_next(tmp_path: Path, monkeypatch):
+    """size_vram is below size, so window 1 cannot bound a larger context.
+
+    The search would stop on its own. This lets it ask anyway. The bound refuses
+    before that context is loaded.
+    """
+
+    def peak_only(obs, abort_mib):
+        if obs.error or obs.peak_mib is None:
+            return True
+        return obs.peak_mib > abort_mib
+
+    monkeypatch.setattr("switchyard.harness.e5.over_margin", peak_only)
+    transport = _Transport(None, split_vram=True)
+    seams = _seams(transport)
+    with pytest.raises(RunnerError, match="the second window had no bound"):
+        _run(tmp_path, transport, seams=seams)
+    ctxs = _ctxs(transport)
+    assert 4096 in ctxs
+    assert 8192 not in ctxs
+
+
+def test_the_next_load_waits_until_the_abort_has_settled(tmp_path: Path):
+    """A slow unload stays on the sampler thread. The next load starts after the settle read."""
+
+    transport = _Transport(None, abort_at=8192, self_sample=False, hold_abort=True, slow_unload=0.4)
+    seams = _seams(transport)
+    seams.threaded = True
+    _repo, rows = _run(tmp_path, transport, seams=seams)
+    settle_at = transport.events.index("settle")
+    next_load = transport.events.index(("load", 6144))
+    assert transport.events.index(("load", 8192)) < settle_at < next_load
+    assert rows[0]["settings"]["max_resident_ctx"] == 6144
+    assert {"ctx": 8192, "mib": 1500} in rows[0]["settings"]["after_unload_mib"]
+
+
 def test_a_card_that_falls_while_the_unload_settles_is_not_noted(tmp_path: Path):
     transport = _Transport(None, abort_at=8192, settle_high=3)
     seams = _seams(transport)
@@ -585,6 +658,7 @@ def test_dry_run_names_the_confirmation_count(monkeypatch):
     assert "closing the request does not return the memory a load already allocated" in text
     assert "one measured window bounds the next context from that window's share" in text
     assert "a second window with no bound stops the row" in text
+    assert "the next load waits until the abort has finished" in text
     assert "heartbeat not read; adapters not called" in text
     assert "devices not started (--dry-run)" in text
     assert "rest_s" not in text

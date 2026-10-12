@@ -128,34 +128,40 @@ def quantization_level(payload: dict) -> str:
     return level
 
 
+class _Ticket:
+    """One request's cancel switch. A later request does not clear it."""
+
+    def __init__(self, close) -> None:
+        self.close = close
+        self.cancelled = threading.Event()
+
+
 class _Flight:
-    """The response currently being read, so another thread can close it."""
+    """The request in flight. Each ``arm`` installs that request's own ticket."""
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._close = None
-        self._cancelled = threading.Event()
+        self._current: _Ticket | None = None
 
-    def arm(self, close) -> None:
+    def arm(self, close) -> _Ticket:
+        ticket = _Ticket(close)
         with self._lock:
-            self._cancelled.clear()
-            self._close = close
+            self._current = ticket
+        return ticket
 
-    def disarm(self) -> None:
+    def disarm(self, ticket: _Ticket) -> None:
         with self._lock:
-            self._close = None
-
-    def cancelled(self) -> bool:
-        return self._cancelled.is_set()
+            if self._current is ticket:
+                self._current = None
 
     def cancel(self) -> None:
-        self._cancelled.set()
         with self._lock:
-            close = self._close
-        if close is None:
+            ticket = self._current
+        if ticket is None:
             return
+        ticket.cancelled.set()
         try:
-            close()
+            ticket.close()
         except Exception:
             return
 
@@ -204,12 +210,13 @@ def default_transport(
     data = None if body is None else json.dumps(body).encode("utf-8")
     headers = {"Content-Type": "application/json"} if data is not None else {}
     conn = http.client.HTTPConnection(parts.hostname, parts.port or 80, timeout=timeout)
+    ticket = None
     try:
         if flight is not None:
-            flight.arm(lambda: _shutdown(conn))
+            ticket = flight.arm(lambda: _shutdown(conn))
         conn.request(method, path, body=data, headers=headers)
-        if flight is not None and getattr(conn, "sock", None) is not None:
-            _wait_for_reply(conn, flight, timeout)
+        if ticket is not None and getattr(conn, "sock", None) is not None:
+            _wait_for_reply(conn, ticket, timeout)
         response = conn.getresponse()
         payload = json.loads(response.read().decode("utf-8"))
     except AdapterError:
@@ -217,8 +224,8 @@ def default_transport(
     except (OSError, http.client.HTTPException, json.JSONDecodeError):
         raise AdapterError("the request was closed")
     finally:
-        if flight is not None:
-            flight.disarm()
+        if ticket is not None and flight is not None:
+            flight.disarm(ticket)
         try:
             conn.close()
         except OSError:
@@ -226,12 +233,12 @@ def default_transport(
     return payload
 
 
-def _wait_for_reply(conn: http.client.HTTPConnection, flight: _Flight, timeout: float | None) -> None:
-    """Return when the socket is readable, or raise once cancel has been asked."""
+def _wait_for_reply(conn: http.client.HTTPConnection, ticket: _Ticket, timeout: float | None) -> None:
+    """Return when the socket is readable, or raise once this request was cancelled."""
 
     deadline = None if timeout is None else time.monotonic() + timeout
     while True:
-        if flight.cancelled():
+        if ticket.cancelled.is_set():
             raise AdapterError("the request was closed")
         if deadline is not None and time.monotonic() >= deadline:
             raise AdapterError("the request was closed")
@@ -355,7 +362,7 @@ class OllamaAdapter:
             if not isinstance(item, dict):
                 continue
             label = item.get("name") or item.get("model")
-            if not isinstance(label, str) or (label != model and not label.startswith(model + ":")):
+            if not isinstance(label, str) or label != model:
                 continue
             size = item.get("size")
             if isinstance(size, bool) or not isinstance(size, int) or size < 0:

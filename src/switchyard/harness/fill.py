@@ -15,11 +15,15 @@ already allocated.
 
 Before a load, two measured windows extrapolate the next card reading. With
 one measured window, the next context is bounded by that window's share of
-the card above the idle baseline and the weight size from ``/api/tags``. A
-window predicted to reach ``abort_mib`` is ``predicted_over`` and is not
-loaded. The first window still loads. If the weight size or the baseline
-cannot be read, the second window is not loaded and the row stops. An
-aborted window is not a measurement. The spec ceiling is not a probe.
+the card above the idle baseline and the weight size from ``/api/tags``.
+A share of 0 or less is not a bound, and a window that is not fully
+resident (``size_vram`` equal to ``size``) is not a bound either. A window
+predicted to reach ``abort_mib`` is ``predicted_over`` and is not loaded.
+The first window still loads. If the weight size or the baseline cannot be
+read, or the share is not positive, or that window is not fully resident,
+the second window is not loaded and the row stops. An aborted window is
+not a measurement. The next load waits until that abort's unload and card
+re-read have finished. The spec ceiling is not a probe.
 Nothing here rests between models. A missing shared-memory reading or a
 missing prompt rate is a spill, which the pure search already treats as a
 step back. A confirmation prefix is counted again from a cold load, and a
@@ -74,7 +78,7 @@ class _CountRefused(Exception):
 
 
 class _NoBound(Exception):
-    """The next window has no weight size or no baseline, so it is not loaded."""
+    """The next window has no share that can be trusted, so it is not loaded."""
 
 
 @dataclass
@@ -158,8 +162,9 @@ class CardSampler:
     ``threaded`` false means the transport calls :meth:`sample` itself, so a
     test can abort on one deterministic reading. The production sampler waits
     ``sample_ms`` between readings. Reaching ``abort_mib`` runs ``on_abort``,
-    which closes the request before the unload. The reading is not compared
-    with the spec ceiling.
+    which closes the request before the unload. ``on_abort`` sets an event
+    when it finishes, and the probe waits for that event with no timeout
+    before it returns. The reading is not compared with the spec ceiling.
     """
 
     def __init__(self, seams: FillSeams, abort_mib: int, sample_ms: int, on_abort) -> None:
@@ -170,6 +175,8 @@ class CardSampler:
         self.peak: int | None = None
         self.over = False
         self._stop = threading.Event()
+        self._abort_done = threading.Event()
+        self._abort_done.set()
         self._lock = threading.Lock()
         self._firing = False
         seams.sample = self.sample
@@ -196,13 +203,24 @@ class CardSampler:
                 self._firing = True
                 fire = True
         if fire:
+            self._abort_done.clear()
             try:
                 self.on_abort()
             except Exception:
                 pass
             finally:
                 self._firing = False
+                self._abort_done.set()
         return value
+
+    def wait_for_abort(self) -> None:
+        """Block until an in-flight abort has finished unloading and re-reading.
+
+        There is no timeout. The settle bound is about 10 seconds and the
+        unload is on top of that, so a shorter wait would return early.
+        """
+
+        self._abort_done.wait()
 
     def cover(self, call):
         if not self.seams.threaded:
@@ -214,7 +232,8 @@ class CardSampler:
             return call()
         finally:
             self._stop.set()
-            thread.join(timeout=5)
+            self._abort_done.wait()
+            thread.join()
 
     def _loop(self) -> None:
         while not self._stop.is_set():
@@ -470,16 +489,18 @@ def _measured_points(measured: list[tuple[int, int]]) -> list[tuple[int, int]]:
 def _one_window_mib(reading: int, ctx_1: int, baseline: int, weights_mib: int, ctx: int) -> int | None:
     """Bound ``ctx`` from one measured window.
 
-    The share is the reading above the idle baseline and the weight file,
-    floored at 0. It includes compute buffers, so it overstates the cache.
-    The bound is ``reading + ceil(share * (ctx - ctx_1) / ctx_1)``.
+    The share is the reading above the idle baseline and the weight file.
+    A share of 0 or less is not a bound: the inputs disagree, and flooring
+    it would predict no growth. A positive share includes compute buffers,
+    so it overstates the cache. The bound is
+    ``reading + ceil(share * (ctx - ctx_1) / ctx_1)``.
     """
 
     if ctx_1 <= 0:
         return None
     share = reading - baseline - weights_mib
-    if share < 0:
-        share = 0
+    if share <= 0:
+        return None
     extra = share * (ctx - ctx_1)
     return reading + (extra + ctx_1 - 1) // ctx_1
 
@@ -708,6 +729,7 @@ def _measure_model(
     predicted_over: list[int] = []
     one_window_bound: list[tuple[int, int]] = []
     measured: list[tuple[int, int]] = []
+    resident_at: dict[int, bool] = {}
     after_unload: list[tuple[int | None, int | None]] = []
     prompts: dict[int, tuple[int, str, int, int]] = {}
     sizes: dict[int, tuple[int, int, bool]] = {}
@@ -825,12 +847,14 @@ def _measure_model(
         )
 
     def probe(ctx: int, kind: str) -> Observation:
+        sampler.wait_for_abort()
         points = _measured_points(measured)
         predicted = _predict_mib(measured, ctx) if len(points) >= 2 else None
         if len(points) == 1 and ctx != points[0][0]:
-            if weights_mib is None or baseline is None:
+            ctx_1, reading_1 = points[0]
+            if weights_mib is None or baseline is None or not resident_at.get(ctx_1, False):
                 raise _NoBound("the second window had no bound")
-            predicted = _one_window_mib(points[0][1], points[0][0], baseline, weights_mib, ctx)
+            predicted = _one_window_mib(reading_1, ctx_1, baseline, weights_mib, ctx)
             if predicted is None:
                 raise _NoBound("the second window had no bound")
             one_window_bound.append((ctx, predicted))
@@ -845,6 +869,8 @@ def _measure_model(
             obs = _over(sampler.peak)
         if kind == "load" and isinstance(obs.peak_mib, int) and obs.error != ABORT_ERROR:
             measured.append((ctx, obs.peak_mib))
+            resident_at[ctx] = bool(obs.resident)
+        sampler.wait_for_abort()
         return obs
 
     try:
