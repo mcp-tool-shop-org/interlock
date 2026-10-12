@@ -1298,7 +1298,8 @@ def execute_block(spec: dict, seams, *, root: Path, run_id: str) -> dict:
 
     try:
         return _execute_block_loop(spec, seams, root=root, run_id=run_id)
-    except Exception as exc:
+    except BaseException as exc:
+        # KeyboardInterrupt is an abort too. The rows finished so far travel with it.
         snap = getattr(_execute_block_loop, "last_partial", None)
         _execute_block_loop.last_partial = None
         if isinstance(snap, dict):
@@ -1552,24 +1553,40 @@ def run_block(
     prompt = ""
     error: BaseException | None = None
     trace: str | None = None
+    cleanup_errors: list[str] = []
     _require_ready(seams)
     try:
         with seams.server as running:
             started = True
             _probe(seams, "GET", "/api/version")
             _probe(seams, "GET", "/api/ps")
+            body_error: BaseException | None = None
             try:
                 seams.load_resident()
                 _require_owned_server(spec, seams, running)
                 body = execute_block(spec, seams, root=root, run_id=run_id)
                 rows = _rows_of(body)
                 prompt = body["prompt"]
+            except BaseException as exc:
+                body_error = exc
+                raise
             finally:
-                try:
-                    seams.unload_resident()
-                finally:
-                    _probe(seams, "GET", "/api/version")
-    except Exception as exc:
+                if body_error is None:
+                    try:
+                        seams.unload_resident()
+                    finally:
+                        _probe(seams, "GET", "/api/version")
+                else:
+                    # A cleanup error must not replace the abort or drop its partial rows.
+                    try:
+                        seams.unload_resident()
+                    except Exception as exc:
+                        cleanup_errors.append(f"unload_resident: {exc}")
+                    try:
+                        _probe(seams, "GET", "/api/version")
+                    except Exception as exc:
+                        cleanup_errors.append(f"GET /api/version: {exc}")
+    except BaseException as exc:
         aborted = True
         error = exc
         trace = traceback.format_exc()
@@ -1582,6 +1599,8 @@ def run_block(
         if started and running is not None:
             header = _header(spec, seams, repo, running, caches, prompt, aborted=aborted, git=recorded)
             header["run_id"] = run_id
+            if cleanup_errors:
+                header["cleanup_errors"] = cleanup_errors
             try:
                 _write_jsonl(receipt, [header, *rows])
             except OSError:
@@ -1642,6 +1661,7 @@ def run_pilot(
     spent_rows: list[dict] = []
     started_at = utc_now()
     stopped: list = []
+    cleanup_errors: list[str] = []
     _require_ready(seams)
     with seams.server as running:
         _probe(seams, "GET", "/api/version")
@@ -1689,11 +1709,17 @@ def run_pilot(
                 count = measured.get("eval_count")
                 predict = arm.get("num_predict")
                 full.append(isinstance(count, int) and not isinstance(count, bool) and count >= predict)
-        except Exception as exc:
+        except BaseException as exc:
             stopped.append(exc)
             stopped.append(traceback.format_exc())
         finally:
-            seams.unload_resident()
+            if stopped:
+                try:
+                    seams.unload_resident()
+                except Exception as exc:
+                    cleanup_errors.append(f"unload_resident: {exc}")
+            else:
+                seams.unload_resident()
     if stopped:
         parked = {
             "kind": "e4b-pilot",
@@ -1707,6 +1733,8 @@ def run_pilot(
             "git_sha": recorded.get("git_sha"),
             "clean_tree": recorded.get("clean_tree"),
         }
+        if cleanup_errors:
+            parked["cleanup_errors"] = cleanup_errors
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(json.dumps(parked, sort_keys=True, indent=2) + "\n", encoding="utf-8")
         _safe_caches(root, [f"compile-cache/{run_id}"])

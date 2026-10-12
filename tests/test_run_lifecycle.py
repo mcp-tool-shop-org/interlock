@@ -180,6 +180,64 @@ def test_a_stopped_run_keeps_finished_rows_in_quarantine(tmp_path: Path):
     assert (parked / f"{run_id}-series").is_dir()
 
 
+def test_a_keyboard_interrupt_is_a_quarantined_abort(tmp_path: Path):
+    run_id = "ctrlc"
+
+    def call(arm, *, num_predict, measured, kind, prompt):
+        if arm["id"] == "5090-alone":
+            return _clean(arm, num_predict=num_predict, kind=kind)
+        raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        run_block(_spec([PAIRS[0]]), _seams(_Server(), call), root=tmp_path, run_id=run_id, repo=tmp_path)
+    assert not (tmp_path / "receipts" / f"{run_id}.jsonl").exists()
+    parked = next((tmp_path / "aborted").glob(f"{run_id}-*"))
+    rows = _rows(parked / f"{run_id}.jsonl")
+    assert rows[0]["aborted"] is True
+    assert rows[0]["run_id"] == run_id
+    assert "cleanup_errors" not in rows[0]
+    assert any(row.get("kind") == "e4b-cold" and row.get("arm") == "5090-alone" for row in rows)
+    assert list_runs(tmp_path) == [(run_id, "aborted")]
+    note = json.loads((parked / "NOTE.json").read_text(encoding="utf-8"))
+    assert note["exception_type"] == "KeyboardInterrupt"
+
+
+def test_an_abort_keeps_its_error_when_unload_also_raises(tmp_path: Path):
+    run_id = "unload-raises"
+
+    def call(arm, *, num_predict, measured, kind, prompt):
+        if arm["id"] == "5090-alone":
+            return _clean(arm, num_predict=num_predict, kind=kind)
+        raise RuntimeError("stopped after the cold slot")
+
+    seams = _seams(_Server(), call)
+
+    def unload():
+        raise RuntimeError("unload refused")
+
+    seams.unload_resident = unload
+    original = seams.probe
+
+    def probe(method, path):
+        if path == "/api/version" and ("GET", "/api/version") in seams.probes:
+            raise RuntimeError("version unread")
+        return original(method, path)
+
+    seams.probe = probe
+    with pytest.raises(RuntimeError, match="stopped after the cold slot"):
+        run_block(_spec([PAIRS[0]]), seams, root=tmp_path, run_id=run_id, repo=tmp_path)
+    assert not (tmp_path / "receipts" / f"{run_id}.jsonl").exists()
+    parked = next((tmp_path / "aborted").glob(f"{run_id}-*"))
+    rows = _rows(parked / f"{run_id}.jsonl")
+    assert rows[0]["aborted"] is True
+    assert any("unload refused" in item for item in rows[0]["cleanup_errors"])
+    assert any("version unread" in item for item in rows[0]["cleanup_errors"])
+    assert any(row.get("kind") == "e4b-cold" and row.get("arm") == "5090-alone" for row in rows)
+    note = json.loads((parked / "NOTE.json").read_text(encoding="utf-8"))
+    assert note["exception_type"] == "RuntimeError"
+    assert "stopped after the cold slot" in note["message"]
+
+
 def test_a_stopped_pilot_is_quarantined(tmp_path: Path):
     def call(arm, *, num_predict, measured, kind, prompt):
         raise RuntimeError("pilot stopped")
