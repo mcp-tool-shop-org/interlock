@@ -46,6 +46,7 @@ from switchyard.guards import (
     require_heartbeat,
 )
 from switchyard.harness.e5 import SearchError, fit_prompt, fit_prompt_words
+from switchyard.harness.steady import BlockPlan, SlotStream, UntilSteady, call_metric, warmup_policy, warmup_trace
 from switchyard.harness.lock import require_unmodified
 from switchyard.harness.marker import RunMarker
 from switchyard.harness.receipts import (
@@ -90,12 +91,37 @@ PASSTHROUGH = (
     "truncate",
     "temperature",
     "quant",
+    "hf_cache",
+    "compile_config",
+    "cold_copy",
 )
 SENSOR_KEYS = ("gpu_temp_c", "sm_clock_mhz", "power_w", "shared_mib", "dedicated_mib")
 
 
 class RunnerError(Exception):
     """A step failed. Later steps do not run."""
+
+
+def _storage_lines(spec: dict) -> list[str]:
+    """Dry-run lines for the cache, the cold copy and ENABLE_MMAP. Absent options add nothing."""
+
+    lines = []
+    for arm in spec.get("arms") or []:
+        cache = arm.get("hf_cache")
+        if cache == "hot":
+            lines.append(
+                f"{arm['id']}: hf_cache hot (C:/AI-Models/hf-cache-hot); a missing copy is a refusal"
+            )
+        elif cache == "archive":
+            lines.append(f"{arm['id']}: hf_cache archive")
+        if arm.get("cold_copy") is True:
+            lines.append(
+                f"{arm['id']}: cold copy on the snapshot drive before the first load, deleted after unload"
+            )
+        config = arm.get("compile_config") if isinstance(arm.get("compile_config"), dict) else {}
+        if "ENABLE_MMAP" in config:
+            lines.append(f"{arm['id']}: ENABLE_MMAP {str(bool(config['ENABLE_MMAP'])).lower()}")
+    return lines
 
 
 def dry_run(spec_path: Path, repo: Path) -> str:
@@ -107,8 +133,16 @@ def dry_run(spec_path: Path, repo: Path) -> str:
         f"procedure: {spec['procedure']}",
     ]
     if spec["procedure"] == "interleaved":
-        slots = _slots(spec)
-        lines.append(f"slots: {len(slots)}")
+        policy = warmup_policy(spec)
+        if policy is None:
+            slots = _slots(spec)
+            lines.append(f"slots: {len(slots)}")
+        else:
+            lines.append(
+                f"warmups: until two consecutive calls agree within {policy['tolerance']} "
+                f"on {spec['decision_metric']}, at most {policy['max']}; "
+                "warm-up calls stay out of the percentiles"
+            )
         lines.append(f"order: {spec.get('order', 'interleaved')}")
         if spec.get("order") == "blocked":
             lines.append("blocks: " + ", ".join(f"{block['id']} ({len(block['arms'])} arms)" for block in spec["blocks"]))
@@ -129,6 +163,7 @@ def dry_run(spec_path: Path, repo: Path) -> str:
         )
         lines.append("cold is measured once per arm and kept out of the warm percentiles")
         lines.append(f"band: {spec['band']}")
+        lines.extend(_storage_lines(spec))
     elif spec["procedure"] == "fill-card":
         lines.append(f"abort_mib: {spec['abort_mib']}")
         lines.append(f"ceiling_mib: {spec['ceiling_mib']}")
@@ -218,17 +253,32 @@ def run_interleaved(
     _guard_flags(spec, grant, npu_session, cpu_window)
     arms = {arm["id"]: arm for arm in spec["arms"]}
     blocked = spec.get("order") == "blocked"
+    policy = warmup_policy(spec)
     if blocked:
         arms.update(_drift_arms(spec))
-        plan = _block_plan(spec)
+    if policy is None:
+        if blocked:
+            plan = _block_plan(spec)
+        else:
+            plan = [(None, [], _slots(spec))]
+        items = [(slot, block_id) for block_id, _ids, block_slots in plan for slot in block_slots]
+        stream = SlotStream(items)
+        block_arms = {block_id: ids for block_id, ids, _slots_of in plan}
     else:
-        plan = [(None, [], _slots(spec))]
-    slots = [(slot, block_id) for block_id, _ids, block_slots in plan for slot in block_slots]
-    block_arms = {block_id: ids for block_id, ids, _slots_of in plan}
+        if blocked:
+            blocks = [
+                BlockPlan(block["id"], list(block["arms"]), False, spec["repeats"]) for block in spec["blocks"]
+            ]
+            drift = spec.get("drift_block")
+            if drift:
+                drift_ids = [_drift_id(arm_id) for arm_id in drift["arms"]]
+                blocks.append(BlockPlan(drift["id"], drift_ids, True, int(drift["repeats"])))
+        else:
+            blocks = [BlockPlan(None, [arm["id"] for arm in spec["arms"]], False, spec["repeats"])]
+        stream = SlotStream([], UntilSteady(blocks, policy["max"], policy["tolerance"]))
+        block_arms = {block.id: list(block.arms) for block in blocks}
     block_of = {arm_id: block_id for block_id, ids in block_arms.items() for arm_id in ids}
-    needed: dict[str, int] = {}
-    for slot, _block_id in slots:
-        needed[slot.step_id] = needed.get(slot.step_id, 0) + 1
+    needed = stream.needed
     refused: dict[str, str] = {}
     stop_all = False
     baseline_used: int | None = None
@@ -313,6 +363,7 @@ def run_interleaved(
         extra.update(_prompt_counts(arms[arm_id], prompt_cache))
         extra.update(_bound_settings(arm_id))
         extra.update(_blocked_extra(arm_id))
+        _rerun_settings(extra, spec, arms[arm_id], records, stream)
         extra["cpu_percent_max"] = _cpu_percent_max(records, arm_id)
         genai = _genai_summary(records, arm_id)
         if genai:
@@ -376,6 +427,7 @@ def run_interleaved(
         extra.update(_prompt_counts(arm, prompt_cache))
         extra.update(_bound_settings(arm_id))
         extra.update(_blocked_extra(arm_id))
+        _rerun_settings(extra, spec, arm, records, stream)
         extra["cpu_percent_max"] = _cpu_percent_max(records, arm_id)
         genai = _genai_summary(records, arm_id)
         if genai:
@@ -564,9 +616,19 @@ def run_interleaved(
             attach_build_guard(build_guard)
     guard.start()
     active_block = None
+
+    def _drop(slot: Slot) -> None:
+        """A slot that did not run. A warm-up drop lets the rest of the round finish."""
+
+        stream.note(slot, None)
+
     try:
         try:
-            for slot, block_id in slots:
+            while True:
+                item = stream.pop()
+                if item is None:
+                    break
+                slot, block_id = item
                 if block_id != active_block:
                     if active_block is not None:
                         _end_block(active_block)
@@ -574,27 +636,32 @@ def run_interleaved(
                 current = slot
                 arm = arms[slot.step_id]
                 if arm["id"] in refused:
+                    _drop(slot)
                     continue
                 if arm.get("drift_of") is not None and arm["drift_of"] not in finished:
                     if arm["id"] not in declined_ids:
                         declined_ids.add(arm["id"])
                         skipped.append(f"{arm['id']} (drift of {arm['drift_of']}, which did not finish)")
+                    _drop(slot)
                     continue
                 companion = _companion(arm, arms, slot)
                 if arm.get("not_run"):
                     if arm["id"] not in declined_ids:
                         declined_ids.add(arm["id"])
                         skipped.append(f"{arm['id']} (the spec says not run: {arm['not_run']})")
+                    _drop(slot)
                     continue
                 if _shape_key(arm) in rejected_keys or (
                     companion is not None and _shape_key(companion) in rejected_keys
                 ):
                     _note(slot)
+                    _drop(slot)
                     continue
                 if arm["device"] in off_devices or (
                     companion is not None and companion["device"] in off_devices
                 ):
                     _note(slot)
+                    _drop(slot)
                     continue
                 started = False
                 compile_s: float | None = None
@@ -662,6 +729,8 @@ def run_interleaved(
                             else:
                                 kind = "fail"
                     with state_lock:
+                        if kind != "ok":
+                            stream.note(slot, None)
                         if kind == "hang":
                             aborted = {"step": _label(slot), "error": error}
                             _remember(arm, "hang")
@@ -708,7 +777,18 @@ def run_interleaved(
                                 cold_calls[arm["id"]] = result.latency_ms / 1000
                             executed_ok.add(_shape_key(arm))
                             seen[slot.step_id] = seen.get(slot.step_id, 0) + 1
-                            if seen[slot.step_id] == needed[slot.step_id]:
+                            if slot.phase == "warmup":
+                                metric = call_metric(result, decision_metric)
+                                # A missing reading does not agree, and it does not drop the arm.
+                                stream.note(slot, metric if metric is not None else float("nan"))
+                            else:
+                                stream.note(slot, None)
+                            if (
+                                slot.step_id not in finished
+                                and seen[slot.step_id] == needed[slot.step_id]
+                                and not stream.accepts_more(slot.step_id)
+                                and not stream.was_dropped(slot.step_id)
+                            ):
                                 finished.append(slot.step_id)
                                 flush()
                                 if decision_metric and _row_path(
@@ -1191,6 +1271,38 @@ def _genai_summary(records: list[dict], arm_id: str) -> dict:
     if out:
         out["repeats_counted"] = max(len(series) for series in values.values())
     return out
+
+
+def _rerun_settings(extra: dict, spec: dict, arm: dict, records: list[dict], stream: SlotStream) -> None:
+    """Cache, mmap, cold copy and the warm-up trace. Arms that use none of these stay as they were."""
+
+    uses = (
+        isinstance(spec.get("warmups"), dict)
+        or bool(arm.get("hf_cache"))
+        or bool(arm.get("compile_config"))
+        or arm.get("cold_copy") is True
+    )
+    if not uses:
+        return
+    extra["hf_cache"] = arm.get("hf_cache") or "archive"
+    extra["cold_copy"] = arm.get("cold_copy") is True
+    mmap = (arm.get("compile_config") or {}).get("ENABLE_MMAP") if isinstance(arm.get("compile_config"), dict) else None
+    if isinstance(mmap, bool):
+        extra["ENABLE_MMAP"] = mmap
+    learned = _resolved(records, arm["id"])
+    storage = learned.get("storage")
+    if isinstance(storage, dict):
+        extra["storage"] = {
+            "drive": storage.get("drive") or "unrecorded",
+            "bus": storage.get("bus") or "unrecorded",
+            "media": storage.get("media") or "unrecorded",
+        }
+    drive = learned.get("cold_copy_drive")
+    if isinstance(drive, str) and drive:
+        extra["cold_copy_drive"] = drive
+    if isinstance(spec.get("warmups"), dict):
+        extra["warmup_trace"] = warmup_trace(records, arm["id"])
+        extra["unsteady"] = not stream.is_steady(arm["id"])
 
 
 def _extra_settings(

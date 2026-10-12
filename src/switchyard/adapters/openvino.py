@@ -61,11 +61,23 @@ from __future__ import annotations
 
 import contextlib
 import gc
+import shutil
+import subprocess
 import threading
 import time
 import warnings
 from pathlib import Path
 
+from switchyard.harness.storage import (
+    HOT_ROOT,
+    StorageError,
+    copy_unbuffered,
+    default_snapshot_download,
+    describe_drive,
+    drive_letter,
+    fresh_copy_dir,
+    hot_snapshot,
+)
 from switchyard.adapters.base import (
     AdapterError,
     CompileRejected,
@@ -219,13 +231,32 @@ class OpenvinoAdapter:
     ``tokenizer_loader``, ``genai_module`` and ``clock``.
     """
 
-    def __init__(self, *, core=None, tokenizer_loader=None, genai_module=None, clock=None, default_device: str | None = None, call_timeout_s: float = 60.0) -> None:
+    def __init__(
+        self,
+        *,
+        core=None,
+        tokenizer_loader=None,
+        genai_module=None,
+        clock=None,
+        default_device: str | None = None,
+        call_timeout_s: float = 60.0,
+        snapshot_download=None,
+        copy_tree=None,
+        disk_facts=None,
+        hot_root: Path | None = None,
+    ) -> None:
         self._injected_core = core
         self._tokenizer_loader = tokenizer_loader
         self._genai_module = genai_module
         self.clock = clock or time.perf_counter
         self.default_device = default_device
         self.call_timeout_s = float(call_timeout_s)
+        self._snapshot_download = snapshot_download
+        self._copy_tree = copy_tree
+        self._disk_facts = disk_facts
+        self._hot_root = HOT_ROOT if hot_root is None else hot_root
+        self._arm_dirs: dict = {}
+        self._cold_copies: list[tuple[str, Path]] = []
         self._tokenizers: dict = {}
         self._compiled: dict = {}
         self._pipelines: dict = {}
@@ -466,6 +497,9 @@ def _timed_call(fn, timeout_s: float):
 
 def _compile_config(s: _Settings) -> dict:
     config: dict = {}
+    extra = s.get("compile_config")
+    if isinstance(extra, dict):
+        config.update(extra)
     if s.compile_cache == "fresh" and s.compile_cache_dir:
         config["CACHE_DIR"] = s.compile_cache_dir
     precision = s.get("precision")
@@ -630,9 +664,11 @@ def _run_generate(self, request: StepRequest, s: _Settings, resolved: dict) -> S
         }
     prefix = _prefix_mode(s)
     resolved["prefix_caching"] = _prefix_recorded(prefix)
+    load_dir, snapshot = _prepare_dir(self, request, s)
+    _note_storage(self, s, resolved, snapshot, load_dir)
     build_t0 = self.clock()
     try:
-        pipe, compile_s = self._pipeline(request.model, ov_id, compile_config, prefix)
+        pipe, compile_s = self._pipeline(request.model, ov_id, compile_config, prefix, load_dir)
     except AdapterError:
         raise
     except Exception as exc:
@@ -743,6 +779,75 @@ def _npu_genai_config(prompt_tokens: int, num_predict: int) -> dict:
     }
 
 
+def _prepare_dir(self, request: StepRequest, s: _Settings) -> tuple[Path, Path]:
+    """The directory to load, and the snapshot it was copied from.
+
+    A local directory stays a local directory when the arm uses the archive.
+    ``hot`` never calls the snapshot fetch. A missing hot copy is a refusal.
+    """
+
+    cached = self._arm_dirs.get(request.step_id)
+    if cached is not None:
+        return cached
+    model = request.model
+    repo, revision = parse_model_ref(model)
+    local = Path(repo)
+    hf_cache = s.get("hf_cache") or "archive"
+    if hf_cache == "hot":
+        if local.is_dir() or not revision:
+            raise AdapterError("hot cache resolves a repo@revision and does not fall back to a local path or the archive")
+        try:
+            snapshot = hot_snapshot(self._hot_root, repo, revision)
+        except StorageError as exc:
+            raise AdapterError(
+                f"hot cache has no copy of {model} under {self._hot_root}; refusing instead of downloading"
+            ) from exc
+    elif local.is_dir():
+        snapshot = local
+    else:
+        download = self._snapshot_download or default_snapshot_download
+        try:
+            snapshot = Path(download(repo, revision))
+        except AdapterError:
+            raise
+        except Exception as exc:
+            raise AdapterError(f"the model {model} could not be fetched: {exc}") from exc
+    load_dir = snapshot
+    if s.get("cold_copy") is True:
+        load_dir = _cold_copy(self, model, snapshot)
+    self._arm_dirs[request.step_id] = (load_dir, snapshot)
+    return load_dir, snapshot
+
+
+def _cold_copy(self, model: str, snapshot: Path) -> Path:
+    dest = fresh_copy_dir(snapshot)
+    run = self._copy_tree or _run_robocopy
+    try:
+        copy_unbuffered(snapshot, dest, run)
+    except Exception:
+        shutil.rmtree(dest, ignore_errors=True)
+        raise
+    self._cold_copies.append((model, dest))
+    return dest
+
+
+def _run_robocopy(argv: list[str]):
+    return subprocess.run(argv, capture_output=True, text=True, check=False)
+
+
+def _note_storage(self, s: _Settings, resolved: dict, snapshot: Path, load_dir: Path) -> None:
+    """Drive, bus and media, plus the cold-copy drive. No path is recorded."""
+
+    if s.get("hf_cache") is None and s.get("cold_copy") is not True:
+        return
+    facts = self._disk_facts or describe_drive
+    resolved["storage"] = facts(drive_letter(snapshot))
+    resolved["hf_cache"] = s.get("hf_cache") or "archive"
+    resolved["cold_copy"] = s.get("cold_copy") is True
+    if s.get("cold_copy") is True:
+        resolved["cold_copy_drive"] = drive_letter(load_dir)
+
+
 def _model_dir(model: str) -> Path:
     """openvino-genai loads a whole export directory, not a single file."""
     path = Path(parse_model_ref(model)[0])
@@ -796,7 +901,7 @@ def _prefix_recorded(mode: str) -> str:
     return f"{mode} (continuous-batching scheduler_config)"
 
 
-def _pipeline(self, model: str, ov_id: str, compile_config: dict, prefix_caching: str = "default"):
+def _pipeline(self, model: str, ov_id: str, compile_config: dict, prefix_caching: str = "default", directory: Path | None = None):
     key = _pipeline_key(model, ov_id, compile_config, prefix_caching)
     entry = self._pipelines.get(key)
     if entry is None:
@@ -809,7 +914,8 @@ def _pipeline(self, model: str, ov_id: str, compile_config: dict, prefix_caching
                 f"{len(self._pipelines)} already built; blocked order keeps at most one, so split the block"
             )
         genai = self._genai_module or _real_genai_module()
-        directory = _model_dir(model)
+        if directory is None:
+            directory = _model_dir(model)
         t0 = self.clock()
         with self._building(model):
             with self._compiling(f"LLMPipeline {ov_id}"):
@@ -848,12 +954,26 @@ def _run(self, request: StepRequest) -> StepResult:
 
 
 def _unload(self, model: str, device: str | None = None) -> None:
-    """Drop the compiled embedders and pipelines for this model; the process keeps nothing."""
+    """Drop the compiled embedders and pipelines for this model; the process keeps nothing.
+
+    A cold copy of this model is deleted here, including when the arm failed.
+    """
     self._compiled = {k: v for k, v in self._compiled.items() if k[0] != parse_model_ref(model)[0] and k[0] != model}
     self._pipelines = {k: v for k, v in self._pipelines.items() if k[0] not in (model, parse_model_ref(model)[0])}
     for key in list(self._tokenizers):
         if key[0] in (model, parse_model_ref(model)[0]):
             del self._tokenizers[key]
+    repo = parse_model_ref(model)[0]
+    deleted: list[Path] = []
+    kept = []
+    for owned, path in self._cold_copies:
+        if owned == model or parse_model_ref(owned)[0] == repo:
+            shutil.rmtree(path, ignore_errors=True)
+            deleted.append(path)
+        else:
+            kept.append((owned, path))
+    self._cold_copies = kept
+    self._arm_dirs = {step: pair for step, pair in self._arm_dirs.items() if pair[0] not in deleted}
     gc.collect()
 
 
