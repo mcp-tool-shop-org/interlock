@@ -1950,6 +1950,75 @@ def test_cancel_then_unload_still_ends_the_generate(monkeypatch):
         server.server_close()
 
 
+def test_a_transport_timeout_on_unload_is_the_resident_note(monkeypatch):
+    """The socket deadline and the wait use one limit. This is the path where the call returns first."""
+
+    def boom(*_args, **_kwargs):
+        raise AdapterError("the request timed out")
+
+    monkeypatch.setattr("switchyard.adapters.ollama.default_transport", boom)
+    adapter = OllamaAdapter()
+    with pytest.raises(AdapterError, match="the model may still be resident") as raised:
+        adapter.unload("qwen3:8b", "5090")
+    assert str(raised.value) == "the unload timed out; the model may still be resident"
+    with pytest.raises(AdapterError, match="the model may still be resident"):
+        adapter.unload("qwen3:8b", "5090")
+
+
+def test_a_hanging_unload_ends_with_the_resident_note(monkeypatch):
+    """The unload's own socket deadline fires. The generate timeout stays unset.
+
+    No GPU and no Ollama. The server accepts the unload and never answers.
+    """
+
+    released = threading.Event()
+
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def do_POST(self):
+            self.close_connection = True
+            length = int(self.headers.get("Content-Length", "0") or "0")
+            if length:
+                self.rfile.read(length)
+            released.wait(3)
+            body = b"{}"
+            try:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except OSError:
+                return
+
+        def log_message(self, format, *args):
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    port = server.server_address[1]
+    worker = threading.Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    monkeypatch.setattr(
+        "switchyard.adapters.ollama.url_for",
+        lambda _device: f"http://127.0.0.1:{port}",
+    )
+    adapter = OllamaAdapter(unload_timeout=0.4)
+    started = time.monotonic()
+    try:
+        with pytest.raises(AdapterError, match="the model may still be resident"):
+            adapter.unload("qwen3:8b", "5090")
+        assert time.monotonic() - started < 1.5
+        again = time.monotonic()
+        with pytest.raises(AdapterError, match="the model may still be resident"):
+            adapter.unload("qwen3:8b", "5090")
+        assert time.monotonic() - again < 0.3
+    finally:
+        released.set()
+        server.shutdown()
+        server.server_close()
+
+
 def test_the_run_path_refuses_an_edited_spec_before_any_adapter_call(tmp_path: Path):
     repo = tmp_path / "repo"
     spec_path = _bind(repo, _spec())
