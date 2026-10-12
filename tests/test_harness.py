@@ -1258,7 +1258,9 @@ def test_e4_and_e5_specs_pin_the_rules():
     assert len(e5["models"]) == 6
     assert e5["shift"] is False and e5["truncate"] is False
     rules = " ".join(e5["stop_rules"])
-    assert r"\GPU Process Memory(*)\Shared Usage" in rules
+    assert r"\GPU Adapter Memory(*)\Shared Usage" in rules
+    assert "trained context length" in rules
+    assert "server log" in rules
     assert "/api/show" in rules
     assert "prompt_eval_count / prompt_eval_duration" in rules
     broken = dict(e4)
@@ -1396,9 +1398,10 @@ def test_fill_card_doubles_bisects_and_steps_back():
     found = search(default_ctx=4096, probe=climb, abort_mib=30500)
     assert found.max_ctx == 14336
     assert found.limit == "margin"
-    assert ("load", 16384) in found.calls
-    assert all(ctx <= 16384 for _, ctx in found.calls)
-    assert ("confirm", 14336) in found.calls
+    assert any(call[0] == "load" and call[1] == 16384 for call in found.calls)
+    assert all(call[1] <= 16384 for call in found.calls)
+    assert any(call[0] == "confirm" and call[1] == 14336 and call[5] == "confirmed" for call in found.calls)
+    assert all(len(call) == 6 for call in found.calls)
     assert over_margin(Observation(True, 30500, 1, 1), 30500) is False
     assert over_margin(Observation(True, 30501, 1, 1), 30500) is True
 
@@ -1409,7 +1412,7 @@ def test_fill_card_doubles_bisects_and_steps_back():
     slowed = search(default_ctx=4096, probe=spill_top, abort_mib=30500, max_ctx=8192)
     assert slowed.max_ctx == 6144
     assert slowed.limit == "max_ctx"
-    assert ("confirm", 6144) in slowed.calls
+    assert any(call[0] == "confirm" and call[1] == 6144 for call in slowed.calls)
 
     def huge_ttft(ctx, kind):
         return _resident(20000, tok_s=1, ttft=1_000_000)
@@ -1424,7 +1427,7 @@ def test_fill_card_doubles_bisects_and_steps_back():
 
     bisected = search(default_ctx=4096, probe=mid_fail, abort_mib=30500)
     assert bisected.max_ctx == 10240
-    assert ("load", 12288) in bisected.calls
+    assert any(call[0] == "load" and call[1] == 12288 for call in bisected.calls)
 
     def odd_grid(ctx, kind):
         return _resident(20000, failed=ctx >= 8192)
@@ -1434,8 +1437,24 @@ def test_fill_card_doubles_bisects_and_steps_back():
 
     nowhere = search(default_ctx=4096, probe=lambda ctx, kind: Observation(False, 1), abort_mib=30500)
     assert nowhere.max_ctx is None
-    assert nowhere.reason == "default context is not resident"
+    assert nowhere.reason == "no resident window"
     assert nowhere.limit == "margin"
+    assert [call[1] for call in nowhere.calls] == [4096, 2048]
+    assert all(call[5] == "not resident" for call in nowhere.calls)
+
+    def resident_below(limit):
+        def probe(ctx, kind):
+            return _resident(20000, failed=ctx >= limit, prompt=100 if ctx == 4096 else 40)
+
+        return probe
+
+    downward = search(default_ctx=16384, probe=resident_below(8192), abort_mib=30500, max_ctx=16384)
+    assert downward.max_ctx == 4096
+    assert downward.calls[0][:2] == ("load", 16384)
+    assert any(call[0] == "load" and call[1] == 4096 for call in downward.calls)
+    assert any(call[0] == "confirm" and call[1] == 6144 and call[5] == "spill" for call in downward.calls)
+    assert any(call[0] == "confirm" and call[1] == 4096 and call[5] == "confirmed" for call in downward.calls)
+    assert all(call[1] <= 16384 for call in downward.calls)
     assert fit_prompt("ab", 4, len) == "abab"
     with pytest.raises(SearchError):
         fit_prompt("", 1, len)
@@ -1453,6 +1472,13 @@ def test_search_spill_and_schedule_refuse_bad_inputs():
     assert is_spill(_resident(1, shared=1257, prompt=20), reference, shared_growth_mib=256, prompt_ratio=0.5) is True
     assert is_spill(_resident(1, shared=1000, prompt=10), reference, shared_growth_mib=256, prompt_ratio=0.5) is False
     assert is_spill(_resident(1, shared=1000, prompt=9), reference, shared_growth_mib=256, prompt_ratio=0.5) is True
+    # The pre-window baseline, not the reference window's shared usage.
+    under = Observation(True, 1, shared_mib=1200, prompt_tok_s=20, shared_baseline=1000, baseline_taken=True)
+    assert is_spill(under, reference, shared_growth_mib=256, prompt_ratio=0.5) is False
+    over = Observation(True, 1, shared_mib=1257, prompt_tok_s=20, shared_baseline=1000, baseline_taken=True)
+    assert is_spill(over, reference, shared_growth_mib=256, prompt_ratio=0.5) is True
+    missing_base = Observation(True, 1, shared_mib=1100, prompt_tok_s=20, shared_baseline=None, baseline_taken=True)
+    assert is_spill(missing_base, reference, shared_growth_mib=256, prompt_ratio=0.5) is True
     assert over_margin(Observation(True, None, error="lost"), 30500) is True
     assert over_margin(Observation(True, None), 30500) is True
 
