@@ -17,6 +17,9 @@ compile-cache/
 pilot-e4b/
 logs/
 
+# A stopped run, set aside. The next start check must not see it.
+aborted/
+
 # run-start markers (receipts/<run_id>.run.json): local state, not receipts
 receipts/*.run.json
 receipts/*.stop

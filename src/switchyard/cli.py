@@ -90,7 +90,25 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--notes", default="")
     run.add_argument("--dry-run", action="store_true")
     run.add_argument("--pilot", action="store_true")
+    run.add_argument(
+        "--quarantine",
+        type=Path,
+        default=None,
+        help="where a stopped run is set aside (default: aborted/ under --root)",
+    )
     run.set_defaults(func=_cmd_run)
+
+    runs = sub.add_parser("runs", help="list measurement runs, or set a stray aside")
+    runs_sub = runs.add_subparsers(dest="runs_command", required=True)
+    runs_list = runs_sub.add_parser("list", help="show each run id and its state")
+    runs_list.add_argument("--root", type=Path, default=Path("."))
+    runs_list.add_argument("--quarantine", type=Path, default=None)
+    runs_list.set_defaults(func=_cmd_runs_list)
+    runs_quarantine = runs_sub.add_parser("quarantine", help="move a stray series aside; does not start a device")
+    runs_quarantine.add_argument("run_id")
+    runs_quarantine.add_argument("--root", type=Path, default=Path("."))
+    runs_quarantine.add_argument("--quarantine", type=Path, default=None)
+    runs_quarantine.set_defaults(func=_cmd_runs_quarantine)
 
     health_cmd = sub.add_parser(
         "ollama-health",
@@ -243,18 +261,60 @@ def _arm_id(row: dict) -> str:
     return parts[-1]
 
 
+def _cmd_runs_list(args: argparse.Namespace) -> int:
+    from switchyard.harness.lifecycle import format_runs, list_runs
+
+    print(format_runs(list_runs(args.root.resolve(), args.quarantine)), end="")
+    return 0
+
+
+def _cmd_runs_quarantine(args: argparse.Namespace) -> int:
+    from switchyard.harness.lifecycle import LifecycleError, quarantine_stray
+
+    root = args.root.resolve()
+    sha = None
+    try:
+        from switchyard.harness.e4b import capture_run, read_git
+
+        found = read_git(root, capture_run)
+        if isinstance(found, dict):
+            sha = found.get("git_sha")
+    except Exception:
+        sha = None
+    try:
+        quarantine_stray(root, args.run_id, sha=sha, setting=args.quarantine)
+    except LifecycleError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    return 0
+
+
 def _cmd_run(args: argparse.Namespace) -> int:
     from switchyard.adapters.base import AdapterError
     from switchyard.guards import GuardError
     from switchyard.harness.e4b import E4bError
+    from switchyard.harness.lifecycle import LifecycleError
     from switchyard.harness.ollama_serve import ServeError
     from switchyard.harness.runner import RunnerError, dry_run, heartbeat_path, run_spec
-    from switchyard.harness.spec import SpecError
+    from switchyard.harness.spec import SpecError, load_spec
 
     try:
         if args.dry_run:
             print(dry_run(args.spec, args.root.resolve(), pilot=args.pilot), end="")
             return 0
+        spec = load_spec(args.spec)
+        if spec.get("id") == "E4b":
+            from switchyard.harness.lifecycle import resolve_run_id
+
+            chosen = resolve_run_id(
+                args.root.resolve(),
+                base="e4b-pilot" if args.pilot else "e4b-block",
+                explicit=args.run_id,
+                setting=args.quarantine,
+            )
+            if not args.run_id:
+                print(f"run id: {chosen}", flush=True)
+            args.run_id = chosen
         from switchyard.ollama_supervisor import OllamaSupervisor, real_seams
 
         run_spec(
@@ -271,8 +331,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
                 heartbeat=heartbeat_path(None),
             ),
             pilot=args.pilot,
+            quarantine=getattr(args, "quarantine", None),
         )
-    except (AdapterError, GuardError, RunnerError, SpecError, E4bError, ServeError, OSError) as exc:
+    except (AdapterError, GuardError, RunnerError, SpecError, E4bError, LifecycleError, ServeError, OSError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
     return 0
