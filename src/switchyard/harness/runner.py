@@ -49,6 +49,13 @@ from switchyard.guards import (
 from switchyard.harness.count_budget import roster_timeout
 from switchyard.harness.e5 import SearchError, fit_prompt, fit_prompt_words
 from switchyard.harness.fill import quiet_fill_seams, real_fill_seams, run_fill_card
+from switchyard.ollama_supervisor import (
+    SupervisorStop,
+    failure_kind,
+    restart_policy_lines,
+    retry_budget,
+)
+from switchyard.adapters.ollama import url_for
 from switchyard.harness.steady import BlockPlan, SlotStream, UntilSteady, call_metric, warmup_policy, warmup_trace
 from switchyard.harness.lock import require_unmodified
 from switchyard.harness.marker import RunMarker
@@ -217,6 +224,7 @@ def dry_run(spec_path: Path, repo: Path) -> str:
             "the final prefix is counted again from a cold load"
         )
     lines.append("a device run would require: " + (", ".join(flags) if flags else "no extra flag"))
+    lines.extend(restart_policy_lines())
     lines.append("heartbeat not read; adapters not called")
     lines.append(devices_not_started())
     return "\n".join(lines) + "\n"
@@ -238,6 +246,7 @@ def run_interleaved(
     wall=None,
     watch: WatchHooks | None = None,
     marker: RunMarker | None = None,
+    supervisor=None,
 ) -> list[dict]:
     """Run a committed spec.
 
@@ -261,7 +270,9 @@ def run_interleaved(
     ``compile_rejected`` row (ruling on #36), scoped the same way and never
     retried. Every row records ``settings.run_window`` (the run's start and
     latest end, from ``wall``) so a later run can read how long this one
-    lasted.
+    lasted. The first kept sample after an Ollama restart is marked
+    ``cold_after_restart`` and left out of the warm percentiles. A sample
+    kept on a retry is marked ``retried``.
 
     A watcher thread guards the run from outside the main thread, which a
     native call can hold for an hour. A compile that runs past
@@ -312,6 +323,8 @@ def run_interleaved(
     baseline_used: int | None = None
     records: list[dict] = []
     seen: dict[str, int] = {}
+    retry_counts: dict[tuple, int] = {}
+    retried_keys: set[tuple] = set()
     finished: list[str] = []
     capability: dict[str, str] = {}
     off_devices: set[str] = set()
@@ -386,6 +399,15 @@ def run_interleaved(
             validate_row(row)
         return row
 
+    def _restart_marks(extra: dict, arm_id: str) -> None:
+        """The kept sample after a restart is cold, and a retried sample says so."""
+
+        samples = [row for row in records if row["step_id"] == arm_id]
+        if any(row.get("cold_after_restart") for row in samples):
+            extra["cold_after_restart"] = True
+        if any(row.get("retried") for row in samples):
+            extra["retried"] = True
+
     def _finished_row(arm_id: str, *, partial: bool, gone: set[str]) -> dict:
         extra = _extra_settings(spec, arms[arm_id], records, run_id, gone, cache_report)
         extra.update(_prompt_counts(arms[arm_id], prompt_cache))
@@ -393,6 +415,7 @@ def run_interleaved(
         extra.update(_blocked_extra(arm_id))
         _rerun_settings(extra, spec, arms[arm_id], records, stream)
         extra["cpu_percent_max"] = _cpu_percent_max(records, arm_id)
+        _restart_marks(extra, arm_id)
         genai = _genai_summary(records, arm_id)
         if genai:
             extra["genai"] = genai
@@ -457,6 +480,7 @@ def run_interleaved(
         extra.update(_blocked_extra(arm_id))
         _rerun_settings(extra, spec, arm, records, stream)
         extra["cpu_percent_max"] = _cpu_percent_max(records, arm_id)
+        _restart_marks(extra, arm_id)
         genai = _genai_summary(records, arm_id)
         if genai:
             extra["genai"] = genai
@@ -504,11 +528,15 @@ def run_interleaved(
                     continue
                 rows.append(_aborted_row(arm_id, gone=gone))
         window = {"start": _iso(started_at), "end": _iso(wall())}
+        restarts = marker.restart_records()
         for row in rows:
             row["settings"]["run_window"] = window
             row["settings"]["start_state"] = start_state
             row["settings"]["ram_guard"] = guard.ram_guard()
             row["settings"]["compile_ceiling_s"] = guard.ceiling_s
+            if restarts:
+                row["settings"]["ollama_restarts"] = restarts
+                validate_row(row)
         return rows
 
     def _flush_locked(*, gone: set[str] | None = None) -> None:
@@ -635,6 +663,50 @@ def run_interleaved(
             flush()
         raise RunnerError(error)
 
+    def _record_restarts() -> None:
+        """Copy committed restarts onto the marker, including one that then stops the run."""
+
+        if supervisor is None:
+            return
+        reason = supervisor.restarts_disabled
+        if reason:
+            marker.note_restart_disabled(reason)
+        have = marker.restart_records()
+        for record in supervisor.restarts:
+            data = record.as_dict()
+            if data not in have:
+                marker.note_restart(data)
+                have.append(data)
+
+    def _resume_after_repair(slot, block_id, arm, kind_name: str, error: str) -> None:
+        """The step has ended. Restart, or stop without one. Never during the measurement."""
+
+        nonlocal aborted
+        try:
+            decision = supervisor.after_failure(url_for(arm["device"]), model=arm["model"], kind=kind_name)
+        except SupervisorStop as exc:
+            _record_restarts()
+            marker.note_failure(_label(slot), error)
+            with state_lock:
+                aborted = {"step": _label(slot), "error": str(exc)}
+                flush()
+            raise RunnerError(str(exc)) from exc
+        _record_restarts()
+        marker.note_failure(_label(slot), error)
+        if decision.action != "restarted" or decision.record is None:
+            with state_lock:
+                aborted = {"step": _label(slot), "error": decision.note or error}
+                flush()
+            raise RunnerError(decision.note or error)
+        key = (slot.step_id, slot.phase, slot.round_index)
+        used = retry_counts.get(key, 0)
+        if used < retry_budget(spec):
+            retry_counts[key] = used + 1
+            retried_keys.add(key)
+            stream.queue.appendleft((slot, block_id))
+            return
+        stream.note(slot, None)
+
     for adapter in adapters.values():
         attach = getattr(adapter, "attach_compile_tracker", None)
         if callable(attach):
@@ -693,7 +765,20 @@ def run_interleaved(
                     continue
                 started = False
                 compile_s: float | None = None
+                pending: tuple[str, str] | None = None
+                epoch: int | None = None
                 bound = _call_bound(slot, cold_calls.get(slot.step_id), ceiling)
+                if supervisor is not None and arm.get("engine") == "ollama":
+                    try:
+                        ollama_url = url_for(arm["device"])
+                    except AdapterError:
+                        ollama_url = None
+                    if ollama_url is not None:
+                        supervisor.prime(ollama_url)
+                        reason = supervisor.restarts_disabled
+                        if reason:
+                            marker.note_restart_disabled(reason)
+                        epoch = supervisor.begin_measurement()
                 if companion is not None:
                     _session(
                         adapters,
@@ -743,9 +828,13 @@ def run_interleaved(
                             kind = "native_binary_rejected"
                             compile_s = exc.compile_s
                         else:
-                            aborted = {"step": _label(slot), "error": error}
-                            flush()
-                            raise
+                            repair = _ollama_repair_kind(supervisor, arm, error)
+                            if repair is None:
+                                aborted = {"step": _label(slot), "error": error}
+                                flush()
+                                raise
+                            kind = "repair"
+                            pending = (repair, error)
                     else:
                         cpu_end = _cpu_sample()
                         reported = _reported_outcome(result)
@@ -760,9 +849,14 @@ def run_interleaved(
                             elif device_lost_error(error):
                                 kind = "device_lost"
                             else:
-                                kind = "fail"
+                                repair = _ollama_repair_kind(supervisor, arm, error)
+                                if repair is None:
+                                    kind = "fail"
+                                else:
+                                    kind = "repair"
+                                    pending = (repair, error)
                     with state_lock:
-                        if kind != "ok":
+                        if kind != "ok" and kind != "repair":
                             stream.note(slot, None)
                         if kind == "hang":
                             aborted = {"step": _label(slot), "error": error}
@@ -792,48 +886,68 @@ def run_interleaved(
                         elif kind == "not run":
                             off_devices.add(arm["device"])
                             _note(slot)
+                        elif kind == "repair":
+                            pass
                         elif kind == "fail":
                             aborted = {"step": _label(slot), "error": error}
                             flush()
                             raise RunnerError(f"step {slot.step_id} failed: {error}")
                         else:
-                            records.append(
-                                _record(
-                                    slot,
-                                    result,
-                                    bound,
-                                    cold_calls.get(arm["id"]),
-                                    {"slot_start": cpu_start, "slot_end": cpu_end},
-                                    _finish_slot_probe(probe, adapter),
-                                )
+                            sample = _record(
+                                slot,
+                                result,
+                                bound,
+                                cold_calls.get(arm["id"]),
+                                {"slot_start": cpu_start, "slot_end": cpu_end},
+                                _finish_slot_probe(probe, adapter),
                             )
-                            if slot.phase == "cold" and result.latency_ms is not None:
-                                cold_calls[arm["id"]] = result.latency_ms / 1000
-                            executed_ok.add(_shape_key(arm))
-                            seen[slot.step_id] = seen.get(slot.step_id, 0) + 1
-                            if slot.phase == "warmup":
-                                metric = call_metric(result, decision_metric)
-                                # A missing reading does not agree, and it does not drop the arm.
-                                stream.note(slot, metric if metric is not None else float("nan"))
-                            else:
-                                stream.note(slot, None)
-                            if (
-                                slot.step_id not in finished
-                                and seen[slot.step_id] == needed[slot.step_id]
-                                and not stream.accepts_more(slot.step_id)
-                                and not stream.was_dropped(slot.step_id)
-                            ):
-                                finished.append(slot.step_id)
-                                flush()
-                                if decision_metric and _row_path(
-                                    _finished_row(slot.step_id, partial=True, gone=removed), decision_metric
-                                ) is None:
-                                    error = f"decision metric {decision_metric} missing on {slot.step_id}"
-                                    aborted = {"step": _label(slot), "error": error}
-                                    stop_all = True
+                            if epoch is not None:
+                                try:
+                                    sample = supervisor.keep_sample(epoch, sample)
+                                except SupervisorStop as exc:
+                                    marker.note_failure(_label(slot), str(exc))
+                                    aborted = {"step": _label(slot), "error": str(exc)}
                                     flush()
-                                    raise RunnerError(error)
+                                    raise RunnerError(str(exc)) from exc
+                            if sample is None:
+                                marker.note_failure(_label(slot), "a measurement crossed a restart")
+                                stream.note(slot, None)
+                                pending = None
+                            else:
+                                if supervisor is not None and supervisor.consume_cold_after_restart():
+                                    sample["cold_after_restart"] = True
+                                if (slot.step_id, slot.phase, slot.round_index) in retried_keys:
+                                    sample["retried"] = True
+                                records.append(sample)
+                                if slot.phase == "cold" and result.latency_ms is not None:
+                                    cold_calls[arm["id"]] = result.latency_ms / 1000
+                                executed_ok.add(_shape_key(arm))
+                                seen[slot.step_id] = seen.get(slot.step_id, 0) + 1
+                                if slot.phase == "warmup":
+                                    metric = call_metric(result, decision_metric)
+                                    # A missing reading does not agree, and it does not drop the arm.
+                                    stream.note(slot, metric if metric is not None else float("nan"))
+                                else:
+                                    stream.note(slot, None)
+                                if (
+                                    slot.step_id not in finished
+                                    and seen[slot.step_id] == needed[slot.step_id]
+                                    and not stream.accepts_more(slot.step_id)
+                                    and not stream.was_dropped(slot.step_id)
+                                ):
+                                    finished.append(slot.step_id)
+                                    flush()
+                                    if decision_metric and _row_path(
+                                        _finished_row(slot.step_id, partial=True, gone=removed), decision_metric
+                                    ) is None:
+                                        error = f"decision metric {decision_metric} missing on {slot.step_id}"
+                                        aborted = {"step": _label(slot), "error": error}
+                                        stop_all = True
+                                        flush()
+                                        raise RunnerError(error)
                 finally:
+                    if epoch is not None:
+                        supervisor.end_measurement()
                     _finish_slot_probe(probe, adapter)
                     if started and companion is not None:
                         _session(
@@ -845,6 +959,8 @@ def run_interleaved(
                             cache_dirs.get(companion["id"]),
                             prompt_cache,
                         )
+                if pending is not None:
+                    _resume_after_repair(slot, block_id, arm, pending[0], pending[1])
         finally:
             _unload(adapters, arms)
             gone, failures = _drop_caches(cache_dirs)
@@ -874,6 +990,14 @@ def run_interleaved(
                     announce_run(written, finished=False)
         finally:
             marker.close(_iso(wall()))
+
+
+def _ollama_repair_kind(supervisor, arm: dict, error: str) -> str | None:
+    """A transport, timeout, or 5xx on an Ollama arm. Other engines are unchanged."""
+
+    if supervisor is None or arm.get("engine") != "ollama":
+        return None
+    return failure_kind(error)
 
 
 def hang_error(error: str | None) -> bool:
@@ -1230,7 +1354,11 @@ def _record(
 
 def _summary(records: list[dict], arm_id: str):
     cold = [row for row in records if row["step_id"] == arm_id and row["phase"] == "cold"]
-    repeats = [row for row in records if row["step_id"] == arm_id and row["phase"] == "repeat"]
+    repeats = [
+        row
+        for row in records
+        if row["step_id"] == arm_id and row["phase"] == "repeat" and not row.get("cold_after_restart")
+    ]
     cold_row = cold[-1] if cold else None
     units = [
         row["throughput_unit"]
@@ -1850,6 +1978,7 @@ def run_spec(
     python_path: str | None = None,
     watch: WatchHooks | None = None,
     seams=None,
+    supervisor=None,
 ) -> list[dict]:
     """Run a committed spec. Every refusal lands before device contact.
 
@@ -1876,6 +2005,11 @@ def run_spec(
     if receipt.exists():
         raise GuardError(f"REFUSED: receipts/{name}.jsonl already exists; pass --run-id for another name")
     wall = wall or time.time
+    if supervisor is not None:
+        if grant and not getattr(supervisor, "grant", None):
+            supervisor.grant = grant
+        if getattr(supervisor, "heartbeat", None) is None and heartbeat is not None:
+            supervisor.heartbeat = heartbeat
     spec_rel = spec_path.resolve().relative_to(root.resolve()).as_posix()
     devices = {"5090"} if spec["procedure"] == "fill-card" else _spec_devices(spec)
     marker = RunMarker(
@@ -1911,6 +2045,7 @@ def run_spec(
                 wall=wall,
                 marker=marker,
                 notes=notes,
+                supervisor=supervisor,
             )
         if spec["procedure"] != "interleaved":
             raise GuardError(
@@ -1936,6 +2071,7 @@ def run_spec(
             wall=wall,
             watch=watch,
             marker=marker,
+            supervisor=supervisor,
         )
     finally:
         if not marker.entered:

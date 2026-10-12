@@ -20,49 +20,26 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 0,
-      "changed": 5,
+      "added": 2,
+      "changed": 6,
       "moved": 0,
       "parts": 3,
       "removed": 0
     },
     "items": [
       {
-        "kind": "landing",
-        "sentence": "experiments/e4/spec.yaml is now read by tests/test_openvino_adapter.py.",
-        "subjects": [
-          "experiments/e4/spec.yaml",
-          "tests/test_openvino_adapter.py"
-        ]
-      },
-      {
         "kind": "counts",
-        "sentence": "5 files changed content, across 3 parts.",
+        "sentence": "Nothing structural changed since 2026-10-12; 2 files added and 6 changed content.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "b3c6b90c455225370660b99a6a815cfa89690fd0",
-      "generatedAt": "2026-10-12T08:09:11.679Z"
+      "commit": "84c48effb6a2fed294ad11def43e0521b95cb4a7",
+      "generatedAt": "2026-10-12T12:22:43.980Z"
     },
-    "unchanged": false
+    "unchanged": true
   },
   "changesTogether": [
-    {
-      "a": "src/switchyard/harness/fill.py",
-      "b": "tests/test_fill_card_live.py",
-      "either": 5,
-      "partLabels": [
-        "src",
-        "tests"
-      ],
-      "parts": [
-        "src",
-        "tests"
-      ],
-      "relation": "b-imports-a",
-      "shared": 5
-    },
     {
       "a": "src/switchyard/adapters/openvino.py",
       "b": "tests/test_openvino_adapter.py",
@@ -79,6 +56,21 @@
       "shared": 17
     },
     {
+      "a": "src/switchyard/harness/fill.py",
+      "b": "tests/test_fill_card_live.py",
+      "either": 8,
+      "partLabels": [
+        "src",
+        "tests"
+      ],
+      "parts": [
+        "src",
+        "tests"
+      ],
+      "relation": "b-imports-a",
+      "shared": 5
+    },
+    {
       "a": "src/switchyard/harness/receipts.py",
       "b": "src/switchyard/receipt.py",
       "either": 12,
@@ -92,21 +84,6 @@
       ],
       "relation": "inside",
       "shared": 7
-    },
-    {
-      "a": "src/switchyard/adapters/ollama.py",
-      "b": "src/switchyard/harness/fill.py",
-      "either": 7,
-      "partLabels": [
-        "src",
-        "src"
-      ],
-      "parts": [
-        "src",
-        "src"
-      ],
-      "relation": "inside",
-      "shared": 4
     },
     {
       "a": "src/switchyard/adapters/ollama.py",
@@ -129,9 +106,9 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 7 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 0,
-  "commit": "84c48effb6a2fed294ad11def43e0521b95cb4a7",
+  "commit": "876d29310b2643cf3ecea4b8348f1da3a1b0c9b8",
   "defaultBranch": "main",
-  "derived": "7 parts, mostly Python (71 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.",
+  "derived": "7 parts, mostly Python (73 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.",
   "doors": [
     {
       "checks": [],
@@ -146,12 +123,12 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 25
+          "files": 26
         },
         {
           "boundary": "src",
           "depth": 1,
-          "files": 42
+          "files": 43
         }
       ],
       "runs": [
@@ -183,7 +160,7 @@
         {
           "boundary": "src",
           "depth": 0,
-          "files": 36
+          "files": 37
         }
       ],
       "runs": [
@@ -202,11 +179,11 @@
   "edges": [],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-12T12:22:43.980Z",
+  "generatedAt": "2026-10-12T13:09:01.338Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "3 writes and 4 reads use paths built at run time and are not named here.",
-    "5 writes and 22 reads go to a path their caller passes, not to this repository.",
+    "6 writes and 26 reads go to a path their caller passes, not to this repository.",
     "3 reads go to the directory the command is run in (receipts/), not to this repository.",
     "19 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 16 more.",
     "Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window."
@@ -234,9 +211,9 @@
   "startReason": "This path follows switchyard (a command people run) from its entry, since CI runs only tests.",
   "summary": "switchyard routes each job to a model, engine and device from a receipt-backed table.",
   "summaryFrom": "person",
-  "testFiles": 43,
+  "testFiles": 44,
   "testedBy": {
-    "src": 23
+    "src": 24
   },
   "unnamedWrites": 3,
   "unread": [],

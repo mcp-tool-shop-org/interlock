@@ -91,6 +91,12 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--dry-run", action="store_true")
     run.set_defaults(func=_cmd_run)
 
+    health_cmd = sub.add_parser(
+        "ollama-health",
+        help="print health for the local Ollama ports, 11434 and 11490",
+    )
+    health_cmd.set_defaults(func=_cmd_ollama_health)
+
     route = sub.add_parser(
         "route",
         help="choose a model, engine and device from the routing table",
@@ -239,13 +245,15 @@ def _arm_id(row: dict) -> str:
 def _cmd_run(args: argparse.Namespace) -> int:
     from switchyard.adapters.base import AdapterError
     from switchyard.guards import GuardError
-    from switchyard.harness.runner import RunnerError, dry_run, run_spec
+    from switchyard.harness.runner import RunnerError, dry_run, heartbeat_path, run_spec
     from switchyard.harness.spec import SpecError
 
     try:
         if args.dry_run:
             print(dry_run(args.spec, args.root.resolve()), end="")
             return 0
+        from switchyard.ollama_supervisor import OllamaSupervisor, real_seams
+
         run_spec(
             args.spec,
             root=args.root.resolve(),
@@ -254,11 +262,24 @@ def _cmd_run(args: argparse.Namespace) -> int:
             cpu_window=args.cpu_window,
             run_id=args.run_id,
             notes=args.notes,
+            supervisor=OllamaSupervisor(
+                real_seams(),
+                grant=args.grant,
+                heartbeat=heartbeat_path(None),
+            ),
         )
     except (AdapterError, GuardError, RunnerError, SpecError, OSError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
     return 0
+
+
+def _cmd_ollama_health(_args: argparse.Namespace) -> int:
+    from switchyard.ollama_supervisor import health_report
+
+    text, ok = health_report()
+    print(text, end="")
+    return 0 if ok else 1
 
 
 def _cmd_route(args: argparse.Namespace) -> int:

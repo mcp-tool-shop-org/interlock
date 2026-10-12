@@ -98,6 +98,30 @@ switchyard run experiments/e4/spec.yaml --grant "<grant text>" --npu-session "<s
 
 `--dry-run` prints the plan and the guards a real run would need, and starts nothing. A real run needs the flags its devices call for: `--grant` for the 5090, `--npu-session` for the NPU or iGPU, and `--cpu-window` for a CPU-heavy leg. It writes one receipt under `receipts/`. `switchyard import` then rebuilds `table/` from the committed receipts, and `switchyard check` validates them.
 
+## When Ollama hangs
+
+`switchyard ollama-health` asks `GET /api/version` on `127.0.0.1:11434` (the 5090 server) and `127.0.0.1:11490` (the CPU-only server). A port is healthy when that answer arrives within 5 seconds. The command prints one line per port and exits 1 if either is down.
+
+A real `switchyard run` restarts Ollama only on `127.0.0.1:11434`, only between steps, and only after a step failed with a transport error, a timeout that is a real hang, or a 5xx while that server is down. Down means three failed health checks, two seconds apart. A request that passed its own deadline is a hang only when health then fails, or `/api/ps` does not show the model making progress. A long prompt whose version still answers, and whose model is still listed, is not a hang. A 118k-token prompt is not killed for being slow.
+
+Port `11490` is offrig's CPU indexer. Health still reports it. A down `11490` stops the run. switchyard never stops that process, and no grant covers a restart of it.
+
+Immediately before anything is stopped, the restart re-checks the `--grant`, the watchdog heartbeat, and `/api/ps`. A listing that names a model from another session is refused. An unreadable `/api/ps` does not, by itself, block a restart of a server that is already down. During a hang, health can still answer. An unreadable `/api/ps` then refuses the restart, because another session's model would be dropped without being seen.
+
+The process that is stopped is the one listening on `11434`. Nothing is killed by name. The tray app stays up unless it is that listener. `ollama serve` is replayed from the start line recorded for this run: the argv, every `OLLAMA_*` and `LLAMA_ARG_*` variable, and the log file. Stdout and stderr are appended to that log. switchyard does not sign in. There is no `OLLAMA_CUDA_BACKEND` variable. If a backend has to be forced, the variable is `OLLAMA_LLM_LIBRARY`, and it belongs in the recorded start line.
+
+The record is a JSON file named by `SWITCHYARD_OLLAMA_SERVE`. The fields are `argv`, `env`, `log_path`, `library_path`, `ggml_cuda_sha256`, and `backend_line`. One recorded start on this rig is `cmd /c ollama serve` with `OLLAMA_HOST=127.0.0.1:11434` and `OLLAMA_MODELS=E:/AI-Models/Ollama`, logging to `E:/AI/ollama-cu134/system-11434.log`. The loaded library is `%LOCALAPPDATA%\Programs\Ollama\lib\ollama\cuda_v13\ggml-cuda.dll`. The publisher's sha256 of that file starts `6d3128e946bc9c95`. A run records the start line it was given and replays that one. A missing record refuses the restart before anything is stopped.
+
+At the start of a run the record's full `OLLAMA_*` and `LLAMA_ARG_*` set is compared with the live process environment. That comparison is exact. When the process environment cannot be read, the server's `server config` log line is the fallback, and that comparison is exact too: a record that is only part of the logged defaults disables restarts. A mismatch means this run makes no restarts. The reason is written on the run marker as `ollama_restart_disabled`. Nothing is stopped. `OLLAMA_HOST` matches with or without an `http://` or `https://` scheme.
+
+After the server is back, the run reads the library sha256 from `library_path`. Flash attention, the KV cache type, the `load_backend` line, and the full `OLLAMA_*` and `LLAMA_ARG_*` set are read from the log bytes written after the spawn. The bytes before that offset are the previous server, and a line there is not a match. A `load_backend` line that has not been written yet is checked after the first model load, and before that sample is kept. A missing or different line stops the run. The new segment's server config line has to cover every variable the run was measured under. Defaults the process did not set may also be logged. A server that comes back on a different library, or under a different environment, stops the run. The driver CUDA version from `nvidia-smi` is not the check: a restart cannot change it. Flash attention and the KV cache type that the log does not echo fail the match. They are not copied forward from the record and called a read.
+
+If the server is not healthy within 60 seconds, or the card is not back at its baseline, the run stops and says a person has to start Ollama. At most two restarts a run. A failed restart counts against that cap.
+
+Each restart is written on the run marker and on `settings.ollama_restarts`: when, which port, why (`down` or `hung`), the old and new pids, the time to healthy, and the version. The step that was in flight is inconclusive, never a pass. It is tried again only when the spec sets `retry` (the default is none). A kept retry sets `settings.retried`. The first kept sample after a restart sets `settings.cold_after_restart` and stays out of the warm percentiles. A measurement taken across a restart is not kept.
+
+`--dry-run` prints this policy and does not contact either port.
+
 ## Develop
 
 The environment is its own, at `E:/AI/envs/switchyard`, Python 3.12. It does not share the NPU environment. OpenVINO 2026.4.1 is the `intel` extra, pinned to the same versions as that environment. Tests do not need it.
