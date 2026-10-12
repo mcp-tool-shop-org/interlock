@@ -176,7 +176,7 @@ stop_rules:
   - Decode rate is the server's eval_count / eval_duration. Prompt rate is
     prompt_eval_count / prompt_eval_duration and is recorded, not the gate for
     this experiment.
-  - The harness owns the companion session. In a paired slot the order is: start
+  - The harness owns the companion session. In a paired slot the order is start
     the companion, warm up (the companion is already running during the
     warm-up), measure, then stop the companion session. Stop is an unload; keep_alive 0
     for Ollama, the Intel lane's unload for OpenVINO. The companion 5090 load
