@@ -13,6 +13,11 @@ LLAMA_ARG_* key removed, then the recorded host, models directory and debug
 flag. Before it starts, the watchdog heartbeat and an empty card are required.
 After the first load, the run refuses unless this start's log names cuda_v13,
 size_vram equals size, and the digest matches the spec pin.
+
+Live seams sample the GPU through NVML, then nvidia-smi, and the CPU through
+typeperf. The burn's threads stop when the burn returns, including on abort.
+Probes time out after 10 s and a generate after 300 s. A pilot call with no
+within-call clock range is missing; the pilot needs at least 18 good calls.
 """
 
 from __future__ import annotations
@@ -49,6 +54,15 @@ class E4bError(Exception):
 
 
 PILOT_CALLS = 20
+PILOT_MIN_GOOD = 18
+PILOT_CLOCK_RULE = (
+    "A measured call with no within-call clock range is missing and does not abort the pilot. "
+    "The pilot needs at least 18 good calls; fewer is a refusal."
+)
+PROBE_TIMEOUT_S = 10
+GENERATE_TIMEOUT_S = 300
+CPU_UTILITY = r"\Processor Information(_Total)\% Processor Utility"
+CPU_PERFORMANCE = r"\Processor Information(_Total)\% Processor Performance"
 LOAD_REFUSE_S = 1.0
 CLOCK_STEP_MHZ = 7.5
 OWNED = f"http://{HOST}:{PORT}"
@@ -174,6 +188,102 @@ def typeperf_once(counter: str, run) -> float | None:
     if isinstance(stdout, bytes):
         stdout = stdout.decode("utf-8", errors="replace")
     return parse_typeperf(stdout or "")
+
+
+class SampleRecord:
+    """Which GPU probe answered, and the gaps between samples in this run."""
+
+    def __init__(self) -> None:
+        self.probe: str | None = None
+        self.intervals: list[float] = []
+
+
+def live_sample_gpu(record: SampleRecord | None = None) -> tuple[float | None, float | None]:
+    """NVML first, then nvidia-smi. The record keeps whichever probe returned."""
+
+    def nvml():
+        import pynvml
+
+        clock, power = read_nvml(pynvml)
+        if record is not None:
+            record.probe = "nvml"
+        return clock, power
+
+    def smi():
+        text = smi_query(capture_run)
+        if record is not None:
+            record.probe = "smi"
+        return text
+
+    return sample_gpu(nvml=nvml, smi=smi)
+
+
+class LiveGpuSample:
+    """The live ``sample_gpu`` seam. Calling it is a real probe, so tests do not."""
+
+    live = True
+
+    def __init__(self, record: SampleRecord) -> None:
+        self.record = record
+
+    def __call__(self) -> tuple[float | None, float | None]:
+        return live_sample_gpu(self.record)
+
+
+def live_sample_cpu(name: str) -> float | None:
+    """typeperf for % Processor Utility and % Processor Performance."""
+
+    if name == "utility":
+        counter = CPU_UTILITY
+    elif name == "performance":
+        counter = CPU_PERFORMANCE
+    else:
+        return None
+    return typeperf_once(counter, capture_run)
+
+
+live_sample_cpu.live = True
+
+
+class CpuBurn:
+    """Busy threads. ``stop`` joins them, including when the burn raises."""
+
+    def __init__(self) -> None:
+        self._stop = threading.Event()
+        self._threads: list[threading.Thread] = []
+
+    def start(self, count: int) -> None:
+        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+            return
+        for _ in range(count):
+            thread = threading.Thread(target=self._spin, name="switchyard-e4b-burn", daemon=True)
+            thread.start()
+            self._threads.append(thread)
+
+    def stop(self) -> None:
+        self._stop.set()
+        threads = list(self._threads)
+        self._threads.clear()
+        for thread in threads:
+            thread.join(timeout=2)
+        self._stop.clear()
+
+    def _spin(self) -> None:
+        while not self._stop.is_set():
+            for _ in range(1000):
+                if self._stop.is_set():
+                    return
+
+
+def _stop_burn(start_threads) -> None:
+    """Stop a burn that published ``stop``, or a bound :meth:`CpuBurn.start`."""
+
+    stop = getattr(start_threads, "stop", None)
+    if not callable(stop):
+        owner = getattr(start_threads, "__self__", None)
+        stop = getattr(owner, "stop", None) if owner is not None else None
+    if callable(stop):
+        stop()
 
 
 def collect_series(*, sample, sleep, every_s: float, duration_s: float) -> list[tuple]:
@@ -464,34 +574,40 @@ def schedule_e4b(spec: dict, repeats: int) -> list[dict]:
 
 
 def run_burn(*, target_utility: float, duration_s: float, sample_utility, sample_performance, sleep, start_threads) -> dict:
-    """Busy threads matched to a utility target. No GPU work is available here."""
+    """Busy threads matched to a utility target. No GPU work is available here.
 
-    threads = 0
-    if target_utility < 0 or duration_s < 0:
-        raise E4bError("the burn target and duration cannot be negative")
-    while threads < 64:
-        if sample_utility() >= target_utility:
-            break
-        threads += 1
-        start_threads(1)
-    matched = sample_utility() >= target_utility
-    samples = []
-    elapsed = 0.0
-    while elapsed + 1e-12 < duration_s:
-        samples.append(
-            {"t_s": elapsed, "utility": sample_utility(), "performance": sample_performance()}
-        )
-        step = min(1.0, duration_s - elapsed)
-        sleep(step)
-        elapsed += step
-    return {
-        "threads": threads,
-        "matched": matched,
-        "duration_s": duration_s,
-        "utility_target": target_utility,
-        "samples": samples,
-        "gpu_calls": 0,
-    }
+    The threads stop when this returns, and when it raises.
+    """
+
+    try:
+        threads = 0
+        if target_utility < 0 or duration_s < 0:
+            raise E4bError("the burn target and duration cannot be negative")
+        while threads < 64:
+            if sample_utility() >= target_utility:
+                break
+            threads += 1
+            start_threads(1)
+        matched = sample_utility() >= target_utility
+        samples = []
+        elapsed = 0.0
+        while elapsed + 1e-12 < duration_s:
+            samples.append(
+                {"t_s": elapsed, "utility": sample_utility(), "performance": sample_performance()}
+            )
+            step = min(1.0, duration_s - elapsed)
+            sleep(step)
+            elapsed += step
+        return {
+            "threads": threads,
+            "matched": matched,
+            "duration_s": duration_s,
+            "utility_target": target_utility,
+            "samples": samples,
+            "gpu_calls": 0,
+        }
+    finally:
+        _stop_burn(start_threads)
 
 
 def pilot_summary(ranges: list[float], full_flags: list[bool], *, step: float = CLOCK_STEP_MHZ) -> dict:
@@ -1058,9 +1174,36 @@ def _probe_arm(spec: dict) -> dict | None:
     return None
 
 
+def _server_config_line(segment: str) -> str | None:
+    last = None
+    for line in segment.splitlines():
+        if 'msg="server config"' in line:
+            last = line
+    return last
+
+
+def _sample_note(seams) -> dict:
+    """The probe that answered, and the mean gap between its samples."""
+
+    record = getattr(seams, "sample_record", None)
+    intervals = [] if record is None else list(getattr(record, "intervals", []) or [])
+    return {
+        "gpu_probe": None if record is None else getattr(record, "probe", None),
+        "sample_interval_s": _mean(intervals),
+    }
+
+
+def _clocks_missing(clocks) -> bool:
+    return not isinstance(clocks, list) or not clocks or any(item is None for item in clocks)
+
+
 def _header(spec, seams, repo, running, caches, prompt, *, aborted: bool) -> dict:
+    from switchyard.ollama_supervisor import server_config_env
+
     git = seams.git(repo) if getattr(seams, "git", None) else {"git_sha": None, "clean_tree": None}
     vram = note_vram(getattr(seams, "vram", None))
+    segment = _log_text(seams, running)
+    config = server_config_env(segment)
     header = {
         "kind": "e4b-header",
         "id": spec["id"],
@@ -1073,8 +1216,12 @@ def _header(spec, seams, repo, running, caches, prompt, *, aborted: bool) -> dic
         "caches": caches,
         "prompt_sha256": _sha256(prompt),
         "aborted": aborted,
+        "server_config_line": _server_config_line(segment),
+        "flash_attention": config.get("OLLAMA_FLASH_ATTENTION"),
+        "kv_cache_type": config.get("OLLAMA_KV_CACHE_TYPE"),
     }
     header.update(vram)
+    header.update(_sample_note(seams))
     return header
 
 
@@ -1159,6 +1306,8 @@ def run_pilot(spec: dict, seams, *, root: Path, run_id: str, repo: Path, calls: 
     ranges = []
     full = []
     warm_short = 0
+    missing = 0
+    call_intervals: list[float] = []
     _require_ready(seams)
     with seams.server as running:
         _probe(seams, "GET", "/api/version")
@@ -1175,15 +1324,25 @@ def run_pilot(spec: dict, seams, *, root: Path, run_id: str, repo: Path, calls: 
                 measured = dict(
                     seams.call(arm, num_predict=arm.get("num_predict"), measured=True, kind="measure", prompt=prompt)
                 )
+                interval = measured.get("sample_interval_s")
+                if isinstance(interval, (int, float)) and not isinstance(interval, bool):
+                    call_intervals.append(float(interval))
                 clocks = measured.get("clocks_mhz")
-                if not isinstance(clocks, list) or not clocks or any(item is None for item in clocks):
-                    raise E4bError("the pilot is missing a within-call clock range")
+                if _clocks_missing(clocks):
+                    missing += 1
+                    continue
                 ranges.append(float(max(clocks) - min(clocks)))
                 count = measured.get("eval_count")
                 predict = arm.get("num_predict")
                 full.append(isinstance(count, int) and not isinstance(count, bool) and count >= predict)
         finally:
             seams.unload_resident()
+    needed = PILOT_MIN_GOOD if calls >= PILOT_MIN_GOOD else calls
+    if len(ranges) < needed:
+        raise E4bError(
+            f"the pilot has {len(ranges)} good calls and {missing} missing; "
+            f"it needs at least {needed}. {PILOT_CLOCK_RULE}"
+        )
     summary = pilot_summary(ranges, full, step=float(measurement.get("clock_step_mhz") or CLOCK_STEP_MHZ))
     git = seams.git(repo) if getattr(seams, "git", None) else {"git_sha": None, "clean_tree": None}
     document = {
@@ -1201,6 +1360,14 @@ def run_pilot(spec: dict, seams, *, root: Path, run_id: str, repo: Path, calls: 
         "version_stop": getattr(running, "version_stop", None),
     }
     document.update(summary)
+    document["calls"] = calls
+    document["good_calls"] = len(ranges)
+    document["missing_calls"] = missing
+    document["pilot_clock_rule"] = PILOT_CLOCK_RULE
+    note = _sample_note(seams)
+    if note["sample_interval_s"] is None and call_intervals:
+        note["sample_interval_s"] = _mean(call_intervals)
+    document.update(note)
     document.update(note_vram(getattr(seams, "vram", None)))
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(document, sort_keys=True, indent=2) + "\n", encoding="utf-8")
@@ -1333,14 +1500,24 @@ def normalize_ollama(payload: dict) -> dict:
     }
 
 
-def threaded_sample(invoke, sample, every_s: float) -> dict:
-    """Sample while ``invoke`` runs. Tests that need a deterministic series skip this."""
+def threaded_sample(invoke, sample, every_s: float, *, intervals: list | None = None) -> dict:
+    """Sample while ``invoke`` runs. Tests that need a deterministic series skip this.
+
+    ``intervals`` receives the measured gap between sample starts. A slow probe
+    stretches the requested step, and that stretch is what the receipt records.
+    """
 
     series: list[tuple] = []
+    gaps: list[float] = []
     stop = threading.Event()
 
     def loop() -> None:
+        previous = None
         while not stop.is_set():
+            now = time.perf_counter()
+            if previous is not None:
+                gaps.append(now - previous)
+            previous = now
             series.append(tuple(sample()))
             if stop.wait(every_s):
                 break
@@ -1352,9 +1529,13 @@ def threaded_sample(invoke, sample, every_s: float) -> dict:
     finally:
         stop.set()
         thread.join(timeout=every_s + 1)
+    if intervals is not None:
+        intervals.extend(gaps)
     if "clocks_mhz" not in result:
         result["clocks_mhz"] = [item[0] for item in series]
         result["power_w"] = [item[1] for item in series]
+    if gaps:
+        result["sample_interval_s"] = sum(gaps) / len(gaps)
     return result
 
 
@@ -1389,19 +1570,39 @@ def _trace(seams, item) -> None:
         trace.append(item)
 
 
+def _http_timeout(url: str) -> float:
+    """Probes are short. A generate is allowed a few minutes, then it is a refusal."""
+
+    from urllib.parse import urlsplit
+
+    if urlsplit(url).path == "/api/generate":
+        return GENERATE_TIMEOUT_S
+    return PROBE_TIMEOUT_S
+
+
 def urllib_exchange(method: str, url: str, body: dict | None = None) -> dict:
     """The live HTTP call. Tests pass their own transport and never reach this."""
 
     import urllib.request
+    from urllib.parse import urlsplit
 
+    timeout = _http_timeout(url)
     data = None if body is None else json.dumps(body).encode("utf-8")
     headers = {"Content-Type": "application/json"} if data is not None else {}
     request = urllib.request.Request(url, data=data, method=method, headers=headers)
-    with urllib.request.urlopen(request) as response:
-        payload = json.loads(response.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except TimeoutError as exc:
+        path = urlsplit(url).path or url
+        raise E4bError(f"REFUSED: {method} {path} timed out after {timeout:g} s") from exc
     if not isinstance(payload, dict):
         raise E4bError("Ollama returned a non-object")
     return payload
+
+
+urllib_exchange.probe_timeout_s = PROBE_TIMEOUT_S
+urllib_exchange.generate_timeout_s = GENERATE_TIMEOUT_S
 
 
 def owned_probe(base: str, path: str, opener) -> dict:
@@ -1531,6 +1732,16 @@ def build_live_seams(root: Path, run_id: str, spec: dict, *, pilot: bool, run=No
     latest_lock = threading.Lock()
     companion_thread: dict = {"thread": None}
     lane = intel if intel is not None else IntelLane(root, run_id)
+    record = SampleRecord()
+    gpu_sample = sample if sample is not None else LiveGpuSample(record)
+    cpu_sample = cpu if cpu is not None else live_sample_cpu
+    burn = CpuBurn()
+    every_s = float(spec["measurement"]["steady_sample_ms"]) / 1000.0
+
+    def sample_during(invoke, sample_fn, every):
+        if sampler is threaded_sample:
+            return threaded_sample(invoke, sample_fn, every, intervals=record.intervals)
+        return sampler(invoke, sample_fn, every)
 
     def call(arm, *, num_predict, measured, kind, prompt, role=None):
         del role
@@ -1543,11 +1754,7 @@ def build_live_seams(root: Path, run_id: str, spec: dict, *, pilot: bool, run=No
                 normalized["kind"] = kind
                 return normalized
 
-            return sampler(
-                invoke,
-                sample or (lambda: (None, None)),
-                float(spec["measurement"]["steady_sample_ms"]) / 1000.0,
-            )
+            return sample_during(invoke, gpu_sample, every_s)
         return lane.call(arm, num_predict=num_predict, measured=measured, kind=kind, prompt=prompt)
 
     def start_companion(arm, *, prompt=""):
@@ -1615,11 +1822,12 @@ def build_live_seams(root: Path, run_id: str, spec: dict, *, pilot: bool, run=No
     seams.start_companion = start_companion
     seams.stop_companion = stop_companion
     seams.companion_report = companion_report
-    seams.sample_cpu = cpu or (lambda name: None)
-    seams.sample_gpu = sample or (lambda: (None, None))
+    seams.sample_cpu = cpu_sample
+    seams.sample_gpu = gpu_sample
     seams.sleep = time.sleep
     seams.now = time.perf_counter
-    seams.start_threads = lambda count: None
+    seams.start_threads = burn.start
+    seams.stop_threads = burn.stop
     seams.probe = lambda method, path: owned_probe(OWNED, path, _open)
 
     def load_resident():
@@ -1632,7 +1840,11 @@ def build_live_seams(root: Path, run_id: str, spec: dict, *, pilot: bool, run=No
     seams.card_models = lambda: card_models_at_ceiling(read_mib, ceiling=IDLE_CEILING_MIB)
     seams.count_tokens = lambda text: count_owned(post, OWNED, model, text)
     seams.git = lambda repo: read_git(repo, git_run or runner)
-    seams.vram = vram
+    seams.vram = read_card_mib if vram is None else vram
+    seams.sample_record = record
+    seams.probe_timeout_s = PROBE_TIMEOUT_S
+    seams.generate_timeout_s = GENERATE_TIMEOUT_S
+    seams.transport = post
     seams.trace = []
     seams.resamples = 50000
     return seams

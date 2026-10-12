@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- E4b's live seams are no longer stubs. The owned server polls `GET /api/version` every 0.25 s for up to 30 s, and a child that exits first stops the run with the tail of this start's log. GPU samples use NVML (`nvidia-ml-py`) and fall back to nvidia-smi; the pilot document and the block receipt record which probe answered and the measured sample interval. CPU samples use typeperf for `% Processor Utility` and `% Processor Performance`. The burn's threads stop at the end of the burn and on abort. `vram_mib_at_start` is read from the card. Probes time out after 10 s and a generate after 300 s; a timeout is a refusal. The block receipt carries this start's server-config line (flash attention and KV cache type). A pilot call with no within-call clock range is missing and does not abort the rest; fewer than 18 good calls is a refusal (spec amendment 2026-10-12).
 - Fixed: the E4b pilot counted its prompt on the run-owned server (11441) before starting it, so the count was refused (WinError 10061) and the pilot stopped before any device work. It now counts once the server is up and proven, as the block already did. Found live by the Publisher, 2026-10-12.
 
 - Fixed: E4b's live runner was a bare `subprocess.run`, which captures no output, so the 11434 pin read "" and the pilot refused ("the 11434 listener report is not JSON"); the receipt's git sha and clean flag read the same way. The default is now `capture_run` (captured, text). Another `test_fake_hides_platform` instance: the fakes returned stdout. Found live by the Publisher, 2026-10-12.

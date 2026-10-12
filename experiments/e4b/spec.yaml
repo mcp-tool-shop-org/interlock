@@ -23,6 +23,9 @@
 # Amended 2026-10-12 (R&D review of the harness on #80, Publisher): a 5090
 # companion stops its generate loop and stays loaded until block end, while
 # the NPU and iGPU companions stop and unload.
+# Amended 2026-10-12 (Publisher, #85): a pilot call with no within-call clock
+# range is missing and does not abort the rest. At least 18 good calls are
+# required; fewer is a refusal. The missing count is on the pilot document.
 # Drafted 2026-10-12 (Kimi, at the Publisher's request, R&D to confirm), after
 # E4 run 7 (valid, inconclusive; every alone spread over the half-band). E4 is
 # not amended and run 7's verdict stands. E4b replaces E4's global alone-spread

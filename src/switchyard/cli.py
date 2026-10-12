@@ -247,6 +247,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
     from switchyard.adapters.base import AdapterError
     from switchyard.guards import GuardError
     from switchyard.harness.e4b import E4bError
+    from switchyard.harness.ollama_serve import ServeError
     from switchyard.harness.runner import RunnerError, dry_run, heartbeat_path, run_spec
     from switchyard.harness.spec import SpecError
 
@@ -271,7 +272,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
             ),
             pilot=args.pilot,
         )
-    except (AdapterError, GuardError, RunnerError, SpecError, E4bError, OSError) as exc:
+    except (AdapterError, GuardError, RunnerError, SpecError, E4bError, ServeError, OSError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
     return 0
