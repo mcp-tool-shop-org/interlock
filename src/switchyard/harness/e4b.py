@@ -265,6 +265,12 @@ def prepare_prompt(spec: dict, count_tokens) -> str:
     return fit_prompt(seed, target, count_tokens)
 
 
+def capture_run(args: list[str]):
+    """The live runner: a bare ``subprocess.run`` returns no stdout, so the pin and git reads saw ""."""
+
+    return subprocess.run(args, capture_output=True, text=True, check=False)
+
+
 def read_git(repo: Path, run) -> dict:
     """HEAD and whether the worktree is clean. The receipt stores the sha, not a path."""
 
@@ -1480,7 +1486,7 @@ def build_live_seams(root: Path, run_id: str, spec: dict, *, pilot: bool, run=No
 
     from switchyard.harness.ollama_serve import Server
 
-    runner = run or subprocess.run
+    runner = run or capture_run
     pin = resolve_pin(runner)
     log_root = root / ("pilot-e4b" if pilot else "logs")
     post = transport or urllib_exchange

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed: E4b's live runner was a bare `subprocess.run`, which captures no output, so the 11434 pin read "" and the pilot refused ("the 11434 listener report is not JSON"); the receipt's git sha and clean flag read the same way. The default is now `capture_run` (captured, text). Another `test_fake_hides_platform` instance: the fakes returned stdout. Found live by the Publisher, 2026-10-12.
+
 - Fixed: the 11434 listener lookups (E4b's pin, E5's runner, the supervisor) no longer filter on `-State Listen`. On Windows build 26340 a listening socket reports state 0, so the E4b pilot refused with "the 11434 listener report is not JSON". They now take the socket on the port that has no remote port. Found live by the Publisher, 2026-10-12.
 
 - If the Ollama log's size cannot be read, a restart stops the run instead of checking the whole log. A missing log is still an empty log.
