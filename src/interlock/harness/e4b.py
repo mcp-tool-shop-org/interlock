@@ -4,7 +4,9 @@ The spec is the contract (experiments/e4b/spec.yaml). This module enforces the
 rules the loader used to ignore. Tests pass fakes. Nothing here opens a GPU
 or a shared Ollama port unless a caller builds the live seams and runs them.
 
-The 5090 companion is a generate loop. Stopping that loop does not unload
+The 5090 companion is a generate loop. A paired NPU or iGPU slot waits until
+that loop has finished one steady warm decode and the next decode is underway,
+then runs the Intel warm and measure. Stopping the loop does not unload
 qwen3. The model loads once at block start and unloads once, with keep_alive 0,
 at block end. An unload in the middle would reload it and refuse the next slot.
 
@@ -648,6 +650,35 @@ def note_vram(read) -> dict:
     }
 
 
+def parse_pairs(text: str | None) -> list[str] | None:
+    """Comma-separated pair ids. None means every pair in the spec."""
+
+    if text is None:
+        return None
+    names = [part.strip() for part in str(text).split(",")]
+    if not names or any(not name for name in names):
+        raise E4bError("--pairs names at least one pair")
+    return names
+
+
+def resolve_pairs(spec: dict, pairs: list[str] | None) -> tuple[list[dict], list[str] | None]:
+    """The pairs this run schedules, in spec order. None records no subset."""
+
+    listed = [pair for pair in spec.get("pairs") or [] if isinstance(pair, dict)]
+    if pairs is None:
+        return listed, None
+    if not isinstance(pairs, (list, tuple)) or not pairs:
+        raise E4bError("--pairs names at least one pair")
+    known = [pair.get("id") for pair in listed]
+    unknown = [name for name in pairs if name not in known]
+    if unknown:
+        raise E4bError(f"unknown pair: {unknown[0]}")
+    if len(list(pairs)) != len(set(pairs)):
+        raise E4bError("a pair is named more than once")
+    chosen = [pair for pair in listed if pair.get("id") in set(pairs)]
+    return chosen, [pair["id"] for pair in chosen]
+
+
 def schedule_e4b(spec: dict, repeats: int) -> list[dict]:
     """Cold once, then rotated A-B-A triplets. The burn probe follows the igpu-5090 triplet."""
 
@@ -755,7 +786,7 @@ def _prompt_line(spec: dict) -> str:
     return f"prompt: counting sequence, shortest prefix at or above {target} tokens"
 
 
-def dry_text(spec: dict, blob: str, *, pilot: bool) -> str:
+def dry_text(spec: dict, blob: str, *, pilot: bool, pairs: list[str] | None = None) -> str:
     """What ``interlock run --dry-run`` prints for E4b. No device is contacted."""
 
     measurement = spec.get("measurement") or {}
@@ -797,7 +828,7 @@ def dry_text(spec: dict, blob: str, *, pilot: bool) -> str:
         "session end is keep_alive 0 unload",
         "warm-up: NPU and iGPU one unmeasured call; 5090 768 tokens at least 3 s until steady",
         "until-steady: 10 samples at 200 ms, 2 attempts, else clock_not_steady",
-        "companion starts before the warm-up",
+        "5090 companion is sustained before the Intel warm-up: 768 tokens, at least 3 s, steady, next decode underway, else clock_not_steady",
         "refusals re-run once in place; two refusals in a pair are inconclusive",
         "Hodges-Lehmann, exact Wilcoxon at least 90%, TOST +/-0.10",
         "extension to 15 when the 10-triplet interval straddles",
@@ -809,6 +840,8 @@ def dry_text(spec: dict, blob: str, *, pilot: bool) -> str:
         "heartbeat not read; adapters not called",
         "devices not started (--dry-run)",
     ]
+    if pairs:
+        lines.insert(-1, "pairs: " + ", ".join(pairs))
     return "\n".join(lines) + "\n"
 
 
@@ -947,6 +980,83 @@ def warm_5090(seams, arm: dict, prompt: str, measurement: dict, *, enforce: bool
     return {"ok": ok, "attempts": attempts, "steady": ok}
 
 
+def _clock_now(seams) -> float:
+    now = getattr(seams, "now", None)
+    if now is None:
+        return time.perf_counter()
+    return float(now())
+
+
+def sustain_5090_companion(seams, arm: dict, prompt: str, measurement: dict) -> dict:
+    """One steady 5090 warm, then the next decode marked underway.
+
+    The fake path runs this on the caller. The live companion thread uses the
+    same ``warm_5090`` rule and signals underway itself, so this is not called
+    twice.
+    """
+
+    begun = _clock_now(seams)
+    warm = warm_5090(seams, arm, prompt, measurement, enforce=True)
+    finished = _clock_now(seams)
+    calls = [
+        {"started_s": begun, "ended_s": finished, "result": attempt, "part": "warm"}
+        for attempt in warm["attempts"]
+    ]
+    if not warm["ok"]:
+        return {"ok": False, "reason": "clock_not_steady", "calls": calls, "open": None}
+    open_call = {"started_s": _clock_now(seams), "ended_s": None, "result": None, "part": "decode"}
+    calls.append(open_call)
+    _trace(seams, ("companion-warm-done", arm["id"]))
+    _trace(seams, ("companion-decode-start", arm["id"]))
+    return {"ok": True, "reason": None, "calls": calls, "open": open_call}
+
+
+def _await_sustained(seams, arm: dict, prompt: str, measurement: dict) -> dict:
+    waiter = getattr(seams, "await_sustained_companion", None)
+    if waiter is not None:
+        return waiter(arm)
+    return sustain_5090_companion(seams, arm, prompt, measurement)
+
+
+def _finish_companion_call(seams, arm: dict, open_call, prompt: str) -> None:
+    """Fill the fake path's open decode. A live thread already holds the generate."""
+
+    if not isinstance(open_call, dict):
+        return
+    if open_call.get("result") is None and getattr(seams, "await_sustained_companion", None) is None:
+        open_call["result"] = dict(
+            seams.call(
+                arm,
+                num_predict=arm.get("num_predict"),
+                measured=False,
+                kind="companion",
+                prompt=prompt,
+            )
+        )
+    if open_call.get("ended_s") is None:
+        open_call["ended_s"] = _clock_now(seams)
+
+
+def _covering_call(calls, span) -> dict | None:
+    """The companion call whose time span covers the Intel measured call."""
+
+    if not calls or span is None:
+        return None
+    start, end = span
+    covers = []
+    for index, call in enumerate(calls):
+        begun = call.get("started_s")
+        finished = call.get("ended_s")
+        if begun is None or finished is None:
+            continue
+        if float(begun) <= float(start) + 1e-9 and float(finished) + 1e-9 >= float(end):
+            covers.append((float(begun), index, call))
+    if not covers:
+        return None
+    covers.sort()
+    return covers[-1][2]
+
+
 def _stop_kind(companion: dict) -> str:
     # 5090 stays loaded. Ending its companion is the end of the generate loop.
     if companion["device"] == "5090":
@@ -970,7 +1080,7 @@ def perform_slot(
     enforce_steady: bool,
     phase: str,
 ) -> dict:
-    """One slot. A paired slot starts its companion before the warm-up."""
+    """One slot. A 5090 companion is sustained before an Intel warm-up."""
 
     tolerance = measurement.get("clock_tolerance_mhz")
     seams.phase = phase
@@ -992,15 +1102,30 @@ def perform_slot(
         cpu_end = None
         warm = {"ok": False, "attempts": []}
         measured = None
+        companion_calls: list = []
+        open_call = None
+        measure_span = None
+        companion_unsteady = False
+        judged = None
         try:
             if companion is not None:
                 _trace(seams, ("start_companion", companion["id"]))
                 seams.start_companion(companion, prompt=prompt)
                 started = True
+                if companion.get("device") == "5090":
+                    phase_now = "companion"
+                    sustained = _await_sustained(seams, companion, prompt, measurement)
+                    calls = sustained.get("calls")
+                    companion_calls = calls if isinstance(calls, list) else []
+                    open_call = sustained.get("open")
+                    if not sustained.get("ok"):
+                        companion_unsteady = True
             cpu_start = seams.sample_cpu("performance")
             utility = seams.sample_cpu("utility") if arm["device"] == "5090" else None
             steady_ok = None
-            if arm["device"] == "5090":
+            if companion_unsteady:
+                warm = {"ok": False, "attempts": []}
+            elif arm["device"] == "5090":
                 phase_now = "warm"
                 warm = warm_5090(seams, arm, prompt, measurement, enforce=enforce_steady)
                 steady_ok = True if not enforce_steady else warm["ok"]
@@ -1011,8 +1136,9 @@ def perform_slot(
                 _trace(seams, ("warm", arm["id"], arm.get("num_predict")))
                 seams.call(arm, num_predict=arm.get("num_predict"), measured=False, kind="warm", prompt=prompt)
                 warm = {"ok": True, "attempts": []}
-            if steady_ok is not False:
+            if not companion_unsteady and steady_ok is not False:
                 phase_now = "measure"
+                measure_began = _clock_now(seams)
                 _trace(seams, ("measure-start", arm["id"], role))
                 measured = dict(
                     seams.call(
@@ -1023,6 +1149,7 @@ def perform_slot(
                         prompt=prompt,
                     )
                 )
+                measure_span = (measure_began, _clock_now(seams))
             cpu_end = seams.sample_cpu("performance")
             report = None
             if companion is not None:
@@ -1031,11 +1158,17 @@ def perform_slot(
                 _trace(seams, ("stop_companion", companion["id"], kind))
                 seams.stop_companion(companion, kind=kind)
                 started = False
-                report = seams.companion_report(companion)
+                _finish_companion_call(seams, companion, open_call, prompt)
+                judged = _covering_call(companion_calls, measure_span)
+                if isinstance(judged, dict) and isinstance(judged.get("result"), dict):
+                    report = judged["result"]
+                elif not companion_unsteady:
+                    report = seams.companion_report(companion)
             if measured is None:
                 measured = {"value": None, "clocks_mhz": None, "power_w": None}
-            reason = None
-            if phase != "cold":
+            if companion_unsteady and phase != "cold":
+                reason = "clock_not_steady"
+            elif phase != "cold":
                 reason = slot_refusal(
                     arm,
                     measured,
@@ -1045,16 +1178,18 @@ def perform_slot(
                     steady_ok=steady_ok if arm["device"] == "5090" and enforce_steady else None,
                     num_predict=arm.get("num_predict"),
                 )
+            else:
+                reason = None
             attempt_time.extend(_phase_times(warm, measured))
             if reason:
                 events += 1
                 reasons.append(reason)
                 final = _slot_row(
-                    arm, role, pair, repeat, measured, reason, events, reasons, cpu_start, cpu_end, utility, root, run_id, warm, attempt_time
+                    arm, role, pair, repeat, measured, reason, events, reasons, cpu_start, cpu_end, utility, root, run_id, warm, attempt_time, judged
                 )
                 continue
             final = _slot_row(
-                arm, role, pair, repeat, measured, None, events, reasons, cpu_start, cpu_end, utility, root, run_id, warm, attempt_time
+                arm, role, pair, repeat, measured, None, events, reasons, cpu_start, cpu_end, utility, root, run_id, warm, attempt_time, judged
             )
             break
         except Exception as exc:
@@ -1098,7 +1233,7 @@ def _phase_times(warm, measured) -> list[dict]:
     return rows
 
 
-def _slot_row(arm, role, pair, repeat, measured, reason, events, reasons, cpu_start, cpu_end, utility, root, run_id, warm, attempt_time=None) -> dict:
+def _slot_row(arm, role, pair, repeat, measured, reason, events, reasons, cpu_start, cpu_end, utility, root, run_id, warm, attempt_time=None, companion_call=None) -> dict:
     clocks = measured.get("clocks_mhz") if isinstance(measured.get("clocks_mhz"), list) else []
     power = measured.get("power_w") if isinstance(measured.get("power_w"), list) else []
     series_rel = None
@@ -1106,7 +1241,7 @@ def _slot_row(arm, role, pair, repeat, measured, reason, events, reasons, cpu_st
         series = root / "receipts" / f"{run_id}-series" / f"{pair or 'cold'}-{repeat}-{role}-{arm['id']}.jsonl"
         _write_series(series, clocks, power)
         series_rel = series.relative_to(root).as_posix()
-    return {
+    row = {
         "arm": arm["id"],
         "role": role,
         "pair": pair,
@@ -1128,6 +1263,14 @@ def _slot_row(arm, role, pair, repeat, measured, reason, events, reasons, cpu_st
         "time_spent": list(attempt_time or []),
         "analysis": role != "cold",
     }
+    if isinstance(companion_call, dict):
+        result = companion_call.get("result") if isinstance(companion_call.get("result"), dict) else {}
+        clocks = result.get("clocks_mhz")
+        row["companion_clock_range_mhz"] = _clock_range(clocks if isinstance(clocks, list) else None)
+        row["companion_call_started_s"] = companion_call.get("started_s")
+        row["companion_call_ended_s"] = companion_call.get("ended_s")
+        row["companion_call_part"] = companion_call.get("part")
+    return row
 
 
 def _triplet(seams, item, arms, prompt, measurement, root, run_id, *, attempts: int, enforce_steady: bool) -> dict:
@@ -1293,11 +1436,11 @@ def _partial_pairs(spec: dict, per_pair: dict) -> list[dict]:
     return rows
 
 
-def execute_block(spec: dict, seams, *, root: Path, run_id: str) -> dict:
+def execute_block(spec: dict, seams, *, root: Path, run_id: str, pairs: list[str] | None = None) -> dict:
     """The measured block. Refusals, the estimate, and the burn probe land on the receipt."""
 
     try:
-        return _execute_block_loop(spec, seams, root=root, run_id=run_id)
+        return _execute_block_loop(spec, seams, root=root, run_id=run_id, pairs=pairs)
     except BaseException as exc:
         # KeyboardInterrupt is an abort too. The rows finished so far travel with it.
         snap = getattr(_execute_block_loop, "last_partial", None)
@@ -1307,7 +1450,10 @@ def execute_block(spec: dict, seams, *, root: Path, run_id: str) -> dict:
         raise
 
 
-def _execute_block_loop(spec: dict, seams, *, root: Path, run_id: str) -> dict:
+def _execute_block_loop(spec: dict, seams, *, root: Path, run_id: str, pairs: list[str] | None = None) -> dict:
+    chosen, _recorded = resolve_pairs(spec, pairs)
+    spec = dict(spec)
+    spec["pairs"] = chosen
     measurement = _measurement(spec)
     prompt = prepare_prompt(spec, seams.count_tokens)
     arms = {arm["id"]: arm for arm in spec["arms"]}
@@ -1455,7 +1601,7 @@ def _git_at_start(seams, repo: Path, git: dict | None) -> dict:
     return {"git_sha": None, "clean_tree": None}
 
 
-def _header(spec, seams, repo, running, caches, prompt, *, aborted: bool, git: dict | None = None) -> dict:
+def _header(spec, seams, repo, running, caches, prompt, *, aborted: bool, git: dict | None = None, pairs: list[str] | None = None) -> dict:
     from interlock.ollama_supervisor import server_config_env
 
     recorded = git if git is not None else {"git_sha": None, "clean_tree": None}
@@ -1480,6 +1626,8 @@ def _header(spec, seams, repo, running, caches, prompt, *, aborted: bool, git: d
     }
     header.update(vram)
     header.update(_sample_note(seams))
+    if pairs is not None:
+        header["pairs"] = list(pairs)
     return header
 
 
@@ -1533,11 +1681,15 @@ def run_block(
     repo: Path,
     git: dict | None = None,
     quarantine: Path | None = None,
+    pairs: list[str] | None = None,
 ) -> list[dict]:
     """One E4b block. The server's process tree stops on the way out, including on abort."""
 
     _check_run_id(run_id)
     _require_amended(spec)
+    recorded_pairs = None
+    if pairs is not None:
+        _chosen, recorded_pairs = resolve_pairs(spec, pairs)
     require_free(root, run_id, quarantine)
     refuse_strays(root)
     receipt = root / "receipts" / f"{run_id}.jsonl"
@@ -1564,7 +1716,7 @@ def run_block(
             try:
                 seams.load_resident()
                 _require_owned_server(spec, seams, running)
-                body = execute_block(spec, seams, root=root, run_id=run_id)
+                body = execute_block(spec, seams, root=root, run_id=run_id, pairs=pairs)
                 rows = _rows_of(body)
                 prompt = body["prompt"]
             except BaseException as exc:
@@ -1597,7 +1749,7 @@ def run_block(
     finally:
         # The receipt lands before cleanup. Cleanup cannot raise past it.
         if started and running is not None:
-            header = _header(spec, seams, repo, running, caches, prompt, aborted=aborted, git=recorded)
+            header = _header(spec, seams, repo, running, caches, prompt, aborted=aborted, git=recorded, pairs=recorded_pairs)
             header["run_id"] = run_id
             if cleanup_errors:
                 header["cleanup_errors"] = cleanup_errors
@@ -1794,12 +1946,17 @@ def run_from_cli(
     seams,
     notes: str = "",
     quarantine: Path | None = None,
+    pairs: list[str] | None = None,
 ) -> list | dict:
     """Flag checks, then the pilot or the block. Null tolerances refuse before any device."""
 
     from interlock.harness.lock import require_unmodified
 
     require_unmodified(repo, spec_path)
+    if pairs is not None:
+        if pilot:
+            raise E4bError("--pairs is for the block, not the pilot")
+        resolve_pairs(spec, pairs)
     require_grant(grant, uses_5090=True)
     if not pilot:
         require_npu_session(npu_session, device="NPU")
@@ -1818,7 +1975,7 @@ def run_from_cli(
     recorded = seams.git(repo) if getattr(seams, "git", None) else None
     if pilot:
         return run_pilot(spec, seams, root=root, run_id=name, repo=repo, git=recorded, quarantine=quarantine)
-    rows = run_block(spec, seams, root=root, run_id=name, repo=repo, git=recorded, quarantine=quarantine)
+    rows = run_block(spec, seams, root=root, run_id=name, repo=repo, git=recorded, quarantine=quarantine, pairs=pairs)
     if notes:
         receipt = root / "receipts" / f"{name}.jsonl"
         if receipt.is_file():
@@ -1967,6 +2124,59 @@ def generate_loop(arm: dict, post, stop: threading.Event) -> dict:
         if stop.is_set():
             break
     return last
+
+
+def _run_5090_companion(seams, arm: dict, prompt: str, measurement: dict, stop: threading.Event, box: dict, record_latest) -> None:
+    """Warm under the 5090 rule, then keep generating. Underway fires as the next decode is entered."""
+
+    begun = time.perf_counter()
+    warm = warm_5090(seams, arm, prompt, measurement, enforce=True)
+    finished = time.perf_counter()
+    for attempt in warm["attempts"]:
+        if isinstance(attempt, dict):
+            record_latest(attempt)
+        box["calls"].append(
+            {"started_s": begun, "ended_s": finished, "result": attempt, "part": "warm"}
+        )
+    if not warm["ok"]:
+        box["ok"] = False
+        box["reason"] = "clock_not_steady"
+        return
+    open_call = {"started_s": None, "ended_s": None, "result": None, "part": "decode"}
+    box["calls"].append(open_call)
+    box["open"] = open_call
+    first = True
+
+    def post(item):
+        nonlocal first
+        started = time.perf_counter()
+        if first:
+            first = False
+            open_call["started_s"] = started
+            box["ok"] = True
+            _trace(seams, ("companion-warm-done", arm["id"]))
+            _trace(seams, ("companion-decode-start", arm["id"]))
+            box["event"].set()
+        payload = seams.call(
+            item,
+            num_predict=item.get("num_predict"),
+            measured=False,
+            kind="companion",
+            prompt=prompt,
+        )
+        ended = time.perf_counter()
+        if isinstance(payload, dict):
+            record_latest(payload)
+        if open_call.get("result") is None:
+            open_call["ended_s"] = ended
+            open_call["result"] = payload
+        else:
+            box["calls"].append(
+                {"started_s": started, "ended_s": ended, "result": payload, "part": "decode"}
+            )
+        return payload
+
+    generate_loop(arm, post, stop)
 
 
 def spawn_ollama(argv: list[str], environment: dict, log_path: Path, *, popen=subprocess.Popen, system: str | None = None):
@@ -2159,6 +2369,14 @@ def build_live_seams(root: Path, run_id: str, spec: dict, *, pilot: bool, run=No
     latest: dict = {}
     latest_lock = threading.Lock()
     companion_thread: dict = {"thread": None}
+    sustain_box = {
+        "event": threading.Event(),
+        "ok": False,
+        "reason": None,
+        "calls": [],
+        "open": None,
+        "error": None,
+    }
     lane = intel if intel is not None else IntelLane(root, run_id)
     record = SampleRecord()
     gpu_sample = sample if sample is not None else LiveGpuSample(record)
@@ -2185,38 +2403,65 @@ def build_live_seams(root: Path, run_id: str, spec: dict, *, pilot: bool, run=No
             return sample_during(invoke, gpu_sample, every_s)
         return lane.call(arm, num_predict=num_predict, measured=measured, kind=kind, prompt=prompt)
 
+    def _record_latest(payload) -> None:
+        if not isinstance(payload, dict):
+            return
+        with latest_lock:
+            latest.clear()
+            latest.update(payload)
+
     def start_companion(arm, *, prompt=""):
         if arm.get("device") == "5090":
             stop_event.clear()
+            sustain_box["event"].clear()
+            sustain_box["ok"] = False
+            sustain_box["reason"] = None
+            sustain_box["calls"] = []
+            sustain_box["open"] = None
+            sustain_box["error"] = None
             with latest_lock:
                 latest.clear()
 
-            def post_arm(item):
-                payload = call(
-                    item,
-                    num_predict=item.get("num_predict"),
-                    measured=False,
-                    kind="companion",
-                    prompt=prompt,
-                )
-                if isinstance(payload, dict):
-                    with latest_lock:
-                        latest.clear()
-                        latest.update(payload)
-                return payload
-
             def run() -> None:
                 try:
-                    generate_loop(arm, post_arm, stop_event)
+                    _run_5090_companion(
+                        seams,
+                        arm,
+                        prompt,
+                        spec["measurement"],
+                        stop_event,
+                        sustain_box,
+                        _record_latest,
+                    )
                 except Exception as exc:
+                    sustain_box["error"] = exc
                     with latest_lock:
                         latest["error"] = exc
+                finally:
+                    sustain_box["event"].set()
 
             thread = threading.Thread(target=run, name="interlock-e4b-companion", daemon=True)
             companion_thread["thread"] = thread
             thread.start()
             return
         lane.start(arm, prompt=prompt)
+
+    def await_sustained_companion(arm):
+        del arm
+        limit = int(spec["measurement"]["warmup_max_attempts"])
+        timeout = (limit + 1) * float(GENERATE_TIMEOUT_S)
+        if not sustain_box["event"].wait(timeout):
+            stop_event.set()
+            raise E4bError("the 5090 companion did not finish its warm-up")
+        error = sustain_box.get("error")
+        if isinstance(error, BaseException):
+            raise error
+        return {
+            "ok": bool(sustain_box["ok"]),
+            "reason": sustain_box.get("reason"),
+            "calls": sustain_box.get("calls") or [],
+            "open": sustain_box.get("open"),
+        }
 
     def stop_companion(arm, *, kind):
         if kind == "end-generate":
@@ -2251,6 +2496,7 @@ def build_live_seams(root: Path, run_id: str, spec: dict, *, pilot: bool, run=No
     seams.server = server
     seams.call = call
     seams.start_companion = start_companion
+    seams.await_sustained_companion = await_sustained_companion
     seams.stop_companion = stop_companion
     seams.companion_report = companion_report
     seams.sample_cpu = cpu_sample

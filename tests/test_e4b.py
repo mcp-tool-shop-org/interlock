@@ -349,7 +349,7 @@ def test_dry_run_names_the_e4b_rules_and_the_pilot(capsys):
         "GET /api/ps",
         "keep_alive 0",
         "until steady",
-        "companion starts before the warm-up",
+        "5090 companion is sustained before the Intel warm-up",
         "two refusals",
         "Hodges-Lehmann",
         "exact Wilcoxon",
@@ -387,6 +387,12 @@ def test_dry_run_names_the_e4b_rules_and_the_pilot(capsys):
     assert "devices not started (--dry-run)" in printed
     assert main(["run", str(E5), "--pilot", "--dry-run", "--root", str(ROOT)]) == 1
     assert "--pilot is only for E4b" in capsys.readouterr().err
+    subset = dry_run(E4B, ROOT, pairs=["npu-5090", "igpu-5090"])
+    assert "pairs: npu-5090, igpu-5090" in subset
+    assert "5090 companion is sustained before the Intel warm-up" in subset
+    assert subset.strip().endswith("devices not started (--dry-run)")
+    assert main(["run", str(E4B), "--dry-run", "--root", str(ROOT), "--pairs", "not-a-pair"]) == 1
+    assert "unknown pair" in capsys.readouterr().err
 
 
 def test_a_full_block_refuses_null_tolerances_before_heartbeat(monkeypatch):
@@ -622,6 +628,186 @@ def test_truncated_tokens_and_a_companion_reload_refuse_the_slot(tmp_path: Path)
     assert pair["refusal_events"] == 1
     assert pair["verdict"] == "free"
     assert any("companion_load_duration_s" in slot.get("attempt_reasons", []) for slot in pair["slots"])
+
+
+def test_a_5090_companion_is_sustained_before_the_intel_warm(tmp_path: Path):
+    spec = _spec([PAIRS[2]])
+
+    def call(arm, *, num_predict, measured, kind, prompt):
+        return _clean(arm, num_predict=num_predict, kind=kind)
+
+    seams = _seams(_Server(), call)
+    run_block(spec, seams, root=tmp_path, run_id="sustained", repo=tmp_path)
+    start = seams.trace.index(("start_companion", "5090-alone"))
+    done = seams.trace.index(("companion-warm-done", "5090-alone"), start)
+    decode = seams.trace.index(("companion-decode-start", "5090-alone"), done)
+    intel = next(
+        index
+        for index, item in enumerate(seams.trace)
+        if index > decode and item[:2] == ("warm", "npu-with-5090")
+    )
+    warm = next(
+        index
+        for index, item in enumerate(seams.trace)
+        if start < index < done and item == ("warm", "5090-alone", 768)
+    )
+    assert warm < done < decode < intel
+
+
+def test_the_judged_companion_call_spans_the_intel_measurement(tmp_path: Path):
+    spec = _spec([PAIRS[2]])
+    clock = {"t": 0.0}
+    spans = []
+
+    def call(arm, *, num_predict, measured, kind, prompt):
+        start = clock["t"]
+        payload = _clean(arm, num_predict=num_predict, kind=kind)
+        if kind == "warm" and arm["id"] == "5090-alone":
+            payload["clocks_mhz"] = [1000.0] * 6 + [2000.0] * 10
+            payload["elapsed_s"] = 3.2
+            clock["t"] += 3.2
+        elif kind == "companion" and arm["id"] == "5090-alone":
+            payload["clocks_mhz"] = [2100.0] * 16
+            clock["t"] += 0.01
+        else:
+            clock["t"] += 0.04
+        spans.append((kind, arm["id"], start, clock["t"]))
+        return payload
+
+    seams = _seams(_Server(), call)
+    seams.now = lambda: clock["t"]
+    run_block(spec, seams, root=tmp_path, run_id="judged", repo=tmp_path)
+    pair = next(row for row in _rows(tmp_path / "receipts" / "judged.jsonl") if row["kind"] == "e4b-pair")
+    paired = next(slot for slot in pair["slots"] if slot["role"] == "paired")
+    measure = [item for item in spans if item[0] == "measure" and item[1] == "npu-with-5090"][-1]
+    assert paired["refusal"] is None
+    assert "companion_clock_range" not in paired["attempt_reasons"]
+    assert paired["companion_call_part"] == "decode"
+    assert paired["companion_clock_range_mhz"] == 0
+    assert paired["companion_call_started_s"] <= measure[2]
+    assert paired["companion_call_ended_s"] >= measure[3]
+    warm_calls = [item for item in seams.calls if item[0] == "warm" and item[1] == "5090-alone"]
+    assert warm_calls
+    assert warm_calls[0][2] == 768
+
+
+def test_an_unsteady_5090_companion_refuses_clock_not_steady(tmp_path: Path):
+    spec = _spec([PAIRS[2]])
+
+    def call(arm, *, num_predict, measured, kind, prompt):
+        payload = _clean(arm, num_predict=num_predict, kind=kind)
+        if kind == "warm" and arm["id"] == "5090-alone":
+            payload["clocks_mhz"] = [1000.0 + index * 50 for index in range(16)]
+            payload["elapsed_s"] = 3.2
+        return payload
+
+    server = _Server()
+    seams = _seams(server, call)
+    run_block(spec, seams, root=tmp_path, run_id="companion-unsteady", repo=tmp_path)
+    pair = next(row for row in _rows(tmp_path / "receipts" / "companion-unsteady.jsonl") if row["kind"] == "e4b-pair")
+    paired = next(slot for slot in pair["slots"] if slot["role"] == "paired")
+    assert paired["attempt_reasons"] == ["clock_not_steady", "clock_not_steady"]
+    assert paired["refusal"] == "clock_not_steady"
+    assert "companion_clock_not_steady" not in paired["attempt_reasons"]
+    assert not any(item[0] == "companion-decode-start" for item in seams.trace)
+    assert not any(item[0] == "measure-start" and item[2] == "paired" for item in seams.trace)
+    assert sum(1 for item in seams.trace if item[:2] == ("warm", "npu-with-5090")) == 1
+
+
+def test_pairs_runs_only_the_named_pairs_and_records_the_subset(tmp_path: Path):
+    spec = _spec(PAIRS, probes=[PROBE])
+
+    def call(arm, *, num_predict, measured, kind, prompt):
+        return _clean(arm, num_predict=num_predict, kind=kind)
+
+    seams = _seams(_Server(), call)
+    run_block(
+        spec,
+        seams,
+        root=tmp_path,
+        run_id="subset",
+        repo=tmp_path,
+        pairs=["igpu-5090", "npu-5090"],
+    )
+    rows = _rows(tmp_path / "receipts" / "subset.jsonl")
+    assert rows[0]["pairs"] == ["npu-5090", "igpu-5090"]
+    kinds = {row["pair"] for row in rows if row["kind"] == "e4b-pair"}
+    assert kinds == {"npu-5090", "igpu-5090"}
+    cold = [row for row in rows if row["kind"] == "e4b-cold"]
+    assert cold[0]["arm"] == "npu-alone"
+    assert cold[0]["role"] == "cold"
+    assert "5090-with-npu" not in {row["arm"] for row in cold}
+    for pair in (row for row in rows if row["kind"] == "e4b-pair"):
+        roles = [slot["role"] for slot in pair["slots"]]
+        assert "alone-before" in roles
+        assert "alone-after" in roles
+    assert any(row["kind"] == "e4b-probe" for row in rows)
+    server = _Server()
+    with pytest.raises(E4bError, match="unknown pair"):
+        run_block(spec, _seams(server, call), root=tmp_path / "bad", run_id="bad", repo=tmp_path, pairs=["npu-5090", "no-such"])
+    assert server.events == []
+    with pytest.raises(E4bError, match="more than once"):
+        run_block(spec, _seams(_Server(), call), root=tmp_path / "dup", run_id="dup", repo=tmp_path, pairs=["npu-5090", "npu-5090"])
+
+
+def test_the_live_5090_companion_waits_until_the_next_decode_is_underway(tmp_path: Path):
+    exe, models = _pinned_install(tmp_path)
+    release = threading.Event()
+    decode_entered = threading.Event()
+    held = {"in": False}
+    bodies = []
+
+    def transport(method, url, body=None):
+        assert ":11434" not in url and ":11490" not in url
+        predict = None
+        if isinstance(body, dict):
+            predict = (body.get("options") or {}).get("num_predict")
+            if body.get("keep_alive") == -1:
+                bodies.append(predict)
+                if predict != 768:
+                    held["in"] = True
+                    decode_entered.set()
+                    assert release.wait(2)
+                    held["in"] = False
+        return {
+            "version": "0.35.1",
+            "eval_count": predict or 1,
+            "eval_duration": 4_000_000_000,
+            "load_duration": 10,
+            "prompt_eval_count": 4,
+        }
+
+    def run(cmd):
+        return json.dumps({"exe": str(exe), "models_dir": str(models)})
+
+    spec = _spec([PAIRS[2]])
+    seams = build_live_seams(
+        tmp_path,
+        "sustained-live",
+        spec,
+        pilot=False,
+        run=run,
+        transport=transport,
+        opener=lambda method, url: transport(method, url),
+        bind=lambda host, port: None,
+        sampler=lambda invoke, sample, every: {**invoke(), "clocks_mhz": [1800.0] * 16, "power_w": [300.0] * 16},
+        sample=lambda: (1800.0, 300.0),
+    )
+    arm = next(item for item in spec["arms"] if item["id"] == "5090-alone")
+    seams.start_companion(arm, prompt="cars")
+    try:
+        assert decode_entered.wait(2)
+        sustained = seams.await_sustained_companion(arm)
+        assert sustained["ok"] is True
+        assert held["in"] is True
+        start = seams.trace.index(("warm", "5090-alone", 768))
+        done = seams.trace.index(("companion-warm-done", "5090-alone"), start)
+        decode = seams.trace.index(("companion-decode-start", "5090-alone"), done)
+        assert start < done < decode
+        assert bodies == [768, 1024]
+    finally:
+        release.set()
+        seams.stop_companion(arm, kind="end-generate")
 
 
 def test_unsteady_warmup_refuses_clock_not_steady(tmp_path: Path):

@@ -136,7 +136,7 @@ def _storage_lines(spec: dict) -> list[str]:
     return lines
 
 
-def dry_run(spec_path: Path, repo: Path, pilot: bool = False) -> str:
+def dry_run(spec_path: Path, repo: Path, pilot: bool = False, pairs: list[str] | None = None) -> str:
     spec = load_spec(spec_path)
     if pilot and spec.get("id") != "E4b":
         from interlock.harness.e4b import E4bError
@@ -144,9 +144,14 @@ def dry_run(spec_path: Path, repo: Path, pilot: bool = False) -> str:
         raise E4bError("--pilot is only for E4b")
     blob = require_unmodified(repo, spec_path)
     if spec.get("id") == "E4b":
-        from interlock.harness.e4b import dry_text
+        from interlock.harness.e4b import E4bError, dry_text, resolve_pairs
 
-        return dry_text(spec, blob, pilot=pilot)
+        recorded = None
+        if pairs is not None:
+            if pilot:
+                raise E4bError("--pairs is for the block, not the pilot")
+            _chosen, recorded = resolve_pairs(spec, pairs)
+        return dry_text(spec, blob, pilot=pilot, pairs=recorded)
     lines = [
         f"interlock dry-run: {spec['id']}",
         f"spec blob: {blob}",
@@ -1990,6 +1995,7 @@ def run_spec(
     pilot: bool = False,
     e4b_seams=None,
     quarantine: Path | None = None,
+    pairs: list[str] | None = None,
 ) -> list[dict]:
     """Run a committed spec. Every refusal lands before device contact.
 
@@ -2023,6 +2029,7 @@ def run_spec(
             seams=e4b_seams,
             notes=notes,
             quarantine=quarantine,
+            pairs=pairs,
         )
     if pilot:
         from interlock.harness.e4b import E4bError
