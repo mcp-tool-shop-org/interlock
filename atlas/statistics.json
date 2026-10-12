@@ -94,12 +94,12 @@
         ],
         "importsOnly": []
       },
-      "cohesion": 0.367707,
+      "cohesion": 0.283212,
       "cohesionDropped": false,
       "confidence": "full",
       "highWater": null,
       "name": "src",
-      "qualifyingSourceCommits": 43,
+      "qualifyingSourceCommits": 44,
       "rebaseline": null
     },
     {
@@ -117,7 +117,7 @@
       "confidence": "full",
       "highWater": null,
       "name": "tests",
-      "qualifyingSourceCommits": 50,
+      "qualifyingSourceCommits": 51,
       "rebaseline": null
     }
   ],
@@ -145,8 +145,8 @@
         "path": ".python-version"
       },
       {
-        "commits": 6,
-        "lines": 37,
+        "commits": 7,
+        "lines": 38,
         "path": "CHANGELOG.md"
       },
       {
@@ -205,8 +205,8 @@
         "path": "assets/logo/switchyard_64.png"
       },
       {
-        "commits": 16,
-        "lines": 473,
+        "commits": 17,
+        "lines": 499,
         "path": "atlas/README.md"
       },
       {
@@ -215,18 +215,18 @@
         "path": "atlas/boundaries.yaml"
       },
       {
-        "commits": 16,
-        "lines": 1372,
+        "commits": 17,
+        "lines": 1462,
         "path": "atlas/page.json"
       },
       {
-        "commits": 16,
-        "lines": 3112,
+        "commits": 17,
+        "lines": 3430,
         "path": "atlas/statistics.json"
       },
       {
-        "commits": 16,
-        "lines": 13536,
+        "commits": 17,
+        "lines": 14360,
         "path": "atlas/structure.json"
       },
       {
@@ -450,8 +450,8 @@
         "path": "src/switchyard/adapters/ollama_cases.py"
       },
       {
-        "commits": 20,
-        "lines": 1444,
+        "commits": 21,
+        "lines": 1546,
         "path": "src/switchyard/adapters/openvino.py"
       },
       {
@@ -525,13 +525,13 @@
         "path": "src/switchyard/harness/marker.py"
       },
       {
-        "commits": 9,
-        "lines": 535,
+        "commits": 10,
+        "lines": 537,
         "path": "src/switchyard/harness/receipts.py"
       },
       {
-        "commits": 20,
-        "lines": 2801,
+        "commits": 21,
+        "lines": 2802,
         "path": "src/switchyard/harness/runner.py"
       },
       {
@@ -835,8 +835,8 @@
         "path": "tests/test_ollama_token_count.py"
       },
       {
-        "commits": 16,
-        "lines": 1203,
+        "commits": 17,
+        "lines": 1364,
         "path": "tests/test_openvino_adapter.py"
       },
       {
@@ -895,51 +895,51 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-10-12T08:09:11.679Z",
+  "generatedAt": "2026-10-12T12:22:43.980Z",
   "generatedFrom": {
-    "commit": "b3c6b90c455225370660b99a6a815cfa89690fd0"
+    "commit": "84c48effb6a2fed294ad11def43e0521b95cb4a7"
   },
   "pairs": [
     {
       "a": "atlas/README.md",
       "b": "atlas/page.json",
-      "either": 15,
-      "shared": 15,
+      "either": 16,
+      "shared": 16,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/statistics.json",
-      "either": 15,
-      "shared": 15,
+      "either": 16,
+      "shared": 16,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/structure.json",
-      "either": 15,
-      "shared": 15,
+      "either": 16,
+      "shared": 16,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/statistics.json",
-      "either": 15,
-      "shared": 15,
+      "either": 16,
+      "shared": 16,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/structure.json",
-      "either": 15,
-      "shared": 15,
+      "either": 16,
+      "shared": 16,
       "strength": 1
     },
     {
       "a": "atlas/statistics.json",
       "b": "atlas/structure.json",
-      "either": 15,
-      "shared": 15,
+      "either": 16,
+      "shared": 16,
       "strength": 1
     },
     {
@@ -948,13 +948,6 @@
       "either": 6,
       "shared": 5,
       "strength": 0.833333
-    },
-    {
-      "a": "src/switchyard/adapters/base.py",
-      "b": "src/switchyard/harness/receipts.py",
-      "either": 10,
-      "shared": 5,
-      "strength": 0.5
     },
     {
       "a": "src/switchyard/adapters/ollama.py",
@@ -973,9 +966,9 @@
     {
       "a": "src/switchyard/adapters/openvino.py",
       "b": "tests/test_openvino_adapter.py",
-      "either": 20,
-      "shared": 16,
-      "strength": 0.8
+      "either": 21,
+      "shared": 17,
+      "strength": 0.809524
     },
     {
       "a": "src/switchyard/harness/fill.py",
@@ -987,23 +980,23 @@
     {
       "a": "src/switchyard/harness/receipts.py",
       "b": "src/switchyard/receipt.py",
-      "either": 11,
+      "either": 12,
       "shared": 7,
-      "strength": 0.636364
+      "strength": 0.583333
     },
     {
       "a": "src/switchyard/harness/receipts.py",
       "b": "src/switchyard/schema/routing-row.schema.json",
-      "either": 12,
+      "either": 13,
       "shared": 8,
-      "strength": 0.666667
+      "strength": 0.615385
     },
     {
       "a": "src/switchyard/harness/runner.py",
       "b": "tests/test_harness.py",
-      "either": 23,
+      "either": 24,
       "shared": 13,
-      "strength": 0.565217
+      "strength": 0.541667
     },
     {
       "a": "src/switchyard/importers/gaps.py",
@@ -1042,7 +1035,7 @@
     }
   ],
   "parameters": {
-    "appliedChangesetLimit": 38.25,
+    "appliedChangesetLimit": 40.25,
     "changeset": 50,
     "changesetFraction": 0.25,
     "cohesionDrop": 0.2,
@@ -1051,16 +1044,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-10-12T04:07:22-04:00",
-    "inScopeFiles": 153,
+    "headDate": "2026-10-12T08:17:38-04:00",
+    "inScopeFiles": 161,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 75,
+    "qualifyingCommits": 76,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-04-15T08:07:22.000Z",
+    "since": "2026-04-15T12:17:38.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",
@@ -1076,7 +1069,7 @@
     ],
     "sourceFileReach": 20,
     "sourceFileRise": 25,
-    "sourceFilesReachingStrongFloor": 6,
+    "sourceFilesReachingStrongFloor": 7,
     "strength": 0.5,
     "windowDays": 180
   },
