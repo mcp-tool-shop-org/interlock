@@ -366,7 +366,7 @@ def test_the_committed_table_is_rekeyed_and_does_not_invent_judge_rates():
     assert "verify" not in counts
     assert counts["judge:planted-error"] == 1
     assert "judge:same-meaning-rewrite" not in counts
-    assert len(rows) == 502  # +1: e2-2026-10-10b l512 native_binary_rejected (the l2048-b8 hang row superseded by #36); +14: e2-2026-10-10c; +1: the tail l512-b8 compile_rejected; +1: the tail l128-b8 (2026-10-11); +27: e3-2026-10-11b; +2: e3-ref-2026-10-11b
+    assert len(rows) == 509  # +7: e4-2026-10-12 (all four pairs inconclusive by the noise rule, R&D readout on #76); +1: e2-2026-10-10b l512 native_binary_rejected (the l2048-b8 hang row superseded by #36); +14: e2-2026-10-10c; +1: the tail l512-b8 compile_rejected; +1: the tail l128-b8 (2026-10-11); +27: e3-2026-10-11b; +2: e3-ref-2026-10-11b
     assert sum(1 for item in rows if item["id"].startswith("ladder/")) == 312
     assert sum(1 for item in rows if item["id"].startswith("verify/")) == 54
     e1 = [item for item in rows if item["id"].startswith("E1/")]
