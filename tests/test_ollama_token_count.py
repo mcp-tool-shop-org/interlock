@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-from switchyard.adapters.base import AdapterError
-from switchyard.adapters.ollama import OllamaAdapter
+from switchyard.adapters.base import AdapterError, StepRequest
+from switchyard.adapters.ollama import OllamaAdapter, generate_body
 from switchyard.guards import GuardError
 from switchyard.harness.e5 import SearchError, fit_prompt_words
 from switchyard.harness.runner import RunnerError, dry_run, run_spec
@@ -100,10 +100,9 @@ def _watch() -> WatchHooks:
 class _Transport:
     """Ollama's three calls: show, an empty card, and generate."""
 
-    def __init__(self, count_of, *, generate_error=None, reject_zero=False):
+    def __init__(self, count_of, *, generate_error=None):
         self.count_of = count_of
         self.generate_error = generate_error
-        self.reject_zero = reject_zero
         self.calls: list[tuple] = []
 
     def __call__(self, method, url, body):
@@ -117,8 +116,8 @@ class _Transport:
             }
         if not url.endswith("/api/generate"):
             raise AssertionError(url)
-        if self.reject_zero and isinstance(body, dict) and body.get("options", {}).get("num_predict") == 0:
-            return {"error": "invalid num_predict"}
+        if isinstance(body, dict) and body.get("options", {}).get("num_predict") == 0:
+            raise AssertionError("num_predict 0 reached the server")
         if self.generate_error and isinstance(body, dict) and body.get("raw") is True:
             return {"error": self.generate_error}
         if isinstance(body, dict) and body.get("keep_alive") == 0 and body.get("prompt") == "":
@@ -239,15 +238,14 @@ def test_word_trim_hits_the_target_and_keeps_the_shortest_prefix_above_it():
         fit_prompt_words("x" * 600_000, 1, lambda _prompt: 0)
 
 
-def test_the_count_call_is_raw_and_retries_a_rejected_zero():
+def test_the_count_call_is_raw_and_asks_for_one_token_never_zero():
+    # Ollama 0.35.1 reads num_predict 0 as no limit and generates until the context fills (E4, 2026-10-11).
     seen = []
 
     def transport(_method, url, body):
         seen.append((url, body))
         if url.endswith("/api/show"):
             return {"error": "missing"}
-        if body["options"]["num_predict"] == 0:
-            return {"error": "invalid num_predict"}
         return {"prompt_eval_count": 4}
 
     adapter = OllamaAdapter(transport=transport, device="5090")
@@ -258,13 +256,17 @@ def test_the_count_call_is_raw_and_retries_a_rejected_zero():
         "hello",
         settings={"num_ctx": 2048, "thinking_level": "off", "keep_alive": "5m"},
     ) == 4
-    retried = seen[-1][1]
-    assert retried["raw"] is True
-    assert retried["truncate"] is False
-    assert retried["options"]["num_predict"] == 1
-    assert retried["options"]["num_ctx"] == 2048
-    assert retried["keep_alive"] == "5m"
-    assert seen[-2][1]["options"]["num_predict"] == 0
+    count = seen[-1][1]
+    assert count["raw"] is True
+    assert count["truncate"] is False
+    assert count["options"]["num_predict"] == 1
+    assert count["options"]["num_ctx"] == 2048
+    assert count["keep_alive"] == "5m"
+    assert all(body["options"]["num_predict"] != 0 for url, body in seen if isinstance(body, dict) and "options" in body)
+    with pytest.raises(AdapterError, match="invalid num_predict"):
+        OllamaAdapter(transport=lambda *_args: {"error": "invalid num_predict"}, device="5090").count_tokens(
+            "qwen3:8b", "hello", settings={"num_ctx": 32}
+        )
     with pytest.raises(AdapterError, match="prompt_eval_count"):
         OllamaAdapter(transport=lambda *_args: {"done": True}, device="5090").count_tokens(
             "qwen3:8b", "hello", settings={"num_ctx": 32}
@@ -285,7 +287,7 @@ def test_an_exact_ollama_count_lands_on_the_receipt_after_the_guards(tmp_path: P
     assert kinds.index("count") < kinds.index("unload") < kinds.index("measure")
     counts = [body for _method, url, body in transport.calls if isinstance(body, dict) and body.get("raw") is True]
     assert counts
-    assert all(body["options"]["num_predict"] == 0 for body in counts)
+    assert all(body["options"]["num_predict"] == 1 for body in counts)
     assert all(body["truncate"] is False for body in counts)
     assert all(body["options"]["num_ctx"] == 4096 for body in counts)
     assert all(body["think"] is False for body in counts)
@@ -437,3 +439,19 @@ def test_dry_run_names_the_count_and_does_not_call_it(tmp_path: Path, monkeypatc
     assert "heartbeat not read; adapters not called" in e4_text
     assert "devices not started (--dry-run)" in e4_text
     assert called == []
+
+
+@pytest.mark.parametrize("value", [0, None, True, -1, "1"])
+def test_a_generate_with_no_completion_limit_is_refused_before_any_request(value):
+    # Ollama reads num_predict 0, null or missing as no limit (E4, 2026-10-11).
+    calls = []
+    adapter = OllamaAdapter(transport=lambda *args: calls.append(args) or {}, device="5090")
+    request = StepRequest(step_id="s", task="generate", model="qwen3:8b", device="5090", engine="ollama",
+                          settings={"prompt": "hi", "num_predict": value})
+    with pytest.raises(AdapterError, match="num_predict must be"):
+        generate_body(request)
+    missing = StepRequest(step_id="s", task="generate", model="qwen3:8b", device="5090", engine="ollama",
+                          settings={"prompt": "hi"})
+    with pytest.raises(AdapterError, match="num_predict must be"):
+        generate_body(missing)
+    assert calls == []
