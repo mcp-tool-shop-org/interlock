@@ -1206,8 +1206,13 @@ def _start_session(self, request: StepRequest) -> None:
                 tokenizer = self._load_tokenizer(repo, ref)
                 ids, mask, tt = self._encode(tokenizer, str(s.get("prompt") or "hello"))
                 if static is not None:
-                    ids, mask, _ = pad_truncate(ids, static[1], int(getattr(tokenizer, "pad_token_id", 0) or 0))
+                    ids, mask, dropped = pad_truncate(
+                        ids, static[1], int(getattr(tokenizer, "pad_token_id", 0) or 0)
+                    )
+                    box["truncated_tokens"] = dropped
                     tt = pad_like(tt, static[1])
+                else:
+                    box["truncated_tokens"] = 0
                 entry = self._embedder(repo, ref, ov_id, static, _compile_config(s))
                 rows = static[0] if static else int(s.get("batch", 1))
                 while not stop.is_set():

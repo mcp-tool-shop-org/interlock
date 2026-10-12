@@ -2358,8 +2358,10 @@ def test_ollama_resolves_show_and_does_not_fake_a_companion():
     assert seen[1][1]["companion"] == "start"
     assert seen[1][1]["options"]["num_ctx"] == 4096
     assert seen[1][0].startswith("http://127.0.0.1:11490/")
-    assert seen[2][1]["companion"] == "stop"
-    assert seen[2][1].get("keep_alive") != 0
+    assert seen[2][1]["keep_alive"] == 0
+    assert seen[2][1]["prompt"] == ""
+    assert "companion" not in seen[2][1]
+    assert seen[2][0].startswith("http://127.0.0.1:11490/")
     marker.unload("qwen3:8b", device="5090")
     assert seen[-1][0].startswith("http://127.0.0.1:11434/")
     assert seen[-1][1]["keep_alive"] == 0

@@ -8,6 +8,7 @@ how to dry-run.
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import yaml
@@ -70,6 +71,8 @@ def validate_spec(data: object) -> dict:
         raise SpecError("compile_ceiling_s must be a number of at least 60")
     _decision_metric(data)
     _choice_rule(data)
+    if data.get("id") == "E4b":
+        _e4b(data)
     return data
 
 
@@ -339,6 +342,73 @@ def _pairs(data: dict, arm_ids: set) -> None:
             raise SpecError(f"paired arm {paired_id} needs companion_device")
         if arms[companion]["device"] != expected:
             raise SpecError(f"arm {paired_id} companion_device does not match the companion arm")
+
+
+def _close(got: object, expected: float, where: str) -> None:
+    if isinstance(got, bool) or not isinstance(got, (int, float)) or not math.isclose(float(got), expected):
+        raise SpecError(f"{where} is {expected}")
+
+
+def _e4b(data: dict) -> None:
+    """The keys E4b adds. Other interleaved specs do not carry them.
+
+    Null clock tolerances stay valid here. A block refuses them at run time,
+    after the pilot amends the spec. Loading this file must succeed today.
+    """
+
+    if data.get("order") != "aba":
+        raise SpecError("E4b order is aba")
+    if data.get("warmups") != 0:
+        raise SpecError("E4b warmups are 0; the warm-up is per slot")
+    if data.get("repeats") != 10:
+        raise SpecError("E4b repeats are 10")
+    if data.get("extension_repeats") != 15:
+        raise SpecError("E4b extends once, to 15")
+    if not _close_ok(data.get("band"), 0.10):
+        raise SpecError("E4b band is 0.10")
+    if data.get("compile_cache") != "fresh":
+        raise SpecError("E4b compile_cache is fresh")
+    estimator = data.get("estimator")
+    if not isinstance(estimator, dict):
+        raise SpecError("E4b needs an estimator")
+    if estimator.get("statistic") != "hodges-lehmann":
+        raise SpecError("E4b statistic is hodges-lehmann")
+    if estimator.get("method") != "exact-wilcoxon-signed-rank":
+        raise SpecError("E4b interval is the exact Wilcoxon signed-rank interval")
+    _close(estimator.get("ci"), 0.90, "E4b confidence")
+    footnote = str(data.get("footnote") or "")
+    if "50000" not in footnote or "20261012" not in footnote:
+        raise SpecError("E4b footnote is the seeded bootstrap and it never decides")
+    measurement = data.get("measurement")
+    if not isinstance(measurement, dict):
+        raise SpecError("E4b needs measurement")
+    expected = {
+        "clock_step_mhz": 7.5,
+        "steady_samples": 10,
+        "steady_sample_ms": 200,
+        "warmup_min_s": 3,
+        "warmup_num_predict": 768,
+        "warmup_max_attempts": 2,
+        "load_refuse_s": 1.0,
+        "call_gap_max_s": 1,
+    }
+    for key, value in expected.items():
+        _close(measurement.get(key), value, f"E4b measurement.{key}")
+    for key in ("clock_tolerance_mhz", "steady_band_mhz"):
+        got = measurement.get(key)
+        if got is None:
+            continue
+        if isinstance(got, bool) or not isinstance(got, (int, float)) or float(got) <= 0:
+            raise SpecError(f"E4b measurement.{key} is null until the pilot, or a positive number of MHz")
+    probes = data.get("probes")
+    if not isinstance(probes, list) or not any(
+        isinstance(item, dict) and item.get("id") == "igpu-after-cpu-burn" for item in probes
+    ):
+        raise SpecError("E4b names the igpu-after-cpu-burn probe")
+
+
+def _close_ok(got: object, expected: float) -> bool:
+    return not isinstance(got, bool) and isinstance(got, (int, float)) and math.isclose(float(got), expected)
 
 
 def _choice_rule(data: dict) -> None:

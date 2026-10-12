@@ -540,15 +540,14 @@ class OllamaAdapter:
         self.transport("POST", f"{url}/api/generate", body)
 
     def stop_session(self, request: StepRequest) -> None:
-        """End the companion load without unloading the model."""
+        """End the companion by unloading it.
 
-        refuse_cloud(request.model)
-        url = url_for(request.device)
-        self.transport(
-            "POST",
-            f"{url}/api/generate",
-            {"model": request.model, "prompt": "", "stream": False, "companion": "stop"},
-        )
+        An empty generate is not an unload. Ollama 0.35.1 answers that shape
+        with done_reason load (tests/fixtures/ollama/0.35.1/companion_stop.json).
+        The unload shape is keep_alive 0.
+        """
+
+        self.unload(request.model, request.device)
 
     def loaded_models(self) -> list:
         url = url_for(self.device)

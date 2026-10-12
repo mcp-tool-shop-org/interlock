@@ -89,6 +89,7 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--run-id")
     run.add_argument("--notes", default="")
     run.add_argument("--dry-run", action="store_true")
+    run.add_argument("--pilot", action="store_true")
     run.set_defaults(func=_cmd_run)
 
     health_cmd = sub.add_parser(
@@ -245,12 +246,13 @@ def _arm_id(row: dict) -> str:
 def _cmd_run(args: argparse.Namespace) -> int:
     from switchyard.adapters.base import AdapterError
     from switchyard.guards import GuardError
+    from switchyard.harness.e4b import E4bError
     from switchyard.harness.runner import RunnerError, dry_run, heartbeat_path, run_spec
     from switchyard.harness.spec import SpecError
 
     try:
         if args.dry_run:
-            print(dry_run(args.spec, args.root.resolve()), end="")
+            print(dry_run(args.spec, args.root.resolve(), pilot=args.pilot), end="")
             return 0
         from switchyard.ollama_supervisor import OllamaSupervisor, real_seams
 
@@ -267,8 +269,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
                 grant=args.grant,
                 heartbeat=heartbeat_path(None),
             ),
+            pilot=args.pilot,
         )
-    except (AdapterError, GuardError, RunnerError, SpecError, OSError) as exc:
+    except (AdapterError, GuardError, RunnerError, SpecError, E4bError, OSError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
     return 0
