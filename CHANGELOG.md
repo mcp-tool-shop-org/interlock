@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Ollama fakes check each request against a recorded exchange. `scripts/record_ollama_fixtures.py` writes those exchanges; it is run on the rig, and it refuses a cloud model or a card that is not idle. `num_predict` 0, null, and missing are recorded as no reply within the timeout. A token count stops after twice the cold-load allowance of the largest roster model (`/api/tags` size, or 16 GiB when the size is missing) and the arm is refused. `confirm_num_predict` below 1 is refused when the spec is validated, and again before a fill-card model is contacted.
 - The Ollama prompt fit estimates the seed repeats from the seed's own count, then trims only past the longest prefix known to be short. It used to add one seed per count, which took thousands of counts at a 118k-token target: E5's first live run spent over 30 minutes on one model without a row.
 - The Ollama token count asks for one completion token, never zero. Ollama 0.35.1 reads `num_predict` 0 as no limit and generates until the context fills. E4's first live run (2026-10-11) sat at full card power for 12 minutes without writing a row. The zero-then-retry path is gone.
 

@@ -35,6 +35,7 @@ from switchyard.adapters.base import (
     StepRequest,
     compile_rejected_error,
 )
+from switchyard.adapters.ollama import COUNT_TIMEOUT_NOTE
 from switchyard.adapters.offrig_calibrate import plan_argv
 from switchyard.adapters.registry import for_engine
 from switchyard.cli import announce_run
@@ -45,6 +46,7 @@ from switchyard.guards import (
     require_card_empty,
     require_heartbeat,
 )
+from switchyard.harness.count_budget import roster_timeout
 from switchyard.harness.e5 import SearchError, fit_prompt, fit_prompt_words
 from switchyard.harness.fill import quiet_fill_seams, real_fill_seams, run_fill_card
 from switchyard.harness.steady import BlockPlan, SlotStream, UntilSteady, call_metric, warmup_policy, warmup_trace
@@ -1508,9 +1510,16 @@ def _dataset_prompt(arm: dict, spec: dict, adapter, prompt_cache: dict[str, tupl
             )
         try:
             if arm["engine"] == "ollama":
+                count_timeout = roster_timeout(adapter, spec)
 
                 def count(text: str, model: str = model) -> int:
-                    return counter(model, text, settings=_count_settings(arm), device=arm["device"])
+                    return counter(
+                        model,
+                        text,
+                        settings=_count_settings(arm),
+                        device=arm["device"],
+                        timeout=count_timeout,
+                    )
 
                 text, tokens, fit = fit_prompt_words(seed, target, count)
                 if _count_leaves_loaded(arm):
@@ -1538,6 +1547,8 @@ def _dataset_prompt(arm: dict, spec: dict, adapter, prompt_cache: dict[str, tupl
         except SearchError as exc:
             raise RunnerError(str(exc)) from exc
         except AdapterError as exc:
+            if str(exc) == COUNT_TIMEOUT_NOTE:
+                raise RunnerError(f"{arm['id']}: {COUNT_TIMEOUT_NOTE}") from exc
             raise RunnerError(f"{arm['id']}: {arm['engine']} token count failed: {exc}") from exc
     return cached[0]
 

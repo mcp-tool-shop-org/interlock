@@ -298,6 +298,20 @@ def _fill_card(data: dict) -> None:
             raise SpecError("fill-card measures local 5090 Ollama models")
     if data["needs"]["grant"] is not True:
         raise SpecError("fill-card requires a grant")
+    _confirm_num_predict(data)
+
+
+def _confirm_num_predict(data: dict) -> None:
+    """A confirmation generate with no limit is refused before any device contact.
+
+    Ollama reads ``num_predict`` 0 as no limit. Absent means the harness default of 1.
+    """
+
+    if "confirm_num_predict" not in data:
+        return
+    value = data["confirm_num_predict"]
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise SpecError(f"confirm_num_predict must be a whole number of at least 1, not {value!r}")
 
 
 def _pairs(data: dict, arm_ids: set) -> None:

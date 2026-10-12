@@ -1,0 +1,239 @@
+"""Record one Ollama exchange per case.
+
+The Publisher runs this against the local server. Seat B does not. A call that
+does not answer within the timeout is stored as ``no_reply`` and is not waited
+out. ``-cloud`` models are refused. The card must be idle before the first
+call and after every call that can load a model.
+"""
+
+from __future__ import annotations
+
+import http.client
+import json
+from pathlib import Path
+from urllib.parse import urlsplit
+
+from switchyard.adapters.base import AdapterError
+from switchyard.adapters.ollama import refuse_cloud
+from switchyard.adapters.ollama_cases import CASES, Case, fixture_document, request_body
+from switchyard.harness.fill import MEMORY_ARGV, parse_mib
+
+RECORD_TIMEOUT_S = 15.0
+IDLE_CEILING_MIB = 4096
+
+# Calls that can leave a model resident are followed by an unload and a fresh baseline check.
+_LOADS = frozenset(
+    {
+        "num_predict_1",
+        "num_predict_0",
+        "num_predict_null",
+        "num_predict_missing",
+        "raw_true",
+        "truncate_over_num_ctx",
+        "think_off",
+        "shift_false",
+        "companion_start",
+    }
+)
+# Captured while num_predict_1 is still resident, before that unload.
+_WHILE_LOADED = "ps_loaded"
+
+
+class RecordError(Exception):
+    """The recorder will not write a fixture."""
+
+
+def refuse_model(model: str) -> None:
+    try:
+        refuse_cloud(model)
+    except AdapterError as exc:
+        raise RecordError(str(exc)) from exc
+
+
+def refuse_unless_baseline(models, card_mib: int | None, *, ceiling: int = IDLE_CEILING_MIB) -> None:
+    """Refuse when a model is loaded or the card is above the idle ceiling."""
+
+    if isinstance(models, list) and models:
+        raise RecordError("the card is not at baseline: a model is loaded")
+    if isinstance(card_mib, bool) or not isinstance(card_mib, int):
+        raise RecordError("the card is not at baseline: memory could not be read")
+    if card_mib > ceiling:
+        raise RecordError(f"the card is not at baseline: {card_mib} MiB is above {ceiling} MiB")
+
+
+def read_card_mib(run=None) -> int | None:
+    """One nvidia-smi memory reading, in MiB. A failed read is None."""
+
+    import subprocess
+
+    launch = subprocess.run if run is None else run
+    try:
+        completed = launch(list(MEMORY_ARGV), capture_output=True, text=True, timeout=10, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return parse_mib(getattr(completed, "stdout", None))
+
+
+def http_exchange(method: str, url: str, body: dict | None, timeout: float):
+    """One local HTTP call. None means the server did not answer within ``timeout``."""
+
+    parts = urlsplit(url)
+    if parts.scheme != "http" or not parts.hostname:
+        raise RecordError("the recorder only opens local http")
+    path = parts.path or "/"
+    data = None if body is None else json.dumps(body).encode("utf-8")
+    headers = {"Content-Type": "application/json"} if data is not None else {}
+    conn = http.client.HTTPConnection(parts.hostname, parts.port or 80, timeout=timeout)
+    try:
+        conn.request(method, path, body=data, headers=headers)
+        response = conn.getresponse()
+        payload = json.loads(response.read().decode("utf-8"))
+    except TimeoutError:
+        return None
+    except (OSError, http.client.HTTPException, json.JSONDecodeError, UnicodeError) as exc:
+        raise RecordError("the request failed") from exc
+    finally:
+        try:
+            conn.close()
+        except OSError:
+            pass
+    if not isinstance(payload, dict):
+        raise RecordError("Ollama returned a non-object")
+    return payload
+
+
+def _observed(case: Case, payload) -> tuple[str, dict | None]:
+    """What this call did. A timeout is ``no_reply`` and is not relabelled."""
+
+    if payload is None:
+        return "no_reply", None
+    if case.behaviour == "no_reply":
+        # The dangerous generate answered inside the timeout. Keep the answer.
+        return "reply", payload
+    if payload.get("error"):
+        return "error", payload
+    return "reply", payload
+
+
+def _unload_body(model: str) -> dict:
+    return {"model": model, "prompt": "", "stream": False, "keep_alive": 0}
+
+
+def record_fixtures(
+    *,
+    model: str,
+    host: str,
+    out_dir: Path,
+    timeout: float,
+    ceiling: int,
+    today: str,
+    transport,
+    card_mib,
+) -> list[Path]:
+    """Write one JSON file per case under ``out_dir/<ollama-version>/``.
+
+    ``transport(method, url, body, timeout)`` returns a dict, or None when the
+    call does not answer. ``card_mib()`` is the card reading in MiB.
+    """
+
+    refuse_model(model)
+    if timeout <= 0:
+        raise RecordError("timeout must be a positive number of seconds")
+    host = host.rstrip("/")
+    idle = card_mib()
+    ps = transport("GET", f"{host}/api/ps", None, timeout)
+    models = ps.get("models") if isinstance(ps, dict) else None
+    refuse_unless_baseline(models if isinstance(models, list) else ["unreadable"], idle, ceiling=ceiling)
+
+    version_payload = transport("GET", f"{host}/api/version", None, timeout)
+    version = version_payload.get("version") if isinstance(version_payload, dict) else None
+    if not isinstance(version, str) or not version.strip():
+        raise RecordError("Ollama did not report a version")
+    version = version.strip()
+
+    tags = transport("GET", f"{host}/api/tags", None, timeout)
+    digest = _digest(tags, model)
+    folder = out_dir / version
+    folder.mkdir(parents=True, exist_ok=True)
+    written: dict[str, Path] = {}
+
+    def capture(case: Case) -> None:
+        payload = transport(case.method, f"{host}{case.path}", request_body(case, model), timeout)
+        behaviour, response = _observed(case, payload)
+        # A catalogued no_reply that timed out stays no_reply even if a later
+        # field would have called it an error.
+        if payload is None:
+            behaviour, response = "no_reply", None
+        document = fixture_document(
+            case,
+            model=model,
+            version=version,
+            digest=digest,
+            date=today,
+            behaviour=behaviour,
+            response=response,
+        )
+        path = folder / f"{case.name}.json"
+        path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8", newline="\n")
+        written[case.name] = path
+
+    def baseline_again() -> None:
+        again = transport("GET", f"{host}/api/ps", None, timeout)
+        loaded = again.get("models") if isinstance(again, dict) else ["unreadable"]
+        refuse_unless_baseline(loaded if isinstance(loaded, list) else ["unreadable"], card_mib(), ceiling=ceiling)
+
+    def unload() -> None:
+        payload = transport("POST", f"{host}/api/generate", _unload_body(model), timeout)
+        if payload is None:
+            raise RecordError("the unload timed out; the model may still be resident")
+        baseline_again()
+
+    quiet = [case for case in CASES if case.name not in _LOADS and case.name != _WHILE_LOADED]
+    for case in quiet:
+        capture(case)
+    baseline_again()
+
+    loaded_case = case_by_loaded()
+    capture(loaded_case)
+    capture(case_named(_WHILE_LOADED))
+    unload()
+
+    for case in CASES:
+        if case.name in written:
+            continue
+        capture(case)
+        if case.name in _LOADS:
+            unload()
+    missing = [case.name for case in CASES if case.name not in written]
+    if missing:
+        raise RecordError(f"fixtures were not written: {', '.join(missing)}")
+    return [written[case.name] for case in CASES]
+
+
+def case_named(name: str) -> Case:
+    for case in CASES:
+        if case.name == name:
+            return case
+    raise RecordError(f"unknown case {name}")
+
+
+def case_by_loaded() -> Case:
+    return case_named("num_predict_1")
+
+
+def _digest(payload, model: str) -> str:
+    if not isinstance(payload, dict) or not isinstance(payload.get("models"), list):
+        raise RecordError("Ollama tags did not list models")
+    for item in payload["models"]:
+        if not isinstance(item, dict):
+            continue
+        label = item.get("name") or item.get("model")
+        if label != model:
+            continue
+        digest = item.get("digest")
+        if isinstance(digest, str) and digest.strip():
+            return digest.strip()
+        raise RecordError(f"{model} has no digest in /api/tags")
+    raise RecordError(f"{model} is not in /api/tags")
+
+

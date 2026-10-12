@@ -33,6 +33,7 @@ COUNT_NUM_PREDICT = 1
 _CANCEL_POLL_S = 0.2
 UNLOAD_TIMEOUT_S = 60.0
 UNLOAD_TIMEOUT_NOTE = "the unload timed out; the model may still be resident"
+COUNT_TIMEOUT_NOTE = "the token count timed out; the arm was refused"
 
 from switchyard.adapters.base import AdapterError, StepRequest, StepResult
 
@@ -320,6 +321,7 @@ class OllamaAdapter:
         *,
         settings: dict | None = None,
         device: str | None = None,
+        timeout: float | None = None,
     ) -> int:
         """How many tokens this served model assigns to ``text``.
 
@@ -351,20 +353,53 @@ class OllamaAdapter:
         body["raw"] = True
         body["truncate"] = False
         body["options"]["num_predict"] = COUNT_NUM_PREDICT
-        payload = self._count_payload(url, body)
+        payload = self._count_payload(url, body, timeout)
         count = payload.get("prompt_eval_count")
         if isinstance(count, bool) or not isinstance(count, int) or count < 0:
             raise AdapterError("Ollama did not report prompt_eval_count")
         return count
 
-    def _count_payload(self, url: str, body: dict) -> dict:
-        payload = self.transport("POST", f"{url}/api/generate", body)
+    def _count_payload(self, url: str, body: dict, timeout: float | None = None) -> dict:
+        payload = self._count_exchange(url, body, timeout)
         if not isinstance(payload, dict):
             raise AdapterError("Ollama returned a non-object")
         error = payload.get("error")
         if error:
             raise AdapterError(str(error))
         return payload
+
+    def _count_exchange(self, url: str, body: dict, timeout: float | None) -> dict:
+        """POST the count. ``timeout`` bounds the call even when the fake ignores it."""
+
+        if timeout is None:
+            return self._post_count(url, body, None)
+        box: dict = {}
+
+        def invoke() -> None:
+            try:
+                box["payload"] = self._post_count(url, body, timeout)
+            except BaseException as exc:
+                box["error"] = exc
+
+        worker = threading.Thread(target=invoke, name="ollama-count", daemon=True)
+        worker.start()
+        worker.join(timeout)
+        if worker.is_alive():
+            self.cancel()
+            raise AdapterError(COUNT_TIMEOUT_NOTE)
+        if "error" in box:
+            exc = box["error"]
+            if isinstance(exc, AdapterError) and str(exc) == "the request timed out":
+                raise AdapterError(COUNT_TIMEOUT_NOTE) from exc
+            raise exc
+        if "payload" not in box:
+            raise AdapterError(COUNT_TIMEOUT_NOTE)
+        return box["payload"]
+
+    def _post_count(self, url: str, body: dict, timeout: float | None) -> dict:
+        if timeout is not None and self._default_transport:
+            return self.transport("POST", f"{url}/api/generate", body, timeout=timeout)
+        return self.transport("POST", f"{url}/api/generate", body)
 
     def tag_size(self, model: str, device: str | None = None) -> int | None:
         """The model's ``size`` from ``/api/tags``, in bytes. Missing is None."""

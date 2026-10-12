@@ -1,3 +1,5 @@
+`ollama/<version>/*.json` is written by `scripts/record_ollama_fixtures.py` on the rig. Those files are not in the tree until that command has been run.
+
 offrig-plan-input.8f2a94a.json is the inputSchema of tool offrig_plan, captured 2026-10-11.
 
 Command: offrig-mcp
