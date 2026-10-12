@@ -8,7 +8,7 @@
   ],
   "breaks": [
     {
-      "doors": 2,
+      "doors": 3,
       "importedBy": [],
       "importedByTests": [
         "tests"
@@ -20,42 +20,68 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 64,
-      "changed": 3,
-      "moved": 0,
-      "parts": 3,
-      "removed": 0
+      "added": 42,
+      "changed": 40,
+      "moved": 23,
+      "parts": 7,
+      "removed": 37
     },
     "items": [
       {
-        "kind": "unassigned",
-        "sentence": "receipts/e4b-block-2-series/5090-igpu-0-alone-after-5090-alone.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.",
+        "kind": "door",
+        "sentence": "Release (.github/workflows/release.yml) is a new door. It starts when a release is published; or by hand. It checks src/interlock/.",
         "subjects": [
-          "receipts/e4b-block-2-series/5090-igpu-0-alone-after-5090-alone.jsonl"
+          ".github/workflows/release.yml",
+          "src/interlock/"
         ]
       },
       {
-        "kind": "unassigned",
-        "sentence": "receipts/e4b-block-2-series/5090-igpu-0-alone-before-5090-alone.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.",
+        "kind": "door",
+        "sentence": "interlock (pyproject.toml) is a new command. It runs src/interlock/cli.py.",
         "subjects": [
-          "receipts/e4b-block-2-series/5090-igpu-0-alone-before-5090-alone.jsonl"
+          "pyproject.toml",
+          "src/interlock/cli.py"
         ]
       },
       {
-        "kind": "unassigned",
-        "sentence": "receipts/e4b-block-2-series/5090-igpu-0-paired-5090-with-igpu.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.",
+        "kind": "door",
+        "sentence": "switchyard (pyproject.toml) is no longer a command.",
         "subjects": [
-          "receipts/e4b-block-2-series/5090-igpu-0-paired-5090-with-igpu.jsonl"
+          "pyproject.toml"
         ]
       },
       {
-        "kind": "unassigned",
-        "sentence": "And 61 more new files that belong to no part.",
+        "kind": "landing",
+        "sentence": "CHANGELOG.md is now read by tests/test_old_name.py.",
+        "subjects": [
+          "CHANGELOG.md",
+          "tests/test_old_name.py"
+        ]
+      },
+      {
+        "kind": "landing",
+        "sentence": "docs/handoff/ is now read by tests/test_old_name.py.",
+        "subjects": [
+          "docs/handoff/",
+          "tests/test_old_name.py"
+        ]
+      },
+      {
+        "kind": "landing",
+        "sentence": "experiments/ is now also read by tests/test_old_name.py.",
+        "subjects": [
+          "experiments/",
+          "tests/test_old_name.py"
+        ]
+      },
+      {
+        "kind": "landing",
+        "sentence": "And 9 more new writers and readers of places.",
         "subjects": []
       },
       {
         "kind": "counts",
-        "sentence": "64 files added and 3 changed content, across 3 parts.",
+        "sentence": "42 files added, 37 removed, 23 moved and 40 changed content, across 7 parts.",
         "subjects": []
       }
     ],
@@ -71,14 +97,14 @@
       "b": "tests/test_openvino_adapter.py",
       "either": 22,
       "partLabels": [
-        "src",
+        null,
         "tests"
       ],
       "parts": [
-        "src",
+        null,
         "tests"
       ],
-      "relation": "b-imports-a",
+      "relation": "unassigned",
       "shared": 17
     },
     {
@@ -86,14 +112,14 @@
       "b": "tests/test_fill_card_live.py",
       "either": 7,
       "partLabels": [
-        "src",
+        null,
         "tests"
       ],
       "parts": [
-        "src",
+        null,
         "tests"
       ],
-      "relation": "b-imports-a",
+      "relation": "unassigned",
       "shared": 5
     },
     {
@@ -101,14 +127,14 @@
       "b": "src/switchyard/receipt.py",
       "either": 13,
       "partLabels": [
-        "src",
-        "src"
+        null,
+        null
       ],
       "parts": [
-        "src",
-        "src"
+        null,
+        null
       ],
-      "relation": "inside",
+      "relation": "unassigned",
       "shared": 7
     },
     {
@@ -116,14 +142,14 @@
       "b": "tests/test_harness.py",
       "either": 27,
       "partLabels": [
-        "src",
+        null,
         "tests"
       ],
       "parts": [
-        "src",
+        null,
         "tests"
       ],
-      "relation": "b-imports-a",
+      "relation": "unassigned",
       "shared": 14
     },
     {
@@ -131,14 +157,14 @@
       "b": "tests/test_fill_card_live.py",
       "either": 8,
       "partLabels": [
-        "src",
+        null,
         "tests"
       ],
       "parts": [
-        "src",
+        null,
         "tests"
       ],
-      "relation": "b-imports-a",
+      "relation": "unassigned",
       "shared": 4
     }
   ],
@@ -148,9 +174,9 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 8 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 1,
-  "commit": "9b2b9aca5c1332d17c23427452338d9e5a02bc5d",
+  "commit": "3d00a1103ebd9904feed4845000c43b065c39874",
   "defaultBranch": "main",
-  "derived": "7 parts, mostly Python (81 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.",
+  "derived": "7 parts, mostly Python (84 files). Work enters through 3 doors; the busiest is CI, which reaches 2 parts. It publishes to PyPI. People run interlock.",
   "doors": [
     {
       "checks": [],
@@ -165,7 +191,7 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 30
+          "files": 33
         },
         {
           "boundary": "src",
@@ -189,14 +215,44 @@
       ]
     },
     {
+      "checks": [
+        "src/interlock/"
+      ],
+      "checksCount": 1,
+      "checksMore": 0,
+      "file": ".github/workflows/release.yml",
+      "id": ".github/workflows/release.yml",
+      "landings": [],
+      "name": "Release",
+      "pushes": false,
+      "reach": [
+        {
+          "boundary": "src",
+          "depth": 0,
+          "files": 50
+        }
+      ],
+      "runs": [],
+      "runsCount": 0,
+      "runsMore": 0,
+      "sends": [
+        "publishes to PyPI"
+      ],
+      "stages": [],
+      "triggers": [
+        "when a release is published",
+        "or by hand"
+      ]
+    },
+    {
       "checks": [],
       "checksCount": 0,
       "checksMore": 0,
       "file": "pyproject.toml",
-      "id": "pyproject.toml#switchyard",
+      "id": "pyproject.toml#interlock",
       "kind": "command",
       "landings": [],
-      "name": "switchyard",
+      "name": "interlock",
       "pushes": false,
       "reach": [
         {
@@ -206,7 +262,7 @@
         }
       ],
       "runs": [
-        "src/switchyard/cli.py"
+        "src/interlock/cli.py"
       ],
       "runsCount": 1,
       "runsMore": 0,
@@ -221,13 +277,13 @@
   "edges": [],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-12T21:56:37.779Z",
+  "generatedAt": "2026-10-12T21:54:33.359Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "3 writes and 4 reads use paths built at run time and are not named here.",
     "12 writes and 37 reads go to a path their caller passes, not to this repository.",
     "3 reads go to the directory the command is run in (receipts/), not to this repository.",
-    "83 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 80 more.",
+    "19 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 16 more.",
     "Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window."
   ],
   "mainDoor": ".github/workflows/ci.yml",
@@ -244,18 +300,18 @@
   "readers": [],
   "repo": "mcp-tool-shop-org/interlock",
   "sequences": [],
-  "startDoor": "pyproject.toml#switchyard",
+  "startDoor": "pyproject.toml#interlock",
   "startHere": [
-    "src/switchyard/cli.py",
-    "src/switchyard/receipt.py",
-    "src/switchyard/families.py"
+    "src/interlock/cli.py",
+    "src/interlock/receipt.py",
+    "src/interlock/families.py"
   ],
-  "startReason": "This path follows switchyard (a command people run) from its entry, since CI runs only tests.",
-  "summary": "switchyard routes each job to a model, engine and device from a receipt-backed table.",
+  "startReason": "This path follows interlock (a command people run) from its entry, since CI runs only tests.",
+  "summary": "interlock routes each job to a model, engine and device from a receipt-backed table.",
   "summaryFrom": "person",
-  "testFiles": 48,
+  "testFiles": 51,
   "testedBy": {
-    "src": 28
+    "src": 30
   },
   "unnamedWrites": 3,
   "unread": [],
