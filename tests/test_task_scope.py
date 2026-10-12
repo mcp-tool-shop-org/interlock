@@ -10,13 +10,13 @@ from pathlib import Path
 
 import pytest
 
-from switchyard.families import FamilyError, family_of, stamp_family
-from switchyard.harness.choice import choose
-from switchyard.harness.spec import SpecError, validate_spec
-from switchyard.importers.gaps import open_gaps
-from switchyard.receipt import ReceiptError, is_speed_row, schema, validate_row
-from switchyard.scope import ScopeError, select
-from switchyard.tasks import JUDGE_RATES, TASKS
+from interlock.families import FamilyError, family_of, stamp_family
+from interlock.harness.choice import choose
+from interlock.harness.spec import SpecError, validate_spec
+from interlock.importers.gaps import open_gaps
+from interlock.receipt import ReceiptError, is_speed_row, schema, validate_row
+from interlock.scope import ScopeError, select
+from interlock.tasks import JUDGE_RATES, TASKS
 from tests.support import row
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -187,7 +187,7 @@ def test_a_row_must_agree_with_the_family_table():
 
 def test_a_broken_family_table_refuses_the_row(monkeypatch, tmp_path: Path):
     target = tmp_path / "model-families.json"
-    monkeypatch.setattr("switchyard.families.families_path", lambda: target)
+    monkeypatch.setattr("interlock.families.families_path", lambda: target)
     with pytest.raises(ReceiptError, match="family table"):
         validate_row(row())
     target.write_text("[]", encoding="utf-8")

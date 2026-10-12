@@ -16,29 +16,29 @@ from pathlib import Path
 
 import pytest
 
-from switchyard.adapters.base import AdapterError, CompileTracker
-from switchyard.cli import main, run_report
-from switchyard.guards import GuardError
-from switchyard.harness import environment as env_capture
-from switchyard.harness import runner as runner_module
-from switchyard.harness.marker import RunMarker, marker_path
-from switchyard.harness.receipts import device_lost_row, environment, for_table
-from switchyard.harness.runner import (
+from interlock.adapters.base import AdapterError, CompileTracker
+from interlock.cli import main, run_report
+from interlock.guards import GuardError
+from interlock.harness import environment as env_capture
+from interlock.harness import runner as runner_module
+from interlock.harness.marker import RunMarker, marker_path
+from interlock.harness.receipts import device_lost_row, environment, for_table
+from interlock.harness.runner import (
     _cache_dirs,
     _drop_caches,
     _rmtree_clearing_readonly,
     run_interleaved,
     run_spec,
 )
-from switchyard.harness.spec import SpecError, validate_spec
-from switchyard.harness.watch import (
+from interlock.harness.spec import SpecError, validate_spec
+from interlock.harness.watch import (
     COMPILE_CEILING_S,
     EXIT_COMPILE_TIMEOUT,
     EXIT_RAM_STOP,
     RunWatch,
     WatchHooks,
 )
-from switchyard.receipt import ReceiptError, check_tree, load_jsonl, receipt_paths, validate_row
+from interlock.receipt import ReceiptError, check_tree, load_jsonl, receipt_paths, validate_row
 from tests.test_harness import _bind, _emb_arm, _result, _spec as _harness_spec
 from tests.test_run_path import Fake, FakeTime, _arm as _plain_arm, _bind as _bind_plain, _spec as _plain_spec
 
@@ -239,7 +239,7 @@ def test_the_compile_tracker_brackets_a_compile_and_clears_on_error():
 
 def test_the_openvino_adapter_signals_each_compile_site(tmp_path, monkeypatch):
     from tests.test_openvino_adapter import local_model, make_adapter, req
-    import switchyard.adapters.openvino as ovm
+    import interlock.adapters.openvino as ovm
 
     adapter = make_adapter()
     tracker = CompileTracker()
@@ -497,7 +497,7 @@ def test_run_spec_writes_the_marker_before_the_card_probe_(tmp_path):
 
 
 def _result_plain():
-    from switchyard.adapters.base import StepResult
+    from interlock.adapters.base import StepResult
 
     return StepResult(ok=True, latency_ms=10)
 
@@ -744,8 +744,8 @@ def test_the_watcher_flushes_and_exits_even_when_another_thread_holds_the_state_
 
 
 def test_a_receipt_write_is_all_or_nothing(tmp_path, monkeypatch):
-    from switchyard.harness import receipts as receipts_module
-    from switchyard.harness.receipts import write_atomic
+    from interlock.harness import receipts as receipts_module
+    from interlock.harness.receipts import write_atomic
 
     path = tmp_path / "receipts" / "r.jsonl"
     path.parent.mkdir()

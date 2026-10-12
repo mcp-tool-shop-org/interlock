@@ -12,12 +12,12 @@ from pathlib import Path
 
 import pytest
 
-import switchyard.adapters.openvino as ovm
-from switchyard.adapters.base import AdapterError, CompileRejected, NativeBinaryRejected, compile_rejected_error
-from switchyard.harness.receipts import device_lost_row, for_table
-from switchyard.harness.runner import compiler_message, dry_run, run_spec
-from switchyard.importers.gaps import aborted_run_lines, summarize_error
-from switchyard.receipt import ReceiptError, check_tree, is_speed_row, load_jsonl, validate_row
+import interlock.adapters.openvino as ovm
+from interlock.adapters.base import AdapterError, CompileRejected, NativeBinaryRejected, compile_rejected_error
+from interlock.harness.receipts import device_lost_row, for_table
+from interlock.harness.runner import compiler_message, dry_run, run_spec
+from interlock.importers.gaps import aborted_run_lines, summarize_error
+from interlock.receipt import ReceiptError, check_tree, is_speed_row, load_jsonl, validate_row
 from tests.support import row as fixture_row
 from tests.test_harness import ScriptedRaise, _emb_arm, _invoke, _result
 from tests.test_harness import _bind as _bind_harness

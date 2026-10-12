@@ -17,20 +17,20 @@ from pathlib import Path
 import pytest
 import yaml
 
-from switchyard.adapters import openvino as ov_mod
-from switchyard.adapters.base import AdapterError, StepRequest
-from switchyard.harness import watch as watch_mod
-from switchyard.harness.runner import RunnerError, dry_run, run_interleaved
-from switchyard.harness.spec import SpecError, validate_spec
-from switchyard.harness.steady import BlockPlan, SlotStream, UntilSteady
-from switchyard.harness.storage import (
+from interlock.adapters import openvino as ov_mod
+from interlock.adapters.base import AdapterError, StepRequest
+from interlock.harness import watch as watch_mod
+from interlock.harness.runner import RunnerError, dry_run, run_interleaved
+from interlock.harness.spec import SpecError, validate_spec
+from interlock.harness.steady import BlockPlan, SlotStream, UntilSteady
+from interlock.harness.storage import (
     describe_drive,
     drive_letter,
     hot_snapshot,
     parse_disk_json,
     physical_disk_script,
 )
-from switchyard.harness.watch import WatchHooks
+from interlock.harness.watch import WatchHooks
 from tests.test_harness import Scripted, _result
 from tests.test_openvino_adapter import FakeGenai, FakePipeline, make_adapter
 
@@ -237,7 +237,7 @@ def test_archive_fetches_with_no_cache_dir(tmp_path: Path, monkeypatch: pytest.M
     module.calls = []
     module.snapshot_download = snapshot_download
     monkeypatch.setitem(sys.modules, "huggingface_hub", module)
-    from switchyard.harness.storage import default_snapshot_download
+    from interlock.harness.storage import default_snapshot_download
 
     assert default_snapshot_download(REPO, REV) == str(tmp_path / "snap")
     assert module.calls == [(REPO, REV, {})]
@@ -782,7 +782,7 @@ def test_the_slot_reader_skips_this_process_and_a_missing_disk(monkeypatch: pyte
 
         def process_iter(self):
             return [
-                Proc(10, "switchyard", 50.0),
+                Proc(10, "interlock", 50.0),
                 Proc(11, "child", 99.0),
                 Proc(12, "busy-neighbor", 80.0),
                 Proc(13, "second", 10.0),
@@ -802,7 +802,7 @@ def test_the_slot_reader_skips_this_process_and_a_missing_disk(monkeypatch: pyte
     assert first["cpu_pct"] == 15.0 and first["ram_pct"] == 22.0
     assert first["disk_read_mb_s"] is None and first["disk_reason"] is None
     assert first["top"] == ["busy-neighbor", "second"]
-    assert "switchyard" not in first["top"] and "child" not in first["top"]
+    assert "interlock" not in first["top"] and "child" not in first["top"]
     fake.bytes = 2 * 1024 * 1024
     second = watch_mod.read_slot("C")
     assert second["disk_read_mb_s"] == pytest.approx(2.0)

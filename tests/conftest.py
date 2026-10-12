@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import pytest
 
-import switchyard.harness.runner as runner
-from switchyard.harness.watch import WatchHooks
+import interlock.harness.runner as runner
+from interlock.harness.watch import WatchHooks
 
 
 def _no_device_state(uses_5090: bool) -> dict:

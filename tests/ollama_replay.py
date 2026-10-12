@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from switchyard.adapters.ollama_cases import RecordedNoReply, request_path, require_recorded_behaviour
+from interlock.adapters.ollama_cases import RecordedNoReply, request_path, require_recorded_behaviour
 
 
 def replay(document: dict) -> dict:

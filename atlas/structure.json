@@ -9,8 +9,12 @@
       "externals": 0,
       "files": [
         {
-          "hash": "789c637f3d752cb58b803e9549b313d6fa2c73902c6f401835991e5c5cad8297",
+          "hash": "bf0655bac60ce5e98372354cf212258c348402d90f4ad014103816bc0f027cb8",
           "path": ".github/workflows/ci.yml"
+        },
+        {
+          "hash": "22086eca137291cf9c3b3b1d49e31d74c3fb42b2c7f4a6dc2cee4cc43153b4a7",
+          "path": ".github/workflows/release.yml"
         }
       ],
       "globs": [
@@ -32,36 +36,40 @@
       "externals": 0,
       "files": [
         {
+          "hash": "1c7ea5b3d8984da5817b44730c55722b84d65aa566b5738374853b9d0fc87455",
+          "path": "assets/logo.png"
+        },
+        {
           "hash": "f38c761d32778e2f22c47d9723f58cbbe9b3bf40d66cd5a8dbcb2661e05318a8",
-          "path": "assets/logo/switchyard-master.png"
+          "path": "assets/logo/interlock-master.png"
         },
         {
           "hash": "d03c4c2af8653c219ab4a77017a9fa4a38a37ec8d5d0b1f0f7609d49fc5f040b",
-          "path": "assets/logo/switchyard-wordmark.png"
+          "path": "assets/logo/interlock-wordmark.png"
         },
         {
           "hash": "d3c590594b41d72ee23570402f81311696fa9bfd0633400bceddca2a07b14276",
-          "path": "assets/logo/switchyard_128.png"
+          "path": "assets/logo/interlock_128.png"
         },
         {
           "hash": "a887ddf1d460202de16c30beeb5bf13fe1ed5e25bb6a644f90ddfc65fabaf70c",
-          "path": "assets/logo/switchyard_16.png"
+          "path": "assets/logo/interlock_16.png"
         },
         {
           "hash": "e94e1b3137a601ebdf97a85091ae7b26490798a4628fc5e48ce3375b4807841b",
-          "path": "assets/logo/switchyard_256.png"
+          "path": "assets/logo/interlock_256.png"
         },
         {
           "hash": "f648e0a450e726d47d008741273f01e5436f3a80f5c7c8d41bdbf371952c3586",
-          "path": "assets/logo/switchyard_32.png"
+          "path": "assets/logo/interlock_32.png"
         },
         {
           "hash": "02e5fa604a00ac8b589876b79382a911f82749db6c23e17c9da6ea2cc8694621",
-          "path": "assets/logo/switchyard_512.png"
+          "path": "assets/logo/interlock_512.png"
         },
         {
           "hash": "4efa92eb4d171ec48edcd5db23b3a91aece21aca7806570cb6ea21d1c6826902",
-          "path": "assets/logo/switchyard_64.png"
+          "path": "assets/logo/interlock_64.png"
         }
       ],
       "globs": [
@@ -103,11 +111,11 @@
           "path": "docs/handoff/feedback_read_exit_before_next_gpu_step.md"
         },
         {
-          "hash": "256842b46e6e60f8232cf23167957b6ab0c419578c5b6ca1eec6cd3b5e8f5a7a",
+          "hash": "e8b99f37da4553d53feb738a828cde5507baeb80d9e3988296db8b7c210b352a",
           "path": "docs/handoff/switchyard-router-buildout-handoff.md"
         },
         {
-          "hash": "7029f03a1209158e84c73e5960a24440255fb285fcaa93d94a0a85003231a33f",
+          "hash": "5f0d8f58b332d4c7707b9008e88037429b9ab262b2355a8c3fbdbf4738218376",
           "path": "docs/offrig-integration.md"
         }
       ],
@@ -154,7 +162,7 @@
           "path": "experiments/e2/quiet-window-cpu-e2-2026-10-10c.csv"
         },
         {
-          "hash": "e52b8d7ee304b03b17f2e2d19d959d4aa25173b15d4dd368af8c6deb15b45ebf",
+          "hash": "06561e55c508203bf1d47be7cd53679ce9e9ebd167d9f6e4aff63fce83d6dd33",
           "path": "experiments/e2/spec-b8tail.yaml"
         },
         {
@@ -170,7 +178,7 @@
           "path": "experiments/e3/run-notes-2026-10-10-11.md"
         },
         {
-          "hash": "1c7b029eb2f9b29fd11d0c1b9dbc9c6f163ecf50db9dac59791050b0799ece5d",
+          "hash": "947eee0ece7f9905891a55db4788db58e1d62607abfc90236a640eb393ac30f6",
           "path": "experiments/e3/spec.yaml"
         },
         {
@@ -182,7 +190,7 @@
           "path": "experiments/e4b/spec.yaml"
         },
         {
-          "hash": "28048dac776a6ee38d91376e3007323a94116a2abafa339e9bbef3a3e825cac6",
+          "hash": "d86bc031bbbbe9e308277934653e3ccb0ceccfb6dcdf8a730731e7b9f6c00ec2",
           "path": "experiments/e5/spec.yaml"
         }
       ],
@@ -217,7 +225,7 @@
           "path": ".python-version"
         },
         {
-          "hash": "011561238c03450ed4989af1d6e1ca2238c1c16e407cc4f0d2931fc429a4bb79",
+          "hash": "e58bdeabc6fb4c9f39923a44407aa7702b71926f5172d4ee95623a862fabccfc",
           "path": "CHANGELOG.md"
         },
         {
@@ -225,11 +233,11 @@
           "path": "LICENSE"
         },
         {
-          "hash": "2343b634bfa4c7e506c287b60168dda13cf27ba672b8829ee2532132d9d58987",
+          "hash": "404dd82662d5963dcc205d2e2de17bceee9399360e69efbb97d62a50f7169aec",
           "path": "README.md"
         },
         {
-          "hash": "34fb108b9173f3b2601eb68406c65914f0b66242178ae780f8ffd23bde8c02d4",
+          "hash": "0b95546735b918f374b1fe2171ba994013d7f733595df7900842d828f31ae0d2",
           "path": "SECURITY.md"
         },
         {
@@ -237,11 +245,11 @@
           "path": "codecov.yml"
         },
         {
-          "hash": "c5c3f06e29a3c8645c412e9f78eaebb141809e9074048fa06b0cb23528fe841d",
+          "hash": "b23a160d16af1383ca7912c1320d4ef2e8ffbfc839d17c4ab8b879bf84bd4e08",
           "path": "pyproject.toml"
         },
         {
-          "hash": "ac7f0dec1cfc6b42a7fa65563f33510e80a838b7a68266f14ed9df5dbce2fcf9",
+          "hash": "0358624e29404b0f8f08f7028d5bbe8a28fa06372ca181179a59c7e25764611b",
           "path": "uv.lock"
         }
       ],
@@ -261,7 +269,7 @@
       "dynamicSpawnsInTests": 0,
       "dynamicWrites": 3,
       "entryPoints": [
-        "src/switchyard/cli.py"
+        "src/interlock/cli.py"
       ],
       "externalNames": [
         "openvino"
@@ -270,8 +278,8 @@
       "files": [
         {
           "constantOnly": true,
-          "hash": "838a3099c11ccb83f202074a21c7192312ccd1b1d8729e3fece029ec7aa27e27",
-          "path": "src/switchyard/__init__.py"
+          "hash": "52acbfe66d0e8edfe45d252163f27718881f44d3f98aabdc6ce1356ec277d0ed",
+          "path": "src/interlock/__init__.py"
         },
         {
           "failurePaths": [
@@ -280,23 +288,23 @@
               "line": 4
             }
           ],
-          "hash": "3947af17c7d14a3307f8348d18370a184726107a84fb4cce16d3c65e4e0ac4fd",
+          "hash": "cd066bb0fc8bb12305848307ecd47a9c7aac9bb81ab13bfe291732c5e993103d",
           "importsFiles": [
-            "src/switchyard/cli.py"
+            "src/interlock/cli.py"
           ],
-          "path": "src/switchyard/__main__.py"
+          "path": "src/interlock/__main__.py"
         },
         {
           "hash": "da1195ecf4c1999cd3ac499bf5bfab6e17209c870882e83e0a79f8d19fbd01d1",
           "noStatements": true,
-          "path": "src/switchyard/adapters/__init__.py"
+          "path": "src/interlock/adapters/__init__.py"
         },
         {
           "exports": [
             "compile_rejected_error"
           ],
-          "hash": "c0f1138cd347b6c4c09a9ff0a6c0e0b8c21860e2c17ec8b26bcd9e7455bded7d",
-          "path": "src/switchyard/adapters/base.py"
+          "hash": "165ee37db2adcbc85cd1848864dbdff50a1c5c3e8d94cf80c8f172862c13d4e8",
+          "path": "src/interlock/adapters/base.py"
         },
         {
           "exports": [
@@ -355,11 +363,11 @@
               "line": 84
             }
           ],
-          "hash": "677913f9e8ea5f17aa39a513fe4312aa19a587595740d0fd175c8abf5a750075",
+          "hash": "e472b945da4a9892e9fd30e4fe5c4b7e86b0aa1d8be692078f3764cefb7d1c6d",
           "importsFiles": [
-            "src/switchyard/adapters/base.py"
+            "src/interlock/adapters/base.py"
           ],
-          "path": "src/switchyard/adapters/offrig_calibrate.py"
+          "path": "src/interlock/adapters/offrig_calibrate.py"
         },
         {
           "exports": [
@@ -548,11 +556,11 @@
               "line": 524
             }
           ],
-          "hash": "b3d0bca78759cfb2af88c51015081dd8656a08f5d9b2cc430af193d58dc78a51",
+          "hash": "6328dc18a46a686ed8678d2972c40cbaf7c5706d16a62a1af7201945988b89df",
           "importsFiles": [
-            "src/switchyard/adapters/base.py"
+            "src/interlock/adapters/base.py"
           ],
-          "path": "src/switchyard/adapters/ollama.py"
+          "path": "src/interlock/adapters/ollama.py"
         },
         {
           "exports": [
@@ -606,12 +614,12 @@
               "line": 269
             }
           ],
-          "hash": "97e5519f2c4ad576006949e28389ea49b1c87687fc549247a46593a228951f2d",
+          "hash": "472d8a69d66ce89baf2bda3a0a7633e06744d7e9a724301c839f40077c039223",
           "importsFiles": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/adapters/ollama.py"
+            "src/interlock/adapters/base.py",
+            "src/interlock/adapters/ollama.py"
           ],
-          "path": "src/switchyard/adapters/ollama_cases.py"
+          "path": "src/interlock/adapters/ollama_cases.py"
         },
         {
           "exports": [
@@ -1046,18 +1054,18 @@
               "line": 1270
             }
           ],
-          "hash": "218e9f47e164cbc2a9506fee291dbcbb3499f4f19f273392da8e11c40426091b",
+          "hash": "945cdd757fe8b5bd9a243db9f0cd23a0859827d407d31e7b09c3ce42da134560",
           "importOrder": [
-            "src/switchyard/harness/storage.py",
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/devices.py"
+            "src/interlock/harness/storage.py",
+            "src/interlock/adapters/base.py",
+            "src/interlock/devices.py"
           ],
           "importsFiles": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/devices.py",
-            "src/switchyard/harness/storage.py"
+            "src/interlock/adapters/base.py",
+            "src/interlock/devices.py",
+            "src/interlock/harness/storage.py"
           ],
-          "path": "src/switchyard/adapters/openvino.py"
+          "path": "src/interlock/adapters/openvino.py"
         },
         {
           "exports": [
@@ -1216,15 +1224,15 @@
               "line": 401
             }
           ],
-          "hash": "47c2e9fce53fc4a5c23c60c8c4ad0cd27dfa5cbc8227c387488888ebca561067",
+          "hash": "8da96f4c7220bcf3bbfe86c3d3c60a62c8ab9ea2b139d77406bb7945f0528d14",
           "importsFiles": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/adapters/ollama.py",
-            "src/switchyard/adapters/ollama_cases.py",
-            "src/switchyard/guards.py",
-            "src/switchyard/harness/fill.py"
+            "src/interlock/adapters/base.py",
+            "src/interlock/adapters/ollama.py",
+            "src/interlock/adapters/ollama_cases.py",
+            "src/interlock/guards.py",
+            "src/interlock/harness/fill.py"
           ],
-          "path": "src/switchyard/adapters/record_fixtures.py"
+          "path": "src/interlock/adapters/record_fixtures.py"
         },
         {
           "exports": [
@@ -1252,14 +1260,14 @@
               "line": 36
             }
           ],
-          "hash": "aab3181298280a20fd46450bddeb18b2d4e565e1539edb82022545bed94f8e60",
+          "hash": "637d89511559222e8009727952e81948ed5ec8d12c1c7db9d417e0a6918f66cb",
           "importsFiles": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/adapters/offrig_calibrate.py",
-            "src/switchyard/adapters/ollama.py",
-            "src/switchyard/adapters/openvino.py"
+            "src/interlock/adapters/base.py",
+            "src/interlock/adapters/offrig_calibrate.py",
+            "src/interlock/adapters/ollama.py",
+            "src/interlock/adapters/openvino.py"
           ],
-          "path": "src/switchyard/adapters/registry.py"
+          "path": "src/interlock/adapters/registry.py"
         },
         {
           "entry": "main",
@@ -1278,82 +1286,82 @@
             {
               "in": "_take_min_metrics",
               "kind": "raise",
-              "line": 160
+              "line": 163
             },
             {
               "in": "_take_min_metrics",
               "kind": "except",
-              "line": 164
+              "line": 167
             },
             {
               "in": "_take_min_metrics",
               "kind": "raise",
-              "line": 165
+              "line": 168
             },
             {
               "in": "_cmd_runs_quarantine",
               "kind": "except",
-              "line": 282
+              "line": 285
             },
             {
               "in": "_cmd_runs_quarantine",
               "kind": "except",
-              "line": 286
+              "line": 289
             },
             {
               "in": "_cmd_run",
               "kind": "except",
-              "line": 336
+              "line": 339
             },
             {
               "in": "_cmd_route",
               "kind": "except",
-              "line": 369
+              "line": 372
             }
           ],
-          "hash": "1bf23f14e9b35a80a5ded3353701c786cfe1c2deee28d459e2cc143697bc2462",
+          "hash": "60a226b78ec00b9024c93ac955f9e0e59047f6b92a387b60fd6f448e1c077cbe",
           "importOrder": [
-            "src/switchyard/receipt.py",
-            "src/switchyard/tasks.py",
-            "src/switchyard/importers/assemble.py",
-            "src/switchyard/importers/gaps.py",
-            "src/switchyard/importers/pins.py",
-            "src/switchyard/harness/lifecycle.py",
-            "src/switchyard/harness/e4b.py",
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/guards.py",
-            "src/switchyard/harness/ollama_serve.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/harness/spec.py",
-            "src/switchyard/ollama_supervisor.py",
-            "src/switchyard/router/policy.py"
+            "src/interlock/receipt.py",
+            "src/interlock/tasks.py",
+            "src/interlock/importers/assemble.py",
+            "src/interlock/importers/gaps.py",
+            "src/interlock/importers/pins.py",
+            "src/interlock/harness/lifecycle.py",
+            "src/interlock/harness/e4b.py",
+            "src/interlock/adapters/base.py",
+            "src/interlock/guards.py",
+            "src/interlock/harness/ollama_serve.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/harness/spec.py",
+            "src/interlock/ollama_supervisor.py",
+            "src/interlock/router/policy.py"
           ],
           "importsFiles": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/guards.py",
-            "src/switchyard/harness/e4b.py",
-            "src/switchyard/harness/lifecycle.py",
-            "src/switchyard/harness/ollama_serve.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/harness/spec.py",
-            "src/switchyard/importers/assemble.py",
-            "src/switchyard/importers/gaps.py",
-            "src/switchyard/importers/pins.py",
-            "src/switchyard/ollama_supervisor.py",
-            "src/switchyard/receipt.py",
-            "src/switchyard/router/policy.py",
-            "src/switchyard/tasks.py"
+            "src/interlock/adapters/base.py",
+            "src/interlock/guards.py",
+            "src/interlock/harness/e4b.py",
+            "src/interlock/harness/lifecycle.py",
+            "src/interlock/harness/ollama_serve.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/harness/spec.py",
+            "src/interlock/importers/assemble.py",
+            "src/interlock/importers/gaps.py",
+            "src/interlock/importers/pins.py",
+            "src/interlock/ollama_supervisor.py",
+            "src/interlock/receipt.py",
+            "src/interlock/router/policy.py",
+            "src/interlock/tasks.py"
           ],
-          "path": "src/switchyard/cli.py",
+          "path": "src/interlock/cli.py",
           "sequences": [
             {
               "calls": [
                 {
-                  "line": 125,
+                  "line": 128,
                   "name": "TASKS",
                   "passed": true,
                   "target": {
-                    "file": "src/switchyard/tasks.py"
+                    "file": "src/interlock/tasks.py"
                   }
                 }
               ],
@@ -1365,25 +1373,25 @@
             {
               "calls": [
                 {
-                  "line": 175,
+                  "line": 178,
                   "name": "check_tree",
                   "target": {
-                    "file": "src/switchyard/receipt.py"
+                    "file": "src/interlock/receipt.py"
                   }
                 },
                 {
-                  "line": 444,
+                  "line": 447,
                   "name": "receipt_paths",
                   "target": {
-                    "file": "src/switchyard/receipt.py"
+                    "file": "src/interlock/receipt.py"
                   },
                   "via": "_count_rows"
                 },
                 {
-                  "line": 446,
+                  "line": 449,
                   "name": "load_jsonl",
                   "target": {
-                    "file": "src/switchyard/receipt.py"
+                    "file": "src/interlock/receipt.py"
                   },
                   "via": "_count_rows"
                 }
@@ -1396,10 +1404,10 @@
             {
               "calls": [
                 {
-                  "line": 190,
+                  "line": 193,
                   "name": "load_jsonl",
                   "target": {
-                    "file": "src/switchyard/receipt.py"
+                    "file": "src/interlock/receipt.py"
                   }
                 }
               ],
@@ -1411,24 +1419,24 @@
             {
               "calls": [
                 {
-                  "line": 208,
+                  "line": 211,
                   "name": "import_receipts",
                   "target": {
-                    "file": "src/switchyard/importers/assemble.py"
+                    "file": "src/interlock/importers/assemble.py"
                   }
                 },
                 {
-                  "line": 213,
+                  "line": 216,
                   "name": "load_candidates",
                   "target": {
-                    "file": "src/switchyard/importers/gaps.py"
+                    "file": "src/interlock/importers/gaps.py"
                   }
                 },
                 {
-                  "line": 222,
+                  "line": 225,
                   "name": "render_gaps",
                   "target": {
-                    "file": "src/switchyard/importers/gaps.py"
+                    "file": "src/interlock/importers/gaps.py"
                   }
                 }
               ],
@@ -1440,17 +1448,17 @@
             {
               "calls": [
                 {
-                  "line": 267,
+                  "line": 270,
                   "name": "list_runs",
                   "target": {
-                    "file": "src/switchyard/harness/lifecycle.py"
+                    "file": "src/interlock/harness/lifecycle.py"
                   }
                 },
                 {
-                  "line": 267,
+                  "line": 270,
                   "name": "format_runs",
                   "target": {
-                    "file": "src/switchyard/harness/lifecycle.py"
+                    "file": "src/interlock/harness/lifecycle.py"
                   }
                 }
               ],
@@ -1462,25 +1470,25 @@
             {
               "calls": [
                 {
-                  "line": 279,
+                  "line": 282,
                   "name": "read_git",
                   "target": {
-                    "file": "src/switchyard/harness/e4b.py"
+                    "file": "src/interlock/harness/e4b.py"
                   }
                 },
                 {
-                  "line": 279,
+                  "line": 282,
                   "name": "capture_run",
                   "passed": true,
                   "target": {
-                    "file": "src/switchyard/harness/e4b.py"
+                    "file": "src/interlock/harness/e4b.py"
                   }
                 },
                 {
-                  "line": 285,
+                  "line": 288,
                   "name": "quarantine_stray",
                   "target": {
-                    "file": "src/switchyard/harness/lifecycle.py"
+                    "file": "src/interlock/harness/lifecycle.py"
                   }
                 }
               ],
@@ -1493,52 +1501,52 @@
               "calls": [
                 {
                   "branch": "args.dry_run",
-                  "line": 303,
+                  "line": 306,
                   "name": "dry_run",
                   "target": {
-                    "file": "src/switchyard/harness/runner.py"
+                    "file": "src/interlock/harness/runner.py"
                   }
                 },
                 {
-                  "line": 305,
+                  "line": 308,
                   "name": "load_spec",
                   "target": {
-                    "file": "src/switchyard/harness/spec.py"
+                    "file": "src/interlock/harness/spec.py"
                   }
                 },
                 {
-                  "line": 309,
+                  "line": 312,
                   "name": "resolve_run_id",
                   "target": {
-                    "file": "src/switchyard/harness/lifecycle.py"
+                    "file": "src/interlock/harness/lifecycle.py"
                   }
                 },
                 {
-                  "line": 329,
+                  "line": 332,
                   "name": "real_seams",
                   "target": {
-                    "file": "src/switchyard/ollama_supervisor.py"
+                    "file": "src/interlock/ollama_supervisor.py"
+                  }
+                },
+                {
+                  "line": 334,
+                  "name": "heartbeat_path",
+                  "target": {
+                    "file": "src/interlock/harness/runner.py"
                   }
                 },
                 {
                   "line": 331,
-                  "name": "heartbeat_path",
-                  "target": {
-                    "file": "src/switchyard/harness/runner.py"
-                  }
-                },
-                {
-                  "line": 328,
                   "name": "OllamaSupervisor",
                   "target": {
-                    "file": "src/switchyard/ollama_supervisor.py"
+                    "file": "src/interlock/ollama_supervisor.py"
                   }
                 },
                 {
-                  "line": 320,
+                  "line": 323,
                   "name": "run_spec",
                   "target": {
-                    "file": "src/switchyard/harness/runner.py"
+                    "file": "src/interlock/harness/runner.py"
                   }
                 }
               ],
@@ -1550,10 +1558,10 @@
             {
               "calls": [
                 {
-                  "line": 345,
+                  "line": 348,
                   "name": "health_report",
                   "target": {
-                    "file": "src/switchyard/ollama_supervisor.py"
+                    "file": "src/interlock/ollama_supervisor.py"
                   }
                 }
               ],
@@ -1565,23 +1573,23 @@
             {
               "calls": [
                 {
-                  "line": 434,
+                  "line": 437,
                   "name": "read_text",
                   "target": null,
                   "via": "_load_jsonl"
                 },
                 {
-                  "line": 373,
+                  "line": 376,
                   "name": "Request",
                   "target": {
-                    "file": "src/switchyard/router/policy.py"
+                    "file": "src/interlock/router/policy.py"
                   }
                 },
                 {
-                  "line": 387,
+                  "line": 390,
                   "name": "decide",
                   "target": {
-                    "file": "src/switchyard/router/policy.py"
+                    "file": "src/interlock/router/policy.py"
                   }
                 }
               ],
@@ -1593,7 +1601,7 @@
             {
               "calls": [
                 {
-                  "line": 434,
+                  "line": 437,
                   "name": "read_text",
                   "target": null
                 }
@@ -1606,17 +1614,17 @@
             {
               "calls": [
                 {
-                  "line": 444,
+                  "line": 447,
                   "name": "receipt_paths",
                   "target": {
-                    "file": "src/switchyard/receipt.py"
+                    "file": "src/interlock/receipt.py"
                   }
                 },
                 {
-                  "line": 446,
+                  "line": 449,
                   "name": "load_jsonl",
                   "target": {
-                    "file": "src/switchyard/receipt.py"
+                    "file": "src/interlock/receipt.py"
                   }
                 }
               ],
@@ -1709,7 +1717,7 @@
             }
           ],
           "hash": "92dc54efe29f127d0432f770b8f388d7624c357c7f4528766c527a8c5a58dcd3",
-          "path": "src/switchyard/devices.py"
+          "path": "src/interlock/devices.py"
         },
         {
           "exports": [
@@ -1746,7 +1754,7 @@
             }
           ],
           "hash": "179c7d95d15dce9011a6ec6f11a5b83bde64e4de178242fed129e566efc41fce",
-          "path": "src/switchyard/families.py"
+          "path": "src/interlock/families.py"
         },
         {
           "exports": [
@@ -1795,23 +1803,23 @@
               "line": 96
             }
           ],
-          "hash": "27a14185d51156eec7cac3b4a24124201bdb624ce18ca486bd91fddc069b6589",
+          "hash": "e9fa5440a49ce900899f6cd57f1fdf7ec469af8a57a19e512b771ca57170bfba",
           "importsFiles": [
-            "src/switchyard/devices.py"
+            "src/interlock/devices.py"
           ],
-          "path": "src/switchyard/guards.py"
+          "path": "src/interlock/guards.py"
         },
         {
           "hash": "1b8016c359c0f38f77602e1abfb41b11fb1c6e93fda453a8bc24975726efab1c",
           "noStatements": true,
-          "path": "src/switchyard/harness/__init__.py"
+          "path": "src/interlock/harness/__init__.py"
         },
         {
           "exports": [
             "choose"
           ],
           "hash": "a8d83cac769823fff3e051321c4c6b08c1916c9b7c027c1b0caf142ea098508f",
-          "path": "src/switchyard/harness/choice.py"
+          "path": "src/interlock/harness/choice.py"
         },
         {
           "exports": [
@@ -1828,7 +1836,7 @@
             }
           ],
           "hash": "1e75bd7ebc95553ec567f6cd9886c7ae4983bd1e03d592b8b506f6a621748672",
-          "path": "src/switchyard/harness/count_budget.py"
+          "path": "src/interlock/harness/count_budget.py"
         },
         {
           "entry": "run_from_cli",
@@ -2296,21 +2304,21 @@
               "line": 2243
             }
           ],
-          "hash": "734391e21e015451918fe54e7baef435d802045ae07b1258f423ab390ea45151",
+          "hash": "5ef6a4b5b8be586b761b5da6ab73d10213d9f7fccb755e8bc22d74405e210805",
           "importsFiles": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/adapters/openvino.py",
-            "src/switchyard/adapters/record_fixtures.py",
-            "src/switchyard/guards.py",
-            "src/switchyard/harness/e4b_stats.py",
-            "src/switchyard/harness/lifecycle.py",
-            "src/switchyard/harness/lock.py",
-            "src/switchyard/harness/ollama_serve.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/harness/timing.py",
-            "src/switchyard/ollama_supervisor.py"
+            "src/interlock/adapters/base.py",
+            "src/interlock/adapters/openvino.py",
+            "src/interlock/adapters/record_fixtures.py",
+            "src/interlock/guards.py",
+            "src/interlock/harness/e4b_stats.py",
+            "src/interlock/harness/lifecycle.py",
+            "src/interlock/harness/lock.py",
+            "src/interlock/harness/ollama_serve.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/harness/timing.py",
+            "src/interlock/ollama_supervisor.py"
           ],
-          "path": "src/switchyard/harness/e4b.py",
+          "path": "src/interlock/harness/e4b.py",
           "sequences": [
             {
               "calls": [
@@ -2470,21 +2478,21 @@
                   "line": 609,
                   "name": "heartbeat_path",
                   "target": {
-                    "file": "src/switchyard/harness/runner.py"
+                    "file": "src/interlock/harness/runner.py"
                   }
                 },
                 {
                   "line": 612,
                   "name": "require_heartbeat",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   }
                 },
                 {
                   "line": 617,
                   "name": "require_card_empty",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   }
                 }
               ],
@@ -2499,7 +2507,7 @@
                   "line": 629,
                   "name": "read_log_segment",
                   "target": {
-                    "file": "src/switchyard/harness/ollama_serve.py"
+                    "file": "src/interlock/harness/ollama_serve.py"
                   }
                 }
               ],
@@ -2514,7 +2522,7 @@
                   "line": 629,
                   "name": "read_log_segment",
                   "target": {
-                    "file": "src/switchyard/harness/ollama_serve.py"
+                    "file": "src/interlock/harness/ollama_serve.py"
                   },
                   "via": "_log_text"
                 },
@@ -2541,7 +2549,7 @@
                   "line": 728,
                   "name": "percentile",
                   "target": {
-                    "file": "src/switchyard/harness/timing.py"
+                    "file": "src/interlock/harness/timing.py"
                   }
                 }
               ],
@@ -2711,7 +2719,7 @@
                   "line": 1167,
                   "name": "effect",
                   "target": {
-                    "file": "src/switchyard/harness/e4b_stats.py"
+                    "file": "src/interlock/harness/e4b_stats.py"
                   }
                 }
               ],
@@ -2776,14 +2784,14 @@
                   "line": 1255,
                   "name": "decide",
                   "target": {
-                    "file": "src/switchyard/harness/e4b_stats.py"
+                    "file": "src/interlock/harness/e4b_stats.py"
                   }
                 },
                 {
                   "line": 1256,
                   "name": "bootstrap_median",
                   "target": {
-                    "file": "src/switchyard/harness/e4b_stats.py"
+                    "file": "src/interlock/harness/e4b_stats.py"
                   }
                 }
               ],
@@ -2835,7 +2843,7 @@
                   "line": 1167,
                   "name": "effect",
                   "target": {
-                    "file": "src/switchyard/harness/e4b_stats.py"
+                    "file": "src/interlock/harness/e4b_stats.py"
                   },
                   "via": "_triplet"
                 }
@@ -2894,7 +2902,7 @@
                   "line": 1167,
                   "name": "effect",
                   "target": {
-                    "file": "src/switchyard/harness/e4b_stats.py"
+                    "file": "src/interlock/harness/e4b_stats.py"
                   },
                   "via": "_triplet"
                 },
@@ -2902,7 +2910,7 @@
                   "line": 1255,
                   "name": "decide",
                   "target": {
-                    "file": "src/switchyard/harness/e4b_stats.py"
+                    "file": "src/interlock/harness/e4b_stats.py"
                   },
                   "via": "_analyze"
                 },
@@ -2910,7 +2918,7 @@
                   "line": 1256,
                   "name": "bootstrap_median",
                   "target": {
-                    "file": "src/switchyard/harness/e4b_stats.py"
+                    "file": "src/interlock/harness/e4b_stats.py"
                   },
                   "via": "_analyze"
                 }
@@ -2969,7 +2977,7 @@
                   "line": 1167,
                   "name": "effect",
                   "target": {
-                    "file": "src/switchyard/harness/e4b_stats.py"
+                    "file": "src/interlock/harness/e4b_stats.py"
                   },
                   "via": "_triplet"
                 },
@@ -2977,7 +2985,7 @@
                   "line": 1255,
                   "name": "decide",
                   "target": {
-                    "file": "src/switchyard/harness/e4b_stats.py"
+                    "file": "src/interlock/harness/e4b_stats.py"
                   },
                   "via": "_analyze"
                 },
@@ -2985,7 +2993,7 @@
                   "line": 1256,
                   "name": "bootstrap_median",
                   "target": {
-                    "file": "src/switchyard/harness/e4b_stats.py"
+                    "file": "src/interlock/harness/e4b_stats.py"
                   },
                   "via": "_analyze"
                 }
@@ -3014,7 +3022,7 @@
                   "line": 629,
                   "name": "read_log_segment",
                   "target": {
-                    "file": "src/switchyard/harness/ollama_serve.py"
+                    "file": "src/interlock/harness/ollama_serve.py"
                   },
                   "via": "_log_text"
                 },
@@ -3022,14 +3030,14 @@
                   "line": 1464,
                   "name": "server_config_env",
                   "target": {
-                    "file": "src/switchyard/ollama_supervisor.py"
+                    "file": "src/interlock/ollama_supervisor.py"
                   }
                 },
                 {
                   "line": 1471,
                   "name": "receipt_environment",
                   "target": {
-                    "file": "src/switchyard/harness/ollama_serve.py"
+                    "file": "src/interlock/harness/ollama_serve.py"
                   }
                 },
                 {
@@ -3063,14 +3071,14 @@
                   "line": 1516,
                   "name": "utc_now",
                   "target": {
-                    "file": "src/switchyard/harness/lifecycle.py"
+                    "file": "src/interlock/harness/lifecycle.py"
                   }
                 },
                 {
                   "line": 1511,
                   "name": "move_aside",
                   "target": {
-                    "file": "src/switchyard/harness/lifecycle.py"
+                    "file": "src/interlock/harness/lifecycle.py"
                   }
                 }
               ],
@@ -3085,28 +3093,28 @@
                   "line": 1541,
                   "name": "require_free",
                   "target": {
-                    "file": "src/switchyard/harness/lifecycle.py"
+                    "file": "src/interlock/harness/lifecycle.py"
                   }
                 },
                 {
                   "line": 1542,
                   "name": "refuse_strays",
                   "target": {
-                    "file": "src/switchyard/harness/lifecycle.py"
+                    "file": "src/interlock/harness/lifecycle.py"
                   }
                 },
                 {
                   "line": 1546,
                   "name": "utc_now",
                   "target": {
-                    "file": "src/switchyard/harness/lifecycle.py"
+                    "file": "src/interlock/harness/lifecycle.py"
                   }
                 },
                 {
                   "line": 609,
                   "name": "heartbeat_path",
                   "target": {
-                    "file": "src/switchyard/harness/runner.py"
+                    "file": "src/interlock/harness/runner.py"
                   },
                   "via": "_require_ready"
                 },
@@ -3114,7 +3122,7 @@
                   "line": 612,
                   "name": "require_heartbeat",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   },
                   "via": "_require_ready"
                 },
@@ -3122,7 +3130,7 @@
                   "line": 617,
                   "name": "require_card_empty",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   },
                   "via": "_require_ready"
                 },
@@ -3141,7 +3149,7 @@
                   "line": 629,
                   "name": "read_log_segment",
                   "target": {
-                    "file": "src/switchyard/harness/ollama_serve.py"
+                    "file": "src/interlock/harness/ollama_serve.py"
                   },
                   "via": "_log_text"
                 },
@@ -3204,7 +3212,7 @@
                   "line": 1167,
                   "name": "effect",
                   "target": {
-                    "file": "src/switchyard/harness/e4b_stats.py"
+                    "file": "src/interlock/harness/e4b_stats.py"
                   },
                   "via": "_triplet"
                 },
@@ -3212,7 +3220,7 @@
                   "line": 1255,
                   "name": "decide",
                   "target": {
-                    "file": "src/switchyard/harness/e4b_stats.py"
+                    "file": "src/interlock/harness/e4b_stats.py"
                   },
                   "via": "_analyze"
                 },
@@ -3220,7 +3228,7 @@
                   "line": 1256,
                   "name": "bootstrap_median",
                   "target": {
-                    "file": "src/switchyard/harness/e4b_stats.py"
+                    "file": "src/interlock/harness/e4b_stats.py"
                   },
                   "via": "_analyze"
                 },
@@ -3233,7 +3241,7 @@
                   "line": 1464,
                   "name": "server_config_env",
                   "target": {
-                    "file": "src/switchyard/ollama_supervisor.py"
+                    "file": "src/interlock/ollama_supervisor.py"
                   },
                   "via": "_header"
                 },
@@ -3241,7 +3249,7 @@
                   "line": 1471,
                   "name": "receipt_environment",
                   "target": {
-                    "file": "src/switchyard/harness/ollama_serve.py"
+                    "file": "src/interlock/harness/ollama_serve.py"
                   },
                   "via": "_header"
                 }
@@ -3258,28 +3266,28 @@
                   "line": 1647,
                   "name": "require_free",
                   "target": {
-                    "file": "src/switchyard/harness/lifecycle.py"
+                    "file": "src/interlock/harness/lifecycle.py"
                   }
                 },
                 {
                   "line": 1648,
                   "name": "refuse_strays",
                   "target": {
-                    "file": "src/switchyard/harness/lifecycle.py"
+                    "file": "src/interlock/harness/lifecycle.py"
                   }
                 },
                 {
                   "line": 1662,
                   "name": "utc_now",
                   "target": {
-                    "file": "src/switchyard/harness/lifecycle.py"
+                    "file": "src/interlock/harness/lifecycle.py"
                   }
                 },
                 {
                   "line": 609,
                   "name": "heartbeat_path",
                   "target": {
-                    "file": "src/switchyard/harness/runner.py"
+                    "file": "src/interlock/harness/runner.py"
                   },
                   "via": "_require_ready"
                 },
@@ -3287,7 +3295,7 @@
                   "line": 612,
                   "name": "require_heartbeat",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   },
                   "via": "_require_ready"
                 },
@@ -3295,7 +3303,7 @@
                   "line": 617,
                   "name": "require_card_empty",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   },
                   "via": "_require_ready"
                 },
@@ -3314,7 +3322,7 @@
                   "line": 629,
                   "name": "read_log_segment",
                   "target": {
-                    "file": "src/switchyard/harness/ollama_serve.py"
+                    "file": "src/interlock/harness/ollama_serve.py"
                   },
                   "via": "_log_text"
                 },
@@ -3340,7 +3348,7 @@
                   "line": 1516,
                   "name": "utc_now",
                   "target": {
-                    "file": "src/switchyard/harness/lifecycle.py"
+                    "file": "src/interlock/harness/lifecycle.py"
                   },
                   "via": "_park"
                 },
@@ -3349,7 +3357,7 @@
                   "line": 1511,
                   "name": "move_aside",
                   "target": {
-                    "file": "src/switchyard/harness/lifecycle.py"
+                    "file": "src/interlock/harness/lifecycle.py"
                   },
                   "via": "_park"
                 },
@@ -3357,7 +3365,7 @@
                   "line": 728,
                   "name": "percentile",
                   "target": {
-                    "file": "src/switchyard/harness/timing.py"
+                    "file": "src/interlock/harness/timing.py"
                   },
                   "via": "pilot_summary"
                 },
@@ -3365,7 +3373,7 @@
                   "line": 1763,
                   "name": "receipt_environment",
                   "target": {
-                    "file": "src/switchyard/harness/ollama_serve.py"
+                    "file": "src/interlock/harness/ollama_serve.py"
                   }
                 }
               ],
@@ -3380,35 +3388,35 @@
                   "line": 1802,
                   "name": "require_unmodified",
                   "target": {
-                    "file": "src/switchyard/harness/lock.py"
+                    "file": "src/interlock/harness/lock.py"
                   }
                 },
                 {
                   "line": 1803,
                   "name": "require_grant",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   }
                 },
                 {
                   "line": 1805,
                   "name": "require_npu_session",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   }
                 },
                 {
                   "line": 1809,
                   "name": "resolve_run_id",
                   "target": {
-                    "file": "src/switchyard/harness/lifecycle.py"
+                    "file": "src/interlock/harness/lifecycle.py"
                   }
                 },
                 {
                   "line": 2135,
                   "name": "resolve_pin",
                   "target": {
-                    "file": "src/switchyard/harness/ollama_serve.py"
+                    "file": "src/interlock/harness/ollama_serve.py"
                   },
                   "via": "build_live_seams"
                 },
@@ -3416,7 +3424,7 @@
                   "line": 2143,
                   "name": "Server",
                   "target": {
-                    "file": "src/switchyard/harness/ollama_serve.py"
+                    "file": "src/interlock/harness/ollama_serve.py"
                   },
                   "via": "build_live_seams"
                 },
@@ -3430,7 +3438,7 @@
                   "line": 2149,
                   "name": "stop_process_tree",
                   "target": {
-                    "file": "src/switchyard/harness/ollama_serve.py"
+                    "file": "src/interlock/harness/ollama_serve.py"
                   },
                   "via": "build_live_seams"
                 },
@@ -3438,7 +3446,7 @@
                   "line": 2269,
                   "name": "heartbeat_path",
                   "target": {
-                    "file": "src/switchyard/harness/runner.py"
+                    "file": "src/interlock/harness/runner.py"
                   },
                   "via": "build_live_seams"
                 },
@@ -3452,7 +3460,7 @@
                   "line": 1647,
                   "name": "require_free",
                   "target": {
-                    "file": "src/switchyard/harness/lifecycle.py"
+                    "file": "src/interlock/harness/lifecycle.py"
                   },
                   "via": "run_pilot"
                 },
@@ -3461,7 +3469,7 @@
                   "line": 1648,
                   "name": "refuse_strays",
                   "target": {
-                    "file": "src/switchyard/harness/lifecycle.py"
+                    "file": "src/interlock/harness/lifecycle.py"
                   },
                   "via": "run_pilot"
                 },
@@ -3470,7 +3478,7 @@
                   "line": 1662,
                   "name": "utc_now",
                   "target": {
-                    "file": "src/switchyard/harness/lifecycle.py"
+                    "file": "src/interlock/harness/lifecycle.py"
                   },
                   "via": "run_pilot"
                 },
@@ -3479,7 +3487,7 @@
                   "line": 609,
                   "name": "heartbeat_path",
                   "target": {
-                    "file": "src/switchyard/harness/runner.py"
+                    "file": "src/interlock/harness/runner.py"
                   },
                   "via": "_require_ready"
                 },
@@ -3488,7 +3496,7 @@
                   "line": 612,
                   "name": "require_heartbeat",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   },
                   "via": "_require_ready"
                 },
@@ -3497,7 +3505,7 @@
                   "line": 617,
                   "name": "require_card_empty",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   },
                   "via": "_require_ready"
                 },
@@ -3520,7 +3528,7 @@
                   "line": 629,
                   "name": "read_log_segment",
                   "target": {
-                    "file": "src/switchyard/harness/ollama_serve.py"
+                    "file": "src/interlock/harness/ollama_serve.py"
                   },
                   "via": "_log_text"
                 },
@@ -3550,7 +3558,7 @@
                   "line": 1516,
                   "name": "utc_now",
                   "target": {
-                    "file": "src/switchyard/harness/lifecycle.py"
+                    "file": "src/interlock/harness/lifecycle.py"
                   },
                   "via": "_park"
                 },
@@ -3559,7 +3567,7 @@
                   "line": 1511,
                   "name": "move_aside",
                   "target": {
-                    "file": "src/switchyard/harness/lifecycle.py"
+                    "file": "src/interlock/harness/lifecycle.py"
                   },
                   "via": "_park"
                 }
@@ -3602,7 +3610,7 @@
                   "line": 2042,
                   "name": "get_json",
                   "target": {
-                    "file": "src/switchyard/harness/ollama_serve.py"
+                    "file": "src/interlock/harness/ollama_serve.py"
                   }
                 }
               ],
@@ -3617,14 +3625,14 @@
                   "line": 2135,
                   "name": "resolve_pin",
                   "target": {
-                    "file": "src/switchyard/harness/ollama_serve.py"
+                    "file": "src/interlock/harness/ollama_serve.py"
                   }
                 },
                 {
                   "line": 2143,
                   "name": "Server",
                   "target": {
-                    "file": "src/switchyard/harness/ollama_serve.py"
+                    "file": "src/interlock/harness/ollama_serve.py"
                   }
                 },
                 {
@@ -3637,14 +3645,14 @@
                   "line": 2149,
                   "name": "stop_process_tree",
                   "target": {
-                    "file": "src/switchyard/harness/ollama_serve.py"
+                    "file": "src/interlock/harness/ollama_serve.py"
                   }
                 },
                 {
                   "line": 2269,
                   "name": "heartbeat_path",
                   "target": {
-                    "file": "src/switchyard/harness/runner.py"
+                    "file": "src/interlock/harness/runner.py"
                   }
                 }
               ],
@@ -3715,7 +3723,7 @@
             }
           ],
           "hash": "b44710d314f1ffbe4498e61eb2d1db8c79fd1bac2efb3ca3113455ffdbbdb6e8",
-          "path": "src/switchyard/harness/e4b_stats.py"
+          "path": "src/interlock/harness/e4b_stats.py"
         },
         {
           "exports": [
@@ -3793,7 +3801,7 @@
             }
           ],
           "hash": "220b68a71a2986218cf30db248fbdb20875f4edb1fd16a1b58b84797d260a0b6",
-          "path": "src/switchyard/harness/e5.py"
+          "path": "src/interlock/harness/e5.py"
         },
         {
           "exports": [
@@ -3837,7 +3845,7 @@
             }
           ],
           "hash": "eec18542eb29c1c008774effc48e4e56dbbd40fba638c637bd015b3e04cb1f9f",
-          "path": "src/switchyard/harness/environment.py"
+          "path": "src/interlock/harness/environment.py"
         },
         {
           "exports": [
@@ -3859,147 +3867,142 @@
             {
               "in": "sample",
               "kind": "except",
-              "line": 248
+              "line": 249
             },
             {
               "in": "sample",
               "kind": "except",
-              "line": 264
+              "line": 265
             },
             {
               "in": "parse_mib",
               "kind": "except",
-              "line": 313
+              "line": 314
             },
             {
               "in": "parse_counter_text",
               "kind": "except",
-              "line": 340
+              "line": 341
             },
             {
               "in": "ggml_cuda_sha256",
               "kind": "except",
-              "line": 506
+              "line": 507
             },
             {
               "in": "_capture",
               "kind": "except",
-              "line": 514
+              "line": 515
             },
             {
               "in": "_read_configured_log",
               "kind": "except",
-              "line": 536
+              "line": 537
             },
             {
               "in": "_optional_reader",
               "kind": "except",
-              "line": 573
+              "line": 574
             },
             {
               "in": "_window_readings",
               "kind": "except",
-              "line": 582
+              "line": 583
             },
             {
               "in": "_ollama_version",
               "kind": "except",
-              "line": 594
+              "line": 595
             },
             {
               "in": "_refuse_confirm_num_predict",
               "kind": "raise",
-              "line": 608
+              "line": 609
             },
             {
               "in": "_ollama",
               "kind": "except",
-              "line": 641
+              "line": 642
             },
             {
               "in": "_ollama",
               "kind": "raise",
-              "line": 642
+              "line": 643
             },
             {
               "in": "_settled_card",
               "kind": "except",
-              "line": 729
+              "line": 730
             },
             {
               "in": "_resume_fill",
               "kind": "except",
-              "line": 831
+              "line": 832
             },
             {
               "in": "run_fill_card",
               "kind": "except",
-              "line": 937
+              "line": 938
             },
             {
               "in": "run_fill_card",
               "kind": "raise",
-              "line": 966
+              "line": 967
             },
             {
               "in": "_unload",
               "kind": "except",
-              "line": 982
+              "line": 983
             },
             {
               "in": "_unload",
               "kind": "raise",
-              "line": 987
-            },
-            {
-              "in": "_unload",
-              "kind": "except",
               "line": 988
             },
             {
               "in": "_unload",
+              "kind": "except",
+              "line": 989
+            },
+            {
+              "in": "_unload",
               "kind": "raise",
-              "line": 991
+              "line": 992
             },
             {
               "in": "_remember",
               "kind": "except",
-              "line": 1062
+              "line": 1063
             },
             {
               "in": "_measure_model",
               "kind": "except",
-              "line": 1114
+              "line": 1115
             },
             {
               "in": "_measure_model",
               "kind": "except",
-              "line": 1162
+              "line": 1163
             },
             {
               "in": "stop_if_unload_timed_out",
               "kind": "raise",
-              "line": 1195
+              "line": 1196
             },
             {
               "in": "count",
               "kind": "except",
-              "line": 1211
+              "line": 1212
             },
             {
               "in": "count",
               "kind": "raise",
-              "line": 1213
+              "line": 1214
             },
             {
               "in": "count",
               "kind": "raise",
-              "line": 1215
-            },
-            {
-              "in": "count",
-              "kind": "raise",
-              "line": 1218
+              "line": 1216
             },
             {
               "in": "count",
@@ -4009,132 +4012,137 @@
             {
               "in": "count",
               "kind": "raise",
-              "line": 1221
+              "line": 1220
+            },
+            {
+              "in": "count",
+              "kind": "raise",
+              "line": 1222
             },
             {
               "in": "observe",
               "kind": "except",
-              "line": 1231
+              "line": 1232
             },
             {
               "in": "observe",
               "kind": "except",
-              "line": 1234
+              "line": 1235
             },
             {
               "in": "observe",
               "kind": "raise",
-              "line": 1240
+              "line": 1241
             },
             {
               "in": "observe",
               "kind": "except",
-              "line": 1246
+              "line": 1247
             },
             {
               "in": "observe",
               "kind": "except",
-              "line": 1249
+              "line": 1250
             },
             {
               "in": "observe",
               "kind": "raise",
-              "line": 1255
+              "line": 1256
             },
             {
               "in": "observe",
               "kind": "raise",
-              "line": 1260
+              "line": 1261
             },
             {
               "in": "observe",
               "kind": "except",
-              "line": 1281
+              "line": 1282
             },
             {
               "in": "observe",
               "kind": "raise",
-              "line": 1287
+              "line": 1288
             },
             {
               "in": "observe",
               "kind": "raise",
-              "line": 1296
+              "line": 1297
             },
             {
               "in": "probe",
               "kind": "raise",
-              "line": 1324
+              "line": 1325
             },
             {
               "in": "probe",
               "kind": "raise",
-              "line": 1332
+              "line": 1333
             },
             {
               "in": "probe",
               "kind": "raise",
-              "line": 1335
+              "line": 1336
             },
             {
               "in": "probe",
               "kind": "except",
-              "line": 1343
+              "line": 1344
             },
             {
               "in": "probe",
               "kind": "raise",
-              "line": 1351
+              "line": 1352
             },
             {
               "in": "_measure_model",
               "kind": "except",
-              "line": 1368
+              "line": 1369
             },
             {
               "in": "_measure_model",
               "kind": "except",
-              "line": 1379
+              "line": 1380
             },
             {
               "in": "_measure_model",
               "kind": "except",
-              "line": 1401
+              "line": 1402
             },
             {
               "in": "_measure_model",
               "kind": "except",
-              "line": 1425
+              "line": 1426
             }
           ],
-          "hash": "898f9e6d887a3d2bc8f43013fb67be4563720c98ea56a01b53c905959fb8517a",
+          "hash": "91e862d238c540daa65ffa71a6cb4149f2c75231a13c7e208063c14aed39759d",
           "importOrder": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/ollama_supervisor.py",
-            "src/switchyard/adapters/ollama.py",
-            "src/switchyard/harness/count_budget.py",
-            "src/switchyard/cli.py",
-            "src/switchyard/families.py",
-            "src/switchyard/guards.py",
-            "src/switchyard/harness/e5.py",
-            "src/switchyard/harness/receipts.py",
-            "src/switchyard/receipt.py",
-            "src/switchyard/harness/runner.py"
+            "src/interlock/adapters/base.py",
+            "src/interlock/ollama_supervisor.py",
+            "src/interlock/adapters/ollama.py",
+            "src/interlock/harness/count_budget.py",
+            "src/interlock/cli.py",
+            "src/interlock/families.py",
+            "src/interlock/guards.py",
+            "src/interlock/harness/e5.py",
+            "src/interlock/harness/receipts.py",
+            "src/interlock/receipt.py",
+            "src/interlock/harness/runner.py"
           ],
           "importsFiles": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/adapters/ollama.py",
-            "src/switchyard/cli.py",
-            "src/switchyard/families.py",
-            "src/switchyard/guards.py",
-            "src/switchyard/harness/count_budget.py",
-            "src/switchyard/harness/e5.py",
-            "src/switchyard/harness/receipts.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/ollama_supervisor.py",
-            "src/switchyard/receipt.py"
+            "src/interlock/adapters/base.py",
+            "src/interlock/adapters/ollama.py",
+            "src/interlock/cli.py",
+            "src/interlock/families.py",
+            "src/interlock/guards.py",
+            "src/interlock/harness/count_budget.py",
+            "src/interlock/harness/e5.py",
+            "src/interlock/harness/receipts.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/ollama_supervisor.py",
+            "src/interlock/receipt.py"
           ],
-          "path": "src/switchyard/harness/fill.py"
+          "path": "src/interlock/harness/fill.py"
         },
         {
           "entry": "artefacts",
@@ -4204,8 +4212,8 @@
               "line": 306
             }
           ],
-          "hash": "b66d8387b3914135ce138635996ccc016ac8e8d133fb0481f138b9d33e0c28e2",
-          "path": "src/switchyard/harness/lifecycle.py",
+          "hash": "d49af96b4e69350ff90ed683abcf89f534d227f9281653374076e830bd2a24a7",
+          "path": "src/interlock/harness/lifecycle.py",
           "sequences": [
             {
               "calls": [
@@ -4523,11 +4531,11 @@
               "line": 40
             }
           ],
-          "hash": "2cf4b48636b66ec5f155a7a4ec9c4d51150b9488eec207084c9cf0474b0ef61b",
+          "hash": "429693eedabd106fd9d5950a669e942050ced11b9dedd66ce53933afe4df40a1",
           "importsFiles": [
-            "src/switchyard/harness/spec.py"
+            "src/interlock/harness/spec.py"
           ],
-          "path": "src/switchyard/harness/lock.py"
+          "path": "src/interlock/harness/lock.py"
         },
         {
           "exports": [
@@ -4565,11 +4573,11 @@
               "line": 112
             }
           ],
-          "hash": "6e7a646918b46bb1c08c8f34c2a561b5a39f32f6a310197a353208961dcbba66",
+          "hash": "2a588df11c8e34794b11fa5774a52a13b76c293229d4d1af665d5040a37b03c4",
           "importsFiles": [
-            "src/switchyard/receipt.py"
+            "src/interlock/receipt.py"
           ],
-          "path": "src/switchyard/harness/marker.py"
+          "path": "src/interlock/harness/marker.py"
         },
         {
           "exports": [
@@ -4700,7 +4708,7 @@
             }
           ],
           "hash": "bc394393985338e10894704593f4ecc2fdabe9e7d57b48f812e6208f13c11fe9",
-          "path": "src/switchyard/harness/ollama_serve.py"
+          "path": "src/interlock/harness/ollama_serve.py"
         },
         {
           "exports": [
@@ -4736,26 +4744,26 @@
               "line": 409
             }
           ],
-          "hash": "dadc726e3d704f05fcf9a0b5b2a1c53bc5b22b62dce9693176188df88e2a50d9",
+          "hash": "054b3b3a6d656bd90aea5b7a9e1f3743e7b652e57c48115482153bb0ef80c7ba",
           "importOrder": [
-            "src/switchyard/harness/__init__.py",
-            "src/switchyard/harness/environment.py",
-            "src/switchyard/harness/timing.py",
-            "src/switchyard/families.py",
-            "src/switchyard/importers/gaps.py",
-            "src/switchyard/receipt.py",
-            "src/switchyard/harness/lifecycle.py"
+            "src/interlock/harness/__init__.py",
+            "src/interlock/harness/environment.py",
+            "src/interlock/harness/timing.py",
+            "src/interlock/families.py",
+            "src/interlock/importers/gaps.py",
+            "src/interlock/receipt.py",
+            "src/interlock/harness/lifecycle.py"
           ],
           "importsFiles": [
-            "src/switchyard/families.py",
-            "src/switchyard/harness/__init__.py",
-            "src/switchyard/harness/environment.py",
-            "src/switchyard/harness/lifecycle.py",
-            "src/switchyard/harness/timing.py",
-            "src/switchyard/importers/gaps.py",
-            "src/switchyard/receipt.py"
+            "src/interlock/families.py",
+            "src/interlock/harness/__init__.py",
+            "src/interlock/harness/environment.py",
+            "src/interlock/harness/lifecycle.py",
+            "src/interlock/harness/timing.py",
+            "src/interlock/importers/gaps.py",
+            "src/interlock/receipt.py"
           ],
-          "path": "src/switchyard/harness/receipts.py"
+          "path": "src/interlock/harness/receipts.py"
         },
         {
           "entry": "run_spec",
@@ -4969,30 +4977,30 @@
               "line": 2082
             }
           ],
-          "hash": "d932efa80dc0d6d8ef12dd9ed016791035522202091f33d345f5401e6a1ea02b",
+          "hash": "a0516afa9402f81e8762b31069709e07e2a8217e475c38f045f6a7156970acf7",
           "importsFiles": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/adapters/offrig_calibrate.py",
-            "src/switchyard/adapters/ollama.py",
-            "src/switchyard/adapters/registry.py",
-            "src/switchyard/cli.py",
-            "src/switchyard/devices.py",
-            "src/switchyard/guards.py",
-            "src/switchyard/harness/count_budget.py",
-            "src/switchyard/harness/e4b.py",
-            "src/switchyard/harness/e5.py",
-            "src/switchyard/harness/fill.py",
-            "src/switchyard/harness/lock.py",
-            "src/switchyard/harness/marker.py",
-            "src/switchyard/harness/receipts.py",
-            "src/switchyard/harness/spec.py",
-            "src/switchyard/harness/steady.py",
-            "src/switchyard/harness/timing.py",
-            "src/switchyard/harness/watch.py",
-            "src/switchyard/ollama_supervisor.py",
-            "src/switchyard/receipt.py"
+            "src/interlock/adapters/base.py",
+            "src/interlock/adapters/offrig_calibrate.py",
+            "src/interlock/adapters/ollama.py",
+            "src/interlock/adapters/registry.py",
+            "src/interlock/cli.py",
+            "src/interlock/devices.py",
+            "src/interlock/guards.py",
+            "src/interlock/harness/count_budget.py",
+            "src/interlock/harness/e4b.py",
+            "src/interlock/harness/e5.py",
+            "src/interlock/harness/fill.py",
+            "src/interlock/harness/lock.py",
+            "src/interlock/harness/marker.py",
+            "src/interlock/harness/receipts.py",
+            "src/interlock/harness/spec.py",
+            "src/interlock/harness/steady.py",
+            "src/interlock/harness/timing.py",
+            "src/interlock/harness/watch.py",
+            "src/interlock/ollama_supervisor.py",
+            "src/interlock/receipt.py"
           ],
-          "path": "src/switchyard/harness/runner.py",
+          "path": "src/interlock/harness/runner.py",
           "sequences": [
             {
               "calls": [
@@ -5000,7 +5008,7 @@
                   "line": 140,
                   "name": "load_spec",
                   "target": {
-                    "file": "src/switchyard/harness/spec.py"
+                    "file": "src/interlock/harness/spec.py"
                   }
                 },
                 {
@@ -5008,14 +5016,14 @@
                   "line": 144,
                   "name": "E4bError",
                   "target": {
-                    "file": "src/switchyard/harness/e4b.py"
+                    "file": "src/interlock/harness/e4b.py"
                   }
                 },
                 {
                   "line": 145,
                   "name": "require_unmodified",
                   "target": {
-                    "file": "src/switchyard/harness/lock.py"
+                    "file": "src/interlock/harness/lock.py"
                   }
                 },
                 {
@@ -5023,14 +5031,14 @@
                   "line": 149,
                   "name": "dry_text",
                   "target": {
-                    "file": "src/switchyard/harness/e4b.py"
+                    "file": "src/interlock/harness/e4b.py"
                   }
                 },
                 {
                   "line": 156,
                   "name": "warmup_policy",
                   "target": {
-                    "file": "src/switchyard/harness/steady.py"
+                    "file": "src/interlock/harness/steady.py"
                   }
                 },
                 {
@@ -5038,7 +5046,7 @@
                   "line": 1294,
                   "name": "schedule",
                   "target": {
-                    "file": "src/switchyard/harness/timing.py"
+                    "file": "src/interlock/harness/timing.py"
                   },
                   "via": "_block_plan"
                 },
@@ -5047,7 +5055,7 @@
                   "line": 1259,
                   "name": "schedule_aba",
                   "target": {
-                    "file": "src/switchyard/harness/timing.py"
+                    "file": "src/interlock/harness/timing.py"
                   },
                   "via": "_slots"
                 },
@@ -5055,7 +5063,7 @@
                   "line": 1261,
                   "name": "schedule",
                   "target": {
-                    "file": "src/switchyard/harness/timing.py"
+                    "file": "src/interlock/harness/timing.py"
                   },
                   "via": "_slots"
                 },
@@ -5063,14 +5071,14 @@
                   "line": 219,
                   "name": "plan_argv",
                   "target": {
-                    "file": "src/switchyard/adapters/offrig_calibrate.py"
+                    "file": "src/interlock/adapters/offrig_calibrate.py"
                   }
                 },
                 {
                   "line": 235,
                   "name": "restart_policy_lines",
                   "target": {
-                    "file": "src/switchyard/ollama_supervisor.py"
+                    "file": "src/interlock/ollama_supervisor.py"
                   }
                 }
               ],
@@ -5085,14 +5093,14 @@
                   "line": 295,
                   "name": "require_unmodified",
                   "target": {
-                    "file": "src/switchyard/harness/lock.py"
+                    "file": "src/interlock/harness/lock.py"
                   }
                 },
                 {
                   "line": 296,
                   "name": "load_spec",
                   "target": {
-                    "file": "src/switchyard/harness/spec.py"
+                    "file": "src/interlock/harness/spec.py"
                   }
                 },
                 {
@@ -5104,7 +5112,7 @@
                   "line": 1844,
                   "name": "assess_step",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   },
                   "via": "_guard_flags"
                 },
@@ -5112,7 +5120,7 @@
                   "line": 303,
                   "name": "warmup_policy",
                   "target": {
-                    "file": "src/switchyard/harness/steady.py"
+                    "file": "src/interlock/harness/steady.py"
                   }
                 },
                 {
@@ -5120,7 +5128,7 @@
                   "line": 1259,
                   "name": "schedule_aba",
                   "target": {
-                    "file": "src/switchyard/harness/timing.py"
+                    "file": "src/interlock/harness/timing.py"
                   },
                   "via": "_slots"
                 },
@@ -5128,7 +5136,7 @@
                   "line": 1261,
                   "name": "schedule",
                   "target": {
-                    "file": "src/switchyard/harness/timing.py"
+                    "file": "src/interlock/harness/timing.py"
                   },
                   "via": "_slots"
                 },
@@ -5136,35 +5144,35 @@
                   "line": 312,
                   "name": "SlotStream",
                   "target": {
-                    "file": "src/switchyard/harness/steady.py"
+                    "file": "src/interlock/harness/steady.py"
                   }
                 },
                 {
                   "line": 317,
                   "name": "BlockPlan",
                   "target": {
-                    "file": "src/switchyard/harness/steady.py"
+                    "file": "src/interlock/harness/steady.py"
                   }
                 },
                 {
                   "line": 325,
                   "name": "UntilSteady",
                   "target": {
-                    "file": "src/switchyard/harness/steady.py"
+                    "file": "src/interlock/harness/steady.py"
                   }
                 },
                 {
                   "line": 325,
                   "name": "SlotStream",
                   "target": {
-                    "file": "src/switchyard/harness/steady.py"
+                    "file": "src/interlock/harness/steady.py"
                   }
                 },
                 {
                   "line": 348,
                   "name": "environment",
                   "target": {
-                    "file": "src/switchyard/harness/receipts.py"
+                    "file": "src/interlock/harness/receipts.py"
                   }
                 },
                 {
@@ -5172,7 +5180,7 @@
                   "line": 1766,
                   "name": "GuardError",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   },
                   "via": "_cache_dirs"
                 },
@@ -5180,21 +5188,21 @@
                   "line": 356,
                   "name": "WatchHooks",
                   "target": {
-                    "file": "src/switchyard/harness/watch.py"
+                    "file": "src/interlock/harness/watch.py"
                   }
                 },
                 {
                   "line": 357,
                   "name": "CompileTracker",
                   "target": {
-                    "file": "src/switchyard/adapters/base.py"
+                    "file": "src/interlock/adapters/base.py"
                   }
                 },
                 {
                   "line": 361,
                   "name": "RunMarker",
                   "target": {
-                    "file": "src/switchyard/harness/marker.py"
+                    "file": "src/interlock/harness/marker.py"
                   }
                 },
                 {
@@ -5212,21 +5220,21 @@
                   "line": 368,
                   "name": "BuildGuard",
                   "target": {
-                    "file": "src/switchyard/harness/watch.py"
+                    "file": "src/interlock/harness/watch.py"
                   }
                 },
                 {
                   "line": 370,
                   "name": "read_bytes",
                   "target": {
-                    "file": "src/switchyard/harness/watch.py"
+                    "file": "src/interlock/harness/watch.py"
                   }
                 },
                 {
                   "line": 602,
                   "name": "RunWatch",
                   "target": {
-                    "file": "src/switchyard/harness/watch.py"
+                    "file": "src/interlock/harness/watch.py"
                   }
                 },
                 {
@@ -5234,7 +5242,7 @@
                   "name": "RAM_STOP_PCT",
                   "passed": true,
                   "target": {
-                    "file": "src/switchyard/harness/watch.py"
+                    "file": "src/interlock/harness/watch.py"
                   }
                 },
                 {
@@ -5242,7 +5250,7 @@
                   "name": "start",
                   "receiver": "RunWatch",
                   "target": {
-                    "file": "src/switchyard/harness/watch.py"
+                    "file": "src/interlock/harness/watch.py"
                   }
                 },
                 {
@@ -5250,7 +5258,7 @@
                   "name": "pop",
                   "receiver": "SlotStream",
                   "target": {
-                    "file": "src/switchyard/harness/steady.py"
+                    "file": "src/interlock/harness/steady.py"
                   }
                 }
               ],
@@ -5266,7 +5274,7 @@
                   "line": 1008,
                   "name": "failure_kind",
                   "target": {
-                    "file": "src/switchyard/ollama_supervisor.py"
+                    "file": "src/interlock/ollama_supervisor.py"
                   }
                 }
               ],
@@ -5282,7 +5290,7 @@
                   "name": "NativeBinaryRejected",
                   "passed": true,
                   "target": {
-                    "file": "src/switchyard/adapters/base.py"
+                    "file": "src/interlock/adapters/base.py"
                   }
                 }
               ],
@@ -5298,14 +5306,14 @@
                   "name": "CompileRejected",
                   "passed": true,
                   "target": {
-                    "file": "src/switchyard/adapters/base.py"
+                    "file": "src/interlock/adapters/base.py"
                   }
                 },
                 {
                   "line": 1159,
                   "name": "compile_rejected_error",
                   "target": {
-                    "file": "src/switchyard/adapters/base.py"
+                    "file": "src/interlock/adapters/base.py"
                   }
                 }
               ],
@@ -5326,7 +5334,7 @@
                   "name": "COMPILER_MESSAGE_MARKER",
                   "passed": true,
                   "target": {
-                    "file": "src/switchyard/adapters/base.py"
+                    "file": "src/interlock/adapters/base.py"
                   }
                 }
               ],
@@ -5348,7 +5356,7 @@
                   "name": "COMPILER_MESSAGE_MARKER",
                   "passed": true,
                   "target": {
-                    "file": "src/switchyard/adapters/base.py"
+                    "file": "src/interlock/adapters/base.py"
                   },
                   "via": "compiler_message"
                 }
@@ -5365,7 +5373,7 @@
                   "line": 1294,
                   "name": "schedule",
                   "target": {
-                    "file": "src/switchyard/harness/timing.py"
+                    "file": "src/interlock/harness/timing.py"
                   },
                   "via": "_block_plan"
                 },
@@ -5374,14 +5382,14 @@
                   "line": 1259,
                   "name": "schedule_aba",
                   "target": {
-                    "file": "src/switchyard/harness/timing.py"
+                    "file": "src/interlock/harness/timing.py"
                   }
                 },
                 {
                   "line": 1261,
                   "name": "schedule",
                   "target": {
-                    "file": "src/switchyard/harness/timing.py"
+                    "file": "src/interlock/harness/timing.py"
                   }
                 }
               ],
@@ -5397,7 +5405,7 @@
                   "line": 1259,
                   "name": "schedule_aba",
                   "target": {
-                    "file": "src/switchyard/harness/timing.py"
+                    "file": "src/interlock/harness/timing.py"
                   },
                   "via": "_slots"
                 },
@@ -5405,7 +5413,7 @@
                   "line": 1261,
                   "name": "schedule",
                   "target": {
-                    "file": "src/switchyard/harness/timing.py"
+                    "file": "src/interlock/harness/timing.py"
                   },
                   "via": "_slots"
                 }
@@ -5421,7 +5429,7 @@
                   "line": 1660,
                   "name": "roster_timeout",
                   "target": {
-                    "file": "src/switchyard/harness/count_budget.py"
+                    "file": "src/interlock/harness/count_budget.py"
                   },
                   "via": "_dataset_prompt"
                 },
@@ -5429,7 +5437,7 @@
                   "line": 1671,
                   "name": "fit_prompt_words",
                   "target": {
-                    "file": "src/switchyard/harness/e5.py"
+                    "file": "src/interlock/harness/e5.py"
                   },
                   "via": "_dataset_prompt"
                 },
@@ -5456,7 +5464,7 @@
                   "line": 1691,
                   "name": "fit_prompt",
                   "target": {
-                    "file": "src/switchyard/harness/e5.py"
+                    "file": "src/interlock/harness/e5.py"
                   },
                   "via": "_dataset_prompt"
                 },
@@ -5464,7 +5472,7 @@
                   "line": 1320,
                   "name": "StepRequest",
                   "target": {
-                    "file": "src/switchyard/adapters/base.py"
+                    "file": "src/interlock/adapters/base.py"
                   }
                 }
               ],
@@ -5480,14 +5488,14 @@
                   "line": 1378,
                   "name": "TimingError",
                   "target": {
-                    "file": "src/switchyard/harness/timing.py"
+                    "file": "src/interlock/harness/timing.py"
                   }
                 },
                 {
                   "line": 1380,
                   "name": "summarize",
                   "target": {
-                    "file": "src/switchyard/harness/timing.py"
+                    "file": "src/interlock/harness/timing.py"
                   }
                 }
               ],
@@ -5502,7 +5510,7 @@
                   "line": 1490,
                   "name": "warmup_trace",
                   "target": {
-                    "file": "src/switchyard/harness/steady.py"
+                    "file": "src/interlock/harness/steady.py"
                   }
                 },
                 {
@@ -5522,7 +5530,7 @@
                   "line": 1520,
                   "name": "aba_call",
                   "target": {
-                    "file": "src/switchyard/harness/timing.py"
+                    "file": "src/interlock/harness/timing.py"
                   }
                 }
               ],
@@ -5537,7 +5545,7 @@
                   "line": 1660,
                   "name": "roster_timeout",
                   "target": {
-                    "file": "src/switchyard/harness/count_budget.py"
+                    "file": "src/interlock/harness/count_budget.py"
                   },
                   "via": "_dataset_prompt"
                 },
@@ -5545,7 +5553,7 @@
                   "line": 1671,
                   "name": "fit_prompt_words",
                   "target": {
-                    "file": "src/switchyard/harness/e5.py"
+                    "file": "src/interlock/harness/e5.py"
                   },
                   "via": "_dataset_prompt"
                 },
@@ -5572,7 +5580,7 @@
                   "line": 1691,
                   "name": "fit_prompt",
                   "target": {
-                    "file": "src/switchyard/harness/e5.py"
+                    "file": "src/interlock/harness/e5.py"
                   },
                   "via": "_dataset_prompt"
                 },
@@ -5580,7 +5588,7 @@
                   "line": 1320,
                   "name": "StepRequest",
                   "target": {
-                    "file": "src/switchyard/adapters/base.py"
+                    "file": "src/interlock/adapters/base.py"
                   },
                   "via": "_request"
                 }
@@ -5596,14 +5604,14 @@
                   "line": 1660,
                   "name": "roster_timeout",
                   "target": {
-                    "file": "src/switchyard/harness/count_budget.py"
+                    "file": "src/interlock/harness/count_budget.py"
                   }
                 },
                 {
                   "line": 1671,
                   "name": "fit_prompt_words",
                   "target": {
-                    "file": "src/switchyard/harness/e5.py"
+                    "file": "src/interlock/harness/e5.py"
                   }
                 },
                 {
@@ -5626,7 +5634,7 @@
                   "line": 1691,
                   "name": "fit_prompt",
                   "target": {
-                    "file": "src/switchyard/harness/e5.py"
+                    "file": "src/interlock/harness/e5.py"
                   }
                 }
               ],
@@ -5642,7 +5650,7 @@
                   "line": 1766,
                   "name": "GuardError",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   }
                 }
               ],
@@ -5657,7 +5665,7 @@
                   "line": 1844,
                   "name": "assess_step",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   }
                 }
               ],
@@ -5673,7 +5681,7 @@
                   "line": 1844,
                   "name": "assess_step",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   },
                   "via": "_guard_flags"
                 },
@@ -5681,7 +5689,7 @@
                   "line": 1867,
                   "name": "assess_step",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   }
                 }
               ],
@@ -5696,7 +5704,7 @@
                   "line": 1889,
                   "name": "for_engine",
                   "target": {
-                    "file": "src/switchyard/adapters/registry.py"
+                    "file": "src/interlock/adapters/registry.py"
                   }
                 }
               ],
@@ -5716,7 +5724,7 @@
                   "line": 1904,
                   "name": "GuardError",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   }
                 }
               ],
@@ -5732,7 +5740,7 @@
                   "line": 1928,
                   "name": "GuardError",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   }
                 }
               ],
@@ -5747,14 +5755,14 @@
                   "line": 1935,
                   "name": "require_heartbeat",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   }
                 },
                 {
                   "line": 1936,
                   "name": "require_card_empty",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   }
                 }
               ],
@@ -5788,7 +5796,7 @@
                   "line": 1904,
                   "name": "GuardError",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   },
                   "via": "_refuse_repo_interpreter"
                 },
@@ -5796,7 +5804,7 @@
                   "line": 2010,
                   "name": "load_spec",
                   "target": {
-                    "file": "src/switchyard/harness/spec.py"
+                    "file": "src/interlock/harness/spec.py"
                   }
                 },
                 {
@@ -5804,7 +5812,7 @@
                   "line": 2014,
                   "name": "run_from_cli",
                   "target": {
-                    "file": "src/switchyard/harness/e4b.py"
+                    "file": "src/interlock/harness/e4b.py"
                   }
                 },
                 {
@@ -5812,7 +5820,7 @@
                   "line": 2030,
                   "name": "E4bError",
                   "target": {
-                    "file": "src/switchyard/harness/e4b.py"
+                    "file": "src/interlock/harness/e4b.py"
                   }
                 },
                 {
@@ -5820,7 +5828,7 @@
                   "line": 1844,
                   "name": "assess_step",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   },
                   "via": "_guard_flags"
                 },
@@ -5828,7 +5836,7 @@
                   "line": 1867,
                   "name": "assess_step",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   },
                   "via": "check_flags"
                 },
@@ -5836,7 +5844,7 @@
                   "line": 2032,
                   "name": "require_unmodified",
                   "target": {
-                    "file": "src/switchyard/harness/lock.py"
+                    "file": "src/interlock/harness/lock.py"
                   }
                 },
                 {
@@ -5844,7 +5852,7 @@
                   "line": 2037,
                   "name": "GuardError",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   }
                 },
                 {
@@ -5856,7 +5864,7 @@
                   "line": 2046,
                   "name": "RunMarker",
                   "target": {
-                    "file": "src/switchyard/harness/marker.py"
+                    "file": "src/interlock/harness/marker.py"
                   }
                 },
                 {
@@ -5864,7 +5872,7 @@
                   "name": "write",
                   "receiver": "RunMarker",
                   "target": {
-                    "file": "src/switchyard/harness/marker.py"
+                    "file": "src/interlock/harness/marker.py"
                   }
                 },
                 {
@@ -5872,7 +5880,7 @@
                   "line": 2059,
                   "name": "for_engine",
                   "target": {
-                    "file": "src/switchyard/adapters/registry.py"
+                    "file": "src/interlock/adapters/registry.py"
                   }
                 },
                 {
@@ -5880,7 +5888,7 @@
                   "line": 2063,
                   "name": "quiet_fill_seams",
                   "target": {
-                    "file": "src/switchyard/harness/fill.py"
+                    "file": "src/interlock/harness/fill.py"
                   }
                 },
                 {
@@ -5888,7 +5896,7 @@
                   "line": 2065,
                   "name": "real_fill_seams",
                   "target": {
-                    "file": "src/switchyard/harness/fill.py"
+                    "file": "src/interlock/harness/fill.py"
                   }
                 },
                 {
@@ -5896,7 +5904,7 @@
                   "line": 2066,
                   "name": "run_fill_card",
                   "target": {
-                    "file": "src/switchyard/harness/fill.py"
+                    "file": "src/interlock/harness/fill.py"
                   }
                 },
                 {
@@ -5904,14 +5912,14 @@
                   "line": 2082,
                   "name": "GuardError",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   }
                 },
                 {
                   "line": 1889,
                   "name": "for_engine",
                   "target": {
-                    "file": "src/switchyard/adapters/registry.py"
+                    "file": "src/interlock/adapters/registry.py"
                   },
                   "via": "real_adapters"
                 },
@@ -5920,7 +5928,7 @@
                   "line": 1928,
                   "name": "GuardError",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   },
                   "via": "_card_probe"
                 },
@@ -5928,7 +5936,7 @@
                   "line": 1935,
                   "name": "require_heartbeat",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   },
                   "via": "_card_guards"
                 },
@@ -5936,7 +5944,7 @@
                   "line": 1936,
                   "name": "require_card_empty",
                   "target": {
-                    "file": "src/switchyard/guards.py"
+                    "file": "src/interlock/guards.py"
                   },
                   "via": "_card_guards"
                 },
@@ -5944,7 +5952,7 @@
                   "line": 295,
                   "name": "require_unmodified",
                   "target": {
-                    "file": "src/switchyard/harness/lock.py"
+                    "file": "src/interlock/harness/lock.py"
                   },
                   "via": "run_interleaved"
                 },
@@ -5952,7 +5960,7 @@
                   "line": 296,
                   "name": "load_spec",
                   "target": {
-                    "file": "src/switchyard/harness/spec.py"
+                    "file": "src/interlock/harness/spec.py"
                   },
                   "via": "run_interleaved"
                 },
@@ -6475,12 +6483,12 @@
               "line": 453
             }
           ],
-          "hash": "815403c06d516ef432242df239ebe651fd66d5df2039e6b90f6b54d10dfb97c6",
+          "hash": "8f1842db316327a2e88d7e3d7a934d49cca3da741dc2d2d63eaafde20b4cc454",
           "importsFiles": [
-            "src/switchyard/harness/e5.py",
-            "src/switchyard/tasks.py"
+            "src/interlock/harness/e5.py",
+            "src/interlock/tasks.py"
           ],
-          "path": "src/switchyard/harness/spec.py",
+          "path": "src/interlock/harness/spec.py",
           "sequences": [
             {
               "calls": [
@@ -6504,11 +6512,11 @@
             "warmup_policy",
             "warmup_trace"
           ],
-          "hash": "2229299e768dcff7aa7a72e741f95b4f926e3eb472fb960f55416312ca1aba11",
+          "hash": "1dd28eb1405899a745058d7942d8aa8909b269d5638f6201d4d5dd6f1924836b",
           "importsFiles": [
-            "src/switchyard/harness/timing.py"
+            "src/interlock/harness/timing.py"
           ],
-          "path": "src/switchyard/harness/steady.py"
+          "path": "src/interlock/harness/steady.py"
         },
         {
           "exports": [
@@ -6556,8 +6564,8 @@
               "line": 153
             }
           ],
-          "hash": "6134ded5a84fa01482e2e4bfd144197fba1c2b00ee7c0767de8a4850c28f30db",
-          "path": "src/switchyard/harness/storage.py"
+          "hash": "21a5c164728dd7b07218137b9dc07e16eeeebc30c1e87c5cd1599b661674e733",
+          "path": "src/interlock/harness/storage.py"
         },
         {
           "exports": [
@@ -6612,7 +6620,7 @@
             }
           ],
           "hash": "d32da389627e87f17a213605e3a669b762a218deaec0fbc035208293fc5d6c5f",
-          "path": "src/switchyard/harness/timing.py"
+          "path": "src/interlock/harness/timing.py"
         },
         {
           "exports": [
@@ -6760,16 +6768,16 @@
               "line": 668
             }
           ],
-          "hash": "104daf9a13e9edceeaff36acedaa8cc4bb7ade5b84a7245c3306744d023cae25",
+          "hash": "27eb28532481e25f969a07cff79312c9c76250caf3bfcec9f78b65997370488b",
           "importsFiles": [
-            "src/switchyard/adapters/base.py"
+            "src/interlock/adapters/base.py"
           ],
-          "path": "src/switchyard/harness/watch.py"
+          "path": "src/interlock/harness/watch.py"
         },
         {
           "hash": "a80241985f5ce658bc6ed7967d97e3d27379e734165863530139acae88fc833b",
           "noStatements": true,
-          "path": "src/switchyard/importers/__init__.py"
+          "path": "src/interlock/importers/__init__.py"
         },
         {
           "exports": [
@@ -6813,13 +6821,13 @@
               "line": 178
             }
           ],
-          "hash": "a86f64e47e6ee19c97bf04c8e7aa652c6e5aa3ef2ddc46f375618557d647f432",
+          "hash": "c65e6da981de6a1bdd3a9db5fe10380a101db41cfb3b87eeb3ceaa4a6388005f",
           "importsFiles": [
-            "src/switchyard/families.py",
-            "src/switchyard/importers/common.py",
-            "src/switchyard/receipt.py"
+            "src/interlock/families.py",
+            "src/interlock/importers/common.py",
+            "src/interlock/receipt.py"
           ],
-          "path": "src/switchyard/importers/aspire_judges.py"
+          "path": "src/interlock/importers/aspire_judges.py"
         },
         {
           "entry": "import_receipts",
@@ -6922,20 +6930,20 @@
               "line": 291
             }
           ],
-          "hash": "5172cda9446e761997eb1dfae98bcf80c6405a7279e8e71d8acc609d95e4abc6",
+          "hash": "9abe4f3bc704d7e82a027cc1cc2adb73fb246579a23831dfc13a09f1cb266f7b",
           "importsFiles": [
-            "src/switchyard/harness/receipts.py",
-            "src/switchyard/importers/aspire_judges.py",
-            "src/switchyard/importers/calibration.py",
-            "src/switchyard/importers/common.py",
-            "src/switchyard/importers/ladder.py",
-            "src/switchyard/importers/nli.py",
-            "src/switchyard/importers/offers.py",
-            "src/switchyard/importers/pins.py",
-            "src/switchyard/importers/probe.py",
-            "src/switchyard/receipt.py"
+            "src/interlock/harness/receipts.py",
+            "src/interlock/importers/aspire_judges.py",
+            "src/interlock/importers/calibration.py",
+            "src/interlock/importers/common.py",
+            "src/interlock/importers/ladder.py",
+            "src/interlock/importers/nli.py",
+            "src/interlock/importers/offers.py",
+            "src/interlock/importers/pins.py",
+            "src/interlock/importers/probe.py",
+            "src/interlock/receipt.py"
           ],
-          "path": "src/switchyard/importers/assemble.py",
+          "path": "src/interlock/importers/assemble.py",
           "sequences": [
             {
               "calls": [
@@ -6949,7 +6957,7 @@
                   "line": 291,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   },
                   "via": "_git"
                 },
@@ -6965,7 +6973,7 @@
                   "line": 155,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   },
                   "via": "require_pin"
                 },
@@ -6973,7 +6981,7 @@
                   "line": 162,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   },
                   "via": "show"
                 },
@@ -6982,7 +6990,7 @@
                   "line": 174,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   },
                   "via": "_calibration"
                 },
@@ -6990,7 +6998,7 @@
                   "line": 181,
                   "name": "calibration_rows",
                   "target": {
-                    "file": "src/switchyard/importers/calibration.py"
+                    "file": "src/interlock/importers/calibration.py"
                   },
                   "via": "_calibration"
                 },
@@ -6998,7 +7006,7 @@
                   "line": 203,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   },
                   "via": "_ladder"
                 },
@@ -7006,7 +7014,7 @@
                   "line": 222,
                   "name": "sha256_bytes",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   },
                   "via": "_check_gold"
                 },
@@ -7015,7 +7023,7 @@
                   "line": 224,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   },
                   "via": "_check_gold"
                 },
@@ -7023,7 +7031,7 @@
                   "line": 207,
                   "name": "ladder_rows",
                   "target": {
-                    "file": "src/switchyard/importers/ladder.py"
+                    "file": "src/interlock/importers/ladder.py"
                   },
                   "via": "_ladder"
                 },
@@ -7031,14 +7039,14 @@
                   "line": 86,
                   "name": "probe_rows",
                   "target": {
-                    "file": "src/switchyard/importers/probe.py"
+                    "file": "src/interlock/importers/probe.py"
                   }
                 },
                 {
                   "line": 271,
                   "name": "prereg_names_intel_igpu",
                   "target": {
-                    "file": "src/switchyard/importers/nli.py"
+                    "file": "src/interlock/importers/nli.py"
                   },
                   "via": "_nli"
                 },
@@ -7046,7 +7054,7 @@
                   "line": 267,
                   "name": "nli_rows",
                   "target": {
-                    "file": "src/switchyard/importers/nli.py"
+                    "file": "src/interlock/importers/nli.py"
                   },
                   "via": "_nli"
                 },
@@ -7055,7 +7063,7 @@
                   "line": 246,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   },
                   "via": "_written_date"
                 },
@@ -7064,7 +7072,7 @@
                   "line": 249,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   },
                   "via": "_written_date"
                 },
@@ -7073,7 +7081,7 @@
                   "line": 260,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   },
                   "via": "_written_date"
                 },
@@ -7081,7 +7089,7 @@
                   "line": 232,
                   "name": "b_rows",
                   "target": {
-                    "file": "src/switchyard/importers/aspire_judges.py"
+                    "file": "src/interlock/importers/aspire_judges.py"
                   },
                   "via": "_aspire_b"
                 },
@@ -7100,7 +7108,7 @@
                   "line": 98,
                   "name": "offer_rows",
                   "target": {
-                    "file": "src/switchyard/importers/offers.py"
+                    "file": "src/interlock/importers/offers.py"
                   }
                 },
                 {
@@ -7108,7 +7116,7 @@
                   "line": 118,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   },
                   "via": "e1_rerun2_rows"
                 },
@@ -7117,7 +7125,7 @@
                   "line": 130,
                   "name": "for_table",
                   "target": {
-                    "file": "src/switchyard/harness/receipts.py"
+                    "file": "src/interlock/harness/receipts.py"
                   },
                   "via": "_e1_table_copy"
                 },
@@ -7126,7 +7134,7 @@
                   "line": 132,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   },
                   "via": "_e1_table_copy"
                 }
@@ -7144,7 +7152,7 @@
                   "line": 118,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   }
                 },
                 {
@@ -7152,7 +7160,7 @@
                   "line": 130,
                   "name": "for_table",
                   "target": {
-                    "file": "src/switchyard/harness/receipts.py"
+                    "file": "src/interlock/harness/receipts.py"
                   },
                   "via": "_e1_table_copy"
                 },
@@ -7161,7 +7169,7 @@
                   "line": 132,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   },
                   "via": "_e1_table_copy"
                 },
@@ -7169,7 +7177,7 @@
                   "line": 137,
                   "name": "validate_row",
                   "target": {
-                    "file": "src/switchyard/receipt.py"
+                    "file": "src/interlock/receipt.py"
                   },
                   "via": "_e1_table_copy"
                 },
@@ -7177,7 +7185,7 @@
                   "line": 139,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   },
                   "via": "_e1_table_copy"
                 }
@@ -7194,7 +7202,7 @@
                   "line": 130,
                   "name": "for_table",
                   "target": {
-                    "file": "src/switchyard/harness/receipts.py"
+                    "file": "src/interlock/harness/receipts.py"
                   }
                 },
                 {
@@ -7202,21 +7210,21 @@
                   "line": 132,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   }
                 },
                 {
                   "line": 137,
                   "name": "validate_row",
                   "target": {
-                    "file": "src/switchyard/receipt.py"
+                    "file": "src/interlock/receipt.py"
                   }
                 },
                 {
                   "line": 139,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   }
                 }
               ],
@@ -7250,7 +7258,7 @@
                   "line": 291,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   },
                   "via": "_git"
                 },
@@ -7265,7 +7273,7 @@
                   "line": 155,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   }
                 }
               ],
@@ -7286,7 +7294,7 @@
                   "line": 291,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   },
                   "via": "_git"
                 }
@@ -7308,7 +7316,7 @@
                   "line": 291,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   },
                   "via": "_git"
                 },
@@ -7317,14 +7325,14 @@
                   "line": 174,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   }
                 },
                 {
                   "line": 181,
                   "name": "calibration_rows",
                   "target": {
-                    "file": "src/switchyard/importers/calibration.py"
+                    "file": "src/interlock/importers/calibration.py"
                   }
                 }
               ],
@@ -7345,7 +7353,7 @@
                   "line": 291,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   },
                   "via": "_git"
                 },
@@ -7353,7 +7361,7 @@
                   "line": 222,
                   "name": "sha256_bytes",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   },
                   "via": "_check_gold"
                 },
@@ -7362,7 +7370,7 @@
                   "line": 224,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   },
                   "via": "_check_gold"
                 },
@@ -7370,7 +7378,7 @@
                   "line": 207,
                   "name": "ladder_rows",
                   "target": {
-                    "file": "src/switchyard/importers/ladder.py"
+                    "file": "src/interlock/importers/ladder.py"
                   }
                 }
               ],
@@ -7385,7 +7393,7 @@
                   "line": 222,
                   "name": "sha256_bytes",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   }
                 },
                 {
@@ -7393,7 +7401,7 @@
                   "line": 224,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   }
                 }
               ],
@@ -7414,7 +7422,7 @@
                   "line": 291,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   },
                   "via": "_git"
                 },
@@ -7423,7 +7431,7 @@
                   "line": 246,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   },
                   "via": "_written_date"
                 },
@@ -7432,7 +7440,7 @@
                   "line": 249,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   },
                   "via": "_written_date"
                 },
@@ -7441,7 +7449,7 @@
                   "line": 260,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   },
                   "via": "_written_date"
                 },
@@ -7449,7 +7457,7 @@
                   "line": 232,
                   "name": "b_rows",
                   "target": {
-                    "file": "src/switchyard/importers/aspire_judges.py"
+                    "file": "src/interlock/importers/aspire_judges.py"
                   }
                 }
               ],
@@ -7465,7 +7473,7 @@
                   "line": 246,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   }
                 },
                 {
@@ -7473,7 +7481,7 @@
                   "line": 249,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   }
                 },
                 {
@@ -7481,7 +7489,7 @@
                   "line": 260,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   }
                 }
               ],
@@ -7502,7 +7510,7 @@
                   "line": 291,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   },
                   "via": "_git"
                 },
@@ -7510,14 +7518,14 @@
                   "line": 271,
                   "name": "prereg_names_intel_igpu",
                   "target": {
-                    "file": "src/switchyard/importers/nli.py"
+                    "file": "src/interlock/importers/nli.py"
                   }
                 },
                 {
                   "line": 267,
                   "name": "nli_rows",
                   "target": {
-                    "file": "src/switchyard/importers/nli.py"
+                    "file": "src/interlock/importers/nli.py"
                   }
                 }
               ],
@@ -7534,7 +7542,7 @@
                   "name": "ImportError_",
                   "over": "rows",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   }
                 }
               ],
@@ -7554,7 +7562,7 @@
                   "line": 291,
                   "name": "ImportError_",
                   "target": {
-                    "file": "src/switchyard/importers/common.py"
+                    "file": "src/interlock/importers/common.py"
                   }
                 }
               ],
@@ -7598,20 +7606,20 @@
               "line": 231
             }
           ],
-          "hash": "5822f9fa1e518310c192d32b1d7e77bc9f29a5e80622cdfcc52f2c93e1663d3d",
+          "hash": "ed21a12d9cf78f075c10b5c9b25437fe65088ff09860df500b6984d39331f813",
           "importOrder": [
-            "src/switchyard/importers/common.py",
-            "src/switchyard/families.py",
-            "src/switchyard/receipt.py",
-            "src/switchyard/tasks.py"
+            "src/interlock/importers/common.py",
+            "src/interlock/families.py",
+            "src/interlock/receipt.py",
+            "src/interlock/tasks.py"
           ],
           "importsFiles": [
-            "src/switchyard/families.py",
-            "src/switchyard/importers/common.py",
-            "src/switchyard/receipt.py",
-            "src/switchyard/tasks.py"
+            "src/interlock/families.py",
+            "src/interlock/importers/common.py",
+            "src/interlock/receipt.py",
+            "src/interlock/tasks.py"
           ],
-          "path": "src/switchyard/importers/calibration.py"
+          "path": "src/interlock/importers/calibration.py"
         },
         {
           "exports": [
@@ -7642,7 +7650,7 @@
             }
           ],
           "hash": "93691cf13ffade7b34b4c917d6d35947aa4f9a8ef4230fc25ee41d650edc6294",
-          "path": "src/switchyard/importers/common.py"
+          "path": "src/interlock/importers/common.py"
         },
         {
           "entry": "append_aborted_runs",
@@ -7655,12 +7663,12 @@
             "render_gaps",
             "summarize_error"
           ],
-          "hash": "7ef7108ac717b583bc8ec9cf43e98fe2b88f1040064e19e72c4ae099765b5c36",
+          "hash": "6bc2d1ff22d1f376d4c560da12984f8d9974de8ee6a69456eaa7bfd4de3e77cc",
           "importsFiles": [
-            "src/switchyard/harness/receipts.py",
-            "src/switchyard/receipt.py"
+            "src/interlock/harness/receipts.py",
+            "src/interlock/receipt.py"
           ],
-          "path": "src/switchyard/importers/gaps.py",
+          "path": "src/interlock/importers/gaps.py",
           "sequences": [
             {
               "calls": [
@@ -7721,7 +7729,7 @@
                   "line": 113,
                   "name": "write_atomic",
                   "target": {
-                    "file": "src/switchyard/harness/receipts.py"
+                    "file": "src/interlock/harness/receipts.py"
                   }
                 }
               ],
@@ -7749,7 +7757,7 @@
                   "line": 127,
                   "name": "is_speed_row",
                   "target": {
-                    "file": "src/switchyard/receipt.py"
+                    "file": "src/interlock/receipt.py"
                   }
                 }
               ],
@@ -7764,7 +7772,7 @@
                   "line": 127,
                   "name": "is_speed_row",
                   "target": {
-                    "file": "src/switchyard/receipt.py"
+                    "file": "src/interlock/receipt.py"
                   },
                   "via": "open_gaps"
                 }
@@ -7780,22 +7788,22 @@
           "exports": [
             "ladder_rows"
           ],
-          "hash": "d39ea17864a4cbaa18b912645de88355aa86e2d9034fc3defa75975a33f8e502",
+          "hash": "b7ae60dd4e0f6228d51c71af23859392d1cbcc1715750b1ae5db260af3d6b0e4",
           "importOrder": [
-            "src/switchyard/importers/calibration.py",
-            "src/switchyard/importers/common.py",
-            "src/switchyard/families.py",
-            "src/switchyard/receipt.py",
-            "src/switchyard/tasks.py"
+            "src/interlock/importers/calibration.py",
+            "src/interlock/importers/common.py",
+            "src/interlock/families.py",
+            "src/interlock/receipt.py",
+            "src/interlock/tasks.py"
           ],
           "importsFiles": [
-            "src/switchyard/families.py",
-            "src/switchyard/importers/calibration.py",
-            "src/switchyard/importers/common.py",
-            "src/switchyard/receipt.py",
-            "src/switchyard/tasks.py"
+            "src/interlock/families.py",
+            "src/interlock/importers/calibration.py",
+            "src/interlock/importers/common.py",
+            "src/interlock/receipt.py",
+            "src/interlock/tasks.py"
           ],
-          "path": "src/switchyard/importers/ladder.py"
+          "path": "src/interlock/importers/ladder.py"
         },
         {
           "exports": [
@@ -7814,18 +7822,18 @@
               "line": 31
             }
           ],
-          "hash": "0042745f295ff2eceb8392087b9054a4d14d93d40342830a6184d97a4c70d3ca",
+          "hash": "9e7602a861d03967f6dc2806c4a75409657c661e416a55b64a2eb5f3cdef69c2",
           "importOrder": [
-            "src/switchyard/importers/common.py",
-            "src/switchyard/families.py",
-            "src/switchyard/receipt.py"
+            "src/interlock/importers/common.py",
+            "src/interlock/families.py",
+            "src/interlock/receipt.py"
           ],
           "importsFiles": [
-            "src/switchyard/families.py",
-            "src/switchyard/importers/common.py",
-            "src/switchyard/receipt.py"
+            "src/interlock/families.py",
+            "src/interlock/importers/common.py",
+            "src/interlock/receipt.py"
           ],
-          "path": "src/switchyard/importers/nli.py"
+          "path": "src/interlock/importers/nli.py"
         },
         {
           "exports": [
@@ -7869,40 +7877,40 @@
               "line": 100
             }
           ],
-          "hash": "dc792261af707b3e4a8ee6fcdac94605da163411403c74ae57621f9eb6c3c406",
+          "hash": "1cb9afccd723c75691211a5747f246d4081d37fb7a7ea4bb7e057f8abd1f9893",
           "importOrder": [
-            "src/switchyard/importers/common.py",
-            "src/switchyard/families.py",
-            "src/switchyard/receipt.py"
+            "src/interlock/importers/common.py",
+            "src/interlock/families.py",
+            "src/interlock/receipt.py"
           ],
           "importsFiles": [
-            "src/switchyard/families.py",
-            "src/switchyard/importers/common.py",
-            "src/switchyard/receipt.py"
+            "src/interlock/families.py",
+            "src/interlock/importers/common.py",
+            "src/interlock/receipt.py"
           ],
-          "path": "src/switchyard/importers/offers.py"
+          "path": "src/interlock/importers/offers.py"
         },
         {
           "constantOnly": true,
-          "hash": "d9ebe1b069c3efb53fdad08dd5f6b9f395d819dd81b14f339452c9ce5151bb6d",
-          "path": "src/switchyard/importers/pins.py"
+          "hash": "184dc7b3ab3ee9c5e072cb460400c54af63149b9d5454ecc2b356c26fdfed01b",
+          "path": "src/interlock/importers/pins.py"
         },
         {
           "exports": [
             "probe_rows"
           ],
-          "hash": "d8d4d9d99b69878d97dd2f85b99e1957899db544e990cd75ef7ba6cb6001d390",
+          "hash": "04e0af7fc351bd514605129517c0a2eaefbb280eddce4912a970a225e09b9547",
           "importOrder": [
-            "src/switchyard/importers/common.py",
-            "src/switchyard/families.py",
-            "src/switchyard/receipt.py"
+            "src/interlock/importers/common.py",
+            "src/interlock/families.py",
+            "src/interlock/receipt.py"
           ],
           "importsFiles": [
-            "src/switchyard/families.py",
-            "src/switchyard/importers/common.py",
-            "src/switchyard/receipt.py"
+            "src/interlock/families.py",
+            "src/interlock/importers/common.py",
+            "src/interlock/receipt.py"
           ],
-          "path": "src/switchyard/importers/probe.py"
+          "path": "src/interlock/importers/probe.py"
         },
         {
           "entry": "listening_pids",
@@ -7934,6 +7942,7 @@
             "read_card_mib",
             "read_cuda",
             "read_log_from",
+            "read_project_env",
             "real_processes",
             "real_seams",
             "restart_policy_lines",
@@ -7947,66 +7956,46 @@
             {
               "in": "port_of",
               "kind": "raise",
-              "line": 251
+              "line": 270
             },
             {
               "in": "log_byte_size",
               "kind": "except",
-              "line": 364
+              "line": 383
             },
             {
               "in": "read_log_from",
               "kind": "except",
-              "line": 378
+              "line": 397
             },
             {
               "in": "_log_text",
               "kind": "except",
-              "line": 525
+              "line": 544
             },
             {
               "in": "load_serve_start",
               "kind": "except",
-              "line": 568
+              "line": 588
             },
             {
               "in": "health",
               "kind": "except",
-              "line": 591
+              "line": 611
             },
             {
               "in": "pids_from_psutil",
               "kind": "except",
-              "line": 693
+              "line": 713
             },
             {
               "in": "stop_pid",
               "kind": "raise",
-              "line": 739
+              "line": 759
             },
             {
               "in": "spawn_detached",
               "kind": "raise",
-              "line": 774
-            },
-            {
-              "in": "spawn_detached",
-              "kind": "raise",
-              "line": 776
-            },
-            {
-              "in": "spawn_detached",
-              "kind": "except",
-              "line": 779
-            },
-            {
-              "in": "spawn_detached",
-              "kind": "raise",
-              "line": 780
-            },
-            {
-              "in": "spawn_detached",
-              "kind": "except",
               "line": 794
             },
             {
@@ -8016,153 +8005,153 @@
             },
             {
               "in": "spawn_detached",
+              "kind": "except",
+              "line": 799
+            },
+            {
+              "in": "spawn_detached",
               "kind": "raise",
               "line": 800
             },
             {
+              "in": "spawn_detached",
+              "kind": "except",
+              "line": 814
+            },
+            {
+              "in": "spawn_detached",
+              "kind": "raise",
+              "line": 816
+            },
+            {
+              "in": "spawn_detached",
+              "kind": "raise",
+              "line": 820
+            },
+            {
               "in": "card_mib_from_text",
               "kind": "except",
-              "line": 815
+              "line": 835
             },
             {
               "in": "http_get",
               "kind": "except",
-              "line": 857
+              "line": 877
             },
             {
               "in": "http_get",
               "kind": "except",
-              "line": 864
+              "line": 884
             },
             {
               "in": "http_get",
               "kind": "except",
-              "line": 870
+              "line": 890
             },
             {
               "in": "environ_of",
               "kind": "except",
-              "line": 894
+              "line": 914
             },
             {
               "in": "_run",
               "kind": "except",
-              "line": 913
+              "line": 933
             },
             {
               "in": "prime",
               "kind": "except",
-              "line": 985
+              "line": 1005
             },
             {
               "in": "_ensure_start",
               "kind": "except",
-              "line": 1009
+              "line": 1029
             },
             {
               "in": "confirm_backend",
               "kind": "raise",
-              "line": 1042
+              "line": 1062
             },
             {
               "in": "confirm_backend",
               "kind": "raise",
-              "line": 1047
+              "line": 1067
             },
             {
               "in": "_live_env",
               "kind": "except",
-              "line": 1084
+              "line": 1104
             },
             {
               "in": "_read_segment",
               "kind": "except",
-              "line": 1115
+              "line": 1135
             },
             {
               "in": "_note_offset",
               "kind": "except",
-              "line": 1133
+              "line": 1153
             },
             {
               "in": "_post_restart_fingerprint",
               "kind": "except",
-              "line": 1144
+              "line": 1164
             },
             {
               "in": "_admit",
               "kind": "except",
-              "line": 1184
-            },
-            {
-              "in": "_admit",
-              "kind": "raise",
-              "line": 1185
-            },
-            {
-              "in": "_admit",
-              "kind": "raise",
-              "line": 1187
-            },
-            {
-              "in": "_admit",
-              "kind": "except",
-              "line": 1191
-            },
-            {
-              "in": "_admit",
-              "kind": "raise",
-              "line": 1192
-            },
-            {
-              "in": "_admit",
-              "kind": "except",
-              "line": 1196
-            },
-            {
-              "in": "_admit",
-              "kind": "raise",
               "line": 1204
             },
             {
               "in": "_admit",
               "kind": "raise",
+              "line": 1205
+            },
+            {
+              "in": "_admit",
+              "kind": "raise",
+              "line": 1207
+            },
+            {
+              "in": "_admit",
+              "kind": "except",
               "line": 1211
+            },
+            {
+              "in": "_admit",
+              "kind": "raise",
+              "line": 1212
+            },
+            {
+              "in": "_admit",
+              "kind": "except",
+              "line": 1216
+            },
+            {
+              "in": "_admit",
+              "kind": "raise",
+              "line": 1224
+            },
+            {
+              "in": "_admit",
+              "kind": "raise",
+              "line": 1231
             },
             {
               "in": "begin_measurement",
               "kind": "raise",
-              "line": 1218
+              "line": 1238
             },
             {
               "in": "after_failure",
               "kind": "raise",
-              "line": 1276
+              "line": 1296
             },
             {
               "in": "_listed",
               "kind": "except",
-              "line": 1299
-            },
-            {
-              "in": "_restart",
-              "kind": "raise",
-              "line": 1306
-            },
-            {
-              "in": "_restart",
-              "kind": "raise",
-              "line": 1310
-            },
-            {
-              "in": "_restart",
-              "kind": "raise",
-              "line": 1316
-            },
-            {
-              "in": "_restart",
-              "kind": "raise",
-              "line": 1322
+              "line": 1319
             },
             {
               "in": "_restart",
@@ -8172,59 +8161,79 @@
             {
               "in": "_restart",
               "kind": "raise",
-              "line": 1328
-            },
-            {
-              "in": "_restart",
-              "kind": "raise",
               "line": 1330
             },
             {
               "in": "_restart",
+              "kind": "raise",
+              "line": 1336
+            },
+            {
+              "in": "_restart",
+              "kind": "raise",
+              "line": 1342
+            },
+            {
+              "in": "_restart",
+              "kind": "raise",
+              "line": 1346
+            },
+            {
+              "in": "_restart",
+              "kind": "raise",
+              "line": 1348
+            },
+            {
+              "in": "_restart",
+              "kind": "raise",
+              "line": 1350
+            },
+            {
+              "in": "_restart",
               "kind": "except",
-              "line": 1341
+              "line": 1361
             },
             {
               "in": "_restart",
               "kind": "raise",
-              "line": 1378
+              "line": 1398
             },
             {
               "in": "_restart",
               "kind": "raise",
-              "line": 1419
+              "line": 1439
             },
             {
               "in": "_baseline_note",
               "kind": "except",
-              "line": 1448
+              "line": 1468
             },
             {
               "in": "_fail",
               "kind": "raise",
-              "line": 1472
+              "line": 1492
             },
             {
               "in": "environment",
               "kind": "except",
-              "line": 1513
+              "line": 1533
             },
             {
               "in": "environment",
               "kind": "except",
-              "line": 1523
+              "line": 1543
             }
           ],
-          "hash": "58ab31555d518285facd5cd6aa2a970ebd66cc6534f9f0f7b86b6339cabe6e86",
+          "hash": "e60d569429dcfc7d4a50701001b33e667f5e2f5890b3a8d23860bd7e4e9453ad",
           "importsFiles": [
-            "src/switchyard/guards.py"
+            "src/interlock/guards.py"
           ],
-          "path": "src/switchyard/ollama_supervisor.py",
+          "path": "src/interlock/ollama_supervisor.py",
           "sequences": [
             {
               "calls": [
                 {
-                  "line": 449,
+                  "line": 468,
                   "name": "splitlines",
                   "target": null
                 }
@@ -8237,7 +8246,7 @@
             {
               "calls": [
                 {
-                  "line": 667,
+                  "line": 687,
                   "name": "splitlines",
                   "target": null
                 }
@@ -8250,7 +8259,7 @@
             {
               "calls": [
                 {
-                  "line": 692,
+                  "line": 712,
                   "name": "net_connections",
                   "target": null
                 }
@@ -8264,13 +8273,13 @@
               "calls": [
                 {
                   "branch": "system == \"win32\"",
-                  "line": 667,
+                  "line": 687,
                   "name": "splitlines",
                   "target": null,
                   "via": "pids_from_windows"
                 },
                 {
-                  "line": 692,
+                  "line": 712,
                   "name": "net_connections",
                   "target": null,
                   "via": "pids_from_psutil"
@@ -8284,7 +8293,7 @@
             {
               "calls": [
                 {
-                  "line": 809,
+                  "line": 829,
                   "name": "splitlines",
                   "target": null
                 }
@@ -8297,7 +8306,7 @@
             {
               "calls": [
                 {
-                  "line": 809,
+                  "line": 829,
                   "name": "splitlines",
                   "target": null,
                   "via": "card_mib_from_text"
@@ -8311,7 +8320,7 @@
             {
               "calls": [
                 {
-                  "line": 893,
+                  "line": 913,
                   "name": "Process",
                   "target": null
                 }
@@ -8325,13 +8334,13 @@
               "calls": [
                 {
                   "branch": "system == \"win32\"",
-                  "line": 667,
+                  "line": 687,
                   "name": "splitlines",
                   "target": null,
                   "via": "pids_from_windows"
                 },
                 {
-                  "line": 692,
+                  "line": 712,
                   "name": "net_connections",
                   "target": null,
                   "via": "pids_from_psutil"
@@ -8345,7 +8354,7 @@
             {
               "calls": [
                 {
-                  "line": 809,
+                  "line": 829,
                   "name": "splitlines",
                   "target": null,
                   "via": "card_mib_from_text"
@@ -8477,11 +8486,11 @@
               "line": 333
             }
           ],
-          "hash": "324030a29998b4481b0cc8fffc46c853aa0acdafd7438416f0d626c92ca02d7f",
+          "hash": "7e05fbc25839777ccd058ce8e54635308211005567c788db8cedd79bd95029bc",
           "importsFiles": [
-            "src/switchyard/families.py"
+            "src/interlock/families.py"
           ],
-          "path": "src/switchyard/receipt.py",
+          "path": "src/interlock/receipt.py",
           "sequences": [
             {
               "calls": [
@@ -8489,7 +8498,7 @@
                   "line": 308,
                   "name": "family_of",
                   "target": {
-                    "file": "src/switchyard/families.py"
+                    "file": "src/interlock/families.py"
                   },
                   "via": "_check_family"
                 }
@@ -8517,7 +8526,7 @@
                   "line": 308,
                   "name": "family_of",
                   "target": {
-                    "file": "src/switchyard/families.py"
+                    "file": "src/interlock/families.py"
                   },
                   "via": "_check_family"
                 }
@@ -8551,7 +8560,7 @@
                   "line": 308,
                   "name": "family_of",
                   "target": {
-                    "file": "src/switchyard/families.py"
+                    "file": "src/interlock/families.py"
                   }
                 }
               ],
@@ -8563,11 +8572,11 @@
           ]
         },
         {
-          "hash": "6a71c838b67b002e179a0708f143459ae11c1d7bd89280f9fb5af25cb60e1526",
+          "hash": "4be9e28f4be0f864681ecd0a92429fc0e7c11b64c27b2a96d67e5cff603408fa",
           "importsFiles": [
-            "src/switchyard/router/policy.py"
+            "src/interlock/router/policy.py"
           ],
-          "path": "src/switchyard/router/__init__.py"
+          "path": "src/interlock/router/__init__.py"
         },
         {
           "entry": "decide",
@@ -8589,7 +8598,7 @@
             }
           ],
           "hash": "259e3430dd9f316bdbb88eee5e7208ec3e295f7425e2e48a3487de79ebe57bc6",
-          "path": "src/switchyard/router/policy.py",
+          "path": "src/interlock/router/policy.py",
           "sequences": [
             {
               "calls": [
@@ -8903,12 +8912,12 @@
           ]
         },
         {
-          "hash": "a8ff2cb2cd67133b8170ee5a10a8a15e9dd7abf042682598e0f509ffc929fc6c",
-          "path": "src/switchyard/schema/route-decision.v1.json"
+          "hash": "da9c360b7ef60c7440604addcd65a869d0748582b52ae03c740215b3ce8e4fd0",
+          "path": "src/interlock/schema/route-decision.v1.json"
         },
         {
-          "hash": "f8974d8b87954d3593249ef900437e0cf8267bf53aa94ea0716cf357115c31e8",
-          "path": "src/switchyard/schema/routing-row.schema.json"
+          "hash": "493a11ebfe0ab32d8a23656e9a1fee11cc268de8ee3a66f082246e2d03972571",
+          "path": "src/interlock/schema/routing-row.schema.json"
         },
         {
           "exports": [
@@ -8926,16 +8935,16 @@
               "line": 39
             }
           ],
-          "hash": "f6b106284742c0549998d6ac07274ddebec172b70eaf426c60fdcfdc811d87ac",
+          "hash": "40fddd341809a56059be6829445c38793c2aba86c16f8ae8c6e3f228f1075262",
           "importsFiles": [
-            "src/switchyard/receipt.py",
-            "src/switchyard/tasks.py"
+            "src/interlock/receipt.py",
+            "src/interlock/tasks.py"
           ],
-          "path": "src/switchyard/scope.py"
+          "path": "src/interlock/scope.py"
         },
         {
           "hash": "fd4387d6fdfdc6f5850f2ed8cbbf9f2f41dba6e9867f3421682ed2802aec8516",
-          "path": "src/switchyard/tasks.py"
+          "path": "src/interlock/tasks.py"
         }
       ],
       "globs": [
@@ -8966,7 +8975,7 @@
       "testRunners": [
         "pytest"
       ],
-      "testedBy": 28,
+      "testedBy": 30,
       "unresolvedSites": 0
     },
     {
@@ -8978,10 +8987,10 @@
       "externals": 0,
       "files": [
         {
-          "hash": "96d421b91b2a5a07942a6724624c5a489e382c8858580f19e7f11321ddfc0413",
+          "hash": "9149c78d8e99a2722a908ff62cdc9e63f5a9e21ff159e27d8eaa1c447b2f3660",
           "importsFiles": [
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/harness/watch.py"
+            "src/interlock/harness/runner.py",
+            "src/interlock/harness/watch.py"
           ],
           "path": "tests/conftest.py",
           "testFramework": "pytest"
@@ -9062,9 +9071,9 @@
           "exports": [
             "replay"
           ],
-          "hash": "53583d5c6d692c68f26e7a37c7077867ec4faaf1c5e1df1c67144e3b1a630398",
+          "hash": "3bdb35f91f223f43411d56215bd43032c715874487adbe5f1a6ed3a6b248cb92",
           "importsFiles": [
-            "src/switchyard/adapters/ollama_cases.py"
+            "src/interlock/adapters/ollama_cases.py"
           ],
           "path": "tests/ollama_replay.py"
         },
@@ -9092,11 +9101,11 @@
             "test_control_row_carries_true_rates_per_type_residency_and_cost",
             "test_the_refusal_is_still_an_importer_error"
           ],
-          "hash": "89221903299d6e2d9bb701a4d96e873a5a59c15eb362fc00c7056511e03b64c5",
+          "hash": "dd70fe0562f4ca1ccb94baedb62691d5ec233806abe9ea92f5c469db88b859e5",
           "importsFiles": [
-            "src/switchyard/importers/aspire_judges.py",
-            "src/switchyard/importers/common.py",
-            "src/switchyard/receipt.py"
+            "src/interlock/importers/aspire_judges.py",
+            "src/interlock/importers/common.py",
+            "src/interlock/receipt.py"
           ],
           "path": "tests/test_aspire_judges.py",
           "testFramework": "pytest"
@@ -9121,32 +9130,32 @@
             "test_the_openvino_adapter_checks_before_building_and_a_refusal_builds_nothing",
             "test_without_a_ram_reading_the_release_check_stands_down"
           ],
-          "hash": "f5f265972336ade72763c5350c4cb5b814005694456a687b7d028c1db0722d0c",
+          "hash": "d0101616f5cbd3297275fc8d59fe5da5a7210de0b6083f38963a83c221898afe",
           "importOrder": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/cli.py",
-            "src/switchyard/harness/__init__.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/harness/marker.py",
-            "src/switchyard/harness/receipts.py",
-            "src/switchyard/harness/spec.py",
-            "src/switchyard/harness/timing.py",
-            "src/switchyard/harness/watch.py",
-            "src/switchyard/receipt.py",
+            "src/interlock/adapters/base.py",
+            "src/interlock/cli.py",
+            "src/interlock/harness/__init__.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/harness/marker.py",
+            "src/interlock/harness/receipts.py",
+            "src/interlock/harness/spec.py",
+            "src/interlock/harness/timing.py",
+            "src/interlock/harness/watch.py",
+            "src/interlock/receipt.py",
             "tests/test_harness.py",
             "tests/test_openvino_adapter.py"
           ],
           "importsFiles": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/cli.py",
-            "src/switchyard/harness/__init__.py",
-            "src/switchyard/harness/marker.py",
-            "src/switchyard/harness/receipts.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/harness/spec.py",
-            "src/switchyard/harness/timing.py",
-            "src/switchyard/harness/watch.py",
-            "src/switchyard/receipt.py",
+            "src/interlock/adapters/base.py",
+            "src/interlock/cli.py",
+            "src/interlock/harness/__init__.py",
+            "src/interlock/harness/marker.py",
+            "src/interlock/harness/receipts.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/harness/spec.py",
+            "src/interlock/harness/timing.py",
+            "src/interlock/harness/watch.py",
+            "src/interlock/receipt.py",
             "tests/test_harness.py",
             "tests/test_openvino_adapter.py"
           ],
@@ -9161,9 +9170,9 @@
             "test_host_port_check_is_opt_in",
             "test_module_entrypoint_parses_check"
           ],
-          "hash": "205052f0e13f27b0d267ae8d6b28caa8ad36f0d71ac7e93b7e3a89553c7ef98e",
+          "hash": "f96d198ea5c3d6f0047a4a84edc309a607b46774502dce67a803279990c7847b",
           "importsFiles": [
-            "src/switchyard/cli.py",
+            "src/interlock/cli.py",
             "tests/support.py"
           ],
           "path": "tests/test_cli.py",
@@ -9191,26 +9200,26 @@
             "test_the_markers_at_execute_are_not_a_compile_rejection",
             "test_the_same_error_on_the_cpu_is_not_a_compile_rejection"
           ],
-          "hash": "3ee2ea52c950ce6902bde7eb970bfa354bc6da26ddca083d7f7b00441cf5e1c7",
+          "hash": "e7b1aa5ca5f556683f6f81f4a73151eb1dd0758d384ec77df277eb20e165e018",
           "importOrder": [
-            "src/switchyard/adapters/openvino.py",
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/harness/receipts.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/importers/gaps.py",
-            "src/switchyard/receipt.py",
+            "src/interlock/adapters/openvino.py",
+            "src/interlock/adapters/base.py",
+            "src/interlock/harness/receipts.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/importers/gaps.py",
+            "src/interlock/receipt.py",
             "tests/support.py",
             "tests/test_harness.py",
             "tests/test_openvino_adapter.py",
             "tests/test_run_path.py"
           ],
           "importsFiles": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/adapters/openvino.py",
-            "src/switchyard/harness/receipts.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/importers/gaps.py",
-            "src/switchyard/receipt.py",
+            "src/interlock/adapters/base.py",
+            "src/interlock/adapters/openvino.py",
+            "src/interlock/harness/receipts.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/importers/gaps.py",
+            "src/interlock/receipt.py",
             "tests/support.py",
             "tests/test_harness.py",
             "tests/test_openvino_adapter.py",
@@ -9237,12 +9246,23 @@
             "test_two_intel_gpus_are_not_guessed",
             "test_two_vendor_igpus_are_not_guessed"
           ],
-          "hash": "28961d2f04bf2d24a5228e523ed380f92eb78b0745305962d67ceba5805c73a9",
+          "hash": "d25678f853e9175ae6d96181342361a761dc1f845116c3dbaf630d4709885718",
           "importsFiles": [
-            "src/switchyard/devices.py"
+            "src/interlock/devices.py"
           ],
           "path": "tests/test_devices.py",
           "testFramework": "pytest"
+        },
+        {
+          "exports": [
+            "test_the_distribution_name_is_mcptoolshop_interlock",
+            "test_the_help_header_names_the_router"
+          ],
+          "hash": "a4af9f19c817046c9777ba1a3b37718bb1da9f14db5a10b78f345c6dbf5078c6",
+          "importsFiles": [
+            "src/interlock/cli.py"
+          ],
+          "path": "tests/test_distribution.py"
         },
         {
           "exports": [
@@ -9297,34 +9317,34 @@
             "test_unsteady_warmup_refuses_clock_not_steady",
             "test_warm_until_steady_and_a_short_warm_is_not_steady"
           ],
-          "hash": "7f36987b2ad486acc2f17a924d331414dbced9b539697c94045af4362c1ba1d4",
+          "hash": "dcd4df8422d8376bd9ef96058caa732eeb74f5ea766b50d5352993933d428148",
           "importOrder": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/adapters/ollama.py",
-            "src/switchyard/guards.py",
-            "src/switchyard/harness/e4b.py",
-            "src/switchyard/harness/e4b_stats.py",
-            "src/switchyard/harness/ollama_serve.py",
-            "src/switchyard/adapters/record_fixtures.py",
-            "src/switchyard/harness/spec.py",
-            "src/switchyard/harness/timing.py",
-            "src/switchyard/cli.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/harness/__init__.py"
+            "src/interlock/adapters/base.py",
+            "src/interlock/adapters/ollama.py",
+            "src/interlock/guards.py",
+            "src/interlock/harness/e4b.py",
+            "src/interlock/harness/e4b_stats.py",
+            "src/interlock/harness/ollama_serve.py",
+            "src/interlock/adapters/record_fixtures.py",
+            "src/interlock/harness/spec.py",
+            "src/interlock/harness/timing.py",
+            "src/interlock/cli.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/harness/__init__.py"
           ],
           "importsFiles": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/adapters/ollama.py",
-            "src/switchyard/adapters/record_fixtures.py",
-            "src/switchyard/cli.py",
-            "src/switchyard/guards.py",
-            "src/switchyard/harness/__init__.py",
-            "src/switchyard/harness/e4b.py",
-            "src/switchyard/harness/e4b_stats.py",
-            "src/switchyard/harness/ollama_serve.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/harness/spec.py",
-            "src/switchyard/harness/timing.py"
+            "src/interlock/adapters/base.py",
+            "src/interlock/adapters/ollama.py",
+            "src/interlock/adapters/record_fixtures.py",
+            "src/interlock/cli.py",
+            "src/interlock/guards.py",
+            "src/interlock/harness/__init__.py",
+            "src/interlock/harness/e4b.py",
+            "src/interlock/harness/e4b_stats.py",
+            "src/interlock/harness/ollama_serve.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/harness/spec.py",
+            "src/interlock/harness/timing.py"
           ],
           "path": "tests/test_e4b.py",
           "testFramework": "pytest"
@@ -9334,10 +9354,10 @@
             "test_a_cache_that_will_not_go_is_reported_not_raised",
             "test_a_read_only_compiled_blob_is_removed"
           ],
-          "hash": "b706f180375ec7cf40919744e178351d7d83829eacabd402cb81ef44f2b8487e",
+          "hash": "df2677502f60bbf228a50703f00fe37f2ef239a35045fd999bb3a2556800e1de",
           "importsFiles": [
-            "src/switchyard/harness/__init__.py",
-            "src/switchyard/harness/e4b.py"
+            "src/interlock/harness/__init__.py",
+            "src/interlock/harness/e4b.py"
           ],
           "path": "tests/test_e4b_cache_cleanup.py"
         },
@@ -9350,13 +9370,27 @@
             "test_read_git_refuses_a_short_sha",
             "test_the_live_runner_returns_the_child_stdout"
           ],
-          "hash": "b720d4d8e71f30f5126c100bcabd0a46221f3f8e6c4c88a821daf01d65975689",
+          "hash": "691e79720d97248578d2d0f7a55bdb68016ff5efba0046161adae0e068367545",
           "importsFiles": [
-            "src/switchyard/harness/e4b.py",
-            "src/switchyard/harness/ollama_serve.py"
+            "src/interlock/harness/e4b.py",
+            "src/interlock/harness/ollama_serve.py"
           ],
           "path": "tests/test_e4b_capture_run.py",
           "testFramework": "pytest"
+        },
+        {
+          "exports": [
+            "test_an_old_environment_name_warns_and_is_read",
+            "test_the_new_environment_name_wins_without_a_warning",
+            "test_the_old_log_and_exe_names_still_resolve",
+            "test_the_old_serve_record_name_still_loads"
+          ],
+          "hash": "3689f1ce34661a089c398554cdcf90919ad7466a0ba981dcd00e56eb055296ba",
+          "importsFiles": [
+            "src/interlock/harness/fill.py",
+            "src/interlock/ollama_supervisor.py"
+          ],
+          "path": "tests/test_env_fallback.py"
         },
         {
           "exports": [
@@ -9393,26 +9427,26 @@
             "test_the_search_does_not_load_above_the_trained_length",
             "test_the_server_log_fills_the_four_fields"
           ],
-          "hash": "d65d8b134fd8d29fa844af15880341cf41a3abc7c95967886e0cfef448767c7a",
+          "hash": "4d1919063895399c3ee795c5dc0e6c70b16635002eaa757f921a38de329d0389",
           "importOrder": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/adapters/ollama.py",
-            "src/switchyard/adapters/ollama_cases.py",
-            "src/switchyard/harness/spec.py",
-            "src/switchyard/guards.py",
-            "src/switchyard/harness/fill.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/receipt.py"
+            "src/interlock/adapters/base.py",
+            "src/interlock/adapters/ollama.py",
+            "src/interlock/adapters/ollama_cases.py",
+            "src/interlock/harness/spec.py",
+            "src/interlock/guards.py",
+            "src/interlock/harness/fill.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/receipt.py"
           ],
           "importsFiles": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/adapters/ollama.py",
-            "src/switchyard/adapters/ollama_cases.py",
-            "src/switchyard/guards.py",
-            "src/switchyard/harness/fill.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/harness/spec.py",
-            "src/switchyard/receipt.py"
+            "src/interlock/adapters/base.py",
+            "src/interlock/adapters/ollama.py",
+            "src/interlock/adapters/ollama_cases.py",
+            "src/interlock/guards.py",
+            "src/interlock/harness/fill.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/harness/spec.py",
+            "src/interlock/receipt.py"
           ],
           "path": "tests/test_fill_card_live.py",
           "testFramework": "pytest"
@@ -9426,9 +9460,9 @@
             "test_heartbeat_uses_mtime_and_refuses_a_stale_or_missing_file",
             "test_npu_session_covers_npu_and_igpu_only"
           ],
-          "hash": "c3ac006f458e05d65453e87fb674a51f0bcfab15de26f8b12d2ca0b685ec3ecf",
+          "hash": "cae1dd682e924eb62e1ae8c6840ddb915cf0983af2f2dfad4695947452cf74d6",
           "importsFiles": [
-            "src/switchyard/guards.py"
+            "src/interlock/guards.py"
           ],
           "path": "tests/test_guards.py",
           "testFramework": "pytest"
@@ -9502,47 +9536,47 @@
             "test_the_rejected_row_validates_and_the_table_sees_pending_replication",
             "test_the_run_path_refuses_an_edited_spec_before_any_adapter_call"
           ],
-          "hash": "e61a3fe44a7e1ee0eab77d1d93c11251a570f7f83957272539d53b2e7649e88b",
+          "hash": "1fb683c096a1f06d52e8496fe283cb0a919ce0eb3e06c3dc4484b65b2435863f",
           "importOrder": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/adapters/offrig_calibrate.py",
-            "src/switchyard/adapters/ollama.py",
-            "src/switchyard/adapters/registry.py",
-            "src/switchyard/guards.py",
-            "src/switchyard/harness/environment.py",
-            "src/switchyard/harness/e5.py",
-            "src/switchyard/harness/lock.py",
-            "src/switchyard/harness/receipts.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/harness/spec.py",
-            "src/switchyard/harness/timing.py",
-            "src/switchyard/importers/gaps.py",
-            "src/switchyard/receipt.py",
+            "src/interlock/adapters/base.py",
+            "src/interlock/adapters/offrig_calibrate.py",
+            "src/interlock/adapters/ollama.py",
+            "src/interlock/adapters/registry.py",
+            "src/interlock/guards.py",
+            "src/interlock/harness/environment.py",
+            "src/interlock/harness/e5.py",
+            "src/interlock/harness/lock.py",
+            "src/interlock/harness/receipts.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/harness/spec.py",
+            "src/interlock/harness/timing.py",
+            "src/interlock/importers/gaps.py",
+            "src/interlock/receipt.py",
             "tests/support.py",
-            "src/switchyard/scope.py",
-            "src/switchyard/cli.py",
-            "src/switchyard/adapters/openvino.py",
-            "src/switchyard/harness/__init__.py"
+            "src/interlock/scope.py",
+            "src/interlock/cli.py",
+            "src/interlock/adapters/openvino.py",
+            "src/interlock/harness/__init__.py"
           ],
           "importsFiles": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/adapters/offrig_calibrate.py",
-            "src/switchyard/adapters/ollama.py",
-            "src/switchyard/adapters/openvino.py",
-            "src/switchyard/adapters/registry.py",
-            "src/switchyard/cli.py",
-            "src/switchyard/guards.py",
-            "src/switchyard/harness/__init__.py",
-            "src/switchyard/harness/e5.py",
-            "src/switchyard/harness/environment.py",
-            "src/switchyard/harness/lock.py",
-            "src/switchyard/harness/receipts.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/harness/spec.py",
-            "src/switchyard/harness/timing.py",
-            "src/switchyard/importers/gaps.py",
-            "src/switchyard/receipt.py",
-            "src/switchyard/scope.py",
+            "src/interlock/adapters/base.py",
+            "src/interlock/adapters/offrig_calibrate.py",
+            "src/interlock/adapters/ollama.py",
+            "src/interlock/adapters/openvino.py",
+            "src/interlock/adapters/registry.py",
+            "src/interlock/cli.py",
+            "src/interlock/guards.py",
+            "src/interlock/harness/__init__.py",
+            "src/interlock/harness/e5.py",
+            "src/interlock/harness/environment.py",
+            "src/interlock/harness/lock.py",
+            "src/interlock/harness/receipts.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/harness/spec.py",
+            "src/interlock/harness/timing.py",
+            "src/interlock/importers/gaps.py",
+            "src/interlock/receipt.py",
+            "src/interlock/scope.py",
             "tests/support.py"
           ],
           "path": "tests/test_harness.py",
@@ -9572,39 +9606,46 @@
             "test_quote_rules_that_disagree_are_refused",
             "test_table_filters_by_task"
           ],
-          "hash": "414d1a33388a866f4d8314bfb50de12aa8d55d57513595993012051da029241e",
+          "hash": "35aee4f215637565588660d3ff83a7250dd94bf26591b43626418cd9c7965c5c",
           "importOrder": [
-            "src/switchyard/importers/calibration.py",
-            "src/switchyard/importers/common.py",
-            "src/switchyard/importers/ladder.py",
-            "src/switchyard/importers/nli.py",
-            "src/switchyard/importers/offers.py",
-            "src/switchyard/importers/probe.py",
-            "src/switchyard/receipt.py",
-            "src/switchyard/importers/gaps.py",
-            "src/switchyard/cli.py",
+            "src/interlock/importers/calibration.py",
+            "src/interlock/importers/common.py",
+            "src/interlock/importers/ladder.py",
+            "src/interlock/importers/nli.py",
+            "src/interlock/importers/offers.py",
+            "src/interlock/importers/probe.py",
+            "src/interlock/receipt.py",
+            "src/interlock/importers/gaps.py",
+            "src/interlock/cli.py",
             "tests/support.py",
-            "src/switchyard/importers/assemble.py",
-            "src/switchyard/importers/pins.py",
-            "src/switchyard/importers/__init__.py"
+            "src/interlock/importers/assemble.py",
+            "src/interlock/importers/pins.py",
+            "src/interlock/importers/__init__.py"
           ],
           "importsFiles": [
-            "src/switchyard/cli.py",
-            "src/switchyard/importers/__init__.py",
-            "src/switchyard/importers/assemble.py",
-            "src/switchyard/importers/calibration.py",
-            "src/switchyard/importers/common.py",
-            "src/switchyard/importers/gaps.py",
-            "src/switchyard/importers/ladder.py",
-            "src/switchyard/importers/nli.py",
-            "src/switchyard/importers/offers.py",
-            "src/switchyard/importers/pins.py",
-            "src/switchyard/importers/probe.py",
-            "src/switchyard/receipt.py",
+            "src/interlock/cli.py",
+            "src/interlock/importers/__init__.py",
+            "src/interlock/importers/assemble.py",
+            "src/interlock/importers/calibration.py",
+            "src/interlock/importers/common.py",
+            "src/interlock/importers/gaps.py",
+            "src/interlock/importers/ladder.py",
+            "src/interlock/importers/nli.py",
+            "src/interlock/importers/offers.py",
+            "src/interlock/importers/pins.py",
+            "src/interlock/importers/probe.py",
+            "src/interlock/receipt.py",
             "tests/support.py"
           ],
           "path": "tests/test_importers.py",
           "testFramework": "pytest"
+        },
+        {
+          "exports": [
+            "test_the_old_name_is_only_on_the_allow_list"
+          ],
+          "hash": "93e0c942a671bca7057bc1f108da97fbc4e81a4c5f407fe5583102d64abe6759",
+          "path": "tests/test_old_name.py"
         },
         {
           "exports": [
@@ -9628,23 +9669,23 @@
             "test_the_recorder_refuses_a_cloud_model",
             "test_the_recorder_refuses_to_run_without_a_grant"
           ],
-          "hash": "a6e9ed516d60b9cc202668534271acf52b2b8f79386efdaf5c6402f25b561b7a",
+          "hash": "e8c344d449c8471d7e4d206a995dfc2b14afced10bfd25a50acf8955b7f004e8",
           "importOrder": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/adapters/ollama.py",
-            "src/switchyard/adapters/ollama_cases.py",
-            "src/switchyard/adapters/record_fixtures.py",
-            "src/switchyard/harness/count_budget.py",
+            "src/interlock/adapters/base.py",
+            "src/interlock/adapters/ollama.py",
+            "src/interlock/adapters/ollama_cases.py",
+            "src/interlock/adapters/record_fixtures.py",
+            "src/interlock/harness/count_budget.py",
             "tests/ollama_replay.py",
             "scripts/record_ollama_fixtures.py"
           ],
           "importsFiles": [
             "scripts/record_ollama_fixtures.py",
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/adapters/ollama.py",
-            "src/switchyard/adapters/ollama_cases.py",
-            "src/switchyard/adapters/record_fixtures.py",
-            "src/switchyard/harness/count_budget.py",
+            "src/interlock/adapters/base.py",
+            "src/interlock/adapters/ollama.py",
+            "src/interlock/adapters/ollama_cases.py",
+            "src/interlock/adapters/record_fixtures.py",
+            "src/interlock/harness/count_budget.py",
             "tests/ollama_replay.py"
           ],
           "path": "tests/test_ollama_fixtures.py",
@@ -9686,24 +9727,24 @@
             "test_the_restart_cap_stops_the_run",
             "test_the_start_line_record_is_optional_and_filtered"
           ],
-          "hash": "0623ca882345d701afe4ec31b30ec3100c107ada5cf1ed8776b09de4324c7321",
+          "hash": "96aa26c5b2ceb0daeac2f8d3c48c08124f24fcdb14ce5860cc258c73cb19f8a6",
           "importOrder": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/adapters/ollama.py",
-            "src/switchyard/harness/fill.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/harness/watch.py",
-            "src/switchyard/ollama_supervisor.py",
-            "src/switchyard/cli.py"
+            "src/interlock/adapters/base.py",
+            "src/interlock/adapters/ollama.py",
+            "src/interlock/harness/fill.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/harness/watch.py",
+            "src/interlock/ollama_supervisor.py",
+            "src/interlock/cli.py"
           ],
           "importsFiles": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/adapters/ollama.py",
-            "src/switchyard/cli.py",
-            "src/switchyard/harness/fill.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/harness/watch.py",
-            "src/switchyard/ollama_supervisor.py"
+            "src/interlock/adapters/base.py",
+            "src/interlock/adapters/ollama.py",
+            "src/interlock/cli.py",
+            "src/interlock/harness/fill.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/harness/watch.py",
+            "src/interlock/ollama_supervisor.py"
           ],
           "path": "tests/test_ollama_supervisor.py",
           "testFramework": "pytest"
@@ -9724,26 +9765,26 @@
             "test_the_shortest_prefix_at_or_above_is_recorded",
             "test_word_trim_hits_the_target_and_keeps_the_shortest_prefix_above_it"
           ],
-          "hash": "06b03048483f019921041e3272eb4ab89771b1d27c5cc233155a285c8c36de79",
+          "hash": "86a94abb211c4f873ace0ffe0980000a39b5c0b55248d29a7b995af394f9df21",
           "importOrder": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/adapters/ollama.py",
-            "src/switchyard/adapters/ollama_cases.py",
-            "src/switchyard/guards.py",
-            "src/switchyard/harness/e5.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/harness/watch.py",
-            "src/switchyard/harness/__init__.py"
+            "src/interlock/adapters/base.py",
+            "src/interlock/adapters/ollama.py",
+            "src/interlock/adapters/ollama_cases.py",
+            "src/interlock/guards.py",
+            "src/interlock/harness/e5.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/harness/watch.py",
+            "src/interlock/harness/__init__.py"
           ],
           "importsFiles": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/adapters/ollama.py",
-            "src/switchyard/adapters/ollama_cases.py",
-            "src/switchyard/guards.py",
-            "src/switchyard/harness/__init__.py",
-            "src/switchyard/harness/e5.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/harness/watch.py"
+            "src/interlock/adapters/base.py",
+            "src/interlock/adapters/ollama.py",
+            "src/interlock/adapters/ollama_cases.py",
+            "src/interlock/guards.py",
+            "src/interlock/harness/__init__.py",
+            "src/interlock/harness/e5.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/harness/watch.py"
           ],
           "path": "tests/test_ollama_token_count.py",
           "testFramework": "pytest"
@@ -9826,26 +9867,26 @@
             "test_unreadable_perf_metrics_are_recorded_not_dropped",
             "test_warm_reload_compile_recorded_on_fresh_cache"
           ],
-          "hash": "55eed7306a3b625a3bd786b8005f7494f1bf6cda2a63f5bd03368ce82c44f1a6",
+          "hash": "cf840bcc9f4207d09fb960877c3a28eaa42ef5cc73fa60634f8ef0f3820320bf",
           "importOrder": [
-            "src/switchyard/adapters/__init__.py",
-            "src/switchyard/adapters/registry.py",
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/adapters/openvino.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/receipt.py",
-            "src/switchyard/harness/receipts.py",
-            "src/switchyard/harness/timing.py"
+            "src/interlock/adapters/__init__.py",
+            "src/interlock/adapters/registry.py",
+            "src/interlock/adapters/base.py",
+            "src/interlock/adapters/openvino.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/receipt.py",
+            "src/interlock/harness/receipts.py",
+            "src/interlock/harness/timing.py"
           ],
           "importsFiles": [
-            "src/switchyard/adapters/__init__.py",
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/adapters/openvino.py",
-            "src/switchyard/adapters/registry.py",
-            "src/switchyard/harness/receipts.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/harness/timing.py",
-            "src/switchyard/receipt.py"
+            "src/interlock/adapters/__init__.py",
+            "src/interlock/adapters/base.py",
+            "src/interlock/adapters/openvino.py",
+            "src/interlock/adapters/registry.py",
+            "src/interlock/harness/receipts.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/harness/timing.py",
+            "src/interlock/receipt.py"
           ],
           "path": "tests/test_openvino_adapter.py",
           "testFramework": "pytest"
@@ -9878,30 +9919,30 @@
             "test_until_steady_stops_when_two_calls_agree",
             "test_until_steady_waits_until_every_arm_in_the_block_settles"
           ],
-          "hash": "b7f11da6867592510f3320e2d8bae214ab0e768d8fd4806377f50c68ce5ea527",
+          "hash": "176a0be5151871dab3a19b836467f102108c31e866f256359c923f5d00c4fed5",
           "importOrder": [
-            "src/switchyard/adapters/__init__.py",
-            "src/switchyard/adapters/openvino.py",
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/harness/__init__.py",
-            "src/switchyard/harness/watch.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/harness/spec.py",
-            "src/switchyard/harness/steady.py",
-            "src/switchyard/harness/storage.py",
+            "src/interlock/adapters/__init__.py",
+            "src/interlock/adapters/openvino.py",
+            "src/interlock/adapters/base.py",
+            "src/interlock/harness/__init__.py",
+            "src/interlock/harness/watch.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/harness/spec.py",
+            "src/interlock/harness/steady.py",
+            "src/interlock/harness/storage.py",
             "tests/test_harness.py",
             "tests/test_openvino_adapter.py"
           ],
           "importsFiles": [
-            "src/switchyard/adapters/__init__.py",
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/adapters/openvino.py",
-            "src/switchyard/harness/__init__.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/harness/spec.py",
-            "src/switchyard/harness/steady.py",
-            "src/switchyard/harness/storage.py",
-            "src/switchyard/harness/watch.py",
+            "src/interlock/adapters/__init__.py",
+            "src/interlock/adapters/base.py",
+            "src/interlock/adapters/openvino.py",
+            "src/interlock/harness/__init__.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/harness/spec.py",
+            "src/interlock/harness/steady.py",
+            "src/interlock/harness/storage.py",
+            "src/interlock/harness/watch.py",
             "tests/test_harness.py",
             "tests/test_openvino_adapter.py"
           ],
@@ -9930,9 +9971,9 @@
             "test_privacy_check_refuses_unc_paths",
             "test_schema_refuses_gpu_1_and_a_broken_interval"
           ],
-          "hash": "34a3f0be5c16da0711600372f2bbe4d6e74b61c138aa0c30c98967a0d71d8b6d",
+          "hash": "cd095a18c6da82e0810d0e76c11dd3d0da083c0f87cbae4a66555691b4dc6b81",
           "importsFiles": [
-            "src/switchyard/receipt.py",
+            "src/interlock/receipt.py",
             "tests/support.py"
           ],
           "path": "tests/test_receipt.py",
@@ -9956,14 +9997,14 @@
             "test_start_state_is_on_every_row_and_taken_once",
             "test_the_stop_file_flushes_closes_the_marker_and_exits_77_while_the_main_thread_is_blocked"
           ],
-          "hash": "a54986ed549e48402bd051334ae00da9678efcc6a518dbe3791efb3ff28e970c",
+          "hash": "fd9da4262e04453a4f79d70420cd51abad5bb65ea67f29dd965d174132a251e6",
           "importsFiles": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/harness/marker.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/harness/spec.py",
-            "src/switchyard/harness/watch.py",
-            "src/switchyard/receipt.py",
+            "src/interlock/adapters/base.py",
+            "src/interlock/harness/marker.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/harness/spec.py",
+            "src/interlock/harness/watch.py",
+            "src/interlock/receipt.py",
             "tests/test_harness.py",
             "tests/test_run_guard.py"
           ],
@@ -9983,9 +10024,9 @@
             "test_route_rejects_a_bad_date_and_a_bad_floor",
             "write_table"
           ],
-          "hash": "61f5bea0196fc3d369276d207fabf81f9e18781861f00cccee8ac001b90f859b",
+          "hash": "a6261914b51bbff5c35a24f907308f42a8bf0c1ce55d017ce1569f2f5e4b3110",
           "importsFiles": [
-            "src/switchyard/cli.py"
+            "src/interlock/cli.py"
           ],
           "path": "tests/test_route_cli.py",
           "testFramework": "pytest"
@@ -10005,10 +10046,10 @@
             "test_ttft_on_the_committed_table_refuses_unset_prefix_caching",
             "test_verify_quote_rule_2_refuses_unregistered"
           ],
-          "hash": "f7a4c75fdd36cc89d8fb363f55b0894ce2c9209cb4b669c57315c4d38d7da0f2",
+          "hash": "53a4444dc69c35678c55456c417d2ea367c3705507ab597a32e6833ac90f1c3c",
           "importsFiles": [
-            "src/switchyard/cli.py",
-            "src/switchyard/router/policy.py"
+            "src/interlock/cli.py",
+            "src/interlock/router/policy.py"
           ],
           "path": "tests/test_router_golden.py"
         },
@@ -10040,9 +10081,9 @@
             "test_ttft_mixed_prefix_caching_refuses",
             "test_ttft_with_one_known_mode_uses_the_repeat_slot_max"
           ],
-          "hash": "c4ce519862395f96c1e363dfe13af6f0f8b24698e044c1305449652792ba0344",
+          "hash": "edcf20efd1946537a36b0fd4d4d5de81aa77b852ccf33b6e2f6020f935fbe198",
           "importsFiles": [
-            "src/switchyard/router/policy.py",
+            "src/interlock/router/policy.py",
             "tests/router_rows.py"
           ],
           "path": "tests/test_router_policy.py",
@@ -10080,37 +10121,37 @@
             "test_the_watcher_flushes_and_exits_even_when_another_thread_holds_the_state_lock",
             "test_without_psutil_the_guard_records_unrecorded_and_the_run_goes_on"
           ],
-          "hash": "a86f1034243a36ffa6aa222e4a43168367bfe152003407f27e96b16661b21861",
+          "hash": "9e36fdcae6d23754ec3ea758778907f4a42ebca865d08b64613f765d5990d4ed",
           "importOrder": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/cli.py",
-            "src/switchyard/guards.py",
-            "src/switchyard/harness/__init__.py",
-            "src/switchyard/harness/environment.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/harness/marker.py",
-            "src/switchyard/harness/receipts.py",
-            "src/switchyard/harness/spec.py",
-            "src/switchyard/harness/watch.py",
-            "src/switchyard/receipt.py",
+            "src/interlock/adapters/base.py",
+            "src/interlock/cli.py",
+            "src/interlock/guards.py",
+            "src/interlock/harness/__init__.py",
+            "src/interlock/harness/environment.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/harness/marker.py",
+            "src/interlock/harness/receipts.py",
+            "src/interlock/harness/spec.py",
+            "src/interlock/harness/watch.py",
+            "src/interlock/receipt.py",
             "tests/test_harness.py",
             "tests/test_run_path.py",
             "tests/test_openvino_adapter.py",
-            "src/switchyard/adapters/openvino.py"
+            "src/interlock/adapters/openvino.py"
           ],
           "importsFiles": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/adapters/openvino.py",
-            "src/switchyard/cli.py",
-            "src/switchyard/guards.py",
-            "src/switchyard/harness/__init__.py",
-            "src/switchyard/harness/environment.py",
-            "src/switchyard/harness/marker.py",
-            "src/switchyard/harness/receipts.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/harness/spec.py",
-            "src/switchyard/harness/watch.py",
-            "src/switchyard/receipt.py",
+            "src/interlock/adapters/base.py",
+            "src/interlock/adapters/openvino.py",
+            "src/interlock/cli.py",
+            "src/interlock/guards.py",
+            "src/interlock/harness/__init__.py",
+            "src/interlock/harness/environment.py",
+            "src/interlock/harness/marker.py",
+            "src/interlock/harness/receipts.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/harness/spec.py",
+            "src/interlock/harness/watch.py",
+            "src/interlock/receipt.py",
             "tests/test_harness.py",
             "tests/test_openvino_adapter.py",
             "tests/test_run_path.py"
@@ -10133,13 +10174,13 @@
             "test_runs_list_reports_complete_aborted_and_stray",
             "test_runs_quarantine_moves_a_stray_and_writes_the_hand_note"
           ],
-          "hash": "491862b5072243e0ee24018e42461cf92e375db92d7e995c1fe7eb7ca0109ed7",
+          "hash": "2f78b82fe843ffe6543c3b578b4fbe50cde5826157e9457078a65cded307bf18",
           "importsFiles": [
-            "src/switchyard/cli.py",
-            "src/switchyard/harness/e4b.py",
-            "src/switchyard/harness/lifecycle.py",
-            "src/switchyard/harness/receipts.py",
-            "src/switchyard/receipt.py",
+            "src/interlock/cli.py",
+            "src/interlock/harness/e4b.py",
+            "src/interlock/harness/lifecycle.py",
+            "src/interlock/harness/receipts.py",
+            "src/interlock/receipt.py",
             "tests/test_e4b.py"
           ],
           "path": "tests/test_run_lifecycle.py",
@@ -10165,14 +10206,14 @@
             "test_the_command_runs_and_refuses_a_name_collision",
             "test_the_dry_run_closes_with_devices_not_started"
           ],
-          "hash": "80a50b732a5b197c642ba22f2af7f372caeabb839efa9e9ca10b2cf7c93caec3",
+          "hash": "47a109afd99601d09545cacb8ba4a3e4351110ba9d2c71cf7a27bd0ea533b96f",
           "importsFiles": [
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/cli.py",
-            "src/switchyard/guards.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/harness/spec.py",
-            "src/switchyard/receipt.py"
+            "src/interlock/adapters/base.py",
+            "src/interlock/cli.py",
+            "src/interlock/guards.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/harness/spec.py",
+            "src/interlock/receipt.py"
           ],
           "path": "tests/test_run_path.py",
           "testFramework": "pytest"
@@ -10194,15 +10235,15 @@
             "test_the_committed_table_is_rekeyed_and_does_not_invent_judge_rates",
             "test_the_schema_task_list_is_the_code_task_list"
           ],
-          "hash": "cc0ebb51bd15910e4c49882c5438beb92ef02e94fe6fc0b3da0726c8747926ed",
+          "hash": "db5c592af0b5970342a3c8064c82d0eafb287d4a1dace266a17d6117ccba5d3d",
           "importsFiles": [
-            "src/switchyard/families.py",
-            "src/switchyard/harness/choice.py",
-            "src/switchyard/harness/spec.py",
-            "src/switchyard/importers/gaps.py",
-            "src/switchyard/receipt.py",
-            "src/switchyard/scope.py",
-            "src/switchyard/tasks.py",
+            "src/interlock/families.py",
+            "src/interlock/harness/choice.py",
+            "src/interlock/harness/spec.py",
+            "src/interlock/importers/gaps.py",
+            "src/interlock/receipt.py",
+            "src/interlock/scope.py",
+            "src/interlock/tasks.py",
             "tests/support.py"
           ],
           "path": "tests/test_task_scope.py",
@@ -10292,13 +10333,13 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 30
+          "files": 33
         },
         {
           "boundary": "src",
           "depth": 1,
           "enters": {
-            "file": "src/switchyard/harness/runner.py",
+            "file": "src/interlock/harness/runner.py",
             "from": "tests/conftest.py"
           },
           "files": 47
@@ -10332,7 +10373,7 @@
         {
           "config": "pyproject.toml",
           "coverage": true,
-          "files": 30,
+          "files": 33,
           "job": "test",
           "runner": "pytest",
           "step": "Test"
@@ -10387,6 +10428,131 @@
       "usesWorkflowToken": false
     },
     {
+      "checksCount": 1,
+      "commands": [
+        {
+          "dir": "",
+          "job": "build",
+          "programs": [
+            "python"
+          ],
+          "step": "The tag matches the version"
+        },
+        {
+          "dir": "",
+          "job": "build",
+          "programs": [
+            "uv"
+          ],
+          "step": "Build"
+        }
+      ],
+      "elsewhere": [],
+      "file": ".github/workflows/release.yml",
+      "jobs": [
+        {
+          "basis": "declared",
+          "name": "build",
+          "runsOn": [
+            {
+              "labels": [
+                "ubuntu-latest"
+              ],
+              "platform": {
+                "cpu": "x64",
+                "libc": "glibc",
+                "os": "linux"
+              }
+            }
+          ]
+        },
+        {
+          "basis": "declared",
+          "environment": {
+            "name": "pypi"
+          },
+          "name": "publish",
+          "runsOn": [
+            {
+              "labels": [
+                "ubuntu-latest"
+              ],
+              "platform": {
+                "cpu": "x64",
+                "libc": "glibc",
+                "os": "linux"
+              }
+            }
+          ]
+        }
+      ],
+      "landings": [],
+      "mentions": [
+        {
+          "job": "build",
+          "path": "pyproject.toml"
+        }
+      ],
+      "name": "Release",
+      "permissions": [
+        "actions:read",
+        "contents:read",
+        "id-token:write"
+      ],
+      "pushes": false,
+      "reach": [
+        {
+          "boundary": "src",
+          "depth": 0,
+          "files": 50
+        }
+      ],
+      "readers": [],
+      "runs": [
+        {
+          "directory": true,
+          "job": "build",
+          "path": "src/interlock/",
+          "runKind": "checks",
+          "via": "build pyproject.toml"
+        }
+      ],
+      "runsCount": 1,
+      "secrets": [],
+      "sends": {
+        "deploysPages": false,
+        "dispatchesTo": [],
+        "opensIssues": false,
+        "opensIssuesOnFailure": false,
+        "opensPullRequests": false,
+        "publishes": true,
+        "publishesTo": [
+          "pypi"
+        ],
+        "releases": false
+      },
+      "stages": [],
+      "triggers": [
+        {
+          "event": "release",
+          "types": [
+            "published"
+          ]
+        },
+        {
+          "event": "workflow_dispatch"
+        }
+      ],
+      "uses": [
+        "actions/checkout",
+        "actions/download-artifact",
+        "actions/upload-artifact",
+        "astral-sh/setup-uv",
+        "pypa/gh-action-pypi-publish"
+      ],
+      "usesWorkflowToken": false
+    },
+    {
       "checksCount": 0,
       "commands": [],
       "elsewhere": [],
@@ -10394,7 +10560,7 @@
       "kind": "command",
       "landings": [],
       "mentions": [],
-      "name": "switchyard",
+      "name": "interlock",
       "permissions": [],
       "pushes": false,
       "reach": [
@@ -10407,7 +10573,7 @@
       "readers": [],
       "runs": [
         {
-          "path": "src/switchyard/cli.py",
+          "path": "src/interlock/cli.py",
           "runKind": "executes"
         }
       ],
@@ -10439,10 +10605,22 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "9b2b9aca5c1332d17c23427452338d9e5a02bc5d",
-    "tracked": 223
+    "commit": "64ff92401747dfe1559afb423208d4a49fadae17",
+    "tracked": 228
   },
   "landings": [
+    {
+      "readers": [
+        {
+          "by": "tests/test_old_name.py",
+          "call": "literal",
+          "confidence": "ast",
+          "fromTests": true
+        }
+      ],
+      "target": "CHANGELOG.md",
+      "writers": []
+    },
     {
       "readers": [
         {
@@ -10457,6 +10635,24 @@
     {
       "readers": [
         {
+          "by": "tests/test_old_name.py",
+          "call": "literal",
+          "confidence": "ast",
+          "fromTests": true
+        }
+      ],
+      "target": "docs/handoff",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "tests/test_old_name.py",
+          "call": "literal",
+          "confidence": "ast",
+          "fromTests": true
+        },
+        {
           "by": "tests/test_router_policy.py",
           "call": "literal",
           "confidence": "ast",
@@ -10464,6 +10660,18 @@
         }
       ],
       "target": "experiments",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "tests/test_old_name.py",
+          "call": "literal",
+          "confidence": "ast",
+          "fromTests": true
+        }
+      ],
+      "target": "experiments/e1/incident-2026-10-09.md",
       "writers": []
     },
     {
@@ -10488,6 +10696,18 @@
         }
       ],
       "target": "experiments/e3-ref/spec.yaml",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "tests/test_old_name.py",
+          "call": "literal",
+          "confidence": "ast",
+          "fromTests": true
+        }
+      ],
+      "target": "experiments/e3/run-notes-2026-10-10-11.md",
       "writers": []
     },
     {
@@ -10541,7 +10761,23 @@
     {
       "readers": [
         {
+          "by": ".github/workflows/release.yml",
+          "confidence": "config"
+        }
+      ],
+      "target": "pyproject.toml",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
           "by": "tests/test_e4b.py",
+          "call": "literal",
+          "confidence": "ast",
+          "fromTests": true
+        },
+        {
+          "by": "tests/test_old_name.py",
           "call": "literal",
           "confidence": "ast",
           "fromTests": true
@@ -10559,18 +10795,41 @@
     {
       "readers": [
         {
-          "by": "src/switchyard/receipt.py",
-          "call": "read_text",
-          "confidence": "ast"
+          "by": "pyproject.toml",
+          "call": "configuration",
+          "confidence": "config"
         }
       ],
-      "target": "src/switchyard/schema/routing-row.schema.json",
+      "target": "src/interlock",
       "writers": []
     },
     {
       "readers": [
         {
-          "by": "src/switchyard/families.py",
+          "by": "src/interlock/receipt.py",
+          "call": "read_text",
+          "confidence": "ast"
+        }
+      ],
+      "target": "src/interlock/schema/routing-row.schema.json",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "tests/test_old_name.py",
+          "call": "literal",
+          "confidence": "ast",
+          "fromTests": true
+        }
+      ],
+      "target": "table",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "src/interlock/families.py",
           "call": "read_text",
           "confidence": "ast"
         }
@@ -10588,12 +10847,24 @@
       ],
       "target": "tests/fixtures/ollama",
       "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "tests/test_old_name.py",
+          "call": "literal",
+          "confidence": "ast",
+          "fromTests": true
+        }
+      ],
+      "target": "tests/test_old_name.py",
+      "writers": []
     }
   ],
   "overlaps": [],
   "submodules": [],
   "symlinks": [],
-  "testFiles": 48,
+  "testFiles": 51,
   "unassigned": [
     {
       "hash": "be418720d26ab2999db6b0a7e07f4f2d6532c8c35f3c2d5329f9ce506b82109f",
@@ -10927,11 +11198,11 @@
           "line": 93
         }
       ],
-      "hash": "4e7c098a1a0e9c3b0a111c39c89c011f560404f70627a1222b6e96f629f14a84",
+      "hash": "d513eac659768cee7c42206cb717fe250eddce80678fb10aca454d083d2ac19d",
       "importsFiles": [
-        "src/switchyard/adapters/ollama_cases.py",
-        "src/switchyard/adapters/record_fixtures.py",
-        "src/switchyard/harness/runner.py"
+        "src/interlock/adapters/ollama_cases.py",
+        "src/interlock/adapters/record_fixtures.py",
+        "src/interlock/harness/runner.py"
       ],
       "path": "scripts/record_ollama_fixtures.py"
     },

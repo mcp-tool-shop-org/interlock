@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from switchyard.cli import main, run_report
+from interlock.cli import main, run_report
 from tests.support import row
 
 
@@ -53,7 +53,7 @@ def test_module_entrypoint_parses_check(tmp_path: Path, monkeypatch):
 
     import pytest
 
-    monkeypatch.setattr(sys, "argv", ["switchyard", "check", "--root", str(tmp_path)])
+    monkeypatch.setattr(sys, "argv", ["interlock", "check", "--root", str(tmp_path)])
     with pytest.raises(SystemExit) as caught:
-        runpy.run_module("switchyard", run_name="__main__")
+        runpy.run_module("interlock", run_name="__main__")
     assert caught.value.code == 0

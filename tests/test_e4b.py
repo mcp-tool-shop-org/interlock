@@ -13,10 +13,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from switchyard.adapters.base import StepRequest
-from switchyard.adapters.ollama import OllamaAdapter
-from switchyard.guards import GuardError
-from switchyard.harness.e4b import (
+from interlock.adapters.base import StepRequest
+from interlock.adapters.ollama import OllamaAdapter
+from interlock.guards import GuardError
+from interlock.harness.e4b import (
     E4bError,
     RepeatLimit,
     IntelLane,
@@ -66,7 +66,7 @@ from switchyard.harness.e4b import (
     urllib_exchange,
     warm_5090,
 )
-from switchyard.harness.e4b_stats import (
+from interlock.harness.e4b_stats import (
     StatsError,
     bootstrap_median,
     decide,
@@ -76,7 +76,7 @@ from switchyard.harness.e4b_stats import (
     signed_rank_cdf,
     tost,
 )
-from switchyard.harness.ollama_serve import (
+from interlock.harness.ollama_serve import (
     LISTENER_SCRIPT,
     READY_INTERVAL_S,
     READY_TIMEOUT_S,
@@ -91,9 +91,9 @@ from switchyard.harness.ollama_serve import (
     start_line,
     stop_process_tree,
 )
-from switchyard.adapters.record_fixtures import read_card_mib
-from switchyard.harness.spec import SpecError, load_spec, validate_spec
-from switchyard.harness.timing import percentile
+from interlock.adapters.record_fixtures import read_card_mib
+from interlock.harness.spec import SpecError, load_spec, validate_spec
+from interlock.harness.timing import percentile
 
 ROOT = Path(__file__).resolve().parents[1]
 E4B = ROOT / "experiments" / "e4b" / "spec.yaml"
@@ -338,8 +338,8 @@ def test_e4b_validation_rejects_a_changed_contract():
 
 
 def test_dry_run_names_the_e4b_rules_and_the_pilot(capsys):
-    from switchyard.cli import main
-    from switchyard.harness.runner import dry_run
+    from interlock.cli import main
+    from interlock.harness.runner import dry_run
 
     text = dry_run(E4B, ROOT)
     for phrase in (
@@ -360,7 +360,7 @@ def test_dry_run_names_the_e4b_rules_and_the_pilot(capsys):
         "not a gate",
         "clock_tolerance_mhz: 22.5",
         "steady_band_mhz: 22.5",
-        "switchyard run experiments/e4b/spec.yaml --pilot",
+        "interlock run experiments/e4b/spec.yaml --pilot",
         "heartbeat not read; adapters not called",
         "devices not started (--dry-run)",
         "counting sequence, shortest prefix at or above 256 tokens",
@@ -391,14 +391,14 @@ def test_dry_run_names_the_e4b_rules_and_the_pilot(capsys):
 
 def test_a_full_block_refuses_null_tolerances_before_heartbeat(monkeypatch):
     # The committed spec now carries the pilot's values, so the refusal is checked on a copy with them nulled.
-    from switchyard.harness import e4b
+    from interlock.harness import e4b
 
     def explode(*args, **kwargs):
         raise AssertionError("live seams were built")
 
-    monkeypatch.setattr("switchyard.harness.e4b.build_live_seams", explode)
+    monkeypatch.setattr("interlock.harness.e4b.build_live_seams", explode)
     monkeypatch.setattr(
-        "switchyard.harness.runner.require_heartbeat",
+        "interlock.harness.runner.require_heartbeat",
         lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("heartbeat")),
     )
     for field in ("clock_tolerance_mhz", "steady_band_mhz"):
@@ -1228,7 +1228,7 @@ def test_warm_until_steady_and_a_short_warm_is_not_steady():
 
 
 def test_pilot_requires_a_grant_and_not_an_npu_session(tmp_path: Path):
-    from switchyard.harness.e4b import run_from_cli
+    from interlock.harness.e4b import run_from_cli
 
     spec = load_spec(E4B)
     with pytest.raises(GuardError, match="grant"):
@@ -1459,7 +1459,7 @@ def test_a_dead_heartbeat_refuses_the_block_and_the_pilot_before_spawn(tmp_path:
 
     fresh = tmp_path / "fresh-heartbeat"
     fresh.write_text("ok", encoding="utf-8")
-    monkeypatch.setattr("switchyard.harness.runner.heartbeat_path", lambda: fresh)
+    monkeypatch.setattr("interlock.harness.runner.heartbeat_path", lambda: fresh)
 
     def ok_call(arm, *, num_predict, measured, kind, prompt):
         return _clean(arm, num_predict=num_predict, kind=kind)
@@ -1716,7 +1716,7 @@ def test_the_burn_stops_when_the_slot_ends_and_when_it_raises():
 
 def test_live_sample_gpu_records_nvml_then_smi(monkeypatch):
     record_nvml = type("R", (), {"probe": None, "intervals": []})()
-    monkeypatch.setattr("switchyard.harness.e4b.read_nvml", lambda library: (1500.0, 80.0))
+    monkeypatch.setattr("interlock.harness.e4b.read_nvml", lambda library: (1500.0, 80.0))
     assert live_sample_gpu(record_nvml) == (1500.0, 80.0)
     assert record_nvml.probe == "nvml"
 
@@ -1725,8 +1725,8 @@ def test_live_sample_gpu_records_nvml_then_smi(monkeypatch):
     def no_nvml(library):
         raise RuntimeError("nvml down")
 
-    monkeypatch.setattr("switchyard.harness.e4b.read_nvml", no_nvml)
-    monkeypatch.setattr("switchyard.harness.e4b.smi_query", lambda run: "1800, 40")
+    monkeypatch.setattr("interlock.harness.e4b.read_nvml", no_nvml)
+    monkeypatch.setattr("interlock.harness.e4b.smi_query", lambda run: "1800, 40")
     assert live_sample_gpu(record_smi) == (1800.0, 40.0)
     assert record_smi.probe == "smi"
 
@@ -1751,13 +1751,13 @@ def test_the_block_receipt_carries_the_server_config_and_the_probe(tmp_path: Pat
 
 def test_live_seams_are_not_stubs(tmp_path: Path, monkeypatch):
     pin = _fresh_pin(tmp_path)
-    monkeypatch.setattr("switchyard.harness.e4b.resolve_pin", lambda run: pin)
+    monkeypatch.setattr("interlock.harness.e4b.resolve_pin", lambda run: pin)
 
     class FakeServer:
         def __init__(self, *args, **kwargs):
             self.kwargs = kwargs
 
-    monkeypatch.setattr("switchyard.harness.ollama_serve.Server", FakeServer)
+    monkeypatch.setattr("interlock.harness.ollama_serve.Server", FakeServer)
     seams = build_live_seams(tmp_path, "live-defaults", _spec([PAIRS[0]]), pilot=True)
     assert isinstance(seams.sample_gpu, LiveGpuSample)
     assert seams.sample_gpu.live is True
@@ -1782,7 +1782,7 @@ def test_the_counting_prompt_is_the_shortest_prefix_at_the_token_target():
     shorter = "".join(f"{n}\n" for n in range(1, 256))
     assert text.startswith(shorter)
     assert _line_count(shorter) < 256
-    assert "switchyard" not in text
+    assert "interlock" not in text
     spec = _spec([PAIRS[0]])
     spec["dataset"]["target_tokens"] = 256
     spec["dataset"]["seed"] = "The switchyard counts the same cars on every pass. "

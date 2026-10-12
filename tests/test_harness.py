@@ -13,9 +13,9 @@ from pathlib import Path
 import pytest
 import yaml
 
-from switchyard.adapters.base import AdapterError, NativeBinaryRejected, StepRequest, StepResult
-from switchyard.adapters.offrig_calibrate import OffrigCalibrateAdapter, plan_argv, scratch_project
-from switchyard.adapters.ollama import (
+from interlock.adapters.base import AdapterError, NativeBinaryRejected, StepRequest, StepResult
+from interlock.adapters.offrig_calibrate import OffrigCalibrateAdapter, plan_argv, scratch_project
+from interlock.adapters.ollama import (
     OllamaAdapter,
     context_length,
     default_transport,
@@ -25,10 +25,10 @@ from switchyard.adapters.ollama import (
     think_value,
     url_for,
 )
-from switchyard.adapters.registry import for_engine
-from switchyard.guards import GuardError
-from switchyard.harness.environment import driver_version_from_lines, package_versions
-from switchyard.harness.e5 import (
+from interlock.adapters.registry import for_engine
+from interlock.guards import GuardError
+from interlock.harness.environment import driver_version_from_lines, package_versions
+from interlock.harness.e5 import (
     PROMPT_RATIO,
     SHARED_GROWTH_MIB,
     Observation,
@@ -38,9 +38,9 @@ from switchyard.harness.e5 import (
     over_margin,
     search,
 )
-from switchyard.harness.lock import require_unmodified
-from switchyard.harness.receipts import apply_parity, device_lost_row, environment, for_table, import_receipt, write_run
-from switchyard.harness.runner import (
+from interlock.harness.lock import require_unmodified
+from interlock.harness.receipts import apply_parity, device_lost_row, environment, for_table, import_receipt, write_run
+from interlock.harness.runner import (
     RunnerError,
     check_flags,
     device_lost_error,
@@ -49,8 +49,8 @@ from switchyard.harness.runner import (
     native_binary_rejected_error,
     run_interleaved,
 )
-from switchyard.harness.spec import SpecError, load_spec, validate_spec
-from switchyard.harness.timing import (
+from interlock.harness.spec import SpecError, load_spec, validate_spec
+from interlock.harness.timing import (
     TimingError,
     aba_call,
     percentile,
@@ -60,8 +60,8 @@ from switchyard.harness.timing import (
     summarize,
     within_band,
 )
-from switchyard.importers.gaps import open_gaps
-from switchyard.receipt import ReceiptError, check_tree, is_speed_row, load_jsonl, validate_row
+from interlock.importers.gaps import open_gaps
+from interlock.receipt import ReceiptError, check_tree, is_speed_row, load_jsonl, validate_row
 
 ROOT = Path(__file__).resolve().parents[1]
 E4 = ROOT / "experiments" / "e4" / "spec.yaml"
@@ -1074,7 +1074,7 @@ def test_import_judges_a_later_receipt_against_the_table_and_keeps_the_timing(tm
 
 
 def test_a_failed_parity_guard_is_recorded_on_the_run_and_not_served(tmp_path: Path):
-    from switchyard.scope import select
+    from interlock.scope import select
 
     repo = tmp_path / "repo"
     spec = _spec()
@@ -1281,7 +1281,7 @@ def test_an_edited_spec_is_refused_and_dry_run_does_not_touch_devices(tmp_path: 
         target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
     _commit(repo)
     monkeypatch.setattr(
-        "switchyard.guards.require_heartbeat",
+        "interlock.guards.require_heartbeat",
         lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("heartbeat was read")),
     )
     e4_text = dry_run(repo / "experiments" / "e4" / "spec.yaml", repo)
@@ -1306,7 +1306,7 @@ def test_an_edited_spec_is_refused_and_dry_run_does_not_touch_devices(tmp_path: 
 
 
 def test_the_command_dry_runs_and_refuses_to_start_a_device(tmp_path: Path, monkeypatch):
-    from switchyard.cli import main
+    from interlock.cli import main
 
     repo = tmp_path / "repo"
     target = repo / "experiments" / "e5" / "spec.yaml"
@@ -1384,7 +1384,7 @@ def test_offrig_calibrate_is_planned_and_not_launched():
 
 def test_openvino_is_a_plug_in_and_not_a_fallback():
     # The plug-in landed with PR #5 (Intel lane). The no-fallback half is unchanged.
-    from switchyard.adapters.openvino import adapter as ov_adapter
+    from interlock.adapters.openvino import adapter as ov_adapter
 
     assert isinstance(for_engine("openvino"), type(ov_adapter()))
     with pytest.raises(AdapterError, match="unknown engine"):
@@ -1753,7 +1753,7 @@ def test_adapter_edges_stay_local(monkeypatch):
         def close(self):
             return None
 
-    monkeypatch.setattr("switchyard.adapters.ollama.http.client.HTTPConnection", _Conn)
+    monkeypatch.setattr("interlock.adapters.ollama.http.client.HTTPConnection", _Conn)
     assert default_transport("POST", "http://127.0.0.1:11434/api/ps", {"a": 1}) == {"ok": True}
     assert captured["timeout"] is None
     assert json.loads(captured["data"]) == {"a": 1}
@@ -1795,7 +1795,7 @@ def test_adapter_edges_stay_local(monkeypatch):
     wired = for_engine("offrig-calibrate", executor=lambda _argv: 0)
     assert wired.executor is not None
 
-    import switchyard.adapters.registry as registry
+    import interlock.adapters.registry as registry
 
     monkeypatch.setattr(registry.importlib, "import_module", lambda _name: object())
     with pytest.raises(AdapterError, match="adapter"):
@@ -1846,7 +1846,7 @@ def test_cancel_unblocks_a_generate_the_server_has_not_answered(monkeypatch):
     worker = threading.Thread(target=server.serve_forever, daemon=True)
     worker.start()
     monkeypatch.setattr(
-        "switchyard.adapters.ollama.url_for",
+        "interlock.adapters.ollama.url_for",
         lambda _device: f"http://127.0.0.1:{port}",
     )
     adapter = OllamaAdapter()
@@ -1938,7 +1938,7 @@ def test_cancel_then_unload_still_ends_the_generate(monkeypatch):
     worker = threading.Thread(target=server.serve_forever, daemon=True)
     worker.start()
     monkeypatch.setattr(
-        "switchyard.adapters.ollama.url_for",
+        "interlock.adapters.ollama.url_for",
         lambda _device: f"http://127.0.0.1:{port}",
     )
     adapter = OllamaAdapter()
@@ -1982,7 +1982,7 @@ def test_a_transport_timeout_on_unload_is_the_resident_note(monkeypatch):
     def boom(*_args, **_kwargs):
         raise AdapterError("the request timed out")
 
-    monkeypatch.setattr("switchyard.adapters.ollama.default_transport", boom)
+    monkeypatch.setattr("interlock.adapters.ollama.default_transport", boom)
     adapter = OllamaAdapter()
     with pytest.raises(AdapterError, match="the model may still be resident") as raised:
         adapter.unload("qwen3:8b", "5090")
@@ -2026,7 +2026,7 @@ def test_a_hanging_unload_ends_with_the_resident_note(monkeypatch):
     worker = threading.Thread(target=server.serve_forever, daemon=True)
     worker.start()
     monkeypatch.setattr(
-        "switchyard.adapters.ollama.url_for",
+        "interlock.adapters.ollama.url_for",
         lambda _device: f"http://127.0.0.1:{port}",
     )
     adapter = OllamaAdapter(unload_timeout=0.4)
@@ -2372,7 +2372,7 @@ def test_ollama_resolves_show_and_does_not_fake_a_companion():
 
 
 def test_environment_pins_openvino_the_npu_driver_and_packages(monkeypatch):
-    from switchyard.harness import environment as env_capture
+    from interlock.harness import environment as env_capture
 
     versions = {"openvino": "2026.4.1", "openvino-tokenizers": "2026.4.1.0"}
 
@@ -2397,7 +2397,7 @@ def test_environment_pins_openvino_the_npu_driver_and_packages(monkeypatch):
 
 
 def test_dist_version_reads_metadata_and_a_missing_package_stays_unrecorded(monkeypatch):
-    from switchyard.harness import environment as env_capture
+    from interlock.harness import environment as env_capture
 
     assert env_capture.dist_version("this-package-is-not-installed") == "unrecorded"
     assert env_capture.dist_version("pytest") != "unrecorded"
@@ -2416,7 +2416,7 @@ def test_dist_version_reads_metadata_and_a_missing_package_stays_unrecorded(monk
 
 
 def test_the_npu_driver_query_keeps_one_version_and_does_not_guess(monkeypatch):
-    from switchyard.harness import environment as env_capture
+    from interlock.harness import environment as env_capture
 
     calls = []
 
@@ -2456,7 +2456,7 @@ def test_the_npu_driver_query_keeps_one_version_and_does_not_guess(monkeypatch):
 
 
 def test_a_run_records_the_captured_environment_on_the_row(tmp_path, monkeypatch):
-    from switchyard.harness import environment as env_capture
+    from interlock.harness import environment as env_capture
 
     monkeypatch.setattr(env_capture, "dist_version", lambda name: "2026.4.1" if name == "openvino" else "unrecorded")
     monkeypatch.setattr(env_capture, "npu_driver_version", lambda: "32.0.100.5540")
@@ -2666,7 +2666,7 @@ class _FakePsutil:
 def test_a_slot_records_cpu_load_and_frequency(monkeypatch, tmp_path: Path):
     """The #36 addendum: psutil readings at each slot edge, summarized max."""
 
-    import switchyard.harness.runner as mod
+    import interlock.harness.runner as mod
 
     monkeypatch.setattr(mod, "psutil", _FakePsutil())
     repo = tmp_path / "repo"
@@ -2683,7 +2683,7 @@ def test_a_slot_records_cpu_load_and_frequency(monkeypatch, tmp_path: Path):
 def test_cpu_noise_is_unrecorded_and_never_a_failure(monkeypatch, tmp_path: Path):
     """The #36 addendum: without psutil the field says unrecorded and the run passes."""
 
-    import switchyard.harness.runner as mod
+    import interlock.harness.runner as mod
 
     monkeypatch.setattr(mod, "psutil", None)
     repo = tmp_path / "repo"

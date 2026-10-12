@@ -13,22 +13,22 @@ from pathlib import Path
 
 import pytest
 
-from switchyard.adapters.base import AdapterError, BuildRefused
-from switchyard.cli import announce_run
-from switchyard.harness import runner as runner_module
-from switchyard.harness.marker import marker_path
-from switchyard.harness.receipts import import_receipt
-from switchyard.harness.runner import RunnerError, dry_run, run_interleaved
-from switchyard.harness.spec import SpecError, validate_spec
-from switchyard.harness.timing import schedule
-from switchyard.harness.watch import (
+from interlock.adapters.base import AdapterError, BuildRefused
+from interlock.cli import announce_run
+from interlock.harness import runner as runner_module
+from interlock.harness.marker import marker_path
+from interlock.harness.receipts import import_receipt
+from interlock.harness.runner import RunnerError, dry_run, run_interleaved
+from interlock.harness.spec import SpecError, validate_spec
+from interlock.harness.timing import schedule
+from interlock.harness.watch import (
     BUILD_GUARD_PCT,
     BUILD_STEP_8B_BYTES,
     BUILD_STEP_DEFAULT_BYTES,
     BuildGuard,
     WatchHooks,
 )
-from switchyard.receipt import is_speed_row, load_jsonl
+from interlock.receipt import is_speed_row, load_jsonl
 from tests.test_harness import _arm, _bind, _result, _spec as _harness_spec
 
 GIB = 2**30

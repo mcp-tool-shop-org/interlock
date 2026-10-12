@@ -15,12 +15,12 @@ from pathlib import Path
 import pytest
 import yaml
 
-from switchyard.adapters.base import AdapterError
-from switchyard.adapters.ollama import OllamaAdapter
-from switchyard.adapters.ollama_cases import require_recorded_behaviour
-from switchyard.harness.spec import SpecError, validate_spec
-from switchyard.guards import GuardError, require_card_empty, require_grant, require_heartbeat
-from switchyard.harness.fill import (
+from interlock.adapters.base import AdapterError
+from interlock.adapters.ollama import OllamaAdapter
+from interlock.adapters.ollama_cases import require_recorded_behaviour
+from interlock.harness.spec import SpecError, validate_spec
+from interlock.guards import GuardError, require_card_empty, require_grant, require_heartbeat
+from interlock.harness.fill import (
     ADAPTER_DEDICATED,
     ADAPTER_SHARED,
     DRIVER_ARGV,
@@ -42,8 +42,8 @@ from switchyard.harness.fill import (
     runner_pid,
     window_delta,
 )
-from switchyard.harness.runner import RunnerError, dry_run, run_spec
-from switchyard.receipt import check_tree, load_jsonl
+from interlock.harness.runner import RunnerError, dry_run, run_spec
+from interlock.receipt import check_tree, load_jsonl
 
 ROOT = Path(__file__).resolve().parents[1]
 E5 = ROOT / "experiments" / "e5" / "spec.yaml"
@@ -648,9 +648,9 @@ def test_guards_run_per_model_and_rest_is_not_taken(tmp_path: Path, monkeypatch)
         order.append("ps")
         return real_empty(models)
 
-    monkeypatch.setattr("switchyard.harness.fill.require_grant", grant)
-    monkeypatch.setattr("switchyard.harness.fill.require_heartbeat", heartbeat)
-    monkeypatch.setattr("switchyard.harness.fill.require_card_empty", empty)
+    monkeypatch.setattr("interlock.harness.fill.require_grant", grant)
+    monkeypatch.setattr("interlock.harness.fill.require_heartbeat", heartbeat)
+    monkeypatch.setattr("interlock.harness.fill.require_card_empty", empty)
     transport = _Transport(None)
     transport.trace = order
     seams = _seams(transport)
@@ -679,7 +679,7 @@ def test_guards_run_per_model_and_rest_is_not_taken(tmp_path: Path, monkeypatch)
 
 def test_a_fake_adapter_without_seams_does_not_call_nvidia(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(
-        "switchyard.harness.fill._capture",
+        "interlock.harness.fill._capture",
         lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("a device command ran")),
     )
     transport = _Transport(quiet_fill_seams())
@@ -697,7 +697,7 @@ def test_a_missing_grant_never_calls_the_adapter(tmp_path: Path):
 
 def test_dry_run_names_the_confirmation_count(monkeypatch):
     monkeypatch.setattr(
-        "switchyard.guards.require_heartbeat",
+        "interlock.guards.require_heartbeat",
         lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("heartbeat was read")),
     )
     text = dry_run(E5, ROOT)
@@ -716,7 +716,7 @@ def test_dry_run_names_the_confirmation_count(monkeypatch):
     assert "heartbeat not read; adapters not called" in text
     assert "devices not started (--dry-run)" in text
     assert "rest_s" not in text
-    source = (ROOT / "src" / "switchyard" / "harness" / "fill.py").read_text(encoding="utf-8")
+    source = (ROOT / "src" / "interlock" / "harness" / "fill.py").read_text(encoding="utf-8")
     assert "31200" not in source
 
 
