@@ -5,6 +5,9 @@ Device runs are fakes. Dry-run does not stat the heartbeat or call an adapter.
 
 import json
 import subprocess
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
@@ -1300,7 +1303,7 @@ def test_an_edited_spec_is_refused_and_dry_run_does_not_touch_devices(tmp_path: 
         require_unmodified(repo, spec)
 
 
-def test_the_command_dry_runs_and_refuses_to_start_a_device(tmp_path: Path):
+def test_the_command_dry_runs_and_refuses_to_start_a_device(tmp_path: Path, monkeypatch):
     from switchyard.cli import main
 
     repo = tmp_path / "repo"
@@ -1308,6 +1311,7 @@ def test_the_command_dry_runs_and_refuses_to_start_a_device(tmp_path: Path):
     target.parent.mkdir(parents=True)
     target.write_text(E5.read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
     _commit(repo)
+    monkeypatch.setenv("WATCHDOG_HEARTBEAT", str(tmp_path / "no-heartbeat"))
     assert main(["run", str(target), "--dry-run", "--root", str(repo)]) == 0
     assert main(["run", str(target), "--root", str(repo), "--grant", "g"]) == 1
     assert main(["run", str(target), "--root", str(repo)]) == 1
@@ -1702,24 +1706,31 @@ def test_adapter_edges_stay_local(monkeypatch):
 
     captured = {}
 
-    class _Body:
+    class _Resp:
         def read(self):
             return b'{"ok": true}'
 
-        def __enter__(self):
-            return self
+    class _Conn:
+        def __init__(self, host, port=None, timeout=None, *args, **kwargs):
+            captured["host"] = host
+            captured["port"] = port
+            captured["timeout"] = timeout
 
-        def __exit__(self, *_args):
-            return False
+        def request(self, method, path, body=None, headers=None):
+            captured["method"] = method
+            captured["path"] = path
+            captured["data"] = body
 
-    def _urlopen(req, timeout=None):
-        captured["data"] = req.data
-        captured["timeout"] = timeout
-        return _Body()
+        def getresponse(self):
+            return _Resp()
 
-    monkeypatch.setattr("switchyard.adapters.ollama.urlopen", _urlopen)
+        def close(self):
+            return None
+
+    monkeypatch.setattr("switchyard.adapters.ollama.http.client.HTTPConnection", _Conn)
     assert default_transport("POST", "http://127.0.0.1:11434/api/ps", {"a": 1}) == {"ok": True}
     assert captured["timeout"] is None
+    assert json.loads(captured["data"]) == {"a": 1}
     assert default_transport("GET", "http://127.0.0.1:11434/api/ps", None) == {"ok": True}
     assert captured["data"] is None
     assert default_transport("GET", "http://127.0.0.1:11434/api/ps", None, timeout=12) == {"ok": True}
@@ -1770,6 +1781,173 @@ def test_adapter_edges_stay_local(monkeypatch):
         lambda _name: type("Mod", (), {"adapter": staticmethod(lambda: marker)})(),
     )
     assert for_engine("openvino") is marker
+
+
+def test_cancel_unblocks_a_generate_the_server_has_not_answered(monkeypatch):
+    """A local server holds the reply. Cancel must return well inside that hold.
+
+    No GPU and no Ollama. The server is a socket on 127.0.0.1.
+    """
+
+    released = threading.Event()
+    started = threading.Event()
+
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def do_POST(self):
+            self.close_connection = True
+            length = int(self.headers.get("Content-Length", "0") or "0")
+            if length:
+                self.rfile.read(length)
+            started.set()
+            released.wait(3)
+            body = b'{"eval_count":1,"eval_duration":1000000000}'
+            try:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except OSError:
+                return
+
+        def log_message(self, format, *args):
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    port = server.server_address[1]
+    worker = threading.Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    monkeypatch.setattr(
+        "switchyard.adapters.ollama.url_for",
+        lambda _device: f"http://127.0.0.1:{port}",
+    )
+    adapter = OllamaAdapter()
+    request = StepRequest(
+        "load-4096",
+        "generate",
+        "qwen3:8b",
+        "5090",
+        "ollama",
+        {"num_predict": 1, "num_ctx": 4096, "prompt": "alpha"},
+    )
+    outcome: dict = {}
+
+    def go():
+        started_at = time.monotonic()
+        try:
+            outcome["result"] = adapter.run(request)
+        except Exception as exc:
+            outcome["error"] = exc
+        outcome["elapsed"] = time.monotonic() - started_at
+
+    runner = threading.Thread(target=go)
+    runner.start()
+    try:
+        assert started.wait(2)
+        cancelled_at = time.monotonic()
+        adapter.cancel()
+        runner.join(timeout=2)
+        assert not runner.is_alive()
+        assert time.monotonic() - cancelled_at < 1
+        assert outcome.get("elapsed", 99) < 2
+        assert isinstance(outcome.get("error"), AdapterError)
+        assert str(outcome["error"]) == "the request was closed"
+    finally:
+        released.set()
+        server.shutdown()
+        server.server_close()
+
+
+def test_cancel_then_unload_still_ends_the_generate(monkeypatch):
+    """Cancel, then unload at once. The unload must not clear the generate's switch.
+
+    No GPU and no Ollama. The generate is still blocked when unload starts, and it
+    ends within about a second.
+    """
+
+    released = threading.Event()
+    started = threading.Event()
+
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def do_POST(self):
+            self.close_connection = True
+            length = int(self.headers.get("Content-Length", "0") or "0")
+            raw = self.rfile.read(length) if length else b""
+            try:
+                payload = json.loads(raw.decode("utf-8")) if raw else {}
+            except json.JSONDecodeError:
+                payload = {}
+            if payload.get("keep_alive") == 0:
+                body = b"{}"
+                try:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                except OSError:
+                    return
+                return
+            started.set()
+            released.wait(3)
+            body = b'{"eval_count":1,"eval_duration":1000000000}'
+            try:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except OSError:
+                return
+
+        def log_message(self, format, *args):
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    port = server.server_address[1]
+    worker = threading.Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    monkeypatch.setattr(
+        "switchyard.adapters.ollama.url_for",
+        lambda _device: f"http://127.0.0.1:{port}",
+    )
+    adapter = OllamaAdapter()
+    request = StepRequest(
+        "load-4096",
+        "generate",
+        "qwen3:8b",
+        "5090",
+        "ollama",
+        {"num_predict": 1, "num_ctx": 4096, "prompt": "alpha"},
+    )
+    outcome: dict = {}
+
+    def go():
+        try:
+            outcome["result"] = adapter.run(request)
+        except Exception as exc:
+            outcome["error"] = exc
+
+    runner = threading.Thread(target=go)
+    runner.start()
+    try:
+        assert started.wait(2)
+        cancelled_at = time.monotonic()
+        adapter.cancel()
+        adapter.unload("qwen3:8b", "5090")
+        runner.join(timeout=2)
+        assert not runner.is_alive()
+        assert time.monotonic() - cancelled_at < 1
+        assert isinstance(outcome.get("error"), AdapterError)
+        assert str(outcome["error"]) == "the request was closed"
+    finally:
+        released.set()
+        server.shutdown()
+        server.server_close()
 
 
 def test_the_run_path_refuses_an_edited_spec_before_any_adapter_call(tmp_path: Path):

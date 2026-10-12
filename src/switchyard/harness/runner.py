@@ -46,6 +46,7 @@ from switchyard.guards import (
     require_heartbeat,
 )
 from switchyard.harness.e5 import SearchError, fit_prompt, fit_prompt_words
+from switchyard.harness.fill import quiet_fill_seams, real_fill_seams, run_fill_card
 from switchyard.harness.steady import BlockPlan, SlotStream, UntilSteady, call_metric, warmup_policy, warmup_trace
 from switchyard.harness.lock import require_unmodified
 from switchyard.harness.marker import RunMarker
@@ -173,6 +174,16 @@ def dry_run(spec_path: Path, repo: Path) -> str:
         lines.append(f"spill_prompt_ratio: {spec['spill_prompt_ratio']}")
         lines.append("the sampler aborts at abort_mib and does not wait for the watchdog")
         lines.append("quant is read from /api/show at run time")
+        lines.append("confirmation prefix counted at run time with prompt_eval_count")
+        lines.append("the final prefix is counted again from a cold load")
+        lines.append("an abort closes the request, then unloads, then reads the card again")
+        lines.append("the next load waits until the abort has finished")
+        lines.append("closing the request does not return the memory a load already allocated")
+        lines.append("a window predicted to reach abort_mib is predicted_over and is not loaded")
+        lines.append("one measured window bounds the next context from that window's share")
+        lines.append("a second window with no bound stops the row")
+        lines.append("one model at a time; unloaded between models; rest is not taken here")
+        lines.append("the ceiling is never loaded")
     else:
         lines.append("argv: " + " ".join(plan_argv(spec)))
         lines.append("not launched")
@@ -1812,26 +1823,25 @@ def run_spec(
     wall=None,
     python_path: str | None = None,
     watch: WatchHooks | None = None,
+    seams=None,
 ) -> list[dict]:
-    """Run a committed interleaved spec. Every refusal lands before device contact.
+    """Run a committed spec. Every refusal lands before device contact.
 
-    The order is: interpreter, spec load, procedure, token flags, the
-    committed blob, the receipt-name collision, adapter construction, the
-    card heartbeat and empty-card check. ``run_interleaved`` re-checks the blob
-    and flags and owns the measurement; a completed run appends its rows to
-    the routing table by the harness's own design.
+    The order is: interpreter, spec load, token flags, the committed blob,
+    the receipt-name collision, then the procedure. An interleaved spec builds
+    adapters and checks the card once. A fill-card spec checks the grant, the
+    heartbeat and an empty card before each model, and it does not read
+    ``arms``. ``run_interleaved`` re-checks the blob and flags and owns the
+    measurement; a completed interleaved run appends its rows to the routing
+    table. A fill-card run writes its receipt and does not import it.
 
     The run-start marker is written right after the receipt-name check, before
-    the first adapter or card probe; a refusal before ``run_interleaved`` takes
-    over removes it, so a run that never started cannot owe a rest.
+    the first adapter or card probe; a refusal before the run takes over
+    removes it, so a run that never started cannot owe a rest.
     """
 
     _refuse_repo_interpreter(root, Path(python_path or sys.executable))
     spec = load_spec(spec_path)
-    if spec["procedure"] != "interleaved":
-        raise GuardError(
-            f"REFUSED: a {spec['procedure']!r} spec has no run path; this command runs interleaved specs"
-        )
     check_flags(spec, grant, npu_session, cpu_window)
     blob = require_unmodified(root, spec_path)
     stamp = date or datetime.date.today().isoformat()
@@ -1840,16 +1850,46 @@ def run_spec(
     if receipt.exists():
         raise GuardError(f"REFUSED: receipts/{name}.jsonl already exists; pass --run-id for another name")
     wall = wall or time.time
+    spec_rel = spec_path.resolve().relative_to(root.resolve()).as_posix()
+    devices = {"5090"} if spec["procedure"] == "fill-card" else _spec_devices(spec)
     marker = RunMarker(
         root,
         name,
-        spec_rel=spec_path.resolve().relative_to(root.resolve()).as_posix(),
+        spec_rel=spec_rel,
         spec_blob=blob,
-        devices=_spec_devices(spec),
+        devices=devices,
         start=_iso(wall()),
     )
     marker.write()
     try:
+        if spec["procedure"] == "fill-card":
+            injected = adapters is not None
+            if adapters is None:
+                adapters = {"ollama": for_engine("ollama")}
+            if seams is not None:
+                chosen = seams
+            elif injected:
+                chosen = quiet_fill_seams()
+            else:
+                chosen = real_fill_seams(adapters["ollama"])
+            return run_fill_card(
+                spec,
+                adapters=adapters,
+                seams=chosen,
+                grant=grant,
+                root=root,
+                spec_rel=spec_rel,
+                run_id=name,
+                date=stamp,
+                heartbeat=heartbeat_path(heartbeat),
+                wall=wall,
+                marker=marker,
+                notes=notes,
+            )
+        if spec["procedure"] != "interleaved":
+            raise GuardError(
+                f"REFUSED: a {spec['procedure']!r} spec has no run path; this command runs interleaved specs"
+            )
         if adapters is None:
             adapters = real_adapters(spec)
         if _uses_5090(spec):

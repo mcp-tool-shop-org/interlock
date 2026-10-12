@@ -133,7 +133,9 @@ class StepResult:
     ``compile_ms`` and ``first_call_ms`` are reported on a cold step, separate
     from ``latency_ms``. ``throughput`` for a generate step is server-reported
     decode (``eval_count / eval_duration``), not wall clock. ``prompt_tok_s``
-    is ``prompt_eval_count / prompt_eval_duration``. ``output`` is the measured
+    is ``prompt_eval_count / prompt_eval_duration``. ``prompt_eval_duration_ns``
+    is that duration; fill-card reports it as time to first token, because
+    Ollama does not send a separate one. ``output`` is the measured
     vectors or the generation. ``resolved`` carries values learned at run time,
     such as ``num_ctx`` and ``quant``. ``sensors`` may include ``gpu_temp_c``,
     ``sm_clock_mhz``, ``power_w``, ``shared_mib`` and ``dedicated_mib``.
@@ -150,6 +152,7 @@ class StepResult:
     resolved: dict | None = None
     output: object | None = None
     sensors: dict | None = None
+    prompt_eval_duration_ns: int | None = None
 
 
 class Adapter(Protocol):
