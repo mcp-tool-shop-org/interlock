@@ -108,8 +108,7 @@ def _interleaved(data: dict) -> None:
     for arm in data.get("arms") or []:
         if isinstance(arm, dict):
             _prefix_caching(arm, f"arm {arm.get('id')}")
-    if not isinstance(data.get("warmups"), int) or data["warmups"] < 0:
-        raise SpecError("warmups must be an integer >= 0")
+    _warmups(data)
     if not isinstance(data.get("repeats"), int) or data["repeats"] < 1:
         raise SpecError("repeats must be an integer >= 1")
     band = data.get("band")
@@ -145,6 +144,7 @@ def _interleaved(data: dict) -> None:
             # e3-ref's first run sent 14 empty prompts and measured nothing: a generate arm
             # needs its own prompt, or a dataset seed and target the harness builds one from.
             raise SpecError(f"generate arm {arm['id']} has no prompt")
+        _arm_storage(arm)
     for arm in arms:
         companion = arm.get("companion")
         if companion is not None and companion not in seen:
@@ -155,12 +155,62 @@ def _interleaved(data: dict) -> None:
     order = data.get("order", "interleaved")
     if order not in {"interleaved", "aba", "blocked"}:
         raise SpecError(f"unknown order {order!r}")
+    if isinstance(data.get("warmups"), dict) and order == "aba":
+        raise SpecError("until_steady does not run on aba order")
     if order == "aba":
         _pairs(data, seen)
     if order == "blocked":
         _blocks(data, seen)
     elif "blocks" in data or "drift_block" in data:
         raise SpecError("blocks and drift_block belong to order: blocked")
+
+
+def _warmups(data: dict) -> None:
+    """An integer count, or warm until two consecutive calls agree."""
+
+    warmups = data.get("warmups")
+    if isinstance(warmups, int) and not isinstance(warmups, bool) and warmups >= 0:
+        return
+    if not isinstance(warmups, dict):
+        raise SpecError("warmups must be an integer >= 0")
+    extra = set(warmups) - {"until_steady", "max", "tolerance"}
+    if extra or warmups.get("until_steady") is not True:
+        raise SpecError("warmups object must set until_steady true, with max and tolerance")
+    rounds = warmups.get("max")
+    if isinstance(rounds, bool) or not isinstance(rounds, int) or rounds < 2:
+        raise SpecError("warmups.max must be an integer >= 2")
+    tolerance = warmups.get("tolerance")
+    if isinstance(tolerance, bool) or not isinstance(tolerance, (int, float)) or not 0 < float(tolerance) <= 1:
+        raise SpecError("warmups.tolerance must be a fraction above 0 and at most 1")
+    if not data.get("decision_metric"):
+        raise SpecError("until_steady needs a decision_metric")
+
+
+def _arm_storage(arm: dict) -> None:
+    """Cache root, compile config and cold copy. Absent means today's arm."""
+
+    cache = arm.get("hf_cache")
+    if cache is not None and cache not in {"archive", "hot"}:
+        raise SpecError(f"arm {arm['id']} hf_cache must be archive or hot")
+    cold = arm.get("cold_copy")
+    if cold is not None and not isinstance(cold, bool):
+        raise SpecError(f"arm {arm['id']} cold_copy must be true or false")
+    if (cache is not None or cold is True) and (arm["engine"] != "openvino" or arm["task"] != "generate"):
+        raise SpecError(f"arm {arm['id']} hf_cache and cold_copy are for an OpenVINO generate arm")
+    config = arm.get("compile_config")
+    if config is None:
+        return
+    if arm["engine"] != "openvino":
+        raise SpecError(f"arm {arm['id']} compile_config is for an OpenVINO arm")
+    if not isinstance(config, dict) or not config:
+        raise SpecError(f"arm {arm['id']} compile_config must be a mapping")
+    for key, value in config.items():
+        if not isinstance(key, str) or not key:
+            raise SpecError(f"arm {arm['id']} compile_config keys must be strings")
+        if not isinstance(value, (bool, int, float, str)):
+            raise SpecError(f"arm {arm['id']} compile_config {key} must be a bool, number or string")
+    if "ENABLE_MMAP" in config and not isinstance(config["ENABLE_MMAP"], bool):
+        raise SpecError(f"arm {arm['id']} ENABLE_MMAP must be true or false")
 
 
 def _builds_prompts(data: dict) -> bool:

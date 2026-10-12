@@ -17,6 +17,10 @@ The runner owns what to write (the callbacks); the watcher owns when. The
 clock, the RAM and working-set samplers and the exit function are injectable,
 so tests prove the receipt is written while a compile is still blocked and
 never end the test process.
+
+A slot probe is separate from that thread. The runner opens one around each
+measured call: a reading before, one a second while the call runs, and one
+after. Tests pass a ``slot_reader`` and leave the thread off.
 """
 
 from __future__ import annotations
@@ -151,6 +155,304 @@ class WatchHooks:
     interval_s: float = RAM_SAMPLE_S
     lock_wait_s: float = 10.0  # how long the watcher waits for the run's state lock before flushing without it
     start_thread: bool = True
+    # None plus start_thread False means a test takes no per-slot samples.
+    # None plus start_thread True is the real reader (production).
+    slot_reader: Callable[[str | None], dict] | None = None
+
+
+def _number(value) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def _span(readings: list[dict], key: str) -> dict | None:
+    values = [row[key] for row in readings if row.get(key) is not None]
+    if not values:
+        return None
+    return {"min": min(values), "max": max(values), "mean": sum(values) / len(values)}
+
+
+def summarize_slot(readings: list[dict]) -> dict:
+    """Min, max and mean for one slot. Top-process names only when CPU passes 30%.
+
+    A disk counter that cannot be mapped is ``unrecorded`` with a reason.
+    It is not a quiet zero and it is not a bare null.
+    """
+
+    cpu = _span(readings, "cpu_pct")
+    names: list[str] = []
+    if cpu is not None and cpu["max"] > 30:
+        for row in readings:
+            if row.get("cpu_pct") is None or row["cpu_pct"] <= 30:
+                continue
+            for name in row.get("top") or []:
+                if name not in names:
+                    names.append(name)
+    drives = [row["drive"] for row in readings if row.get("drive")]
+    disk = _span(readings, "disk_read_mb_s")
+    reasons = [row["disk_reason"] for row in readings if row.get("disk_reason")]
+    out = {
+        "samples": len(readings),
+        "cpu_pct": cpu,
+        "ram_pct": _span(readings, "ram_pct"),
+        "disk_read_mb_s": disk if disk is not None or not reasons else UNRECORDED,
+        "top_processes": names,
+        "load_drive": drives[-1] if drives else None,
+    }
+    if disk is None and reasons:
+        out["disk_reason"] = reasons[-1]
+    return out
+
+
+def disk_number_script(letter: str) -> str:
+    """PowerShell that prints the disk number for one drive letter.
+
+    Windows names ``psutil`` counters ``PhysicalDrive<n>``. ``(Get-Partition |
+    Get-Disk).Number`` is that ``n``. This does not call Get-PhysicalDisk.
+    """
+
+    if len(letter) != 1 or not letter.isalpha():
+        raise OSError(f"not a drive letter: {letter!r}")
+    safe = letter.upper()
+    return (
+        f"$n = (Get-Partition -DriveLetter {safe} -ErrorAction Stop | Get-Disk).Number; "
+        "if ($null -eq $n) { throw 'no disk number' }; "
+        "[string]$n"
+    )
+
+
+def windows_disk_number(letter: str, run=None) -> int:
+    """The physical-disk number for a drive letter. Tests pass ``run`` and do not start PowerShell."""
+
+    script = disk_number_script(letter)
+    if run is None:
+        completed = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", script],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+    else:
+        completed = run(script)
+    if getattr(completed, "returncode", 1) != 0:
+        detail = (getattr(completed, "stderr", None) or getattr(completed, "stdout", None) or "disk number query failed")
+        first = str(detail).strip().splitlines()
+        raise OSError(first[0][:200] if first else "disk number query failed")
+    text = str(getattr(completed, "stdout", "") or "").strip()
+    if not text.isdigit():
+        raise OSError("disk number query did not return a number")
+    return int(text)
+
+
+class _DiskRate:
+    """Read MB/s from the physical disk behind a drive letter.
+
+    The first look at a disk is a baseline, not a rate. A mapping or counter
+    failure returns a reason so the receipt can say ``unrecorded``.
+    """
+
+    def __init__(self, clock: Callable[[], float] = time.monotonic, disk_number: Callable[[str], int] | None = None) -> None:
+        self._clock = clock
+        self._disk_number = disk_number if disk_number is not None else windows_disk_number
+        self._last: dict[str, tuple[float, int]] = {}
+        self._numbers: dict[str, int | None] = {}
+        self._reasons: dict[str, str] = {}
+
+    def mb_s(self, drive: str | None) -> tuple[float | None, str | None]:
+        if not drive or drive == UNRECORDED:
+            return None, None
+        letter = drive[:1].upper()
+        if not letter.isalpha():
+            return None, f"not a drive letter: {drive}"
+        if psutil is None:
+            return None, "psutil is not installed"
+        number, map_reason = self._number(letter)
+        if number is None:
+            return None, map_reason or "the drive letter could not be mapped to a physical disk"
+        try:
+            counters = psutil.disk_io_counters(perdisk=True) or {}
+        except Exception as exc:
+            return None, f"disk counters unreadable: {type(exc).__name__}"
+        key = _disk_key(counters, number)
+        if key is None:
+            return None, f"no counter named PhysicalDrive{number}"
+        try:
+            read = int(counters[key].read_bytes)
+        except Exception as exc:
+            return None, f"disk counter unreadable: {type(exc).__name__}"
+        now = self._clock()
+        previous = self._last.get(key)
+        self._last[key] = (now, read)
+        if previous is None:
+            return None, None
+        elapsed = now - previous[0]
+        if elapsed <= 0:
+            return None, None
+        delta = read - previous[1]
+        if delta < 0:
+            return None, None
+        return delta / elapsed / (1024 * 1024), None
+
+    def _number(self, letter: str) -> tuple[int | None, str | None]:
+        if letter in self._numbers:
+            return self._numbers[letter], self._reasons.get(letter)
+        try:
+            number = int(self._disk_number(letter))
+        except Exception as exc:
+            reason = str(exc).strip().splitlines()
+            text = reason[0][:200] if reason else "the drive letter could not be mapped to a physical disk"
+            self._numbers[letter] = None
+            self._reasons[letter] = text
+            return None, text
+        self._numbers[letter] = number
+        return number, None
+
+
+def _disk_key(counters: dict, number: int) -> str | None:
+    """The ``PhysicalDrive<n>`` counter. A letter key is not a Windows counter."""
+
+    wanted = f"PHYSICALDRIVE{number}"
+    for key in counters:
+        label = str(key).upper().replace("\\", "").rstrip(":")
+        if label == wanted:
+            return key
+    return None
+
+
+_DISK = _DiskRate()
+
+
+def _top_other(limit: int = 3) -> list[str]:
+    """The busiest other processes. This process and its children are left out."""
+
+    if psutil is None:
+        return []
+    try:
+        me = psutil.Process()
+        excluded = {int(me.pid)}
+        for child in me.children(recursive=True):
+            excluded.add(int(child.pid))
+    except Exception:
+        return []
+    ranked: list[tuple[float, str]] = []
+    try:
+        processes = psutil.process_iter()
+    except Exception:
+        return []
+    for proc in processes:
+        try:
+            if int(proc.pid) in excluded:
+                continue
+            cpu = _number(proc.cpu_percent(interval=None))
+            if cpu is None:
+                continue
+            ranked.append((cpu, str(proc.name())))
+        except Exception:
+            continue
+    ranked.sort(key=lambda item: item[0], reverse=True)
+    return [name for _cpu, name in ranked[:limit]]
+
+
+def read_slot(drive: str | None) -> dict:
+    """One sample of total CPU, used RAM, disk read MB/s and the top other processes.
+
+    ``drive`` is the letter the weights are loaded from. Disk stays None until
+    that letter is known and the counter can be read.
+    """
+
+    cpu = None
+    ram = None
+    if psutil is not None:
+        try:
+            cpu = float(psutil.cpu_percent(interval=None))
+        except Exception:
+            cpu = None
+        try:
+            ram = float(psutil.virtual_memory().percent)
+        except Exception:
+            ram = None
+    rate, reason = _DISK.mb_s(drive)
+    return {
+        "cpu_pct": cpu,
+        "ram_pct": ram,
+        "disk_read_mb_s": rate,
+        "disk_reason": reason,
+        "top": _top_other(3),
+    }
+
+
+class SlotProbe:
+    """Readings around one measured call. The runner opens it and closes it."""
+
+    def __init__(self, reader: Callable[[str | None], dict], *, start_thread: bool = True, interval_s: float = 1.0) -> None:
+        self._reader = reader
+        self._start_thread = start_thread
+        self.interval_s = float(interval_s)
+        self._drive: str | None = None
+        self._readings: list[dict] = []
+        self._lock = threading.Lock()
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._closed = False
+
+    def set_drive(self, drive: str | None) -> None:
+        with self._lock:
+            self._drive = None if not drive or drive == UNRECORDED else str(drive)
+
+    def sample(self) -> None:
+        with self._lock:
+            drive = self._drive
+        try:
+            raw = self._reader(drive) or {}
+        except Exception:
+            raw = {}
+        reason = raw.get("disk_reason")
+        reading = {
+            "cpu_pct": _number(raw.get("cpu_pct")),
+            "ram_pct": _number(raw.get("ram_pct")),
+            "disk_read_mb_s": _number(raw.get("disk_read_mb_s")),
+            "disk_reason": None if not reason else str(reason).strip().splitlines()[0][:200],
+            "top": [str(name) for name in list(raw.get("top") or [])[:3]],
+            "drive": drive,
+        }
+        with self._lock:
+            self._readings.append(reading)
+
+    def open(self) -> None:
+        self.sample()
+        if self._start_thread and self._thread is None:
+            self._thread = threading.Thread(target=self._loop, name="switchyard-slot-sample", daemon=True)
+            self._thread.start()
+
+    def _loop(self) -> None:
+        while not self._stop.wait(self.interval_s):
+            self.sample()
+
+    def close(self) -> dict:
+        if self._closed:
+            return self.summary()
+        self._stop.set()
+        thread = self._thread
+        if thread is not None and thread is not threading.current_thread():
+            thread.join(timeout=2)
+        self.sample()
+        self._closed = True
+        return self.summary()
+
+    def summary(self) -> dict:
+        with self._lock:
+            readings = list(self._readings)
+        return summarize_slot(readings)
+
+
+def slot_probe(hooks: WatchHooks) -> SlotProbe | None:
+    """A probe for this run, or None when a test asked for no slot samples."""
+
+    if hooks.slot_reader is None and not hooks.start_thread:
+        return None
+    return SlotProbe(hooks.slot_reader or read_slot, start_thread=hooks.start_thread)
 
 
 class RunWatch:

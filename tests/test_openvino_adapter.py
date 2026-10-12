@@ -693,7 +693,7 @@ def test_device_loss_generate_build_is_a_result_not_unsupported_length(tmp_path)
     r = a.run(req(task="generate", model=str(tmp_path), device="NPU", prompt="hi"))
     assert r.ok is True and r.resolved["outcome"] == "device_lost"
     assert r.latency_ms is None and r.throughput is None
-    assert (str(tmp_path), "NPU") not in a._pipelines
+    assert not [key for key in a._pipelines if key[:2] == (str(tmp_path), "NPU")]
     cpu = a.run(req(task="generate", model=str(tmp_path), device="CPU", prompt="hi"))
     assert cpu.ok and cpu.latency_ms is not None
 
@@ -709,7 +709,7 @@ def test_device_loss_generate_call_marks_and_skips(tmp_path):
     a = make_adapter(genai_module=LostCallGenai)
     r = a.run(req(task="generate", model=str(tmp_path), device="NPU", prompt="hi"))
     assert r.ok is True and r.resolved["outcome"] == "device_lost"
-    assert (str(tmp_path), "NPU") not in a._pipelines
+    assert not [key for key in a._pipelines if key[:2] == (str(tmp_path), "NPU")]
     rest = a.run(req(task="generate", model=str(tmp_path), device="NPU", prompt="hi there"))
     assert rest.ok and rest.resolved["outcome"] == "not run"
 
