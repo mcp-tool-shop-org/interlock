@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import threading
 import time
 from pathlib import Path
 
@@ -15,6 +16,7 @@ import yaml
 
 from switchyard.adapters.base import AdapterError, StepRequest
 from switchyard.adapters.ollama import OllamaAdapter, generate_body
+from switchyard.adapters.ollama_cases import require_recorded_behaviour
 from switchyard.guards import GuardError
 from switchyard.harness.e5 import SearchError, fit_prompt_words
 from switchyard.harness.runner import RunnerError, dry_run, run_spec
@@ -100,15 +102,21 @@ def _watch() -> WatchHooks:
 class _Transport:
     """Ollama's three calls: show, an empty card, and generate."""
 
-    def __init__(self, count_of, *, generate_error=None):
+    def __init__(self, count_of, *, generate_error=None, block_count=False, tag_bytes=5 * 1024**3):
         self.count_of = count_of
         self.generate_error = generate_error
+        self.block_count = block_count
+        self.tag_bytes = tag_bytes
+        self.released = threading.Event()
         self.calls: list[tuple] = []
 
     def __call__(self, method, url, body):
+        require_recorded_behaviour(method, url, body)
         self.calls.append((method, url, body))
         if url.endswith("/api/ps"):
             return {"models": []}
+        if url.endswith("/api/tags"):
+            return {"models": [{"name": "qwen3:8b", "size": self.tag_bytes, "digest": "abc"}]}
         if url.endswith("/api/show"):
             return {
                 "model_info": {"qwen3.context_length": 4096},
@@ -116,6 +124,8 @@ class _Transport:
             }
         if not url.endswith("/api/generate"):
             raise AssertionError(url)
+        if self.block_count and isinstance(body, dict) and body.get("raw") is True:
+            self.released.wait(2)
         if isinstance(body, dict) and body.get("options", {}).get("num_predict") == 0:
             raise AssertionError("num_predict 0 reached the server")
         if self.generate_error and isinstance(body, dict) and body.get("raw") is True:
@@ -168,6 +178,8 @@ def _kinds(calls):
     for _method, url, body in calls:
         if url.endswith("/api/ps"):
             kinds.append("ps")
+        elif url.endswith("/api/tags"):
+            kinds.append("tags")
         elif url.endswith("/api/show"):
             kinds.append("show")
         elif isinstance(body, dict) and body.get("raw") is True:
@@ -470,3 +482,47 @@ def test_a_long_target_takes_a_few_counts_not_one_per_repeat():
     assert number >= 118_000 and fit in ("exact", "shortest_at_or_above")
     assert count(text[: text.rstrip().rfind(" ")]) < 118_000 or number == 118_000
     assert len(calls) <= 25, len(calls)
+
+
+def test_a_fake_receiving_num_predict_0_fails():
+    transport = _Transport(lambda prompt: 1)
+    body = {
+        "model": "qwen3:8b",
+        "prompt": "hi",
+        "stream": False,
+        "keep_alive": "5m",
+        "options": {"num_predict": 0, "temperature": 0},
+    }
+    with pytest.raises(AssertionError, match="no reply"):
+        transport("POST", "http://127.0.0.1:11434/api/generate", body)
+    missing = dict(body)
+    missing["options"] = {"temperature": 0}
+    with pytest.raises(AssertionError, match="no reply"):
+        transport("POST", "http://127.0.0.1:11434/api/generate", missing)
+    null_body = dict(body)
+    null_body["options"] = {"num_predict": None, "temperature": 0}
+    with pytest.raises(AssertionError, match="no reply"):
+        transport("POST", "http://127.0.0.1:11434/api/generate", null_body)
+
+
+def test_a_count_timeout_refuses_the_arm(tmp_path: Path):
+    transport = _Transport(lambda prompt: len(prompt.split()), block_count=True, tag_bytes=1024**2)
+    repo = tmp_path / "repo"
+    try:
+        with pytest.raises(RunnerError, match="the token count timed out; the arm was refused"):
+            run_spec(
+                _bind(repo, _spec(_arm())),
+                root=repo,
+                grant="grant-t",
+                adapters={"ollama": OllamaAdapter(transport=transport, device="5090")},
+                heartbeat=_fresh_heartbeat(tmp_path),
+                date="2026-10-11",
+                run_id="run-1",
+                watch=_watch(),
+            )
+    finally:
+        transport.released.set()
+    assert not any(
+        isinstance(body, dict) and body.get("options", {}).get("num_predict") == 8
+        for _method, _url, body in transport.calls
+    )

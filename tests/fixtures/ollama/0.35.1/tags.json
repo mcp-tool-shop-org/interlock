@@ -1,0 +1,41 @@
+{
+  "ollama_version": "0.35.1",
+  "model": "qwen3:8b",
+  "digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "date": "2026-10-12",
+  "case": "tags",
+  "request": {
+    "method": "GET",
+    "path": "/api/tags",
+    "body": null
+  },
+  "behaviour": "reply",
+  "response": {
+    "models": [
+      {
+        "name": "qwen3:8b",
+        "model": "qwen3:8b",
+        "modified_at": "2026-09-10T19:13:06.1155745-04:00",
+        "size": 5225388164,
+        "digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+        "details": {
+          "format": "gguf",
+          "family": "qwen3",
+          "families": [
+            "qwen3"
+          ],
+          "parameter_size": "8.2B",
+          "quantization_level": "Q4_K_M",
+          "context_length": 40960,
+          "embedding_length": 4096
+        },
+        "capabilities": [
+          "completion",
+          "tools",
+          "thinking"
+        ]
+      }
+    ]
+  },
+  "notes": "Trimmed by the Publisher to the recorded model only (the rig's full model list is not published); details.parent_model removed (upstream builders' paths)."
+}

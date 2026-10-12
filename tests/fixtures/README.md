@@ -1,3 +1,5 @@
+`ollama/<version>/*.json` is written by `scripts/record_ollama_fixtures.py` on the rig. Those files are not in the tree until that command has been run. The three no-limit cases send `num_ctx` 64 and `shift` false. Their `behaviour` is `no_reply`, and `eval_count` is above 1.
+
 offrig-plan-input.8f2a94a.json is the inputSchema of tool offrig_plan, captured 2026-10-11.
 
 Command: offrig-mcp

@@ -25,7 +25,8 @@ the second window is not loaded and the row stops. An aborted window is
 not a measurement. The next load waits until that abort's unload and card
 re-read have finished. The unload call itself stops after about 60 seconds.
 If it expires, the run stops with a note that the model may still be
-resident. The spec ceiling is not a probe.
+resident. A token count stops after about twice a cold load of the largest
+roster model, and that timeout refuses the model. The spec ceiling is not a probe.
 Nothing here rests between models. A missing shared-memory reading or a
 missing prompt rate is a spill, which the pure search already treats as a
 step back. A confirmation prefix is counted again from a cold load, and a
@@ -46,11 +47,13 @@ from typing import Callable
 
 from switchyard.adapters.base import AdapterError, StepRequest
 from switchyard.adapters.ollama import (
+    COUNT_TIMEOUT_NOTE,
     UNLOAD_TIMEOUT_NOTE,
     context_length,
     quantization_level,
     url_for,
 )
+from switchyard.harness.count_budget import roster_timeout
 from switchyard.cli import announce_run
 from switchyard.families import stamp_family
 from switchyard.guards import GuardError, require_card_empty, require_grant, require_heartbeat
@@ -420,6 +423,14 @@ def _ollama_version(adapter) -> str | None:
     return version.strip()
 
 
+def _refuse_confirm_num_predict(value: object) -> int:
+    """The run-time line. Spec validation already refused this before contact."""
+
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError(f"confirm_num_predict must be a whole number of at least 1, not {value!r}")
+    return value
+
+
 def _optional_int(value: object) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int):
         return None
@@ -596,6 +607,7 @@ def run_fill_card(
 ) -> list[dict]:
     """Measure each roster model. Unload at the end of the model and on any exit."""
 
+    _refuse_confirm_num_predict(spec.get("confirm_num_predict", 1))
     rows: list[dict] = []
     stop_note = None
     try:
@@ -724,9 +736,7 @@ def _measure_model(
             baseline=baseline,
         )
 
-    num_predict = spec.get("confirm_num_predict", 1)
-    if isinstance(num_predict, bool) or not isinstance(num_predict, int) or num_predict < 1:
-        raise ValueError(f"confirm_num_predict must be a whole number of at least 1, not {num_predict!r}")
+    num_predict = _refuse_confirm_num_predict(spec.get("confirm_num_predict", 1))
     fraction = float(spec["confirm_prompt_fraction"])
     sample_ms = spec.get("sample_ms", 200)
     if isinstance(sample_ms, bool) or not isinstance(sample_ms, int) or sample_ms < 1:
@@ -792,6 +802,8 @@ def _measure_model(
 
     sampler = CardSampler(seams, spec["abort_mib"], sample_ms, on_abort)
 
+    count_timeout = roster_timeout(adapter, spec)
+
     def count(text: str, ctx: int) -> int:
         settings = {"num_ctx": ctx, "temperature": 0}
         if shift:
@@ -799,8 +811,12 @@ def _measure_model(
         if truncate:
             settings["truncate"] = False
         try:
-            counted = adapter.count_tokens(model, text, settings=settings, device="5090")
-        except AdapterError:
+            counted = adapter.count_tokens(
+                model, text, settings=settings, device="5090", timeout=count_timeout
+            )
+        except AdapterError as exc:
+            if str(exc) == COUNT_TIMEOUT_NOTE:
+                raise _CountRefused(COUNT_TIMEOUT_NOTE) from exc
             if sampler.over:
                 raise _WindowOver()
             raise
@@ -1083,9 +1099,7 @@ def _row(
     weights_mib: int | None = None,
     one_window_bound: list[tuple[int, int]] | None = None,
 ) -> dict:
-    num_predict = spec.get("confirm_num_predict", 1)
-    if isinstance(num_predict, bool) or not isinstance(num_predict, int) or num_predict < 1:
-        raise ValueError(f"confirm_num_predict must be a whole number of at least 1, not {num_predict!r}")
+    num_predict = _refuse_confirm_num_predict(spec.get("confirm_num_predict", 1))
     settings = {
         "thinking_level": None,
         "num_predict": num_predict,

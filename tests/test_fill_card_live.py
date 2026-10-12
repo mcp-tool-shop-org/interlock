@@ -16,6 +16,8 @@ import yaml
 
 from switchyard.adapters.base import AdapterError
 from switchyard.adapters.ollama import OllamaAdapter
+from switchyard.adapters.ollama_cases import require_recorded_behaviour
+from switchyard.harness.spec import SpecError, validate_spec
 from switchyard.guards import GuardError, require_card_empty, require_grant, require_heartbeat
 from switchyard.harness.fill import (
     CUDA_ARGV,
@@ -31,6 +33,7 @@ from switchyard.harness.fill import (
     parse_mib,
     quiet_fill_seams,
     real_fill_seams,
+    run_fill_card,
     runner_pids,
     shared_mib_for_runners,
 )
@@ -136,6 +139,8 @@ class _Transport:
         self.hold_abort = hold_abort
         self.slow_unload = slow_unload
         self.hang_unload = hang_unload
+        self.block_count = False
+        self.released = threading.Event()
         self._hang = threading.Event()
         self.settle_reads = 0
         self.events = []
@@ -185,6 +190,7 @@ class _Transport:
         return 12
 
     def __call__(self, method, url, body):
+        require_recorded_behaviour(method, url, body)
         self.calls.append((method, url, body))
         if url.endswith("/api/ps"):
             if self.loaded is None:
@@ -241,6 +247,8 @@ class _Transport:
             self.seams.sample()
         if holding:
             self._release.wait(5)
+        if body.get("raw") and self.block_count:
+            self.released.wait(2)
         if body.get("raw"):
             count = 100000
             if self.cold_disagrees and self.loaded is None:
@@ -770,7 +778,44 @@ def test_a_confirmation_with_no_completion_limit_is_refused(tmp_path: Path, valu
     spec_path = _bind(repo, spec)
     transport = _Transport(None)
     seams = _seams(transport)
-    with pytest.raises((ValueError, AdapterError, RunnerError)):
+    with pytest.raises((SpecError, ValueError, AdapterError, RunnerError)):
         run_spec(spec_path, root=repo, grant="g", adapters={"ollama": OllamaAdapter(transport=transport)},
                  heartbeat=_fresh(tmp_path), date="2026-10-11", run_id="fill-np", seams=seams)
     assert not any(isinstance(body, dict) and body.get("prompt") not in (None, "") for _m, _u, body in transport.calls)
+
+
+def test_spec_validation_refuses_confirm_num_predict_0():
+    spec = _spec([_model()])
+    spec["confirm_num_predict"] = 0
+    with pytest.raises(SpecError, match="confirm_num_predict"):
+        validate_spec(spec)
+
+
+def test_the_runtime_check_refuses_confirm_num_predict_before_the_card(tmp_path: Path):
+    spec = _spec([_model()])
+    spec["confirm_num_predict"] = 0
+
+    class Boom:
+        def loaded_models(self):
+            raise AssertionError("device contact")
+
+    class Marker:
+        entered = False
+
+        def close(self, _end):
+            return None
+
+    with pytest.raises(ValueError, match="confirm_num_predict"):
+        run_fill_card(
+            spec,
+            adapters={"ollama": Boom()},
+            seams=quiet_fill_seams(),
+            grant="g",
+            root=tmp_path,
+            spec_rel="experiments/e5/spec.yaml",
+            run_id="rt",
+            date="2026-10-12",
+            heartbeat=tmp_path / "beat",
+            wall=lambda: 0.0,
+            marker=Marker(),
+        )
