@@ -1036,9 +1036,9 @@ def test_live_seams_post_only_to_11441(tmp_path: Path, monkeypatch):
         return {"n": len(posts)}
 
     assert generate_loop({"id": "5090-alone"}, post, stop)["n"] == 2
-    dirty = read_git(tmp_path, lambda args: "abc" if "rev-parse" in args else " M spec.yaml\n")
+    dirty = read_git(tmp_path, lambda args: "a" * 40 if "rev-parse" in args else " M spec.yaml\n")
     assert dirty["clean_tree"] is False
-    clean = read_git(tmp_path, lambda args: "abc\n" if "rev-parse" in args else "")
+    clean = read_git(tmp_path, lambda args: "a" * 40 + "\n" if "rev-parse" in args else "")
     assert clean["clean_tree"] is True
 
     class Response:

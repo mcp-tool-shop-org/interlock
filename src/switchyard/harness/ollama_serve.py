@@ -16,6 +16,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import socket
 import subprocess
 from dataclasses import dataclass
@@ -74,7 +75,10 @@ def pin_install(exe: Path, models_dir: Path, *, read_sha=sha256_file) -> Pin:
     library = cuda_dll(Path(exe))
     if not library.is_file():
         raise ServeError(f"CUDA backend is missing ({library})")
-    return Pin(str(Path(exe)), str(Path(models_dir)), read_sha(library))
+    sha = read_sha(library)
+    if not (isinstance(sha, str) and re.fullmatch(r"[0-9a-f]{64}", sha)):
+        raise ServeError(f"CUDA backend sha is not a 64-hex digest ({sha!r})")
+    return Pin(str(Path(exe)), str(Path(models_dir)), sha)
 
 
 def assert_port_free(host: str, port: int, *, opener=socket.socket) -> None:

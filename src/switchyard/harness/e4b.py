@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import os
 import shutil
 import subprocess
@@ -265,19 +266,37 @@ def prepare_prompt(spec: dict, count_tokens) -> str:
     return fit_prompt(seed, target, count_tokens)
 
 
+def capture_run(args: list[str]):
+    """The live runner: a bare ``subprocess.run`` returns no stdout, so the pin and git reads saw ""."""
+
+    return subprocess.run(args, capture_output=True, text=True, check=False)
+
+
 def read_git(repo: Path, run) -> dict:
-    """HEAD and whether the worktree is clean. The receipt stores the sha, not a path."""
+    """HEAD and whether the worktree is clean. The receipt stores the sha, not a path.
+
+    Fails closed: both git calls must succeed and HEAD must be a 40-hex sha, and the
+    tree is clean only on a successful, empty porcelain read. A runner that captured
+    nothing used to give ``git_sha ""`` and ``clean_tree True``.
+    """
 
     def _out(args: list[str]) -> str:
         completed = run(args)
         if isinstance(completed, str):
             return completed
-        stdout = getattr(completed, "stdout", "")
+        code = getattr(completed, "returncode", 0)
+        if code != 0:
+            raise E4bError(f"git {args[3]} failed with exit code {code}")
+        stdout = getattr(completed, "stdout", None)
         if isinstance(stdout, bytes):
             stdout = stdout.decode("utf-8", errors="replace")
-        return stdout or ""
+        if stdout is None:
+            raise E4bError(f"git {args[3]} returned no output (the runner captured nothing)")
+        return stdout
 
     sha = _out(["git", "-C", repo.as_posix(), "rev-parse", "HEAD"]).strip()
+    if not re.fullmatch(r"[0-9a-f]{40}", sha):
+        raise E4bError(f"git rev-parse HEAD did not return a 40-hex sha ({sha!r})")
     porcelain = _out(["git", "-C", repo.as_posix(), "status", "--porcelain"])
     return {"git_sha": sha, "clean_tree": porcelain.strip() == ""}
 
@@ -1213,6 +1232,8 @@ def run_from_cli(
     name = run_id or ("e4b-pilot" if pilot else "e4b-block")
     if seams is None:
         seams = build_live_seams(root, name, spec, pilot=pilot)
+    if getattr(seams, "git", None):
+        seams.git(repo)  # refuse an unreadable sha or tree before any device starts
     if pilot:
         return run_pilot(spec, seams, root=root, run_id=name, repo=repo)
     rows = run_block(spec, seams, root=root, run_id=name, repo=repo)
@@ -1480,7 +1501,7 @@ def build_live_seams(root: Path, run_id: str, spec: dict, *, pilot: bool, run=No
 
     from switchyard.harness.ollama_serve import Server
 
-    runner = run or subprocess.run
+    runner = run or capture_run
     pin = resolve_pin(runner)
     log_root = root / ("pilot-e4b" if pilot else "logs")
     post = transport or urllib_exchange
