@@ -36,6 +36,17 @@
 # good calls, all full length, NVML at 0.205 s. Within-call SM ranges were 13x0,
 # 7, 7, 8, 8, 15, 15, 22 MHz; the 95th percentile 15.35 rounds up to the 7.5 MHz
 # step, so clock_tolerance_mhz and steady_band_mhz are both 22.5.
+# Amended 2026-10-12 (R&D, after e4b-block-2): sustained, for a paired NPU or
+# iGPU slot with a 5090 companion, means the companion loop has finished one
+# full warm decode under the same rule as a 5090 slot (768 tokens, at least
+# 3 s, steady inside steady_band_mhz) and its next decode is underway before
+# the Intel warm call. The judged companion call is the one whose time span
+# covers the Intel measured call. If the companion cannot get steady within
+# the existing attempts, the slot is refused as clock_not_steady. The 22.5
+# MHz limit is unchanged.
+# Amended 2026-10-12 (R&D): a re-run may pass --pairs with a subset of these
+# pairs. The other pre-registered rules apply unchanged. The subset is
+# recorded on the receipt.
 # Drafted 2026-10-12 (Kimi, at the Publisher's request, R&D to confirm), after
 # E4 run 7 (valid, inconclusive; every alone spread over the half-band). E4 is
 # not amended and run 7's verdict stands. E4b replaces E4's global alone-spread
@@ -195,12 +206,14 @@ stop_rules:
     prompt_eval_count / prompt_eval_duration and is recorded, not the gate for
     this experiment.
   - The harness owns the companion session. In a paired slot the order is start
-    the companion, warm up (the companion is already running during the
-    warm-up), measure, then stop the companion session. Stop is an unload; keep_alive 0
+    the companion, warm up (a 5090 companion is already sustained, and an NPU
+    or iGPU companion is already running, during the warm-up), measure, then
+    stop the companion session. Stop is an unload; keep_alive 0
     for Ollama, the Intel lane's unload for OpenVINO. The companion 5090 load
     is the 5090-alone arm's generate run back to back for the paired slot's
     duration. The companion NPU load is bge-base embedding at 1x256, and the
     companion iGPU load is DeBERTa NLI at 1x256, each run back to back.
+  - "Amended 2026-10-12 (R&D, after e4b-block-2). Sustained, for a paired NPU or iGPU slot with a 5090 companion, means the companion loop has finished one full warm decode under the same rule as a 5090 slot (768 tokens, at least 3 s, steady inside steady_band_mhz) and its next decode is underway before the Intel warm call. The judged companion call is the one whose time span covers the Intel measured call. If the companion cannot get steady within the existing attempts, the slot is refused as clock_not_steady. The 22.5 MHz limit is unchanged. A re-run may pass --pairs with a subset of these pairs. The other pre-registered rules apply unchanged. The subset is recorded on the receipt."
   - Inside the block the 5090's qwen3:8b stays loaded. It loads once at block
     start and unloads once (keep_alive 0) at block end. Any other 5090 load
     inside the block shows in load_duration_s and refuses its slot.

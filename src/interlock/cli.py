@@ -94,6 +94,11 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--dry-run", action="store_true")
     run.add_argument("--pilot", action="store_true")
     run.add_argument(
+        "--pairs",
+        default=None,
+        help="comma-separated E4b pair ids (a subset of the spec). The receipt records them",
+    )
+    run.add_argument(
         "--quarantine",
         type=Path,
         default=None,
@@ -295,15 +300,16 @@ def _cmd_runs_quarantine(args: argparse.Namespace) -> int:
 def _cmd_run(args: argparse.Namespace) -> int:
     from interlock.adapters.base import AdapterError
     from interlock.guards import GuardError
-    from interlock.harness.e4b import E4bError
+    from interlock.harness.e4b import E4bError, parse_pairs
     from interlock.harness.lifecycle import LifecycleError
     from interlock.harness.ollama_serve import ServeError
     from interlock.harness.runner import RunnerError, dry_run, heartbeat_path, run_spec
     from interlock.harness.spec import SpecError, load_spec
 
     try:
+        pairs = parse_pairs(getattr(args, "pairs", None))
         if args.dry_run:
-            print(dry_run(args.spec, args.root.resolve(), pilot=args.pilot), end="")
+            print(dry_run(args.spec, args.root.resolve(), pilot=args.pilot, pairs=pairs), end="")
             return 0
         spec = load_spec(args.spec)
         if spec.get("id") == "E4b":
@@ -335,6 +341,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
             ),
             pilot=args.pilot,
             quarantine=getattr(args, "quarantine", None),
+            pairs=pairs,
         )
     except (AdapterError, GuardError, RunnerError, SpecError, E4bError, LifecycleError, ServeError, OSError) as exc:
         print(str(exc), file=sys.stderr)
