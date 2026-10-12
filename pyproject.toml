@@ -16,7 +16,7 @@ intel = [
     "openvino==2026.4.1",
     "openvino-tokenizers==2026.4.1.0",
     "openvino-genai==2026.4.1.0",
-    "transformers==5.5.4",
+    "transformers==5.10.1",
 ]
 
 [project.scripts]
@@ -25,7 +25,7 @@ switchyard = "switchyard.cli:main"
 [dependency-groups]
 dev = [
     "hypothesis==6.168.5",
-    "pytest==8.4.2",
+    "pytest==9.0.3",
     "pytest-cov==7.0.0",
 ]
 
