@@ -94,12 +94,12 @@
         ],
         "importsOnly": []
       },
-      "cohesion": 0.555392,
+      "cohesion": 0.367707,
       "cohesionDropped": false,
       "confidence": "full",
       "highWater": null,
       "name": "src",
-      "qualifyingSourceCommits": 39,
+      "qualifyingSourceCommits": 43,
       "rebaseline": null
     },
     {
@@ -117,7 +117,7 @@
       "confidence": "full",
       "highWater": null,
       "name": "tests",
-      "qualifyingSourceCommits": 45,
+      "qualifyingSourceCommits": 50,
       "rebaseline": null
     }
   ],
@@ -145,8 +145,8 @@
         "path": ".python-version"
       },
       {
-        "commits": 3,
-        "lines": 30,
+        "commits": 6,
+        "lines": 37,
         "path": "CHANGELOG.md"
       },
       {
@@ -205,8 +205,8 @@
         "path": "assets/logo/switchyard_64.png"
       },
       {
-        "commits": 15,
-        "lines": 444,
+        "commits": 16,
+        "lines": 473,
         "path": "atlas/README.md"
       },
       {
@@ -215,18 +215,18 @@
         "path": "atlas/boundaries.yaml"
       },
       {
-        "commits": 15,
-        "lines": 1305,
+        "commits": 16,
+        "lines": 1372,
         "path": "atlas/page.json"
       },
       {
-        "commits": 15,
-        "lines": 2843,
+        "commits": 16,
+        "lines": 3112,
         "path": "atlas/statistics.json"
       },
       {
-        "commits": 15,
-        "lines": 11195,
+        "commits": 16,
+        "lines": 13536,
         "path": "atlas/structure.json"
       },
       {
@@ -325,13 +325,13 @@
         "path": "experiments/e3/spec.yaml"
       },
       {
-        "commits": 3,
-        "lines": 201,
+        "commits": 4,
+        "lines": 204,
         "path": "experiments/e4/spec.yaml"
       },
       {
-        "commits": 2,
-        "lines": 115,
+        "commits": 3,
+        "lines": 129,
         "path": "experiments/e5/spec.yaml"
       },
       {
@@ -405,6 +405,16 @@
         "path": "receipts/e3-ref-2026-10-11b.jsonl"
       },
       {
+        "commits": 1,
+        "lines": 7,
+        "path": "receipts/e4-2026-10-12.jsonl"
+      },
+      {
+        "commits": 2,
+        "lines": 93,
+        "path": "scripts/record_ollama_fixtures.py"
+      },
+      {
         "commits": 3,
         "lines": 7,
         "path": "src/switchyard/__init__.py"
@@ -430,14 +440,24 @@
         "path": "src/switchyard/adapters/offrig_calibrate.py"
       },
       {
-        "commits": 5,
-        "lines": 604,
+        "commits": 6,
+        "lines": 645,
         "path": "src/switchyard/adapters/ollama.py"
       },
       {
-        "commits": 19,
-        "lines": 1438,
+        "commits": 2,
+        "lines": 320,
+        "path": "src/switchyard/adapters/ollama_cases.py"
+      },
+      {
+        "commits": 20,
+        "lines": 1444,
         "path": "src/switchyard/adapters/openvino.py"
+      },
+      {
+        "commits": 2,
+        "lines": 421,
+        "path": "src/switchyard/adapters/record_fixtures.py"
       },
       {
         "commits": 1,
@@ -475,8 +495,13 @@
         "path": "src/switchyard/harness/choice.py"
       },
       {
-        "commits": 3,
-        "lines": 308,
+        "commits": 1,
+        "lines": 100,
+        "path": "src/switchyard/harness/count_budget.py"
+      },
+      {
+        "commits": 4,
+        "lines": 505,
         "path": "src/switchyard/harness/e5.py"
       },
       {
@@ -485,8 +510,8 @@
         "path": "src/switchyard/harness/environment.py"
       },
       {
-        "commits": 3,
-        "lines": 1200,
+        "commits": 5,
+        "lines": 1630,
         "path": "src/switchyard/harness/fill.py"
       },
       {
@@ -505,13 +530,13 @@
         "path": "src/switchyard/harness/receipts.py"
       },
       {
-        "commits": 18,
-        "lines": 2778,
+        "commits": 20,
+        "lines": 2801,
         "path": "src/switchyard/harness/runner.py"
       },
       {
-        "commits": 7,
-        "lines": 391,
+        "commits": 9,
+        "lines": 407,
         "path": "src/switchyard/harness/spec.py"
       },
       {
@@ -640,8 +665,8 @@
         "path": "table/model-families.json"
       },
       {
-        "commits": 9,
-        "lines": 1236,
+        "commits": 10,
+        "lines": 1243,
         "path": "table/routing.jsonl"
       },
       {
@@ -650,14 +675,99 @@
         "path": "tests/conftest.py"
       },
       {
-        "commits": 1,
-        "lines": 6,
+        "commits": 2,
+        "lines": 8,
         "path": "tests/fixtures/README.md"
       },
       {
         "commits": 1,
         "lines": 46,
         "path": "tests/fixtures/offrig-plan-input.8f2a94a.json"
+      },
+      {
+        "commits": 1,
+        "lines": 51,
+        "path": "tests/fixtures/ollama/0.35.1/companion_start.json"
+      },
+      {
+        "commits": 1,
+        "lines": 25,
+        "path": "tests/fixtures/ollama/0.35.1/companion_stop.json"
+      },
+      {
+        "commits": 1,
+        "lines": 25,
+        "path": "tests/fixtures/ollama/0.35.1/keep_alive_0.json"
+      },
+      {
+        "commits": 1,
+        "lines": 195,
+        "path": "tests/fixtures/ollama/0.35.1/num_predict_0.json"
+      },
+      {
+        "commits": 1,
+        "lines": 51,
+        "path": "tests/fixtures/ollama/0.35.1/num_predict_1.json"
+      },
+      {
+        "commits": 1,
+        "lines": 194,
+        "path": "tests/fixtures/ollama/0.35.1/num_predict_missing.json"
+      },
+      {
+        "commits": 1,
+        "lines": 195,
+        "path": "tests/fixtures/ollama/0.35.1/num_predict_null.json"
+      },
+      {
+        "commits": 1,
+        "lines": 16,
+        "path": "tests/fixtures/ollama/0.35.1/ps_empty.json"
+      },
+      {
+        "commits": 1,
+        "lines": 36,
+        "path": "tests/fixtures/ollama/0.35.1/ps_loaded.json"
+      },
+      {
+        "commits": 1,
+        "lines": 39,
+        "path": "tests/fixtures/ollama/0.35.1/raw_true.json"
+      },
+      {
+        "commits": 1,
+        "lines": 51,
+        "path": "tests/fixtures/ollama/0.35.1/shift_false.json"
+      },
+      {
+        "commits": 1,
+        "lines": 73,
+        "path": "tests/fixtures/ollama/0.35.1/show_qwen3_8b.json"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "tests/fixtures/ollama/0.35.1/tags.json"
+      },
+      {
+        "commits": 1,
+        "lines": 57,
+        "path": "tests/fixtures/ollama/0.35.1/think_off.json"
+      },
+      {
+        "commits": 1,
+        "lines": 116,
+        "path": "tests/fixtures/ollama/0.35.1/truncate_over_num_ctx.json"
+      },
+      {
+        "commits": 1,
+        "lines": 16,
+        "path": "tests/fixtures/ollama/0.35.1/version.json"
+      },
+      {
+        "commits": 1,
+        "lines": 59,
+        "path": "tests/ollama_replay.py"
       },
       {
         "commits": 1,
@@ -695,8 +805,8 @@
         "path": "tests/test_devices.py"
       },
       {
-        "commits": 3,
-        "lines": 784,
+        "commits": 5,
+        "lines": 1221,
         "path": "tests/test_fill_card_live.py"
       },
       {
@@ -705,8 +815,8 @@
         "path": "tests/test_guards.py"
       },
       {
-        "commits": 15,
-        "lines": 2752,
+        "commits": 16,
+        "lines": 2792,
         "path": "tests/test_harness.py"
       },
       {
@@ -715,13 +825,18 @@
         "path": "tests/test_importers.py"
       },
       {
-        "commits": 3,
-        "lines": 506,
+        "commits": 2,
+        "lines": 583,
+        "path": "tests/test_ollama_fixtures.py"
+      },
+      {
+        "commits": 4,
+        "lines": 564,
         "path": "tests/test_ollama_token_count.py"
       },
       {
-        "commits": 15,
-        "lines": 1195,
+        "commits": 16,
+        "lines": 1203,
         "path": "tests/test_openvino_adapter.py"
       },
       {
@@ -765,8 +880,8 @@
         "path": "tests/test_run_path.py"
       },
       {
-        "commits": 10,
-        "lines": 412,
+        "commits": 11,
+        "lines": 414,
         "path": "tests/test_task_scope.py"
       },
       {
@@ -780,52 +895,59 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-10-12T04:53:00.616Z",
+  "generatedAt": "2026-10-12T08:09:11.679Z",
   "generatedFrom": {
-    "commit": "ca8b5f9dbd096bcbae9676d75005c3cc024bf83e"
+    "commit": "b3c6b90c455225370660b99a6a815cfa89690fd0"
   },
   "pairs": [
     {
       "a": "atlas/README.md",
       "b": "atlas/page.json",
-      "either": 13,
-      "shared": 13,
+      "either": 15,
+      "shared": 15,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/statistics.json",
-      "either": 13,
-      "shared": 13,
+      "either": 15,
+      "shared": 15,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/structure.json",
-      "either": 13,
-      "shared": 13,
+      "either": 15,
+      "shared": 15,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/statistics.json",
-      "either": 13,
-      "shared": 13,
+      "either": 15,
+      "shared": 15,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/structure.json",
-      "either": 13,
-      "shared": 13,
+      "either": 15,
+      "shared": 15,
       "strength": 1
     },
     {
       "a": "atlas/statistics.json",
       "b": "atlas/structure.json",
-      "either": 13,
-      "shared": 13,
+      "either": 15,
+      "shared": 15,
       "strength": 1
+    },
+    {
+      "a": "pyproject.toml",
+      "b": "uv.lock",
+      "either": 6,
+      "shared": 5,
+      "strength": 0.833333
     },
     {
       "a": "src/switchyard/adapters/base.py",
@@ -835,78 +957,92 @@
       "strength": 0.5
     },
     {
-      "a": "src/switchyard/adapters/openvino.py",
-      "b": "tests/test_openvino_adapter.py",
-      "either": 19,
-      "shared": 15,
-      "strength": 0.789474
-    },
-    {
-      "a": "src/switchyard/harness/receipts.py",
-      "b": "src/switchyard/receipt.py",
-      "either": 10,
-      "shared": 7,
-      "strength": 0.7
-    },
-    {
-      "a": "src/switchyard/harness/receipts.py",
-      "b": "src/switchyard/schema/routing-row.schema.json",
-      "either": 11,
-      "shared": 8,
-      "strength": 0.727273
-    },
-    {
-      "a": "src/switchyard/harness/runner.py",
-      "b": "tests/test_harness.py",
-      "either": 21,
-      "shared": 12,
+      "a": "src/switchyard/adapters/ollama.py",
+      "b": "src/switchyard/harness/fill.py",
+      "either": 7,
+      "shared": 4,
       "strength": 0.571429
     },
     {
-      "a": "src/switchyard/importers/gaps.py",
-      "b": "src/switchyard/receipt.py",
-      "either": 10,
+      "a": "src/switchyard/adapters/ollama.py",
+      "b": "tests/test_fill_card_live.py",
+      "either": 7,
+      "shared": 4,
+      "strength": 0.571429
+    },
+    {
+      "a": "src/switchyard/adapters/openvino.py",
+      "b": "tests/test_openvino_adapter.py",
+      "either": 20,
+      "shared": 16,
+      "strength": 0.8
+    },
+    {
+      "a": "src/switchyard/harness/fill.py",
+      "b": "tests/test_fill_card_live.py",
+      "either": 5,
       "shared": 5,
-      "strength": 0.5
+      "strength": 1
     },
     {
-      "a": "src/switchyard/importers/gaps.py",
-      "b": "src/switchyard/schema/routing-row.schema.json",
-      "either": 11,
-      "shared": 6,
-      "strength": 0.545455
-    },
-    {
-      "a": "src/switchyard/receipt.py",
-      "b": "src/switchyard/schema/routing-row.schema.json",
+      "a": "src/switchyard/harness/receipts.py",
+      "b": "src/switchyard/receipt.py",
       "either": 11,
       "shared": 7,
       "strength": 0.636364
     },
     {
+      "a": "src/switchyard/harness/receipts.py",
+      "b": "src/switchyard/schema/routing-row.schema.json",
+      "either": 12,
+      "shared": 8,
+      "strength": 0.666667
+    },
+    {
+      "a": "src/switchyard/harness/runner.py",
+      "b": "tests/test_harness.py",
+      "either": 23,
+      "shared": 13,
+      "strength": 0.565217
+    },
+    {
+      "a": "src/switchyard/importers/gaps.py",
+      "b": "src/switchyard/schema/routing-row.schema.json",
+      "either": 12,
+      "shared": 6,
+      "strength": 0.5
+    },
+    {
+      "a": "src/switchyard/receipt.py",
+      "b": "src/switchyard/schema/routing-row.schema.json",
+      "either": 12,
+      "shared": 8,
+      "strength": 0.666667
+    },
+    {
       "a": "table/gaps.md",
       "b": "table/routing.jsonl",
-      "either": 11,
+      "either": 12,
       "shared": 8,
-      "strength": 0.727273
+      "strength": 0.666667
     },
     {
       "a": "table/gaps.md",
       "b": "tests/test_task_scope.py",
-      "either": 13,
+      "either": 14,
       "shared": 7,
-      "strength": 0.538462
+      "strength": 0.5
     },
     {
       "a": "table/routing.jsonl",
       "b": "tests/test_task_scope.py",
-      "either": 11,
-      "shared": 8,
-      "strength": 0.727273
+      "either": 12,
+      "shared": 9,
+      "strength": 0.75
     }
   ],
   "parameters": {
-    "appliedChangesetLimit": 34,
+    "appliedChangesetLimit": 38.25,
     "changeset": 50,
     "changesetFraction": 0.25,
     "cohesionDrop": 0.2,
@@ -915,16 +1051,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-10-11T21:49:37-07:00",
-    "inScopeFiles": 136,
+    "headDate": "2026-10-12T04:07:22-04:00",
+    "inScopeFiles": 153,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 69,
+    "qualifyingCommits": 75,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-04-15T04:49:37.000Z",
+    "since": "2026-04-15T08:07:22.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",

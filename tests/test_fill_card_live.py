@@ -5,6 +5,7 @@ Nothing here opens a socket, runs nvidia-smi, or reads a GPU counter.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import subprocess
 import threading
@@ -20,22 +21,26 @@ from switchyard.adapters.ollama_cases import require_recorded_behaviour
 from switchyard.harness.spec import SpecError, validate_spec
 from switchyard.guards import GuardError, require_card_empty, require_grant, require_heartbeat
 from switchyard.harness.fill import (
-    CUDA_ARGV,
-    DEDICATED_COUNTER,
+    ADAPTER_DEDICATED,
+    ADAPTER_SHARED,
     DRIVER_ARGV,
     MEMORY_ARGV,
-    SHARED_COUNTER,
+    NVIDIA_SMI_ARGV,
     CardSampler,
     FillSeams,
-    facts_from_show,
+    adapter_usage,
+    driver_cuda,
+    facts_from_log,
     first_line,
+    ggml_cuda_sha256,
+    match_adapter_instance,
     parse_counter_text,
     parse_mib,
     quiet_fill_seams,
     real_fill_seams,
     run_fill_card,
-    runner_pids,
-    shared_mib_for_runners,
+    runner_pid,
+    window_delta,
 )
 from switchyard.harness.runner import RunnerError, dry_run, run_spec
 from switchyard.receipt import check_tree, load_jsonl
@@ -117,7 +122,7 @@ def _fresh(tmp_path: Path) -> Path:
 
 
 class _Transport:
-    def __init__(self, seams, *, show_error=None, explode=False, spill_shared=False, spill_prompt=False, missing_shared=False, missing_prompt=False, abort_at=None, stick=False, linear=None, cold_disagrees=False, omit_tags=False, tag_bytes=None, busy_mib=20000, hide_baseline=False, settle_high=0, self_sample=True, split_vram=False, hold_abort=False, slow_unload=0, hang_unload=False):
+    def __init__(self, seams, *, show_error=None, explode=False, spill_shared=False, spill_prompt=False, missing_shared=False, missing_prompt=False, abort_at=None, stick=False, linear=None, cold_disagrees=False, omit_tags=False, tag_bytes=None, busy_mib=20000, hide_baseline=False, settle_high=0, self_sample=True, split_vram=False, hold_abort=False, slow_unload=0, hang_unload=False, trained=4096, unresident_at=None):
         self.seams = seams
         self.show_error = show_error
         self.explode = explode
@@ -139,6 +144,8 @@ class _Transport:
         self.hold_abort = hold_abort
         self.slow_unload = slow_unload
         self.hang_unload = hang_unload
+        self.trained = trained
+        self.unresident_at = unresident_at
         self.block_count = False
         self.released = threading.Event()
         self._hang = threading.Event()
@@ -209,7 +216,7 @@ class _Transport:
             if self.show_error:
                 return {"error": self.show_error}
             return {
-                "model_info": {"qwen3.context_length": 4096},
+                "model_info": {"qwen3.context_length": self.trained},
                 "details": {"quantization_level": "Q4_K_M"},
                 "parameters": "flash_attn true\nkv_cache_type q8_0\n",
             }
@@ -254,7 +261,12 @@ class _Transport:
             if self.cold_disagrees and self.loaded is None:
                 count = 100001
             return {"prompt_eval_count": count}
-        vram = 999 if self.split_vram else 1000
+        above = (
+            self.unresident_at is not None
+            and isinstance(self.state["ctx"], int)
+            and self.state["ctx"] >= self.unresident_at
+        )
+        vram = 999 if self.split_vram or above else 1000
         self.loaded = {"name": body["model"], "size": 1000, "size_vram": vram}
         rate = self._rate()
         payload = {"eval_count": 1, "eval_duration": 1_000_000_000, "total_duration": 5_000_000}
@@ -322,7 +334,7 @@ def test_a_clean_search_records_the_confirmed_window(tmp_path: Path):
     seams = _seams(transport)
     repo, rows = _run(tmp_path, transport, seams=seams)
     row = rows[0]
-    assert row["settings"]["max_resident_ctx"] == 8192
+    assert row["settings"]["max_resident_ctx"] == 4096
     assert row["settings"]["num_ctx"] == 4096
     assert row["settings"]["peak_mib"] == 20000
     assert row["settings"]["shared_mib"] == 1000
@@ -336,29 +348,38 @@ def test_a_clean_search_records_the_confirmed_window(tmp_path: Path):
     assert row["settings"]["digest"] == "abc123"
     assert row["settings"]["quantization"] == "Q4_K_M"
     assert row["model"]["quant"] == "Q4_K_M"
-    assert row["settings"]["flash_attention"] == "true"
-    assert row["settings"]["kv_cache_type"] == "q8_0"
+    assert row["settings"]["flash_attention"] == "unrecorded"
+    assert row["settings"]["kv_cache_type"] == "unrecorded"
+    assert row["settings"]["default_context"] == "unrecorded"
+    assert row["settings"]["backend_library"] == "unrecorded"
+    assert row["settings"]["server_facts_reason"] == "server log is missing"
     assert row["settings"]["ggml_cuda_sha"] == "unrecorded"
+    assert "ggml-cuda.dll" in row["settings"]["ggml_cuda_reason"]
+    assert row["settings"]["search_calls"] == [
+        ["load", 4096, 20000, 1000, 100, "resident"],
+        ["confirm", 4096, 20000, 1000, 100, "confirmed"],
+    ]
+    assert row["settings"]["dedicated_delta_mib"] == 0
     assert row["settings"]["dedicated_mib"] == 12
     assert row["settings"]["prompt_token_method"].startswith("prompt_eval_count")
     assert row["settings"]["prompt_tokens"] == 100000
     assert row["settings"]["prompt_token_search"] == 100000
     assert row["settings"]["prompt_token_cold"] == 100000
     assert row["settings"]["weights_mib"] == 16000
-    assert {"ctx": 8192, "mib": 22500} in row["settings"]["one_window_bound"]
+    assert "one_window_bound" not in row["settings"]
     assert row["gpu_resident"] is True
     assert row["model"]["size"] == row["model"]["size_vram"] == 1000
     assert row["model_family"] == "qwen"
     assert row["provisional"] is True
     assert "aborted" not in row
     assert 31200 not in _ctxs(transport)
-    assert all(ctx <= 8192 for ctx in _ctxs(transport))
+    assert all(ctx <= 4096 for ctx in _ctxs(transport))
     confirms = [
         body
         for _method, _url, body in transport.calls
         if isinstance(body, dict) and body.get("raw") is not True and body.get("prompt") not in (None, "", SEED)
     ]
-    assert confirms and confirms[-1]["options"]["num_ctx"] == 8192
+    assert confirms and confirms[-1]["options"]["num_ctx"] == 4096
     assert confirms[-1]["shift"] is False and confirms[-1]["truncate"] is False
     assert confirms[-1]["options"]["num_predict"] == 1
     assert any(body.get("raw") is True and body["options"]["num_predict"] == 1 for _m, _u, body in transport.calls if isinstance(body, dict))
@@ -369,7 +390,7 @@ def test_a_clean_search_records_the_confirmed_window(tmp_path: Path):
 
 
 def test_the_sampler_unloads_when_the_window_reaches_abort_mib(tmp_path: Path):
-    transport = _Transport(None, abort_at=8192)
+    transport = _Transport(None, abort_at=8192, trained=8192)
     seams = _seams(transport)
     _repo, rows = _run(tmp_path, transport, seams=seams)
     row = rows[0]
@@ -386,7 +407,7 @@ def test_the_sampler_unloads_when_the_window_reaches_abort_mib(tmp_path: Path):
 
 
 def test_a_window_whose_card_does_not_fall_after_unload_is_noted(tmp_path: Path):
-    transport = _Transport(None, abort_at=8192, stick=True)
+    transport = _Transport(None, abort_at=8192, trained=8192, stick=True)
     seams = _seams(transport)
     _repo, rows = _run(tmp_path, transport, seams=seams)
     row = rows[0]
@@ -396,31 +417,31 @@ def test_a_window_whose_card_does_not_fall_after_unload_is_noted(tmp_path: Path)
     assert row["settings"]["max_resident_ctx"] != 8192
 
 
-def test_a_doubling_step_predicted_over_is_skipped_and_the_first_window_still_loads(tmp_path: Path):
-    transport = _Transport(None, linear=(10000, 2))
+def test_a_bisect_predicted_over_is_skipped(tmp_path: Path):
+    transport = _Transport(None, linear=(10000, 2), trained=32768)
     seams = _seams(transport)
     _repo, rows = _run(tmp_path, transport, seams=seams, max_ctx=32768)
     row = rows[0]
     ctxs = _ctxs(transport)
-    assert ctxs[0] == 4096
+    assert ctxs[0] == 32768
     assert 8192 in ctxs
-    assert 16384 in row["settings"]["predicted_over"]
-    assert 16384 not in ctxs
+    assert 12288 in row["settings"]["predicted_over"]
+    assert 12288 not in ctxs
     assert 31200 not in ctxs
     assert row["settings"]["max_resident_ctx"] not in row["settings"]["predicted_over"]
     assert row["settings"]["max_resident_ctx"] == 10240
 
 
-def test_one_measured_window_skips_a_doubling_with_less_than_one_cache_of_room(tmp_path: Path):
-    """Window 1 leaves less than one cache of room, so the doubling is predicted_over."""
+def test_one_measured_window_skips_a_bisect_with_less_than_one_cache_of_room(tmp_path: Path):
+    """The resident window leaves less than one cache of room, so the bisect is predicted_over."""
 
     weights = 1000 * 1024 * 1024
-    transport = _Transport(None, busy_mib=28000, tag_bytes=weights)
+    transport = _Transport(None, busy_mib=28000, tag_bytes=weights, trained=16384, abort_at=16384)
     seams = _seams(transport)
-    _repo, rows = _run(tmp_path, transport, seams=seams)
+    _repo, rows = _run(tmp_path, transport, seams=seams, max_ctx=16384)
     row = rows[0]
     ctxs = _ctxs(transport)
-    reading, baseline, ctx_1 = 28000, 1500, 4096
+    reading, baseline, ctx_1 = 28000, 1500, 8192
     share = reading - baseline - 1000
 
     def bound(ctx: int) -> int:
@@ -428,76 +449,70 @@ def test_one_measured_window_skips_a_doubling_with_less_than_one_cache_of_room(t
         return reading + (extra + ctx_1 - 1) // ctx_1
 
     assert row["settings"]["weights_mib"] == 1000
-    assert row["settings"]["max_resident_ctx"] == 4096
-    assert {"ctx": 8192, "mib": bound(8192)} in row["settings"]["one_window_bound"]
-    assert bound(8192) >= 30500
-    assert 8192 in row["settings"]["predicted_over"]
-    assert 6144 in row["settings"]["predicted_over"]
-    assert 8192 not in ctxs
-    assert 6144 not in ctxs
+    assert row["settings"]["max_resident_ctx"] == 8192
+    assert {"ctx": 12288, "mib": bound(12288)} in row["settings"]["one_window_bound"]
+    assert bound(12288) >= 30500
+    assert 12288 in row["settings"]["predicted_over"]
+    assert 10240 in row["settings"]["predicted_over"]
+    assert 12288 not in ctxs
+    assert 10240 not in ctxs
     assert 31200 not in ctxs
-    assert all(ctx == 4096 for ctx in ctxs)
 
 
-def test_a_missing_weight_size_stops_before_the_second_window(tmp_path: Path):
-    transport = _Transport(None, omit_tags=True)
+def test_a_missing_weight_size_stops_before_the_larger_window(tmp_path: Path):
+    transport = _Transport(None, omit_tags=True, trained=16384, abort_at=16384)
     seams = _seams(transport)
     with pytest.raises(RunnerError, match="the second window had no bound"):
-        _run(tmp_path, transport, seams=seams)
+        _run(tmp_path, transport, seams=seams, max_ctx=16384)
     ctxs = _ctxs(transport)
-    assert 4096 in ctxs
-    assert 8192 not in ctxs
+    assert 16384 in ctxs
+    assert 8192 in ctxs
+    assert 12288 not in ctxs
 
 
-def test_a_missing_baseline_stops_before_the_second_window(tmp_path: Path):
-    transport = _Transport(None, hide_baseline=True)
+def test_a_missing_baseline_stops_before_the_larger_window(tmp_path: Path):
+    transport = _Transport(None, hide_baseline=True, trained=16384, abort_at=16384)
     seams = _seams(transport)
     with pytest.raises(RunnerError, match="the second window had no bound"):
-        _run(tmp_path, transport, seams=seams)
+        _run(tmp_path, transport, seams=seams, max_ctx=16384)
     ctxs = _ctxs(transport)
-    assert 4096 in ctxs
-    assert 8192 not in ctxs
+    assert 16384 in ctxs
+    assert 8192 in ctxs
+    assert 12288 not in ctxs
 
 
-def test_a_non_positive_share_stops_before_the_second_window(tmp_path: Path):
+def test_a_non_positive_share_stops_before_the_larger_window(tmp_path: Path):
     """The tag is larger than the card above the baseline, so the share is not a bound."""
 
     weights = 19000 * 1024 * 1024
-    transport = _Transport(None, tag_bytes=weights)
+    transport = _Transport(None, tag_bytes=weights, trained=16384, abort_at=16384)
     seams = _seams(transport)
     with pytest.raises(RunnerError, match="the second window had no bound"):
-        _run(tmp_path, transport, seams=seams)
+        _run(tmp_path, transport, seams=seams, max_ctx=16384)
     ctxs = _ctxs(transport)
-    assert 4096 in ctxs
-    assert 8192 not in ctxs
+    assert 16384 in ctxs
+    assert 8192 in ctxs
+    assert 12288 not in ctxs
 
 
-def test_a_window_that_is_not_fully_resident_does_not_bound_the_next(tmp_path: Path, monkeypatch):
-    """size_vram is below size, so window 1 cannot bound a larger context.
+def test_a_window_that_is_not_fully_resident_searches_down(tmp_path: Path):
+    """A non-resident trained window is not a reason to load a larger one."""
 
-    The search would stop on its own. This lets it ask anyway. The bound refuses
-    before that context is loaded.
-    """
-
-    def peak_only(obs, abort_mib):
-        if obs.error or obs.peak_mib is None:
-            return True
-        return obs.peak_mib > abort_mib
-
-    monkeypatch.setattr("switchyard.harness.e5.over_margin", peak_only)
-    transport = _Transport(None, split_vram=True)
+    transport = _Transport(None, split_vram=True, trained=8192)
     seams = _seams(transport)
-    with pytest.raises(RunnerError, match="the second window had no bound"):
-        _run(tmp_path, transport, seams=seams)
+    _repo, rows = _run(tmp_path, transport, seams=seams, max_ctx=8192)
     ctxs = _ctxs(transport)
+    assert ctxs[0] == 8192
     assert 4096 in ctxs
-    assert 8192 not in ctxs
+    assert all(ctx <= 8192 for ctx in ctxs)
+    assert rows[0]["settings"]["max_resident_ctx"] is None
+    assert rows[0]["notes"] == "no resident window"
 
 
 def test_the_next_load_waits_until_the_abort_has_settled(tmp_path: Path):
     """A slow unload stays on the sampler thread. The next load starts after the settle read."""
 
-    transport = _Transport(None, abort_at=8192, self_sample=False, hold_abort=True, slow_unload=0.4)
+    transport = _Transport(None, abort_at=8192, trained=8192, self_sample=False, hold_abort=True, slow_unload=0.4)
     seams = _seams(transport)
     seams.threaded = True
     _repo, rows = _run(tmp_path, transport, seams=seams)
@@ -511,7 +526,7 @@ def test_the_next_load_waits_until_the_abort_has_settled(tmp_path: Path):
 def test_a_hanging_unload_stops_before_the_next_load(tmp_path: Path):
     """The abort's unload never returns. The run stops, and the next size does not load."""
 
-    transport = _Transport(None, abort_at=8192, self_sample=False, hold_abort=True, hang_unload=True)
+    transport = _Transport(None, abort_at=8192, trained=8192, self_sample=False, hold_abort=True, hang_unload=True)
     seams = _seams(transport)
     seams.threaded = True
     started = time.monotonic()
@@ -525,7 +540,7 @@ def test_a_hanging_unload_stops_before_the_next_load(tmp_path: Path):
 
 
 def test_a_card_that_falls_while_the_unload_settles_is_not_noted(tmp_path: Path):
-    transport = _Transport(None, abort_at=8192, settle_high=3)
+    transport = _Transport(None, abort_at=8192, trained=8192, settle_high=3)
     seams = _seams(transport)
     _repo, rows = _run(tmp_path, transport, seams=seams)
     row = rows[0]
@@ -557,15 +572,19 @@ def test_a_cold_recount_mismatch_refuses_the_confirmation(tmp_path: Path):
 
 
 def test_shared_growth_steps_the_candidate_back(tmp_path: Path):
-    transport = _Transport(None, spill_shared=True)
+    transport = _Transport(None, spill_shared=True, trained=8192)
     seams = _seams(transport)
     _repo, rows = _run(tmp_path, transport, seams=seams)
     assert rows[0]["settings"]["max_resident_ctx"] == 6144
     assert rows[0]["settings"]["shared_mib"] == 1000
+    calls = rows[0]["settings"]["search_calls"]
+    spilled = [call for call in calls if call[0] == "confirm" and call[1] == 8192]
+    assert spilled == [["confirm", 8192, 20000, 1257, 100, "spill"]]
+    assert calls[-1] == ["confirm", 6144, 20000, 1000, 100, "confirmed"]
 
 
 def test_a_fallen_prompt_rate_steps_the_candidate_back(tmp_path: Path):
-    transport = _Transport(None, spill_prompt=True)
+    transport = _Transport(None, spill_prompt=True, trained=8192)
     seams = _seams(transport)
     _repo, rows = _run(tmp_path, transport, seams=seams)
     assert rows[0]["settings"]["max_resident_ctx"] == 6144
@@ -666,7 +685,7 @@ def test_a_fake_adapter_without_seams_does_not_call_nvidia(tmp_path: Path, monke
     transport = _Transport(quiet_fill_seams())
     _repo, rows = _run(tmp_path, transport, seams=None)
     assert rows[0]["settings"]["max_resident_ctx"] is None
-    assert rows[0]["notes"] == "default context is not resident"
+    assert rows[0]["notes"] == "no resident window"
 
 
 def test_a_missing_grant_never_calls_the_adapter(tmp_path: Path):
@@ -701,55 +720,230 @@ def test_dry_run_names_the_confirmation_count(monkeypatch):
     assert "31200" not in source
 
 
-def test_readers_parse_fake_output_and_do_not_guess():
+_MIB = 1024 * 1024
+_GPU = "luid_5090_phys_0"
+_IGPU = "luid_igpu_phys_0"
+
+
+def _bytes(mib: int) -> int:
+    return mib * _MIB
+
+
+def test_the_search_does_not_load_above_the_trained_length(tmp_path: Path):
+    transport = _Transport(None, trained=4096)
+    seams = _seams(transport)
+    _repo, rows = _run(tmp_path, transport, seams=seams, max_ctx=1_048_576)
+    ctxs = _ctxs(transport)
+    assert ctxs[0] == 4096
+    assert all(ctx <= 4096 for ctx in ctxs)
+    assert rows[0]["settings"]["max_resident_ctx"] == 4096
+    assert rows[0]["settings"]["num_ctx"] == 4096
+
+
+def test_a_trained_window_that_is_not_resident_searches_down_to_the_grain(tmp_path: Path):
+    transport = _Transport(None, trained=16384, unresident_at=8192)
+    seams = _seams(transport)
+    _repo, rows = _run(tmp_path, transport, seams=seams, max_ctx=16384)
+    ctxs = _ctxs(transport)
+    row = rows[0]
+    assert ctxs[0] == 16384
+    assert all(ctx <= 16384 for ctx in ctxs)
+    assert 8192 in ctxs
+    assert row["settings"]["max_resident_ctx"] == 6144
+    assert 6144 % 2048 == 0
+    calls = row["settings"]["search_calls"]
+    assert calls[0] == ["load", 16384, 20000, 1000, 100, "not resident"]
+    assert ["load", 6144, 20000, 1000, 100, "resident"] in calls
+    assert calls[-1] == ["confirm", 6144, 20000, 1000, 100, "confirmed"]
+
+
+def test_shared_growth_uses_the_pre_window_baseline(tmp_path: Path):
+    """A high absolute shared reading is not a spill when this window barely grew.
+
+    The load's shared reading stays at 100. The confirmation sits near 2200.
+    Gating on the load would call that a spill. The baseline taken just before
+    the confirmation is 2000, so 200 MiB of growth is under the 256 MiB line.
+    """
+
+    transport = _Transport(None, trained=8192)
+    seams = _seams(transport)
+    script = [
+        (_GPU, 100, 12),
+        (_GPU, 100, 12),
+        (_GPU, 2000, 12),
+        (_GPU, 2200, 20),
+    ]
+
+    def adapter_reading():
+        if not script:
+            raise AssertionError("the window asked for another adapter reading")
+        return script.pop(0)
+
+    seams.adapter_reading = adapter_reading
+    _repo, rows = _run(tmp_path, transport, seams=seams, max_ctx=8192)
+    assert script == []
+    assert rows[0]["settings"]["max_resident_ctx"] == 8192
+    assert rows[0]["settings"]["shared_mib"] == 2200
+    assert rows[0]["settings"]["dedicated_delta_mib"] == 8
+    assert rows[0]["settings"]["dedicated_mib"] == 20
+    assert rows[0]["settings"]["search_calls"][-1] == ["confirm", 8192, 20000, 2200, 100, "confirmed"]
+
+
+def test_the_5090_is_the_dedicated_match_and_a_bad_match_is_a_spill(tmp_path: Path):
+    mib = _MIB
+    igpu = (_IGPU, _bytes(512))
+    gpu = (_GPU, _bytes(20000))
+    assert match_adapter_instance([igpu, gpu], 20000) == _GPU
+    assert match_adapter_instance([gpu, igpu], 20000) == _GPU
+    assert match_adapter_instance([igpu, (_GPU, _bytes(20000)), ("luid_other_phys_0", _bytes(20000))], 20000) is None
+    assert match_adapter_instance([igpu], 20000) is None
+    assert adapter_usage(
+        [igpu, gpu],
+        [(_IGPU, _bytes(10)), (_GPU, _bytes(30))],
+        20000,
+    ) == (_GPU, 30, 20000)
+    assert window_delta((_GPU, 1000, 20), (_IGPU, 1001, 21)) == (None, None, None)
+    assert window_delta((_GPU, 1000, 12), (_GPU, 1257, 20)) == (1257, 1000, 8)
+    assert window_delta(None, (_GPU, 1, 1)) == (None, None, None)
+
+    transport = _Transport(None, trained=8192)
+    seams = _seams(transport)
+
+    def matched():
+        grown = transport.state["confirm"] and transport.state["ctx"] == 8192
+        dedicated = [igpu, gpu]
+        shared = [(_IGPU, 10 * mib), (_GPU, _bytes(1257 if grown else 1000))]
+        return adapter_usage(dedicated, shared, 20000)
+
+    seams.adapter_reading = matched
+    _repo, rows = _run(tmp_path, transport, seams=seams, max_ctx=8192)
+    calls = rows[0]["settings"]["search_calls"]
+    assert rows[0]["settings"]["max_resident_ctx"] == 6144
+    assert ["confirm", 8192, 20000, 1257, 100, "spill"] in calls
+    assert calls[-1][3] == 1000
+
+    transport = _Transport(None, trained=4096)
+    seams = _seams(transport)
+
+    def ambiguous():
+        dedicated = [igpu, (_GPU, _bytes(20000)), ("luid_other_phys_0", _bytes(20000))]
+        shared = [(_IGPU, _bytes(10)), (_GPU, _bytes(1000))]
+        return adapter_usage(dedicated, shared, 20000)
+
+    seams.adapter_reading = ambiguous
+    _repo, rows = _run(tmp_path, transport, seams=seams, max_ctx=4096, folder="ambiguous")
+    assert rows[0]["settings"]["max_resident_ctx"] is None
+    assert rows[0]["notes"] == "no confirmed window"
+    assert rows[0]["settings"]["search_calls"]
+    assert all(call[3] is None for call in rows[0]["settings"]["search_calls"])
+    assert any(call[0] == "confirm" and call[5] == "spill" for call in rows[0]["settings"]["search_calls"])
+
+
+def test_the_server_log_fills_the_four_fields(tmp_path: Path):
+    transport = _Transport(None, trained=4096)
+    seams = _seams(transport)
+    dll = tmp_path / "ggml-cuda.dll"
+    dll.write_bytes(b"cuda-bytes")
+    library = "C:/ollama/lib/ollama/cuda_v13/ggml-cuda.dll"
+    log = (
+        'msg="server config" env="map[OLLAMA_FLASH_ATTENTION:false OLLAMA_KV_CACHE_TYPE:f16 OLLAMA_CONTEXT_LENGTH:2048]"\n'
+        'msg="server config" env="map[OLLAMA_FLASH_ATTENTION:true OLLAMA_KV_CACHE_TYPE:q8_0 OLLAMA_CONTEXT_LENGTH:8192]"\n'
+        "load_backend: loaded CPU backend from C:/ollama/lib/ollama/cpu/ggml-cpu.dll\n"
+        f"load_backend: loaded CUDA backend from {library}\n"
+    )
+    seams.server_log = lambda: log
+    seams.ggml_dll = lambda: str(dll)
+    seams.runner_pid = lambda: 4242
+    _repo, rows = _run(tmp_path, transport, seams=seams)
+    settings = rows[0]["settings"]
+    assert settings["flash_attention"] == "true"
+    assert settings["kv_cache_type"] == "q8_0"
+    assert settings["default_context"] == "8192"
+    assert settings["backend_library"] == library
+    assert "server_facts_reason" not in settings
+    assert settings["ggml_cuda_sha"] == hashlib.sha256(b"cuda-bytes").hexdigest()
+    assert "ggml_cuda_reason" not in settings
+    assert settings["runner_pid"] == 4242
+
+
+def test_readers_parse_fake_output_and_do_not_guess(tmp_path: Path):
     assert parse_mib("20000\n") == 20000
     assert parse_mib("20000\n100\n") is None
     assert first_line("581.29\n") == "581.29"
-    samples = parse_counter_text("pid_42_luid_x=31457280\npid_9_luid_y=1048576\n")
-    assert shared_mib_for_runners(samples, [42]) == 30
-    assert shared_mib_for_runners(samples, [42, 9]) is None
-    assert runner_pids(["42 ollama.exe ollama runner", "7 ollama.exe serve"]) == [42]
-    flash, kv, ggml = facts_from_show({"parameters": "flash_attn true\nkv_cache_type q8_0\n"})
-    assert (flash, kv, ggml) == ("true", "q8_0", "unrecorded")
-    assert facts_from_show({}) == ("unrecorded", "unrecorded", "unrecorded")
+    header = "NVIDIA-SMI 617.14    Driver Version: 617.14    CUDA Version: 13.2\n"
+    assert driver_cuda(header) == "driver 13.2"
+    assert driver_cuda("no cuda header\n") is None
+    assert runner_pid(["42 7 ollama.exe", "9 7 ollama.exe"]) is None
+    assert runner_pid(["42 7 OLLAMA.EXE"]) == 42
+    assert runner_pid([]) is None
+    missing = facts_from_log(None)
+    assert missing["flash_attention"] == "unrecorded"
+    assert missing["reason"] == "server log is missing"
+    partial = facts_from_log('msg="server config" env="map[OLLAMA_FLASH_ATTENTION:true]"\n')
+    assert partial["flash_attention"] == "true"
+    assert partial["kv_cache_type"] == "unrecorded"
+    assert "kv_cache_type" in partial["reason"]
+    assert ggml_cuda_sha256(None) == ("unrecorded", "ggml-cuda.dll path is not configured")
+    missing_dll = tmp_path / "absent.dll"
+    assert ggml_cuda_sha256(str(missing_dll))[0] == "unrecorded"
 
     class Completed:
-        returncode = 0
-        stdout = "20000\n"
+        def __init__(self, stdout):
+            self.returncode = 0
+            self.stdout = stdout
+
+    counters = {"mode": "match"}
+
+    def read_counter(counter):
+        seen_counters.append(counter)
+        if counters["mode"] == "ambiguous" and counter == ADAPTER_DEDICATED:
+            return f"{_IGPU}={_bytes(20000)}\n{_GPU}={_bytes(20000)}\n"
+        if counter == ADAPTER_DEDICATED:
+            return f"{_IGPU}={_bytes(512)}\n{_GPU}={_bytes(20000)}\n"
+        if counter == ADAPTER_SHARED:
+            return f"{_IGPU}={_bytes(10)}\n{_GPU}={_bytes(30)}\n"
+        raise AssertionError(counter)
 
     def run(argv, **kwargs):
         seen.append(tuple(argv))
-        if argv == MEMORY_ARGV:
-            return Completed()
-        if argv == DRIVER_ARGV:
-            return type("C", (), {"returncode": 0, "stdout": "581.29\n"})()
-        if argv == CUDA_ARGV:
-            return type("C", (), {"returncode": 0, "stdout": "13.0\n"})()
-        script = argv[-1]
-        if SHARED_COUNTER in script:
-            return type("C", (), {"returncode": 0, "stdout": "pid_42_luid=31457280\n"})()
-        if DEDICATED_COUNTER in script:
-            return type("C", (), {"returncode": 0, "stdout": "pid_42_luid=1048576\n"})()
-        if "Win32_Process" in script:
-            return type("C", (), {"returncode": 0, "stdout": "42 ollama.exe ollama runner\n"})()
+        if tuple(argv) == MEMORY_ARGV:
+            return Completed("20000\n")
+        if tuple(argv) == DRIVER_ARGV:
+            return Completed("581.29\n")
+        if tuple(argv) == NVIDIA_SMI_ARGV:
+            return Completed(header)
+        script = argv[-1] if argv else ""
+        if "cuda_version" in script or "cuda_version" in " ".join(argv):
+            raise AssertionError(argv)
+        if "11434" in script:
+            return Completed("42 100 ollama.exe\n")
         raise AssertionError(argv)
 
     seen = []
+    seen_counters = []
 
     class Adapter:
         def transport(self, method, url, body):
             assert method == "GET" and url.endswith("/api/version")
             return {"version": "0.35.1"}
 
-    seams = real_fill_seams(Adapter(), run=run)
+    seams = real_fill_seams(Adapter(), run=run, read_counter=read_counter)
     assert seams.card_mib() == 20000
     assert seams.shared_mib() == 30
-    assert seams.dedicated_mib() == 1
+    assert seams.dedicated_mib() == 20000
     assert seams.driver() == "581.29"
-    assert seams.cuda_backend() == "13.0"
+    assert seams.cuda_backend() == "driver 13.2"
     assert seams.ollama_version() == "0.35.1"
+    assert seams.runner_pid() == 42
     assert MEMORY_ARGV in seen
+    assert NVIDIA_SMI_ARGV in seen
+    assert ADAPTER_DEDICATED in seen_counters
+    assert ADAPTER_SHARED in seen_counters
+    assert not any("cuda_version" in " ".join(argv) for argv in seen)
     assert seams.threaded is True
+    counters["mode"] = "ambiguous"
+    assert seams.shared_mib() is None
+    assert seams.dedicated_mib() is None
 
 
 def test_the_sampler_loop_stops_at_abort_without_a_device():

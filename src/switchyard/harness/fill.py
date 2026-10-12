@@ -38,6 +38,9 @@ caller builds :func:`real_fill_seams` and then calls them.
 
 from __future__ import annotations
 
+import hashlib
+import os
+import re
 import subprocess
 import threading
 import time
@@ -73,10 +76,15 @@ UNLOAD_SETTLE_S = 10.0
 _SETTLE_STEP_S = 0.2
 MEMORY_ARGV = ("nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits")
 DRIVER_ARGV = ("nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader,nounits")
-CUDA_ARGV = ("nvidia-smi", "--query-gpu=cuda_version", "--format=csv,noheader,nounits")
-SHARED_COUNTER = r"\GPU Process Memory(*)\Shared Usage"
-DEDICATED_COUNTER = r"\GPU Process Memory(*)\Dedicated Usage"
+NVIDIA_SMI_ARGV = ("nvidia-smi",)
+ADAPTER_SHARED = r"\GPU Adapter Memory(*)\Shared Usage"
+ADAPTER_DEDICATED = r"\GPU Adapter Memory(*)\Dedicated Usage"
+LOG_ENV = "SWITCHYARD_OLLAMA_LOG"
+EXE_ENV = "SWITCHYARD_OLLAMA_EXE"
 _MIB = 1024 * 1024
+_ENV_IN_LOG = re.compile(r"\b(OLLAMA_[A-Z0-9_]+)[=:]([^\s,\]]+)")
+_BACKEND_LINE = re.compile(r"load_backend: loaded \S+ backend from (\S+)")
+_CUDA_HEADER = re.compile(r"CUDA Version:\s*([0-9.]+)")
 
 
 class _WindowOver(Exception):
@@ -135,30 +143,42 @@ def quiet_fill_seams() -> FillSeams:
     )
 
 
-def real_fill_seams(adapter, *, run=None, read_counter=None, pids=None) -> FillSeams:
-    """The command's seams. ``run``, ``read_counter`` and ``pids`` are test fakes."""
+def real_fill_seams(adapter, *, run=None, read_counter=None) -> FillSeams:
+    """The command's seams. ``run`` and ``read_counter`` are test fakes.
+
+    Shared and dedicated usage come from the 5090's adapter instance. The
+    runner pid is recorded when one child of the listener can be named. It
+    is not a gate. The server log and the ggml library come from the
+    environment, not from ``/api/show``.
+    """
 
     run = run or subprocess.run
     read_counter = read_counter or (lambda counter: _powershell_counter(counter, run))
-    pids = pids or (lambda: _runner_pids(run))
 
-    def card_mib() -> int | None:
-        return parse_mib(_capture(run, MEMORY_ARGV))
+    def read_adapter():
+        nvidia = parse_mib(_capture(run, MEMORY_ARGV))
+        if nvidia is None:
+            return None
+        dedicated = parse_counter_text(read_counter(ADAPTER_DEDICATED) or "")
+        shared = parse_counter_text(read_counter(ADAPTER_SHARED) or "")
+        return adapter_usage(dedicated, shared, nvidia)
 
     def shared_mib() -> int | None:
-        return shared_mib_for_runners(parse_counter_text(read_counter(SHARED_COUNTER) or ""), pids())
+        found = read_adapter()
+        return None if found is None else found[1]
 
     def dedicated_mib() -> int | None:
-        return shared_mib_for_runners(parse_counter_text(read_counter(DEDICATED_COUNTER) or ""), pids())
+        found = read_adapter()
+        return None if found is None else found[2]
 
     def driver() -> str | None:
         return first_line(_capture(run, DRIVER_ARGV))
 
     def cuda() -> str | None:
-        return first_line(_capture(run, CUDA_ARGV))
+        return driver_cuda(_capture(run, NVIDIA_SMI_ARGV))
 
-    return FillSeams(
-        card_mib=card_mib,
+    seams = FillSeams(
+        card_mib=lambda: parse_mib(_capture(run, MEMORY_ARGV)),
         shared_mib=shared_mib,
         dedicated_mib=dedicated_mib,
         ollama_version=lambda: _ollama_version(adapter),
@@ -168,6 +188,11 @@ def real_fill_seams(adapter, *, run=None, read_counter=None, pids=None) -> FillS
         clock=time.monotonic,
         threaded=True,
     )
+    seams.adapter_reading = read_adapter
+    seams.server_log = lambda: _read_configured_log()
+    seams.ggml_dll = lambda: _configured_dll()
+    seams.runner_pid = lambda: _runner_pid(run)
+    return seams
 
 
 class CardSampler:
@@ -301,84 +326,170 @@ def parse_counter_text(text: str) -> list[tuple[str, float]]:
     return rows
 
 
-def mib_for_pid(samples: list[tuple[str, float]], pid: int) -> int | None:
-    """The largest Shared or Dedicated sample whose instance names this pid."""
-
-    needle = f"pid_{pid}_".lower()
-    found = []
-    for name, cooked in samples:
-        if not isinstance(name, str) or needle not in name.lower():
-            continue
-        if isinstance(cooked, bool) or not isinstance(cooked, (int, float)) or cooked < 0:
-            continue
-        found.append(int(cooked / _MIB))
-    if not found:
+def _cooked_mib(cooked: object) -> int | None:
+    if isinstance(cooked, bool) or not isinstance(cooked, (int, float)) or cooked < 0:
         return None
-    return max(found)
+    return int(cooked / _MIB)
 
 
-def shared_mib_for_runners(samples: list[tuple[str, float]], pids: list[int]) -> int | None:
-    """One runner pid. Several matches is a missing reading, not a guess."""
+def match_adapter_instance(dedicated: list[tuple[str, float]], nvidia_mib: int) -> str | None:
+    """The one adapter whose dedicated MiB equals ``nvidia_mib``.
 
-    if len(pids) != 1:
+    The iGPU is an adapter too. Zero matches or more than one is missing.
+    Order is not a match.
+    """
+
+    if isinstance(nvidia_mib, bool) or not isinstance(nvidia_mib, int):
         return None
-    return mib_for_pid(samples, pids[0])
+    matches = []
+    for name, cooked in dedicated:
+        if not isinstance(name, str):
+            continue
+        if _cooked_mib(cooked) == nvidia_mib:
+            matches.append(name)
+    if len(matches) != 1:
+        return None
+    return matches[0]
 
 
-def runner_pids(lines: list[str]) -> list[int]:
-    """Ollama runner processes. The server process itself is not a match.
+def _instance_mib(samples: list[tuple[str, float]], instance: str) -> int | None:
+    found = [_cooked_mib(cooked) for name, cooked in samples if name == instance and _cooked_mib(cooked) is not None]
+    if len(found) != 1:
+        return None
+    return found[0]
 
-    A match names ollama and runner, or its executable is the bundled runner.
+
+def adapter_usage(
+    dedicated: list[tuple[str, float]],
+    shared: list[tuple[str, float]],
+    nvidia_mib: int,
+) -> tuple[str, int, int] | None:
+    """``(instance, shared MiB, dedicated MiB)`` for the one matching adapter."""
+
+    instance = match_adapter_instance(dedicated, nvidia_mib)
+    if instance is None:
+        return None
+    shared_mib = _instance_mib(shared, instance)
+    dedicated_mib = _instance_mib(dedicated, instance)
+    if shared_mib is None or dedicated_mib is None:
+        return None
+    return instance, shared_mib, dedicated_mib
+
+
+def window_delta(before, after) -> tuple[int | None, int | None, int | None]:
+    """Shared after the window, the pre-window shared baseline, and the dedicated delta.
+
+    A missing match, or two matches that name different instances, is a missing
+    shared reading. The dedicated delta is recorded and is not a gate, so a
+    missing dedicated value does not by itself blank the shared reading.
+    """
+
+    if before is None or after is None or before[0] != after[0]:
+        return None, None, None
+    dedicated_delta = None
+    if before[2] is not None and after[2] is not None:
+        dedicated_delta = after[2] - before[2]
+    return after[1], before[1], dedicated_delta
+
+
+def driver_cuda(text: str | None) -> str | None:
+    """CUDA from the nvidia-smi header, labelled as the driver's.
+
+    ``nvidia-smi --query-gpu=cuda_version`` is not a field on driver 617.14.
+    """
+
+    if not isinstance(text, str):
+        return None
+    match = _CUDA_HEADER.search(text)
+    if match is None:
+        return None
+    return f"driver {match.group(1)}"
+
+
+def runner_pid(lines: list[str]) -> int | None:
+    """The one ``ollama.exe`` child of the listener. Several, or none, is unrecorded.
+
+    Each line is ``pid parent name``. The caller already limited the lines to
+    children of the process that listens on 11434. This value never gates.
     """
 
     found: list[int] = []
     for line in lines:
         if not isinstance(line, str):
             continue
-        parts = line.split(None, 2)
-        if not parts or not parts[0].isdigit():
+        parts = line.split()
+        if len(parts) < 3 or not parts[0].isdigit():
             continue
-        blob = line.lower()
-        name = parts[1].lower() if len(parts) > 1 else ""
-        runner = "runner" in blob and "ollama" in blob
-        named = name.startswith("llama-server") or "ollama_llama" in name
-        if not runner and not named:
+        if parts[2].lower() != "ollama.exe":
             continue
         pid = int(parts[0])
         if pid not in found:
             found.append(pid)
-    return found
+    if len(found) != 1:
+        return None
+    return found[0]
 
 
-def facts_from_show(payload: dict) -> tuple[str, str, str]:
-    """Flash attention, KV cache type, and a ggml cuda sha. Absent stays unrecorded."""
+def facts_from_log(text: str | None) -> dict[str, str | None]:
+    """Flash attention, KV cache type, default context, and the backend library.
 
-    flash = UNRECORDED
-    kv = UNRECORDED
-    ggml = UNRECORDED
-    pairs: list[tuple[str, str]] = []
-    parameters = payload.get("parameters")
-    if isinstance(parameters, str):
-        for line in parameters.splitlines():
-            stripped = line.strip()
-            if not stripped or stripped.startswith("#"):
-                continue
-            parts = stripped.split(None, 1)
-            if len(parts) == 2:
-                pairs.append((parts[0].lower(), parts[1].strip()))
-    info = payload.get("model_info")
-    if isinstance(info, dict):
-        for key, value in info.items():
-            if isinstance(key, str) and isinstance(value, (str, int, float)) and not isinstance(value, bool):
-                pairs.append((key.lower(), str(value)))
-    for key, value in pairs:
-        if flash == UNRECORDED and ("flash_attn" in key or "flash_attention" in key):
-            flash = value
-        if kv == UNRECORDED and "kv" in key and "cache" in key:
-            kv = value
-        if ggml == UNRECORDED and "ggml" in key and ("sha" in key or "cuda" in key):
-            ggml = value
-    return flash, kv, ggml
+    The four values come from the latest server-config line and the latest
+    ``load_backend`` line. A missing log, or a log with neither line, leaves
+    them unrecorded and names the reason. ``/api/show`` is not a source.
+    """
+
+    blank = {
+        "flash_attention": UNRECORDED,
+        "kv_cache_type": UNRECORDED,
+        "default_context": UNRECORDED,
+        "backend_library": UNRECORDED,
+        "reason": "server log is missing",
+    }
+    if not isinstance(text, str) or not text.strip():
+        return blank
+    config_lines = []
+    libraries = []
+    for line in text.splitlines():
+        if "OLLAMA_" in line and ("server config" in line.lower() or "env=" in line.lower()):
+            config_lines.append(line)
+        match = _BACKEND_LINE.search(line)
+        if match is not None:
+            libraries.append(match.group(1))
+    if not config_lines and not libraries:
+        return {**blank, "reason": "server log has no config line"}
+    env = {key: value for key, value in _ENV_IN_LOG.findall(config_lines[-1])} if config_lines else {}
+
+    def take(key: str) -> str:
+        value = env.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        return UNRECORDED
+
+    facts = {
+        "flash_attention": take("OLLAMA_FLASH_ATTENTION"),
+        "kv_cache_type": take("OLLAMA_KV_CACHE_TYPE"),
+        "default_context": take("OLLAMA_CONTEXT_LENGTH"),
+        "backend_library": libraries[-1] if libraries else UNRECORDED,
+    }
+    missing = [name for name, value in facts.items() if value == UNRECORDED]
+    facts["reason"] = None if not missing else "server log did not record " + ", ".join(missing)
+    return facts
+
+
+def ggml_cuda_sha256(path: str | None) -> tuple[str, str | None]:
+    """Sha256 of ``ggml-cuda.dll``. A missing file is unrecorded, with a reason."""
+
+    if not isinstance(path, str) or not path.strip():
+        return UNRECORDED, "ggml-cuda.dll path is not configured"
+    file = Path(path)
+    try:
+        digest = hashlib.sha256()
+        with file.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1 << 16), b""):
+                digest.update(chunk)
+    except OSError:
+        return UNRECORDED, "ggml-cuda.dll is missing"
+    return digest.hexdigest(), None
 
 
 def _capture(run, argv) -> str | None:
@@ -400,14 +511,64 @@ def _powershell_counter(counter: str, run) -> str | None:
     return _capture(run, ["powershell", "-NoProfile", "-Command", script])
 
 
-def _runner_pids(run) -> list[int]:
+def _read_configured_log() -> str | None:
+    path = os.environ.get(LOG_ENV)
+    if not isinstance(path, str) or not path.strip():
+        return None
+    try:
+        return Path(path).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+
+
+def _configured_dll() -> str | None:
+    """``<exe>\\lib\\ollama\\cuda_v13\\ggml-cuda.dll``. The exe comes from config."""
+
+    exe = os.environ.get(EXE_ENV)
+    if not isinstance(exe, str) or not exe.strip():
+        return None
+    return str(Path(exe).parent / "lib" / "ollama" / "cuda_v13" / "ggml-cuda.dll")
+
+
+def _runner_pid(run) -> int | None:
+    """The ollama.exe whose parent is the 11434 listener. A miss is unrecorded."""
+
     script = (
+        "$listener = Get-NetTCPConnection -LocalPort 11434 -State Listen -ErrorAction SilentlyContinue | "
+        "Select-Object -First 1 -ExpandProperty OwningProcess; "
+        "if (-not $listener) { return }; "
         "Get-CimInstance Win32_Process | "
-        "Where-Object { $_.Name -match 'ollama' -or ($_.CommandLine -and $_.CommandLine -match 'ollama') } | "
-        "ForEach-Object { $_.ProcessId.ToString() + ' ' + $_.Name + ' ' + $_.CommandLine }"
+        "Where-Object { $_.ParentProcessId -eq $listener -and $_.Name -eq 'ollama.exe' } | "
+        "ForEach-Object { $_.ProcessId.ToString() + ' ' + $_.ParentProcessId.ToString() + ' ollama.exe' }"
     )
     text = _capture(run, ["powershell", "-NoProfile", "-Command", script])
-    return runner_pids([] if text is None else text.splitlines())
+    if text is None:
+        return None
+    return runner_pid(text.splitlines())
+
+
+def _optional_reader(seams, name: str):
+    reader = getattr(seams, name, None)
+    if not callable(reader):
+        return None
+    try:
+        return reader()
+    except Exception:
+        return None
+
+
+def _window_readings(seams):
+    reader = getattr(seams, "adapter_reading", None)
+    if callable(reader):
+        try:
+            return reader()
+        except Exception:
+            return None
+    shared = _optional_int(seams.shared_mib())
+    dedicated = _optional_int(seams.dedicated_mib())
+    if shared is None:
+        return None
+    return ("seam", shared, dedicated)
 
 
 def _ollama_version(adapter) -> str | None:
@@ -699,11 +860,25 @@ def _measure_model(
     version = _text(seams.ollama_version())
     driver = _text(seams.driver())
     cuda = _text(seams.cuda_backend())
+    facts = facts_from_log(_optional_reader(seams, "server_log"))
+    ggml, ggml_reason = ggml_cuda_sha256(_optional_reader(seams, "ggml_dll"))
+    pid_value = _optional_reader(seams, "runner_pid")
+    runner = pid_value if isinstance(pid_value, int) and not isinstance(pid_value, bool) else None
+
+    def row(**kwargs):
+        kwargs.setdefault("flash", str(facts["flash_attention"]))
+        kwargs.setdefault("kv", str(facts["kv_cache_type"]))
+        kwargs.setdefault("ggml", ggml)
+        kwargs.setdefault("default_context", str(facts["default_context"]))
+        kwargs.setdefault("backend_library", str(facts["backend_library"]))
+        kwargs.setdefault("server_reason", facts["reason"])
+        kwargs.setdefault("ggml_reason", ggml_reason)
+        kwargs.setdefault("runner_pid", runner)
+        return _row(spec, entry, **kwargs)
+
     baseline = _optional_int(seams.card_mib())
     if baseline is not None and baseline >= spec["abort_mib"]:
-        return _row(
-            spec,
-            entry,
+        return row(
             grant=grant,
             spec_rel=spec_rel,
             run_id=run_id,
@@ -719,11 +894,10 @@ def _measure_model(
         shown = adapter.show(model, "5090")
         default_ctx = context_length(shown)
         quant = quantization_level(shown)
-        flash, kv, ggml = facts_from_show(shown)
+        flash = str(facts["flash_attention"])
+        kv = str(facts["kv_cache_type"])
     except AdapterError as exc:
-        return _row(
-            spec,
-            entry,
+        return row(
             grant=grant,
             spec_rel=spec_rel,
             run_id=run_id,
@@ -743,9 +917,7 @@ def _measure_model(
         sample_ms = 200
     seed = (spec.get("dataset") or {}).get("seed")
     if not isinstance(seed, str) or not seed.strip():
-        return _row(
-            spec,
-            entry,
+        return row(
             grant=grant,
             spec_rel=spec_rel,
             run_id=run_id,
@@ -872,6 +1044,7 @@ def _measure_model(
         if truncate:
             settings["truncate"] = False
         request = StepRequest(f"{kind}-{ctx}", "generate", model, "5090", "ollama", settings)
+        before = _window_readings(seams)
         try:
             result = adapter.run(request)
         except AdapterError as exc:
@@ -887,9 +1060,10 @@ def _measure_model(
         resident, size, vram = _residency(adapter.loaded_models(), model)
         if size is not None and vram is not None:
             sizes[ctx] = (size, vram, resident)
-        reading = _optional_int(seams.dedicated_mib())
-        if reading is not None:
-            dedicated_by_ctx[ctx] = reading
+        after = _window_readings(seams)
+        shared_mib, baseline, dedicated_delta = window_delta(before, after)
+        if after is not None and after[2] is not None:
+            dedicated_by_ctx[ctx] = after[2]
         duration = result.prompt_eval_duration_ns
         ttft = None
         if isinstance(duration, int) and not isinstance(duration, bool) and duration >= 0:
@@ -899,8 +1073,11 @@ def _measure_model(
             sampler.peak,
             tok_s=result.throughput,
             ttft_ms=ttft,
-            shared_mib=_optional_int(seams.shared_mib()),
+            shared_mib=shared_mib,
             prompt_tok_s=result.prompt_tok_s,
+            shared_baseline=baseline,
+            baseline_taken=True,
+            dedicated_delta=dedicated_delta,
         )
 
     def probe(ctx: int, kind: str) -> Observation:
@@ -909,7 +1086,9 @@ def _measure_model(
             raise _UnloadTimeout(hung["note"])
         points = _measured_points(measured)
         predicted = _predict_mib(measured, ctx) if len(points) >= 2 else None
-        if len(points) == 1 and ctx != points[0][0]:
+        # A larger window needs a bound. A smaller one is the downward search:
+        # the trained window did not fit, and the next try is a halve.
+        if len(points) == 1 and ctx > points[0][0]:
             ctx_1, reading_1 = points[0]
             if weights_mib is None or baseline is None or not resident_at.get(ctx_1, False):
                 raise _NoBound("the second window had no bound")
@@ -934,20 +1113,22 @@ def _measure_model(
             raise _UnloadTimeout(hung["note"])
         return obs
 
+    spec_cap = spec.get("max_ctx", 1_048_576)
+    if isinstance(spec_cap, bool) or not isinstance(spec_cap, int) or spec_cap < 1:
+        spec_cap = default_ctx
+    search_cap = min(spec_cap, default_ctx)
     try:
         found = search(
-            default_ctx=default_ctx,
+            default_ctx=search_cap,
             probe=probe,
             abort_mib=spec["abort_mib"],
             grain=spec["grain"],
             shared_growth_mib=spec["spill_shared_mib"],
             prompt_ratio=spec["spill_prompt_ratio"],
-            max_ctx=spec.get("max_ctx", 1_048_576),
+            max_ctx=search_cap,
         )
     except SearchError as exc:
-        return _row(
-            spec,
-            entry,
+        return row(
             grant=grant,
             spec_rel=spec_rel,
             run_id=run_id,
@@ -969,9 +1150,7 @@ def _measure_model(
             one_window_bound=one_window_bound,
         )
     except (_NoBound, _UnloadTimeout) as exc:
-        return _row(
-            spec,
-            entry,
+        return row(
             grant=grant,
             spec_rel=spec_rel,
             run_id=run_id,
@@ -995,9 +1174,7 @@ def _measure_model(
             one_window_bound=one_window_bound,
         )
     except _CountRefused as exc:
-        return _row(
-            spec,
-            entry,
+        return row(
             grant=grant,
             spec_rel=spec_rel,
             run_id=run_id,
@@ -1032,9 +1209,7 @@ def _measure_model(
     recorded = _join(found.reason, notes)
     if stuck:
         recorded = _join(recorded, "; ".join(stuck))
-    return _row(
-        spec,
-        entry,
+    return row(
         grant=grant,
         spec_rel=spec_rel,
         run_id=run_id,
@@ -1098,6 +1273,11 @@ def _row(
     predicted_over: list[int] | None = None,
     weights_mib: int | None = None,
     one_window_bound: list[tuple[int, int]] | None = None,
+    default_context: str = UNRECORDED,
+    backend_library: str = UNRECORDED,
+    server_reason: str | None = None,
+    ggml_reason: str | None = None,
+    runner_pid: int | None = None,
 ) -> dict:
     num_predict = _refuse_confirm_num_predict(spec.get("confirm_num_predict", 1))
     settings = {
@@ -1123,14 +1303,24 @@ def _row(
         "kv_cache_type": kv,
         "nvidia_driver": driver,
         "ggml_cuda_sha": ggml,
+        "default_context": default_context,
+        "backend_library": backend_library,
         "shift": spec.get("shift"),
         "truncate": spec.get("truncate"),
     }
+    if server_reason:
+        settings["server_facts_reason"] = server_reason
+    if ggml_reason:
+        settings["ggml_cuda_reason"] = ggml_reason
+    if runner_pid is not None:
+        settings["runner_pid"] = runner_pid
     if sample_ms is not None:
         settings["sample_ms"] = sample_ms
     if found is not None:
         settings["limit"] = found.limit
-        settings["search_calls"] = [[kind, ctx] for kind, ctx in found.calls]
+        settings["search_calls"] = [list(call) for call in found.calls]
+        if found.dedicated_delta is not None:
+            settings["dedicated_delta_mib"] = found.dedicated_delta
     if aborted_windows:
         settings["aborted_windows"] = list(aborted_windows)
     if after_unload:

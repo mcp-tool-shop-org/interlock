@@ -196,6 +196,9 @@ def record_fixtures(
     heartbeat: Path,
     now: float,
     sleep=None,
+    cases: tuple | None = None,
+    num_ctx: int | None = None,
+    prompt_repeats: int | None = None,
 ) -> list[Path]:
     """Write one JSON file per case under ``out_dir/<ollama-version>/``.
 
@@ -235,9 +238,28 @@ def record_fixtures(
     folder.mkdir(parents=True, exist_ok=True)
     written: dict[str, Path] = {}
 
+    def _exchange_body(case: Case, model_name: str):
+        body = request_body(case, model_name)
+        if body is None or (num_ctx is None and prompt_repeats is None):
+            return body
+        if num_ctx is not None and (isinstance(num_ctx, bool) or not isinstance(num_ctx, int) or num_ctx < 1):
+            raise RecordError("--num-ctx must be a positive integer")
+        if prompt_repeats is not None and (
+            isinstance(prompt_repeats, bool) or not isinstance(prompt_repeats, int) or prompt_repeats < 1
+        ):
+            raise RecordError("--prompt-repeats must be a positive integer")
+        options = body.get("options") if isinstance(body, dict) else None
+        if num_ctx is not None and isinstance(options, dict):
+            options["num_ctx"] = num_ctx
+        prompt = body.get("prompt") if isinstance(body, dict) else None
+        if prompt_repeats is not None and isinstance(prompt, str) and prompt:
+            body["prompt"] = "word " * prompt_repeats
+        return body
+
     def capture(case: Case) -> None:
         started = time.perf_counter()
-        payload = call(case.method, f"{host}{case.path}", request_body(case, model), timeout)
+        sent = _exchange_body(case, model)
+        payload = call(case.method, f"{host}{case.path}", sent, timeout)
         elapsed = time.perf_counter() - started
         behaviour, response = _observed(case, payload)
         document = fixture_document(
@@ -248,6 +270,7 @@ def record_fixtures(
             date=today,
             behaviour=behaviour,
             response=response,
+            body=sent,
         )
         if case.name == "num_predict_1":
             document["cold_load_s"] = round(elapsed, 3)
@@ -317,15 +340,24 @@ def record_fixtures(
         resident = True
         capture(case)
 
-    quiet = [case for case in CASES if not _leaves_resident(case) and case.name != _WHILE_LOADED]
+    selected = tuple(CASES if cases is None else cases)
+    names = {case.name for case in selected}
+    quiet = [case for case in selected if not _leaves_resident(case) and case.name != _WHILE_LOADED]
     try:
         for case in quiet:
             capture(case)
-        baseline_again()
-        capture_loaded(case_by_loaded())
-        capture(case_named(_WHILE_LOADED))
-        unload()
-        for case in CASES:
+        # The full catalogue records ps_loaded while num_predict_1 is still resident.
+        # A subset records only its own cases, and unloads any generate that loads.
+        if cases is None or {"num_predict_1", _WHILE_LOADED} <= names:
+            baseline_again()
+            capture_loaded(case_by_loaded())
+            capture(case_named(_WHILE_LOADED))
+            unload()
+        elif "num_predict_1" in names:
+            baseline_again()
+            capture_loaded(case_by_loaded())
+            unload()
+        for case in selected:
             if case.name in written:
                 continue
             if _leaves_resident(case):
@@ -333,10 +365,10 @@ def record_fixtures(
                 unload()
             else:
                 capture(case)
-        missing = [case.name for case in CASES if case.name not in written]
+        missing = [case.name for case in selected if case.name not in written]
         if missing:
             raise RecordError(f"fixtures were not written: {', '.join(missing)}")
-        return [written[case.name] for case in CASES]
+        return [written[case.name] for case in selected]
     except BaseException:
         release()
         raise

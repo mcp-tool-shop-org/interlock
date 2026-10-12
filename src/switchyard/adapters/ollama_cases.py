@@ -2,8 +2,10 @@
 
 Each case is one fixture file the recorder writes. ``no_reply`` is a call that
 must not be waited out: Ollama 0.35.1 reads ``num_predict`` 0, null, or missing
-as no limit. A parameter the adapter can send and no case covers is a missing
-fixture.
+as no limit. Those three recordings used ``num_ctx`` 64 and were not bounded by
+it. ``truncate_over_num_ctx`` is a reply: on 0.35.1, ``truncate`` false with
+``num_ctx`` 8 answered, because a small ``num_ctx`` is raised to a floor. A
+parameter the adapter can send and no case covers is a missing fixture.
 """
 
 from __future__ import annotations
@@ -18,6 +20,11 @@ from switchyard.adapters.ollama import generate_body
 MODEL = "qwen3:8b"
 SHORT_PROMPT = "hi"
 LONG_PROMPT = "word " * 64
+# The committed recording. num_ctx 64 did not stop the generate.
+NO_LIMIT_NOTE = (
+    "num_ctx 64 did not bound this generate (11 prompt tokens and 144 eval tokens, "
+    "done_reason stop, end of turn). The 15 s timeout and the unload were the guard."
+)
 
 
 @dataclass(frozen=True)
@@ -28,6 +35,7 @@ class Case:
     body: dict | None
     behaviour: str
     covers: frozenset[str]
+    note: str = ""
 
 
 def _generate(options: dict, **extra) -> dict:
@@ -58,6 +66,7 @@ CASES: tuple[Case, ...] = (
         _generate({"num_predict": 0, "temperature": 0, "num_ctx": 64}, shift=False),
         "no_reply",
         frozenset({"num_predict", "num_ctx", "shift"}),
+        NO_LIMIT_NOTE,
     ),
     Case(
         "num_predict_null",
@@ -66,6 +75,7 @@ CASES: tuple[Case, ...] = (
         _generate({"num_predict": None, "temperature": 0, "num_ctx": 64}, shift=False),
         "no_reply",
         frozenset({"num_predict", "num_ctx", "shift"}),
+        NO_LIMIT_NOTE,
     ),
     Case(
         "num_predict_missing",
@@ -74,6 +84,7 @@ CASES: tuple[Case, ...] = (
         _generate({"temperature": 0, "num_ctx": 64}, shift=False),
         "no_reply",
         frozenset({"num_predict", "num_ctx", "shift"}),
+        NO_LIMIT_NOTE,
     ),
     Case(
         "raw_true",
@@ -112,7 +123,7 @@ CASES: tuple[Case, ...] = (
             truncate=False,
             prompt=LONG_PROMPT,
         ),
-        "error",
+        "reply",
         frozenset({"truncate", "num_ctx"}),
     ),
     Case(
@@ -278,16 +289,22 @@ def fixture_document(
     date: str,
     behaviour: str,
     response,
+    body=None,
 ) -> dict:
-    """One fixture file. ``response`` is null when the call did not answer."""
+    """One fixture file. ``response`` is null when the call did not answer.
 
+    ``body`` is the request that was sent. The catalogue body is the default,
+    so a one-case re-record can store the window it actually used.
+    """
+
+    recorded = request_body(case, model) if body is None else body
     return {
         "ollama_version": version,
         "model": model,
         "digest": digest,
         "date": date,
         "case": case.name,
-        "request": {"method": case.method, "path": case.path, "body": request_body(case, model)},
+        "request": {"method": case.method, "path": case.path, "body": recorded},
         "behaviour": behaviour,
         "response": response,
     }

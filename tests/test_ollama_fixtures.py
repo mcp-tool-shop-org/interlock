@@ -16,10 +16,12 @@ from switchyard.adapters.ollama import COUNT_TIMEOUT_NOTE, OllamaAdapter
 from switchyard.adapters.ollama_cases import (
     CASES,
     MODEL,
+    NO_LIMIT_NOTE,
     RecordedNoReply,
     case_by_name,
     covered_parameters,
     fixture_document,
+    request_body,
     sent_parameters,
 )
 from switchyard.adapters.record_fixtures import (
@@ -124,6 +126,95 @@ def test_replay_of_each_recorded_fixture(tmp_path: Path):
                     assert body["shift"] is False
                 else:
                     replay(document)
+
+
+def test_the_catalogue_agrees_with_the_recorded_fixture():
+    assert FIXTURE_ROOT.is_dir()
+    version_dirs = [path for path in FIXTURE_ROOT.iterdir() if path.is_dir()]
+    assert version_dirs
+    for version_dir in version_dirs:
+        for case in CASES:
+            path = version_dir / f"{case.name}.json"
+            document = json.loads(path.read_text(encoding="utf-8"))
+            assert document["behaviour"] == case.behaviour, case.name
+            assert document["request"]["method"] == case.method, case.name
+            assert document["request"]["path"] == case.path, case.name
+            assert document["request"]["body"] == request_body(case, document["model"]), case.name
+    for name in ("num_predict_0", "num_predict_null", "num_predict_missing"):
+        case = case_by_name(name)
+        assert case.note == NO_LIMIT_NOTE
+        assert "11 prompt tokens and 144 eval tokens" in case.note
+        assert "num_ctx 64" in case.note
+        document = json.loads((FIXTURE_ROOT / "0.35.1" / f"{name}.json").read_text(encoding="utf-8"))
+        assert document["response"]["prompt_eval_count"] == 11
+        assert document["response"]["eval_count"] == 144
+        assert document["response"]["done_reason"] == "stop"
+        assert document["request"]["body"]["options"]["num_ctx"] == 64
+
+
+def test_only_records_truncate_at_the_override_window(tmp_path: Path):
+    import importlib.util
+
+    path = ROOT / "scripts" / "record_ollama_fixtures.py"
+    spec = importlib.util.spec_from_file_location("record_ollama_fixtures_only", path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    beat = _beat(tmp_path)
+    bodies = []
+
+    def transport(method, url, body, timeout):
+        bodies.append((method, url, body))
+        assert timeout == 15
+        if url.endswith("/api/ps"):
+            return {"models": []}
+        if url.endswith("/api/version"):
+            return {"version": "0.35.1"}
+        if url.endswith("/api/tags"):
+            return {"models": [{"name": "qwen3:8b", "digest": "sha256:abc", "size": 5}]}
+        return {"done": True, "done_reason": "length"}
+
+    code = module.main(
+        [
+            "--model", "qwen3:8b",
+            "--host", "http://127.0.0.1:11434",
+            "--timeout", "15",
+            "--out", str(tmp_path / "out"),
+            "--grant", "grant-t",
+            "--only", "truncate_over_num_ctx",
+            "--num-ctx", "2048",
+            "--prompt-repeats", "2500",
+        ],
+        transport=transport,
+        card_mib=lambda: 100,
+        today="2026-10-12",
+        heartbeat=beat,
+        now=time.time(),
+    )
+    assert code == 0
+    written = list((tmp_path / "out").rglob("*.json"))
+    assert [item.name for item in written] == ["truncate_over_num_ctx.json"]
+    document = json.loads(written[0].read_text(encoding="utf-8"))
+    assert document["request"]["body"]["options"]["num_ctx"] == 2048
+    assert document["request"]["body"]["prompt"] == "word " * 2500
+    assert document["request"]["body"]["truncate"] is False
+    assert document["behaviour"] == "reply"
+    assert any(isinstance(body, dict) and body.get("keep_alive") == 0 for _method, _url, body in bodies)
+    catalog = case_by_name("truncate_over_num_ctx")
+    assert catalog.behaviour == "reply"
+    assert catalog.body["options"]["num_ctx"] == 8
+    assert catalog.body["prompt"] == "word " * 64
+    called = []
+    refused = module.main(
+        ["--model", "qwen3:8b", "--grant", "grant-t", "--only", "not-a-case"],
+        transport=lambda *_args: called.append("called"),
+        card_mib=lambda: 100,
+        today="2026-10-12",
+        heartbeat=beat,
+        now=time.time(),
+    )
+    assert refused == 2
+    assert called == []
 
 
 def test_every_ollama_option_the_adapter_can_send_has_a_fixture():

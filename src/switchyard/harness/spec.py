@@ -284,7 +284,7 @@ def _fill_card(data: dict) -> None:
     if not isinstance(fraction, (int, float)) or isinstance(fraction, bool) or not 0 < float(fraction) < 1:
         raise SpecError("confirm_prompt_fraction must be between 0 and 1")
     if data.get("spill_shared_mib") != SHARED_GROWTH_MIB:
-        raise SpecError(f"spill_shared_mib is {SHARED_GROWTH_MIB} MiB over the post-load shared usage")
+        raise SpecError(f"spill_shared_mib is {SHARED_GROWTH_MIB} MiB over the pre-window shared baseline")
     if data.get("spill_prompt_ratio") != PROMPT_RATIO:
         raise SpecError(f"spill_prompt_ratio is {PROMPT_RATIO}")
     models = data.get("models")

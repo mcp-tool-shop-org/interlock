@@ -20,8 +20,8 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 14,
-      "changed": 30,
+      "added": 17,
+      "changed": 19,
       "moved": 0,
       "parts": 4,
       "removed": 0
@@ -29,36 +29,36 @@
     "items": [
       {
         "kind": "landing",
-        "sentence": "experiments/e5/spec.yaml is now read by tests/test_fill_card_live.py.",
+        "sentence": "tests/fixtures/ollama/ is now read by scripts/record_ollama_fixtures.py.",
         "subjects": [
-          "experiments/e5/spec.yaml",
-          "tests/test_fill_card_live.py"
-        ]
-      },
-      {
-        "kind": "unassigned",
-        "sentence": "scripts/record_ollama_fixtures.py is new and belongs to no part, so atlas check fails on it against the previous map.",
-        "subjects": [
+          "tests/fixtures/ollama/",
           "scripts/record_ollama_fixtures.py"
         ]
       },
       {
+        "kind": "unassigned",
+        "sentence": "receipts/e4-2026-10-12.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.",
+        "subjects": [
+          "receipts/e4-2026-10-12.jsonl"
+        ]
+      },
+      {
         "kind": "counts",
-        "sentence": "14 files added and 30 changed content, across 4 parts.",
+        "sentence": "17 files added and 19 changed content, across 4 parts.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "3de07c66264c122c6d20e181bcf2c62ba1e25d55",
-      "generatedAt": "2026-10-11T06:35:25.633Z"
+      "commit": "ca8b5f9dbd096bcbae9676d75005c3cc024bf83e",
+      "generatedAt": "2026-10-12T04:53:00.616Z"
     },
     "unchanged": false
   },
   "changesTogether": [
     {
-      "a": "src/switchyard/adapters/openvino.py",
-      "b": "tests/test_openvino_adapter.py",
-      "either": 19,
+      "a": "src/switchyard/harness/fill.py",
+      "b": "tests/test_fill_card_live.py",
+      "either": 5,
       "partLabels": [
         "src",
         "tests"
@@ -68,12 +68,27 @@
         "tests"
       ],
       "relation": "b-imports-a",
-      "shared": 15
+      "shared": 5
+    },
+    {
+      "a": "src/switchyard/adapters/openvino.py",
+      "b": "tests/test_openvino_adapter.py",
+      "either": 20,
+      "partLabels": [
+        "src",
+        "tests"
+      ],
+      "parts": [
+        "src",
+        "tests"
+      ],
+      "relation": "b-imports-a",
+      "shared": 16
     },
     {
       "a": "src/switchyard/harness/receipts.py",
       "b": "src/switchyard/receipt.py",
-      "either": 10,
+      "either": 11,
       "partLabels": [
         "src",
         "src"
@@ -86,9 +101,24 @@
       "shared": 7
     },
     {
-      "a": "src/switchyard/harness/runner.py",
-      "b": "tests/test_harness.py",
-      "either": 21,
+      "a": "src/switchyard/adapters/ollama.py",
+      "b": "src/switchyard/harness/fill.py",
+      "either": 7,
+      "partLabels": [
+        "src",
+        "src"
+      ],
+      "parts": [
+        "src",
+        "src"
+      ],
+      "relation": "inside",
+      "shared": 4
+    },
+    {
+      "a": "src/switchyard/adapters/ollama.py",
+      "b": "tests/test_fill_card_live.py",
+      "either": 7,
       "partLabels": [
         "src",
         "tests"
@@ -98,37 +128,7 @@
         "tests"
       ],
       "relation": "b-imports-a",
-      "shared": 12
-    },
-    {
-      "a": "src/switchyard/adapters/base.py",
-      "b": "src/switchyard/harness/receipts.py",
-      "either": 10,
-      "partLabels": [
-        "src",
-        "src"
-      ],
-      "parts": [
-        "src",
-        "src"
-      ],
-      "relation": "inside",
-      "shared": 5
-    },
-    {
-      "a": "src/switchyard/importers/gaps.py",
-      "b": "src/switchyard/receipt.py",
-      "either": 10,
-      "partLabels": [
-        "src",
-        "src"
-      ],
-      "parts": [
-        "src",
-        "src"
-      ],
-      "relation": "inside",
-      "shared": 5
+      "shared": 4
     }
   ],
   "changesTogetherNote": [
@@ -136,7 +136,7 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 6 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 0,
-  "commit": "ca8b5f9dbd096bcbae9676d75005c3cc024bf83e",
+  "commit": "b3c6b90c455225370660b99a6a815cfa89690fd0",
   "defaultBranch": "main",
   "derived": "7 parts, mostly Python (71 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.",
   "doors": [
@@ -209,13 +209,13 @@
   "edges": [],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-12T04:53:00.616Z",
+  "generatedAt": "2026-10-12T08:09:11.679Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
-    "3 writes and 3 reads use paths built at run time and are not named here.",
-    "5 writes and 21 reads go to a path their caller passes, not to this repository.",
+    "3 writes and 4 reads use paths built at run time and are not named here.",
+    "5 writes and 22 reads go to a path their caller passes, not to this repository.",
     "3 reads go to the directory the command is run in (receipts/), not to this repository.",
-    "18 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 15 more.",
+    "19 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 16 more.",
     "Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window."
   ],
   "mainDoor": ".github/workflows/ci.yml",
@@ -241,7 +241,7 @@
   "startReason": "This path follows switchyard (a command people run) from its entry, since CI runs only tests.",
   "summary": "switchyard routes each job to a model, engine and device from a receipt-backed table.",
   "summaryFrom": "person",
-  "testFiles": 27,
+  "testFiles": 43,
   "testedBy": {
     "src": 23
   },
