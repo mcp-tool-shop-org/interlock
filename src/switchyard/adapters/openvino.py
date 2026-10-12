@@ -196,6 +196,12 @@ def pool(matrix, mask, how: str) -> list[float]:
     Pure Python on purpose: the harness CI has no numpy, and the row count here
     is the sequence length, never large.
     """
+    if how == "none" and matrix and all(isinstance(x, (int, float)) and not isinstance(x, bool) for x in matrix):
+        # A sequence-classification graph (NLI, rerank) returns one flat logit
+        # row per batch item, already reduced by [0], not a row per position.
+        # E4's sixth live run failed here on the iGPU ('float' object is not
+        # iterable, 2026-10-12): the fakes returned per-position rows.
+        return [float(x) for x in matrix]
     rows = [[float(x) for x in row] for row in matrix]
     if not rows:
         raise AdapterError("the model returned no rows")
