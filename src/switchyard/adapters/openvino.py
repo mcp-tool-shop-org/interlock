@@ -44,8 +44,13 @@ msg`` with ``0x78000007``) is raised as :class:`CompileRejected` with the time
 to failure; any other compile error is left as it was.
 
 The NPU infers static shapes only, so a NPU step without ``static_shape``
-(``"BxL"``) is refused before any compile. AUTO, HETERO, Multi and GPU.1 are
-refused by devices.resolve_device. A ``compile_cache: fresh`` spec gets a
+(``"BxL"``) is refused before any compile. An embed, nli, or rerank step on
+the iGPU is refused the same way: a dynamic shape on the GPU plugin
+recompiles per length. The spec may opt in with ``dynamic_shape: true``, and
+that opt-in is recorded. Generate is not part of this refusal; it builds an
+LLMPipeline, a different compile than the graph that raises
+``rank().is_static()``. AUTO, HETERO, Multi and GPU.1 are refused by
+devices.resolve_device. A ``compile_cache: fresh`` spec gets a
 new driver cache directory from the harness; the first compile into it is
 B_fresh's numerator, and an immediate second compile into the same dir is
 recorded as ``resolved["compile_warm_reload_ms"]`` — the realistic reload
@@ -191,10 +196,14 @@ def pad_like(values: list[int], length: int, fill: int = 0) -> list[int]:
 
 
 def pool(matrix, mask, how: str) -> list[float]:
-    """how cls|mean over unmasked rows; 'none' enforces one logit row.
+    """how cls|mean over unmasked rows; 'none' takes one logit row.
 
     Pure Python on purpose: the harness CI has no numpy, and the row count here
     is the sequence length, never large.
+
+    ``none`` accepts a flat logit row, or a matrix of exactly one row. A
+    multi-row matrix is a per-position export, and taking row 0 would hide
+    that the graph was not a classifier. That is what hid the E4 iGPU failure.
     """
     if how == "none" and matrix and all(isinstance(x, (int, float)) and not isinstance(x, bool) for x in matrix):
         # A sequence-classification graph (NLI, rerank) returns one flat logit
@@ -205,7 +214,11 @@ def pool(matrix, mask, how: str) -> list[float]:
     rows = [[float(x) for x in row] for row in matrix]
     if not rows:
         raise AdapterError("the model returned no rows")
-    if how in ("cls", "none"):
+    if how == "none":
+        if len(rows) != 1:
+            raise AdapterError("pooling none expects one logit row, not a row per position")
+        return rows[0]
+    if how == "cls":
         return rows[0]
     if how == "last":  # Qwen3-Embedding's recipe: the last unmasked row
         keep = [i for i, m in enumerate(mask) if m]
@@ -221,6 +234,22 @@ def pool(matrix, mask, how: str) -> list[float]:
             for j, x in enumerate(row):
                 acc[j] += x
     return [x / total for x in acc]
+
+
+def first_batch(exported: list):
+    """Drop the batch axis of a real OpenVINO export.
+
+    A pooled embed is ``[batch, hidden]`` and becomes a vector. A token embed
+    is ``[batch, seq, hidden]`` and becomes a matrix. NLI and rerank are
+    ``[batch, labels]`` and become one flat logit row. A vector with no batch
+    axis is refused, so the first scalar is never treated as the output.
+    The fake seam does not come through here: it already returns the shape
+    after this reduction.
+    """
+
+    if isinstance(exported, list) and exported and isinstance(exported[0], list):
+        return exported[0]
+    raise AdapterError("the model output has no batch axis")
 
 
 def normalize(vec) -> list[float]:
@@ -437,10 +466,22 @@ class OpenvinoAdapter:
         tt_i = [int(t) for t in tt] if tt else [0] * len(ids_i)
         return ids_i, [int(m) for m in mask], tt_i
 
-    def _infer_embed(self, entry: dict, ids: list[int], mask: list[int], tt: list[int], batch_rows: int) -> list:
+    def _infer_embed(
+        self, entry: dict, ids: list[int], mask: list[int], tt: list[int], batch_rows: int, task: str = "embed"
+    ) -> list:
         model = entry["model"]
         if hasattr(model, "infer_lists"):  # fake seam; not part of OpenVINO's API
-            return model.infer_lists({"input_ids": ids, "attention_mask": mask, "token_type_ids": list(tt)}, batch_rows)
+            # The task selects the recorded output shape. Embed is position rows;
+            # nli and rerank are one flat label row.
+            return model.infer_lists(
+                {
+                    "input_ids": ids,
+                    "attention_mask": mask,
+                    "token_type_ids": list(tt),
+                    "task": task,
+                },
+                batch_rows,
+            )
         import numpy as np  # real inference implies the intel extra, which ships numpy
 
         arrays = {
@@ -454,7 +495,7 @@ class OpenvinoAdapter:
         if any(port.get_any_name() == "token_type_ids" for port in model.inputs):
             arrays["token_type_ids"] = np.asarray([tt] * batch_rows, dtype=np.int64)
         result = model(arrays)
-        return np.asarray(result[model.outputs[0]])[0].tolist()
+        return first_batch(np.asarray(result[model.outputs[0]]).tolist())
 
 
 def _default_tokenizer_loader(model: str, revision: str | None):
@@ -569,6 +610,16 @@ def _compile_config(s: _Settings) -> dict:
     return config
 
 
+# Shapes the fakes must return, after the batch axis is dropped. Taken from the
+# live exports: embed is one row per position, nli and rerank are one flat
+# label row. A per-position row for nli hid the E4 iGPU failure.
+RECORDED_OUTPUT = {
+    "embed": "positions",
+    "nli": "labels",
+    "rerank": "labels",
+}
+
+
 # Pooling belongs to the model, not the task. The recipes below are the ones
 # the npu-probe/npu-serve rows on rnd's npu-buildout were measured with
 # (bge-base a5beb1e, bge-small 5c38ec7, nomic e9b6763 — every arm still pins
@@ -593,6 +644,27 @@ def _pooling_for(task: str, repo: str) -> str:
     return recipe
 
 
+def _dynamic_opt_in(settings: _Settings) -> bool:
+    return settings.get("dynamic_shape") is True
+
+
+def _require_static_shape(ov_id: str, static: tuple[int, int] | None, settings: _Settings) -> None:
+    """Refuse a dynamic compile on the NPU, and on the iGPU unless the spec opts in.
+
+    Generate does not come through here. It builds an LLMPipeline, which is a
+    different compile than the graph reshape that raises rank().is_static().
+    """
+
+    if static is not None:
+        return
+    if ov_id == "NPU":
+        raise AdapterError("the NPU needs a static_shape BxL; dynamic shapes are not supported there")
+    if ov_id.upper().startswith("GPU."):
+        if _dynamic_opt_in(settings):
+            return
+        raise AdapterError("the iGPU needs a static_shape BxL; dynamic shapes are not supported there")
+
+
 def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> StepResult:
     ov_id = self._resolve_ov_id(request.device)
     if ov_id in self._lost_devices:
@@ -603,8 +675,9 @@ def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> Step
             f"{request.model} on {ov_id} hung earlier in this run; the device pair is poisoned for the run"
         )
     static = parse_static_shape(s.get("static_shape"))
-    if ov_id == "NPU" and static is None:
-        raise AdapterError("the NPU needs a static_shape BxL; dynamic shapes are not supported there")
+    _require_static_shape(ov_id, static, s)
+    if static is None and _dynamic_opt_in(s):
+        resolved["dynamic_shape"] = True
     repo, ref = parse_model_ref(request.model)
     pooling = _pooling_for(request.task, repo)  # refused before anything loads
     tokenizer = self._load_tokenizer(repo, ref)
@@ -638,7 +711,9 @@ def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> Step
     try:
         bound = _bound(self, s)
         status, matrix = _timed_call(
-            lambda: self._infer_embed(entry, ids, mask, tt, batch_rows if static is None else static[0]),
+            lambda: self._infer_embed(
+                entry, ids, mask, tt, batch_rows if static is None else static[0], request.task
+            ),
             bound,
         )
     except Exception as exc:
@@ -1127,8 +1202,7 @@ def _start_session(self, request: StepRequest) -> None:
             else:
                 repo, ref = parse_model_ref(request.model)
                 static = parse_static_shape(s.get("static_shape"))
-                if ov_id == "NPU" and static is None:
-                    raise AdapterError("the NPU needs a static_shape BxL; dynamic shapes are not supported there")
+                _require_static_shape(ov_id, static, s)
                 tokenizer = self._load_tokenizer(repo, ref)
                 ids, mask, tt = self._encode(tokenizer, str(s.get("prompt") or "hello"))
                 if static is not None:
@@ -1139,7 +1213,9 @@ def _start_session(self, request: StepRequest) -> None:
                 while not stop.is_set():
                     t0 = self.clock()
                     bound = _bound(self, s)
-                    status, _ = _timed_call(lambda: self._infer_embed(entry, ids, mask, tt, rows), bound)
+                    status, _ = _timed_call(
+                        lambda: self._infer_embed(entry, ids, mask, tt, rows, request.task), bound
+                    )
                     if status == "hang":
                         box["fault"] = AdapterError(f"hang: companion call exceeded {bound:g} s")
                         return

@@ -47,8 +47,13 @@ class FakeCompiled:
             raise OSError(self.msg)
         mask = inputs["attention_mask"]
         n = sum(mask)
-        # one row per position, like a real last_hidden_state — last-token pooling needs it
-        return [[float(n), 1.0, 2.0]] * max(len(mask), 1)
+        kind = ovm.RECORDED_OUTPUT[inputs.get("task") or "embed"]
+        row = [float(n), 1.0, 2.0]
+        if kind == "labels":
+            # nli and rerank: one flat logit row, the shape after the batch axis
+            return row
+        # embed: one row per position, like a real last_hidden_state
+        return [row] * max(len(mask), 1)
 
 
 class FakeGraph:
@@ -1156,8 +1161,156 @@ def test_prefix_caching_mode_keys_the_pipeline_cache(tmp_path):
 
 
 def test_pool_none_takes_a_flat_logit_row():
-    # A real cross-encoder returns [batch, labels]; _infer_embed's [0] leaves one flat row (E4, 2026-10-12).
+    # A real cross-encoder returns [batch, labels]; first_batch leaves one flat row (E4, 2026-10-12).
     assert ovm.pool([0.1, -1.5, 2.0], [1, 1, 1, 0], "none") == [0.1, -1.5, 2.0]
-    assert ovm.pool([[0.1, 0.2], [0.3, 0.4]], [1, 1], "none") == [0.1, 0.2]
+    assert ovm.pool([[0.1, 0.2]], [1], "none") == [0.1, 0.2]
+    with pytest.raises(AdapterError, match="one logit row"):
+        ovm.pool([[0.1, 0.2], [0.3, 0.4]], [1, 1], "none")
     with pytest.raises(TypeError):
         ovm.pool([0.1, 0.2], [1, 1], "mean")
+
+
+def test_first_batch_drops_the_batch_axis_of_pooled_and_token_exports():
+    assert ovm.first_batch([[0.1, 0.2, 0.3]]) == [0.1, 0.2, 0.3]
+    assert ovm.first_batch([[[1.0, 2.0], [3.0, 4.0]]]) == [[1.0, 2.0], [3.0, 4.0]]
+    assert ovm.first_batch([[0.1, -1.5, 2.0]]) == [0.1, -1.5, 2.0]
+    with pytest.raises(AdapterError, match="no batch axis"):
+        ovm.first_batch([0.1, 0.2, 0.3])
+
+
+@pytest.mark.parametrize("device", ["iGPU", "GPU.0"])
+@pytest.mark.parametrize("task", ["embed", "nli"])
+def test_an_igpu_step_without_a_shape_refuses_before_compile(tmp_path, monkeypatch, device, task):
+    a = make_adapter()
+    m = local_model(tmp_path)
+    monkeypatch.setitem(ovm._POOLING, m, "cls")
+    with pytest.raises(AdapterError, match="the iGPU needs a static_shape"):
+        a.run(req(task=task, model=m, device=device))
+    assert a._injected_core.compiled == []
+    with pytest.raises(AdapterError, match="the iGPU needs a static_shape"):
+        a.start_session(req(task=task, model=m, device=device))
+    assert a._injected_core.compiled == []
+
+
+def test_igpu_dynamic_shape_opt_in_compiles_and_is_recorded(tmp_path, monkeypatch):
+    a = make_adapter()
+    m = local_model(tmp_path)
+    monkeypatch.setitem(ovm._POOLING, m, "cls")
+    refused = make_adapter()
+    with pytest.raises(AdapterError, match="the iGPU needs a static_shape"):
+        refused.run(req(model=m, device="iGPU", dynamic_shape=False))
+    assert refused._injected_core.compiled == []
+    r = a.run(req(model=m, device="iGPU", dynamic_shape=True))
+    assert r.ok and r.resolved["dynamic_shape"] is True
+    assert a._injected_core.compiled
+    npu = make_adapter()
+    with pytest.raises(AdapterError, match="the NPU needs a static_shape"):
+        npu.run(req(model=m, device="NPU", dynamic_shape=True))
+    assert npu._injected_core.compiled == []
+    kept = npu.run(req(model=m, device="NPU", static_shape="1x16"))
+    assert kept.ok and "dynamic_shape" not in kept.resolved
+
+
+def test_dynamic_shape_is_recorded_on_the_row():
+    from switchyard.harness.receipts import measured_row
+    from switchyard.harness.timing import Summary
+
+    arm = {
+        "id": "igpu",
+        "task": "embed",
+        "model": "acme/embed",
+        "revision_or_digest": "unrecorded",
+        "licence": "unrecorded",
+        "engine": "openvino",
+        "device": "iGPU",
+        "dynamic_shape": True,
+        "static_shape": None,
+        "thinking_level": None,
+        "num_predict": None,
+        "num_ctx": None,
+        "batch": 1,
+        "precision": None,
+    }
+    summary = Summary(None, None, None, None, None)
+    recorded = measured_row(
+        spec_id="T",
+        arm=arm,
+        summary=summary,
+        repeats=1,
+        date="2026-10-12",
+        spec_rel="experiments/e4/spec.yaml",
+        run_id="run-1",
+        grant=None,
+        env={"openvino": "2026.4.1"},
+        notes="dynamic iGPU shape opted in",
+        resolved={"quant": "fp16"},
+    )
+    assert recorded["settings"]["dynamic_shape"] is True
+    learned_only = dict(arm)
+    learned_only.pop("dynamic_shape")
+    via_step = measured_row(
+        spec_id="T",
+        arm=learned_only,
+        summary=summary,
+        repeats=1,
+        date="2026-10-12",
+        spec_rel="experiments/e4/spec.yaml",
+        run_id="run-1",
+        grant=None,
+        env={"openvino": "2026.4.1"},
+        notes="recorded from the step",
+        resolved={"quant": "fp16", "dynamic_shape": True},
+    )
+    assert via_step["settings"]["dynamic_shape"] is True
+    plain = dict(arm)
+    plain["dynamic_shape"] = False
+    absent = measured_row(
+        spec_id="T",
+        arm=plain,
+        summary=summary,
+        repeats=1,
+        date="2026-10-12",
+        spec_rel="experiments/e4/spec.yaml",
+        run_id="run-1",
+        grant=None,
+        env={"openvino": "2026.4.1"},
+        notes="",
+        resolved={"quant": "fp16"},
+    )
+    assert "dynamic_shape" not in absent["settings"]
+
+
+@pytest.mark.parametrize(
+    "case",
+    ["flat", "nli", "rerank", "multi_row", "embed"],
+    ids=["1", "2", "3", "4", "5"],
+)
+def test_fake_hides_platform(case, tmp_path, monkeypatch):
+    """Instance 4 is the multi-row matrix that used to be taken as row 0.
+
+    That silent row hid the E4 iGPU failure: the fakes never returned the
+    flat label row a real nli or rerank export has.
+    """
+
+    if case == "flat":
+        assert ovm.pool([0.2, 0.8], [1], "none") == [0.2, 0.8]
+        return
+    if case == "multi_row":
+        with pytest.raises(AdapterError, match="one logit row"):
+            ovm.pool([[0.1, 0.2], [0.3, 0.4]], [1, 1], "none")
+        return
+    if case == "embed":
+        mask = [1, 1, 0]
+        out = FakeCompiled().infer_lists({"attention_mask": mask, "task": "embed"}, 1)
+        assert out == [[2.0, 1.0, 2.0]] * len(mask)
+        assert ovm.RECORDED_OUTPUT["embed"] == "positions"
+        return
+    assert ovm.RECORDED_OUTPUT[case] == "labels"
+    flat = FakeCompiled().infer_lists({"attention_mask": [1, 1, 0], "task": case}, 1)
+    assert flat == [2.0, 1.0, 2.0]
+    assert isinstance(flat[0], float)
+    a = make_adapter()
+    m = local_model(tmp_path)
+    r = a.run(req(task=case, model=m, device="CPU", static_shape="1x16", batch=1))
+    assert r.ok and r.resolved["pooling"] == "none"
+    assert len(r.output) == 3
