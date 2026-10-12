@@ -54,6 +54,7 @@ from switchyard.harness.e4b import (
     round_up_mhz,
     run_block,
     run_burn,
+    run_from_cli,
     run_pilot,
     sample_gpu,
     schedule_e4b,
@@ -1918,3 +1919,123 @@ def test_any_other_500_stays_fatal(tmp_path: Path, monkeypatch):
     with pytest.raises(RuntimeError, match="model runner crashed"):
         run_pilot(_spec([PAIRS[0]]), _seams(_Server(), call), root=tmp_path, run_id="other-500", repo=tmp_path, calls=1)
     assert not (tmp_path / "pilot-e4b" / "other-500.json").exists()
+
+
+def _writes_during_the_call(root: Path, calls: dict):
+    def call(arm, *, num_predict, measured, kind, prompt):
+        calls["n"] += 1
+        (root / "pilot-e4b").mkdir(parents=True, exist_ok=True)
+        (root / "pilot-e4b" / "during.json").write_text("{}\n", encoding="utf-8")
+        (root / "logs").mkdir(parents=True, exist_ok=True)
+        (root / "logs" / "during.log").write_text("log\n", encoding="utf-8")
+        return _clean(arm, num_predict=num_predict, kind=kind)
+
+    return call
+
+
+def _git_clean_once_then_dirty(root: Path, calls: dict):
+    """A second read would see the run's own output and report a dirty tree."""
+
+    seen = []
+
+    def git(repo):
+        seen.append(
+            {
+                "calls": calls["n"],
+                "pilot": (root / "pilot-e4b").exists(),
+                "logs": (root / "logs").exists(),
+                "cache": (root / "compile-cache").exists(),
+            }
+        )
+        return {"git_sha": "abc123", "clean_tree": len(seen) == 1}
+
+    return git, seen
+
+
+def test_a_run_that_writes_output_keeps_the_clean_tree_from_the_start(tmp_path: Path):
+    ignored = {line.strip() for line in (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()}
+    assert "pilot-e4b/" in ignored
+    assert "logs/" in ignored
+    assert "receipts/" not in ignored
+    assert "receipts/*.jsonl" not in ignored
+
+    spec = _spec([PAIRS[0]])
+    for kind in ("pilot", "block"):
+        root = tmp_path / kind
+        root.mkdir()
+        calls = {"n": 0}
+        git, seen = _git_clean_once_then_dirty(root, calls)
+        seams = _seams(_Server(), _writes_during_the_call(root, calls))
+        seams.git = git
+        if kind == "pilot":
+            document = run_pilot(spec, seams, root=root, run_id="kept-clean", repo=root, calls=1)
+            written = json.loads((root / "pilot-e4b" / "kept-clean.json").read_text(encoding="utf-8"))
+            assert document["clean_tree"] is True
+            assert written["clean_tree"] is True
+            assert written["git_sha"] == "abc123"
+        else:
+            run_block(spec, seams, root=root, run_id="kept-clean", repo=root)
+            header = _rows(root / "receipts" / "kept-clean.jsonl")[0]
+            assert header["clean_tree"] is True
+            assert header["git_sha"] == "abc123"
+        assert seen == [{"calls": 0, "pilot": False, "logs": False, "cache": False}]
+        assert (root / "pilot-e4b" / "during.json").is_file()
+        assert (root / "logs" / "during.log").is_file()
+
+
+def test_the_cli_reads_git_once_before_the_first_device_call(tmp_path: Path):
+    def once(root: Path, *, pilot: bool):
+        calls = {"n": 0}
+        git, seen = _git_clean_once_then_dirty(root, calls)
+        seams = _seams(_Server(), _writes_during_the_call(root, calls))
+        seams.git = git
+        spec = load_spec(E4B) if pilot else _spec([PAIRS[0]])
+        result = run_from_cli(
+            spec,
+            spec_path=E4B,
+            root=root,
+            repo=ROOT,
+            grant="grant",
+            npu_session=None if pilot else "session",
+            run_id="cli-once",
+            pilot=pilot,
+            seams=seams,
+        )
+        assert seen == [{"calls": 0, "pilot": False, "logs": False, "cache": False}]
+        if pilot:
+            assert result["clean_tree"] is True
+            assert result["git_sha"] == "abc123"
+            written = json.loads((root / "pilot-e4b" / "cli-once.json").read_text(encoding="utf-8"))
+            assert written["clean_tree"] is True
+        else:
+            header = _rows(root / "receipts" / "cli-once.jsonl")[0]
+            assert header["clean_tree"] is True
+            assert header["git_sha"] == "abc123"
+
+    once(tmp_path / "pilot", pilot=True)
+    once(tmp_path / "block", pilot=False)
+
+
+def test_a_dirty_tree_at_the_start_is_recorded_false(tmp_path: Path):
+    def git(repo):
+        return {"git_sha": "abc123", "clean_tree": False}
+
+    spec = _spec([PAIRS[0]])
+    pilot_root = tmp_path / "pilot"
+    pilot_root.mkdir()
+    seams = _seams(_Server(), lambda arm, **kwargs: _clean(arm, num_predict=kwargs["num_predict"], kind=kwargs["kind"]))
+    seams.git = git
+    document = run_pilot(spec, seams, root=pilot_root, run_id="dirty-start", repo=pilot_root, calls=1)
+    assert document["clean_tree"] is False
+    assert document["git_sha"] == "abc123"
+    written = json.loads((pilot_root / "pilot-e4b" / "dirty-start.json").read_text(encoding="utf-8"))
+    assert written["clean_tree"] is False
+
+    block_root = tmp_path / "block"
+    block_root.mkdir()
+    block = _seams(_Server(), lambda arm, **kwargs: _clean(arm, num_predict=kwargs["num_predict"], kind=kwargs["kind"]))
+    block.git = git
+    run_block(spec, block, root=block_root, run_id="dirty-start", repo=block_root)
+    header = _rows(block_root / "receipts" / "dirty-start.jsonl")[0]
+    assert header["clean_tree"] is False
+    assert header["git_sha"] == "abc123"

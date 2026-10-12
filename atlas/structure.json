@@ -209,7 +209,7 @@
           "path": ".gitattributes"
         },
         {
-          "hash": "ea647a16f52a0f57e3b6af54756fbd7df3980841c954264969a82b85c6c213e5",
+          "hash": "8cd13c5d921e69478648cabef33530a9c2634fe0e40faf4ef4be86767e71a33b",
           "path": ".gitignore"
         },
         {
@@ -217,7 +217,7 @@
           "path": ".python-version"
         },
         {
-          "hash": "acc6be5db48895290457d6ac3ca5972dcf07a92e7990a22011bcaab08c771e87",
+          "hash": "ccd873edc337c2a5c78858acd3e3d470f3a9430f2b99a10f837fbc395a2a1a63",
           "path": "CHANGELOG.md"
         },
         {
@@ -274,6 +274,12 @@
           "path": "src/switchyard/__init__.py"
         },
         {
+          "failurePaths": [
+            {
+              "kind": "raise",
+              "line": 4
+            }
+          ],
           "hash": "3947af17c7d14a3307f8348d18370a184726107a84fb4cce16d3c65e4e0ac4fd",
           "importsFiles": [
             "src/switchyard/cli.py"
@@ -297,6 +303,58 @@
             "plan_argv",
             "scratch_project"
           ],
+          "failurePaths": [
+            {
+              "in": "scratch_project",
+              "kind": "raise",
+              "line": 22
+            },
+            {
+              "in": "scratch_project",
+              "kind": "raise",
+              "line": 25
+            },
+            {
+              "in": "plan_argv",
+              "kind": "raise",
+              "line": 34
+            },
+            {
+              "in": "plan_argv",
+              "kind": "raise",
+              "line": 37
+            },
+            {
+              "in": "plan_argv",
+              "kind": "raise",
+              "line": 40
+            },
+            {
+              "in": "plan_argv",
+              "kind": "raise",
+              "line": 42
+            },
+            {
+              "in": "plan_argv",
+              "kind": "raise",
+              "line": 45
+            },
+            {
+              "in": "plan_argv",
+              "kind": "raise",
+              "line": 48
+            },
+            {
+              "in": "plan_argv",
+              "kind": "raise",
+              "line": 51
+            },
+            {
+              "in": "run",
+              "kind": "raise",
+              "line": 84
+            }
+          ],
           "hash": "677913f9e8ea5f17aa39a513fe4312aa19a587595740d0fd175c8abf5a750075",
           "importsFiles": [
             "src/switchyard/adapters/base.py"
@@ -313,6 +371,183 @@
             "think_value",
             "url_for"
           ],
+          "failurePaths": [
+            {
+              "in": "url_for",
+              "kind": "raise",
+              "line": 49
+            },
+            {
+              "in": "refuse_cloud",
+              "kind": "raise",
+              "line": 55
+            },
+            {
+              "in": "_require_num_predict",
+              "kind": "raise",
+              "line": 87
+            },
+            {
+              "in": "context_length",
+              "kind": "raise",
+              "line": 124
+            },
+            {
+              "in": "context_length",
+              "kind": "raise",
+              "line": 131
+            },
+            {
+              "in": "cancel",
+              "kind": "except",
+              "line": 181
+            },
+            {
+              "in": "_shutdown",
+              "kind": "except",
+              "line": 192
+            },
+            {
+              "in": "_shutdown",
+              "kind": "except",
+              "line": 196
+            },
+            {
+              "in": "_shutdown",
+              "kind": "except",
+              "line": 200
+            },
+            {
+              "in": "default_transport",
+              "kind": "raise",
+              "line": 222
+            },
+            {
+              "in": "default_transport",
+              "kind": "except",
+              "line": 238
+            },
+            {
+              "in": "default_transport",
+              "kind": "raise",
+              "line": 239
+            },
+            {
+              "in": "default_transport",
+              "kind": "except",
+              "line": 240
+            },
+            {
+              "in": "default_transport",
+              "kind": "raise",
+              "line": 241
+            },
+            {
+              "in": "default_transport",
+              "kind": "except",
+              "line": 247
+            },
+            {
+              "in": "_wait_for_reply",
+              "kind": "raise",
+              "line": 258
+            },
+            {
+              "in": "_wait_for_reply",
+              "kind": "raise",
+              "line": 260
+            },
+            {
+              "in": "_wait_for_reply",
+              "kind": "raise",
+              "line": 263
+            },
+            {
+              "in": "_wait_for_reply",
+              "kind": "except",
+              "line": 269
+            },
+            {
+              "in": "_wait_for_reply",
+              "kind": "raise",
+              "line": 270
+            },
+            {
+              "in": "count_tokens",
+              "kind": "raise",
+              "line": 359
+            },
+            {
+              "in": "_count_payload",
+              "kind": "raise",
+              "line": 365
+            },
+            {
+              "in": "_count_payload",
+              "kind": "raise",
+              "line": 368
+            },
+            {
+              "in": "invoke",
+              "kind": "except",
+              "line": 381
+            },
+            {
+              "in": "_count_exchange",
+              "kind": "raise",
+              "line": 389
+            },
+            {
+              "in": "_count_exchange",
+              "kind": "raise",
+              "line": 393
+            },
+            {
+              "in": "_count_exchange",
+              "kind": "raise",
+              "line": 394
+            },
+            {
+              "in": "_count_exchange",
+              "kind": "raise",
+              "line": 396
+            },
+            {
+              "in": "show",
+              "kind": "raise",
+              "line": 432
+            },
+            {
+              "in": "show",
+              "kind": "raise",
+              "line": 434
+            },
+            {
+              "in": "unload",
+              "kind": "raise",
+              "line": 497
+            },
+            {
+              "in": "invoke",
+              "kind": "except",
+              "line": 509
+            },
+            {
+              "in": "unload",
+              "kind": "raise",
+              "line": 518
+            },
+            {
+              "in": "unload",
+              "kind": "raise",
+              "line": 523
+            },
+            {
+              "in": "unload",
+              "kind": "raise",
+              "line": 524
+            }
+          ],
           "hash": "b3d0bca78759cfb2af88c51015081dd8656a08f5d9b2cc430af193d58dc78a51",
           "importsFiles": [
             "src/switchyard/adapters/base.py"
@@ -328,6 +563,48 @@
             "request_path",
             "require_recorded_behaviour",
             "sent_parameters"
+          ],
+          "failurePaths": [
+            {
+              "in": "_no_reply",
+              "kind": "raise",
+              "line": 226
+            },
+            {
+              "in": "require_recorded_behaviour",
+              "kind": "raise",
+              "line": 239
+            },
+            {
+              "in": "require_recorded_behaviour",
+              "kind": "raise",
+              "line": 242
+            },
+            {
+              "in": "require_recorded_behaviour",
+              "kind": "raise",
+              "line": 244
+            },
+            {
+              "in": "require_recorded_behaviour",
+              "kind": "raise",
+              "line": 247
+            },
+            {
+              "in": "require_recorded_behaviour",
+              "kind": "raise",
+              "line": 256
+            },
+            {
+              "in": "require_recorded_behaviour",
+              "kind": "raise",
+              "line": 266
+            },
+            {
+              "in": "require_recorded_behaviour",
+              "kind": "raise",
+              "line": 269
+            }
           ],
           "hash": "97e5519f2c4ad576006949e28389ea49b1c87687fc549247a46593a228951f2d",
           "importsFiles": [
@@ -347,6 +624,427 @@
             "parse_static_shape",
             "pool",
             "quant_of"
+          ],
+          "failurePaths": [
+            {
+              "kind": "except",
+              "line": 99
+            },
+            {
+              "in": "_need_openvino",
+              "kind": "raise",
+              "line": 138
+            },
+            {
+              "in": "parse_static_shape",
+              "kind": "raise",
+              "line": 159
+            },
+            {
+              "in": "parse_static_shape",
+              "kind": "except",
+              "line": 162
+            },
+            {
+              "in": "parse_static_shape",
+              "kind": "raise",
+              "line": 163
+            },
+            {
+              "in": "parse_static_shape",
+              "kind": "raise",
+              "line": 165
+            },
+            {
+              "in": "pad_truncate",
+              "kind": "raise",
+              "line": 182
+            },
+            {
+              "in": "pool",
+              "kind": "raise",
+              "line": 216
+            },
+            {
+              "in": "pool",
+              "kind": "raise",
+              "line": 219
+            },
+            {
+              "in": "pool",
+              "kind": "raise",
+              "line": 226
+            },
+            {
+              "in": "pool",
+              "kind": "raise",
+              "line": 230
+            },
+            {
+              "in": "first_batch",
+              "kind": "raise",
+              "line": 252
+            },
+            {
+              "in": "enumerate_devices",
+              "kind": "except",
+              "line": 346
+            },
+            {
+              "in": "_resolve_ov_id",
+              "kind": "except",
+              "line": 362
+            },
+            {
+              "in": "_resolve_ov_id",
+              "kind": "raise",
+              "line": 363
+            },
+            {
+              "in": "_model_path",
+              "kind": "raise",
+              "line": 392
+            },
+            {
+              "in": "_model_path",
+              "kind": "except",
+              "line": 395
+            },
+            {
+              "in": "_model_path",
+              "kind": "raise",
+              "line": 396
+            },
+            {
+              "in": "_model_path",
+              "kind": "except",
+              "line": 401
+            },
+            {
+              "in": "_model_path",
+              "kind": "except",
+              "line": 409
+            },
+            {
+              "in": "_model_path",
+              "kind": "raise",
+              "line": 410
+            },
+            {
+              "in": "_model_path",
+              "kind": "raise",
+              "line": 412
+            },
+            {
+              "in": "_load_compiled",
+              "kind": "except",
+              "line": 423
+            },
+            {
+              "in": "_load_compiled",
+              "kind": "raise",
+              "line": 424
+            },
+            {
+              "in": "_default_tokenizer_loader",
+              "kind": "except",
+              "line": 504
+            },
+            {
+              "in": "_default_tokenizer_loader",
+              "kind": "raise",
+              "line": 505
+            },
+            {
+              "in": "_directory_tokenizer_loader",
+              "kind": "except",
+              "line": 515
+            },
+            {
+              "in": "_directory_tokenizer_loader",
+              "kind": "raise",
+              "line": 516
+            },
+            {
+              "in": "_directory_tokenizer_loader",
+              "kind": "except",
+              "line": 519
+            },
+            {
+              "in": "_directory_tokenizer_loader",
+              "kind": "raise",
+              "line": 520
+            },
+            {
+              "in": "work",
+              "kind": "except",
+              "line": 587
+            },
+            {
+              "in": "_timed_call",
+              "kind": "raise",
+              "line": 596
+            },
+            {
+              "in": "_pooling_for",
+              "kind": "raise",
+              "line": 640
+            },
+            {
+              "in": "_require_static_shape",
+              "kind": "raise",
+              "line": 661
+            },
+            {
+              "in": "_require_static_shape",
+              "kind": "raise",
+              "line": 665
+            },
+            {
+              "in": "_run_embed",
+              "kind": "raise",
+              "line": 674
+            },
+            {
+              "in": "_run_embed",
+              "kind": "except",
+              "line": 699
+            },
+            {
+              "in": "_run_embed",
+              "kind": "raise",
+              "line": 700
+            },
+            {
+              "in": "_run_embed",
+              "kind": "except",
+              "line": 701
+            },
+            {
+              "in": "_run_embed",
+              "kind": "raise",
+              "line": 707
+            },
+            {
+              "in": "_run_embed",
+              "kind": "raise",
+              "line": 708
+            },
+            {
+              "in": "_run_embed",
+              "kind": "except",
+              "line": 719
+            },
+            {
+              "in": "_run_embed",
+              "kind": "raise",
+              "line": 726
+            },
+            {
+              "in": "_run_embed",
+              "kind": "raise",
+              "line": 729
+            },
+            {
+              "in": "_run_generate",
+              "kind": "raise",
+              "line": 788
+            },
+            {
+              "in": "_run_generate",
+              "kind": "except",
+              "line": 815
+            },
+            {
+              "in": "_run_generate",
+              "kind": "raise",
+              "line": 816
+            },
+            {
+              "in": "_run_generate",
+              "kind": "except",
+              "line": 817
+            },
+            {
+              "in": "_run_generate",
+              "kind": "raise",
+              "line": 823
+            },
+            {
+              "in": "_run_generate",
+              "kind": "raise",
+              "line": 829
+            },
+            {
+              "in": "_run_generate",
+              "kind": "except",
+              "line": 841
+            },
+            {
+              "in": "_run_generate",
+              "kind": "raise",
+              "line": 848
+            },
+            {
+              "in": "_run_generate",
+              "kind": "raise",
+              "line": 849
+            },
+            {
+              "in": "_run_generate",
+              "kind": "except",
+              "line": 872
+            },
+            {
+              "in": "_run_generate",
+              "kind": "except",
+              "line": 881
+            },
+            {
+              "in": "_real_genai_module",
+              "kind": "except",
+              "line": 906
+            },
+            {
+              "in": "_real_genai_module",
+              "kind": "raise",
+              "line": 907
+            },
+            {
+              "in": "_prepare_dir",
+              "kind": "raise",
+              "line": 942
+            },
+            {
+              "in": "_prepare_dir",
+              "kind": "except",
+              "line": 945
+            },
+            {
+              "in": "_prepare_dir",
+              "kind": "raise",
+              "line": 946
+            },
+            {
+              "in": "_prepare_dir",
+              "kind": "except",
+              "line": 955
+            },
+            {
+              "in": "_prepare_dir",
+              "kind": "raise",
+              "line": 956
+            },
+            {
+              "in": "_prepare_dir",
+              "kind": "except",
+              "line": 957
+            },
+            {
+              "in": "_prepare_dir",
+              "kind": "raise",
+              "line": 958
+            },
+            {
+              "in": "_cold_copy",
+              "kind": "except",
+              "line": 974
+            },
+            {
+              "in": "_cold_copy",
+              "kind": "raise",
+              "line": 976
+            },
+            {
+              "in": "_model_dir",
+              "kind": "except",
+              "line": 1006
+            },
+            {
+              "in": "_model_dir",
+              "kind": "raise",
+              "line": 1007
+            },
+            {
+              "in": "_model_dir",
+              "kind": "except",
+              "line": 1010
+            },
+            {
+              "in": "_model_dir",
+              "kind": "raise",
+              "line": 1011
+            },
+            {
+              "in": "_pipeline",
+              "kind": "raise",
+              "line": 1089
+            },
+            {
+              "in": "_run",
+              "kind": "raise",
+              "line": 1116
+            },
+            {
+              "in": "_run",
+              "kind": "raise",
+              "line": 1124
+            },
+            {
+              "in": "_run",
+              "kind": "except",
+              "line": 1127
+            },
+            {
+              "in": "_run",
+              "kind": "raise",
+              "line": 1128
+            },
+            {
+              "in": "_run",
+              "kind": "except",
+              "line": 1129
+            },
+            {
+              "in": "_start_session",
+              "kind": "raise",
+              "line": 1165
+            },
+            {
+              "in": "loop",
+              "kind": "except",
+              "line": 1228
+            },
+            {
+              "in": "_start_session",
+              "kind": "raise",
+              "line": 1243
+            },
+            {
+              "in": "_start_session",
+              "kind": "raise",
+              "line": 1244
+            },
+            {
+              "in": "_stop_session",
+              "kind": "raise",
+              "line": 1253
+            },
+            {
+              "in": "_stop_session",
+              "kind": "raise",
+              "line": 1263
+            },
+            {
+              "in": "_stop_session",
+              "kind": "raise",
+              "line": 1265
+            },
+            {
+              "in": "_guarded_unload",
+              "kind": "raise",
+              "line": 1270
+            }
           ],
           "hash": "218e9f47e164cbc2a9506fee291dbcbb3499f4f19f273392da8e11c40426091b",
           "importOrder": [
@@ -371,6 +1069,153 @@
             "refuse_model",
             "refuse_unless_baseline"
           ],
+          "failurePaths": [
+            {
+              "in": "refuse_model",
+              "kind": "except",
+              "line": 90
+            },
+            {
+              "in": "refuse_model",
+              "kind": "raise",
+              "line": 91
+            },
+            {
+              "in": "refuse_unless_baseline",
+              "kind": "raise",
+              "line": 98
+            },
+            {
+              "in": "refuse_unless_baseline",
+              "kind": "raise",
+              "line": 100
+            },
+            {
+              "in": "refuse_unless_baseline",
+              "kind": "raise",
+              "line": 102
+            },
+            {
+              "in": "read_card_mib",
+              "kind": "except",
+              "line": 113
+            },
+            {
+              "in": "http_exchange",
+              "kind": "raise",
+              "line": 123
+            },
+            {
+              "in": "http_exchange",
+              "kind": "except",
+              "line": 132
+            },
+            {
+              "in": "http_exchange",
+              "kind": "except",
+              "line": 134
+            },
+            {
+              "in": "http_exchange",
+              "kind": "raise",
+              "line": 135
+            },
+            {
+              "in": "http_exchange",
+              "kind": "except",
+              "line": 139
+            },
+            {
+              "in": "http_exchange",
+              "kind": "raise",
+              "line": 142
+            },
+            {
+              "in": "_guards",
+              "kind": "except",
+              "line": 173
+            },
+            {
+              "in": "_guards",
+              "kind": "raise",
+              "line": 174
+            },
+            {
+              "in": "_require_empty",
+              "kind": "except",
+              "line": 181
+            },
+            {
+              "in": "_require_empty",
+              "kind": "raise",
+              "line": 182
+            },
+            {
+              "in": "record_fixtures",
+              "kind": "raise",
+              "line": 215
+            },
+            {
+              "in": "record_fixtures",
+              "kind": "raise",
+              "line": 232
+            },
+            {
+              "in": "_exchange_body",
+              "kind": "raise",
+              "line": 246
+            },
+            {
+              "in": "_exchange_body",
+              "kind": "raise",
+              "line": 250
+            },
+            {
+              "in": "send_unload",
+              "kind": "raise",
+              "line": 295
+            },
+            {
+              "in": "release",
+              "kind": "except",
+              "line": 335
+            },
+            {
+              "in": "record_fixtures",
+              "kind": "raise",
+              "line": 370
+            },
+            {
+              "in": "record_fixtures",
+              "kind": "except",
+              "line": 372
+            },
+            {
+              "in": "record_fixtures",
+              "kind": "raise",
+              "line": 374
+            },
+            {
+              "in": "case_named",
+              "kind": "raise",
+              "line": 381
+            },
+            {
+              "in": "_digest",
+              "kind": "raise",
+              "line": 390
+            },
+            {
+              "in": "_digest",
+              "kind": "raise",
+              "line": 400
+            },
+            {
+              "in": "_digest",
+              "kind": "raise",
+              "line": 401
+            }
+          ],
           "hash": "47c2e9fce53fc4a5c23c60c8c4ad0cd27dfa5cbc8227c387488888ebca561067",
           "importsFiles": [
             "src/switchyard/adapters/base.py",
@@ -384,6 +1229,28 @@
         {
           "exports": [
             "for_engine"
+          ],
+          "failurePaths": [
+            {
+              "in": "for_engine",
+              "kind": "raise",
+              "line": 23
+            },
+            {
+              "in": "_openvino",
+              "kind": "except",
+              "line": 29
+            },
+            {
+              "in": "_openvino",
+              "kind": "raise",
+              "line": 30
+            },
+            {
+              "in": "_openvino",
+              "kind": "raise",
+              "line": 36
+            }
           ],
           "hash": "aab3181298280a20fd46450bddeb18b2d4e565e1539edb82022545bed94f8e60",
           "importsFiles": [
@@ -401,6 +1268,38 @@
             "announce_run",
             "main",
             "run_report"
+          ],
+          "failurePaths": [
+            {
+              "in": "main",
+              "kind": "except",
+              "line": 51
+            },
+            {
+              "in": "_take_min_metrics",
+              "kind": "raise",
+              "line": 142
+            },
+            {
+              "in": "_take_min_metrics",
+              "kind": "except",
+              "line": 146
+            },
+            {
+              "in": "_take_min_metrics",
+              "kind": "raise",
+              "line": 147
+            },
+            {
+              "in": "_cmd_run",
+              "kind": "except",
+              "line": 275
+            },
+            {
+              "in": "_cmd_route",
+              "kind": "except",
+              "line": 308
+            }
           ],
           "hash": "6b78395af2900d5bb4769eeecd0d2260a403ba9640380738457275e653b69ff2",
           "importOrder": [
@@ -654,6 +1553,83 @@
           "exports": [
             "resolve_device"
           ],
+          "failurePaths": [
+            {
+              "in": "_as_text",
+              "kind": "raise",
+              "line": 58
+            },
+            {
+              "in": "resolve_device",
+              "kind": "raise",
+              "line": 78
+            },
+            {
+              "in": "resolve_device",
+              "kind": "raise",
+              "line": 80
+            },
+            {
+              "in": "resolve_device",
+              "kind": "raise",
+              "line": 90
+            },
+            {
+              "in": "_optional",
+              "kind": "raise",
+              "line": 101
+            },
+            {
+              "in": "_catalog",
+              "kind": "raise",
+              "line": 110
+            },
+            {
+              "in": "_catalog",
+              "kind": "raise",
+              "line": 120
+            },
+            {
+              "in": "_require_id",
+              "kind": "raise",
+              "line": 128
+            },
+            {
+              "in": "_resolve_gpu_id",
+              "kind": "raise",
+              "line": 141
+            },
+            {
+              "in": "_resolve_gpu_id",
+              "kind": "raise",
+              "line": 143
+            },
+            {
+              "in": "_resolve_gpu_id",
+              "kind": "raise",
+              "line": 150
+            },
+            {
+              "in": "_intel_igpu",
+              "kind": "raise",
+              "line": 166
+            },
+            {
+              "in": "_intel_igpu",
+              "kind": "raise",
+              "line": 169
+            },
+            {
+              "in": "_require_igpu",
+              "kind": "raise",
+              "line": 176
+            },
+            {
+              "in": "_require_igpu",
+              "kind": "raise",
+              "line": 178
+            }
+          ],
           "hash": "92dc54efe29f127d0432f770b8f388d7624c357c7f4528766c527a8c5a58dcd3",
           "path": "src/switchyard/devices.py"
         },
@@ -663,6 +1639,33 @@
             "family_of",
             "load_families",
             "stamp_family"
+          ],
+          "failurePaths": [
+            {
+              "in": "load_families",
+              "kind": "except",
+              "line": 26
+            },
+            {
+              "in": "load_families",
+              "kind": "raise",
+              "line": 27
+            },
+            {
+              "in": "load_families",
+              "kind": "raise",
+              "line": 29
+            },
+            {
+              "in": "load_families",
+              "kind": "raise",
+              "line": 33
+            },
+            {
+              "in": "family_of",
+              "kind": "raise",
+              "line": 42
+            }
           ],
           "hash": "179c7d95d15dce9011a6ec6f11a5b83bde64e4de178242fed129e566efc41fce",
           "path": "src/switchyard/families.py"
@@ -676,6 +1679,43 @@
             "require_grant",
             "require_heartbeat",
             "require_npu_session"
+          ],
+          "failurePaths": [
+            {
+              "in": "require_grant",
+              "kind": "raise",
+              "line": 24
+            },
+            {
+              "in": "require_npu_session",
+              "kind": "raise",
+              "line": 32
+            },
+            {
+              "in": "require_cpu_window",
+              "kind": "raise",
+              "line": 40
+            },
+            {
+              "in": "heartbeat_age_s",
+              "kind": "except",
+              "line": 49
+            },
+            {
+              "in": "require_heartbeat",
+              "kind": "raise",
+              "line": 58
+            },
+            {
+              "in": "require_card_empty",
+              "kind": "raise",
+              "line": 65
+            },
+            {
+              "in": "assess_step",
+              "kind": "raise",
+              "line": 96
+            }
           ],
           "hash": "27a14185d51156eec7cac3b4a24124201bdb624ce18ca486bd91fddc069b6589",
           "importsFiles": [
@@ -701,6 +1741,13 @@
             "prompt_tokens",
             "roster_pairs",
             "roster_timeout"
+          ],
+          "failurePaths": [
+            {
+              "in": "roster_timeout",
+              "kind": "except",
+              "line": 98
+            }
           ],
           "hash": "1e75bd7ebc95553ec567f6cd9886c7ae4983bd1e03d592b8b506f6a621748672",
           "path": "src/switchyard/harness/count_budget.py"
@@ -752,7 +1799,359 @@
             "urllib_exchange",
             "warm_5090"
           ],
-          "hash": "00275d1f4218548d0d1da9f3169ab0a4d4088f3b9fcd43aa7e32866fccda2b92",
+          "failurePaths": [
+            {
+              "in": "round_up_mhz",
+              "kind": "raise",
+              "line": 84
+            },
+            {
+              "in": "round_up_mhz",
+              "kind": "raise",
+              "line": 86
+            },
+            {
+              "in": "parse_typeperf",
+              "kind": "except",
+              "line": 127
+            },
+            {
+              "in": "_first_number",
+              "kind": "except",
+              "line": 148
+            },
+            {
+              "in": "sample_gpu",
+              "kind": "except",
+              "line": 159
+            },
+            {
+              "in": "sample_gpu",
+              "kind": "except",
+              "line": 165
+            },
+            {
+              "in": "collect_series",
+              "kind": "raise",
+              "line": 302
+            },
+            {
+              "in": "collect_series",
+              "kind": "raise",
+              "line": 304
+            },
+            {
+              "in": "_json_object",
+              "kind": "except",
+              "line": 442
+            },
+            {
+              "in": "counting_prompt",
+              "kind": "raise",
+              "line": 455
+            },
+            {
+              "in": "counting_prompt",
+              "kind": "raise",
+              "line": 457
+            },
+            {
+              "in": "counting_prompt",
+              "kind": "raise",
+              "line": 465
+            },
+            {
+              "in": "counting_prompt",
+              "kind": "raise",
+              "line": 469
+            },
+            {
+              "in": "prepare_prompt",
+              "kind": "raise",
+              "line": 478
+            },
+            {
+              "in": "prepare_prompt",
+              "kind": "raise",
+              "line": 480
+            },
+            {
+              "in": "_out",
+              "kind": "raise",
+              "line": 504
+            },
+            {
+              "in": "_out",
+              "kind": "raise",
+              "line": 509
+            },
+            {
+              "in": "read_git",
+              "kind": "raise",
+              "line": 514
+            },
+            {
+              "in": "ollama_pin",
+              "kind": "raise",
+              "line": 545
+            },
+            {
+              "in": "ollama_pin",
+              "kind": "raise",
+              "line": 549
+            },
+            {
+              "in": "ollama_pin",
+              "kind": "raise",
+              "line": 551
+            },
+            {
+              "in": "prove_owned_server",
+              "kind": "raise",
+              "line": 588
+            },
+            {
+              "in": "prove_owned_server",
+              "kind": "raise",
+              "line": 594
+            },
+            {
+              "in": "prove_owned_server",
+              "kind": "raise",
+              "line": 596
+            },
+            {
+              "in": "note_vram",
+              "kind": "except",
+              "line": 638
+            },
+            {
+              "in": "schedule_e4b",
+              "kind": "raise",
+              "line": 653
+            },
+            {
+              "in": "schedule_e4b",
+              "kind": "raise",
+              "line": 655
+            },
+            {
+              "in": "run_burn",
+              "kind": "raise",
+              "line": 690
+            },
+            {
+              "in": "pilot_summary",
+              "kind": "raise",
+              "line": 722
+            },
+            {
+              "in": "pilot_summary",
+              "kind": "raise",
+              "line": 724
+            },
+            {
+              "in": "pilot_destination",
+              "kind": "raise",
+              "line": 743
+            },
+            {
+              "in": "_require_amended",
+              "kind": "raise",
+              "line": 815
+            },
+            {
+              "in": "_check_run_id",
+              "kind": "raise",
+              "line": 820
+            },
+            {
+              "in": "_measurement",
+              "kind": "raise",
+              "line": 826
+            },
+            {
+              "in": "_probe",
+              "kind": "raise",
+              "line": 860
+            },
+            {
+              "in": "_probe",
+              "kind": "raise",
+              "line": 863
+            },
+            {
+              "in": "perform_slot",
+              "kind": "raise",
+              "line": 942
+            },
+            {
+              "in": "perform_slot",
+              "kind": "except",
+              "line": 1020
+            },
+            {
+              "in": "perform_slot",
+              "kind": "raise",
+              "line": 1023
+            },
+            {
+              "in": "perform_slot",
+              "kind": "raise",
+              "line": 1036
+            },
+            {
+              "in": "_stop_started",
+              "kind": "except",
+              "line": 1047
+            },
+            {
+              "in": "_stop_started",
+              "kind": "raise",
+              "line": 1049
+            },
+            {
+              "in": "execute_block",
+              "kind": "raise",
+              "line": 1276
+            },
+            {
+              "in": "run_block",
+              "kind": "raise",
+              "line": 1426
+            },
+            {
+              "in": "run_block",
+              "kind": "except",
+              "line": 1453
+            },
+            {
+              "in": "run_block",
+              "kind": "raise",
+              "line": 1455
+            },
+            {
+              "in": "run_pilot",
+              "kind": "raise",
+              "line": 1484
+            },
+            {
+              "in": "run_pilot",
+              "kind": "raise",
+              "line": 1487
+            },
+            {
+              "in": "run_pilot",
+              "kind": "except",
+              "line": 1509
+            },
+            {
+              "in": "run_pilot",
+              "kind": "raise",
+              "line": 1511
+            },
+            {
+              "in": "run_pilot",
+              "kind": "except",
+              "line": 1521
+            },
+            {
+              "in": "run_pilot",
+              "kind": "raise",
+              "line": 1523
+            },
+            {
+              "in": "run_pilot",
+              "kind": "raise",
+              "line": 1548
+            },
+            {
+              "in": "_refuse_base",
+              "kind": "raise",
+              "line": 1629
+            },
+            {
+              "in": "_refuse_base",
+              "kind": "raise",
+              "line": 1631
+            },
+            {
+              "in": "owned_generate",
+              "kind": "raise",
+              "line": 1651
+            },
+            {
+              "in": "unload_owned",
+              "kind": "raise",
+              "line": 1662
+            },
+            {
+              "in": "count_owned",
+              "kind": "raise",
+              "line": 1681
+            },
+            {
+              "in": "urllib_exchange",
+              "kind": "except",
+              "line": 1806
+            },
+            {
+              "in": "urllib_exchange",
+              "kind": "raise",
+              "line": 1808
+            },
+            {
+              "in": "urllib_exchange",
+              "kind": "except",
+              "line": 1809
+            },
+            {
+              "in": "urllib_exchange",
+              "kind": "raise",
+              "line": 1814
+            },
+            {
+              "in": "urllib_exchange",
+              "kind": "raise",
+              "line": 1818
+            },
+            {
+              "in": "urllib_exchange",
+              "kind": "raise",
+              "line": 1820
+            },
+            {
+              "in": "owned_probe",
+              "kind": "raise",
+              "line": 1833
+            },
+            {
+              "in": "call",
+              "kind": "raise",
+              "line": 1882
+            },
+            {
+              "in": "run",
+              "kind": "except",
+              "line": 2003
+            },
+            {
+              "in": "stop_companion",
+              "kind": "raise",
+              "line": 2020
+            },
+            {
+              "in": "companion_report",
+              "kind": "raise",
+              "line": 2033
+            },
+            {
+              "in": "companion_report",
+              "kind": "raise",
+              "line": 2035
+            }
+          ],
+          "hash": "8504d460470d774e7d4562d85cb99f3a31e148062a051cc645f73d216566acc7",
           "importOrder": [
             "src/switchyard/guards.py",
             "src/switchyard/harness/e4b_stats.py",
@@ -791,6 +2190,53 @@
             "tost",
             "walsh_averages"
           ],
+          "failurePaths": [
+            {
+              "in": "effect",
+              "kind": "raise",
+              "line": 26
+            },
+            {
+              "in": "walsh_averages",
+              "kind": "raise",
+              "line": 35
+            },
+            {
+              "in": "median",
+              "kind": "raise",
+              "line": 48
+            },
+            {
+              "in": "_signed_rank_counts",
+              "kind": "raise",
+              "line": 65
+            },
+            {
+              "in": "exact_interval",
+              "kind": "raise",
+              "line": 95
+            },
+            {
+              "in": "tost",
+              "kind": "raise",
+              "line": 131
+            },
+            {
+              "in": "tost",
+              "kind": "raise",
+              "line": 133
+            },
+            {
+              "in": "bootstrap_median",
+              "kind": "raise",
+              "line": 156
+            },
+            {
+              "in": "bootstrap_median",
+              "kind": "raise",
+              "line": 158
+            }
+          ],
           "hash": "b44710d314f1ffbe4498e61eb2d1db8c79fd1bac2efb3ca3113455ffdbbdb6e8",
           "path": "src/switchyard/harness/e4b_stats.py"
         },
@@ -801,6 +2247,73 @@
             "is_spill",
             "over_margin",
             "search"
+          ],
+          "failurePaths": [
+            {
+              "in": "fit_prompt",
+              "kind": "raise",
+              "line": 104
+            },
+            {
+              "in": "fit_prompt",
+              "kind": "raise",
+              "line": 106
+            },
+            {
+              "in": "fit_prompt",
+              "kind": "raise",
+              "line": 111
+            },
+            {
+              "in": "_as_count",
+              "kind": "raise",
+              "line": 152
+            },
+            {
+              "in": "fit_prompt_words",
+              "kind": "raise",
+              "line": 176
+            },
+            {
+              "in": "fit_prompt_words",
+              "kind": "raise",
+              "line": 178
+            },
+            {
+              "in": "fit_prompt_words",
+              "kind": "raise",
+              "line": 182
+            },
+            {
+              "in": "fit_prompt_words",
+              "kind": "raise",
+              "line": 199
+            },
+            {
+              "in": "search",
+              "kind": "raise",
+              "line": 285
+            },
+            {
+              "in": "search",
+              "kind": "raise",
+              "line": 287
+            },
+            {
+              "in": "search",
+              "kind": "raise",
+              "line": 289
+            },
+            {
+              "in": "search",
+              "kind": "raise",
+              "line": 291
+            },
+            {
+              "in": "measure",
+              "kind": "raise",
+              "line": 298
+            }
           ],
           "hash": "220b68a71a2986218cf30db248fbdb20875f4edb1fd16a1b58b84797d260a0b6",
           "path": "src/switchyard/harness/e5.py"
@@ -813,6 +2326,38 @@
             "igpu_shared_memory_override",
             "npu_driver_version",
             "package_versions"
+          ],
+          "failurePaths": [
+            {
+              "in": "dist_version",
+              "kind": "except",
+              "line": 30
+            },
+            {
+              "in": "dist_version",
+              "kind": "except",
+              "line": 32
+            },
+            {
+              "in": "_read_npu_driver",
+              "kind": "except",
+              "line": 105
+            },
+            {
+              "in": "igpu_shared_memory_override",
+              "kind": "except",
+              "line": 129
+            },
+            {
+              "in": "_read_override_percent",
+              "kind": "except",
+              "line": 147
+            },
+            {
+              "in": "_read_override_percent",
+              "kind": "except",
+              "line": 159
+            }
           ],
           "hash": "eec18542eb29c1c008774effc48e4e56dbbd40fba638c637bd015b3e04cb1f9f",
           "path": "src/switchyard/harness/environment.py"
@@ -832,6 +2377,258 @@
             "run_fill_card",
             "runner_pid",
             "window_delta"
+          ],
+          "failurePaths": [
+            {
+              "in": "sample",
+              "kind": "except",
+              "line": 248
+            },
+            {
+              "in": "sample",
+              "kind": "except",
+              "line": 264
+            },
+            {
+              "in": "parse_mib",
+              "kind": "except",
+              "line": 313
+            },
+            {
+              "in": "parse_counter_text",
+              "kind": "except",
+              "line": 340
+            },
+            {
+              "in": "ggml_cuda_sha256",
+              "kind": "except",
+              "line": 506
+            },
+            {
+              "in": "_capture",
+              "kind": "except",
+              "line": 514
+            },
+            {
+              "in": "_read_configured_log",
+              "kind": "except",
+              "line": 536
+            },
+            {
+              "in": "_optional_reader",
+              "kind": "except",
+              "line": 573
+            },
+            {
+              "in": "_window_readings",
+              "kind": "except",
+              "line": 582
+            },
+            {
+              "in": "_ollama_version",
+              "kind": "except",
+              "line": 594
+            },
+            {
+              "in": "_refuse_confirm_num_predict",
+              "kind": "raise",
+              "line": 608
+            },
+            {
+              "in": "_ollama",
+              "kind": "except",
+              "line": 641
+            },
+            {
+              "in": "_ollama",
+              "kind": "raise",
+              "line": 642
+            },
+            {
+              "in": "_settled_card",
+              "kind": "except",
+              "line": 729
+            },
+            {
+              "in": "_resume_fill",
+              "kind": "except",
+              "line": 831
+            },
+            {
+              "in": "run_fill_card",
+              "kind": "except",
+              "line": 937
+            },
+            {
+              "in": "run_fill_card",
+              "kind": "raise",
+              "line": 966
+            },
+            {
+              "in": "_unload",
+              "kind": "except",
+              "line": 982
+            },
+            {
+              "in": "_unload",
+              "kind": "raise",
+              "line": 987
+            },
+            {
+              "in": "_unload",
+              "kind": "except",
+              "line": 988
+            },
+            {
+              "in": "_unload",
+              "kind": "raise",
+              "line": 991
+            },
+            {
+              "in": "_remember",
+              "kind": "except",
+              "line": 1062
+            },
+            {
+              "in": "_measure_model",
+              "kind": "except",
+              "line": 1114
+            },
+            {
+              "in": "_measure_model",
+              "kind": "except",
+              "line": 1162
+            },
+            {
+              "in": "stop_if_unload_timed_out",
+              "kind": "raise",
+              "line": 1195
+            },
+            {
+              "in": "count",
+              "kind": "except",
+              "line": 1211
+            },
+            {
+              "in": "count",
+              "kind": "raise",
+              "line": 1213
+            },
+            {
+              "in": "count",
+              "kind": "raise",
+              "line": 1215
+            },
+            {
+              "in": "count",
+              "kind": "raise",
+              "line": 1218
+            },
+            {
+              "in": "count",
+              "kind": "raise",
+              "line": 1219
+            },
+            {
+              "in": "count",
+              "kind": "raise",
+              "line": 1221
+            },
+            {
+              "in": "observe",
+              "kind": "except",
+              "line": 1231
+            },
+            {
+              "in": "observe",
+              "kind": "except",
+              "line": 1234
+            },
+            {
+              "in": "observe",
+              "kind": "raise",
+              "line": 1240
+            },
+            {
+              "in": "observe",
+              "kind": "except",
+              "line": 1246
+            },
+            {
+              "in": "observe",
+              "kind": "except",
+              "line": 1249
+            },
+            {
+              "in": "observe",
+              "kind": "raise",
+              "line": 1255
+            },
+            {
+              "in": "observe",
+              "kind": "raise",
+              "line": 1260
+            },
+            {
+              "in": "observe",
+              "kind": "except",
+              "line": 1281
+            },
+            {
+              "in": "observe",
+              "kind": "raise",
+              "line": 1287
+            },
+            {
+              "in": "observe",
+              "kind": "raise",
+              "line": 1296
+            },
+            {
+              "in": "probe",
+              "kind": "raise",
+              "line": 1324
+            },
+            {
+              "in": "probe",
+              "kind": "raise",
+              "line": 1332
+            },
+            {
+              "in": "probe",
+              "kind": "raise",
+              "line": 1335
+            },
+            {
+              "in": "probe",
+              "kind": "except",
+              "line": 1343
+            },
+            {
+              "in": "probe",
+              "kind": "raise",
+              "line": 1351
+            },
+            {
+              "in": "_measure_model",
+              "kind": "except",
+              "line": 1368
+            },
+            {
+              "in": "_measure_model",
+              "kind": "except",
+              "line": 1379
+            },
+            {
+              "in": "_measure_model",
+              "kind": "except",
+              "line": 1401
+            },
+            {
+              "in": "_measure_model",
+              "kind": "except",
+              "line": 1425
+            }
           ],
           "hash": "898f9e6d887a3d2bc8f43013fb67be4563720c98ea56a01b53c905959fb8517a",
           "importOrder": [
@@ -866,6 +2663,33 @@
           "exports": [
             "require_unmodified"
           ],
+          "failurePaths": [
+            {
+              "in": "require_unmodified",
+              "kind": "raise",
+              "line": 20
+            },
+            {
+              "in": "_relative",
+              "kind": "except",
+              "line": 27
+            },
+            {
+              "in": "_relative",
+              "kind": "raise",
+              "line": 28
+            },
+            {
+              "in": "_git",
+              "kind": "except",
+              "line": 38
+            },
+            {
+              "in": "_git",
+              "kind": "raise",
+              "line": 40
+            }
+          ],
           "hash": "2cf4b48636b66ec5f155a7a4ec9c4d51150b9488eec207084c9cf0474b0ef61b",
           "importsFiles": [
             "src/switchyard/harness/spec.py"
@@ -875,6 +2699,38 @@
         {
           "exports": [
             "marker_path"
+          ],
+          "failurePaths": [
+            {
+              "in": "touch",
+              "kind": "except",
+              "line": 60
+            },
+            {
+              "in": "close",
+              "kind": "except",
+              "line": 70
+            },
+            {
+              "in": "note_restart",
+              "kind": "except",
+              "line": 79
+            },
+            {
+              "in": "note_restart_disabled",
+              "kind": "except",
+              "line": 90
+            },
+            {
+              "in": "note_failure",
+              "kind": "except",
+              "line": 101
+            },
+            {
+              "in": "discard",
+              "kind": "except",
+              "line": 112
+            }
           ],
           "hash": "6e7a646918b46bb1c08c8f34c2a561b5a39f32f6a310197a353208961dcbba66",
           "importsFiles": [
@@ -898,6 +2754,118 @@
             "start_line",
             "stop_process_tree"
           ],
+          "failurePaths": [
+            {
+              "in": "pin_install",
+              "kind": "raise",
+              "line": 77
+            },
+            {
+              "in": "pin_install",
+              "kind": "raise",
+              "line": 79
+            },
+            {
+              "in": "pin_install",
+              "kind": "raise",
+              "line": 82
+            },
+            {
+              "in": "pin_install",
+              "kind": "raise",
+              "line": 85
+            },
+            {
+              "in": "assert_port_free",
+              "kind": "raise",
+              "line": 93
+            },
+            {
+              "in": "assert_port_free",
+              "kind": "except",
+              "line": 97
+            },
+            {
+              "in": "assert_port_free",
+              "kind": "raise",
+              "line": 98
+            },
+            {
+              "in": "refuse_shared_url",
+              "kind": "raise",
+              "line": 176
+            },
+            {
+              "in": "get_json",
+              "kind": "raise",
+              "line": 184
+            },
+            {
+              "in": "get_json",
+              "kind": "raise",
+              "line": 187
+            },
+            {
+              "in": "parse_pin_json",
+              "kind": "except",
+              "line": 208
+            },
+            {
+              "in": "parse_pin_json",
+              "kind": "raise",
+              "line": 209
+            },
+            {
+              "in": "parse_pin_json",
+              "kind": "raise",
+              "line": 211
+            },
+            {
+              "in": "start",
+              "kind": "except",
+              "line": 302
+            },
+            {
+              "in": "_abandon",
+              "kind": "except",
+              "line": 325
+            },
+            {
+              "in": "_abandon",
+              "kind": "raise",
+              "line": 328
+            },
+            {
+              "in": "probe_ps",
+              "kind": "raise",
+              "line": 332
+            },
+            {
+              "in": "stop",
+              "kind": "raise",
+              "line": 339
+            },
+            {
+              "in": "stop",
+              "kind": "except",
+              "line": 344
+            },
+            {
+              "in": "stop",
+              "kind": "raise",
+              "line": 353
+            },
+            {
+              "in": "__exit__",
+              "kind": "except",
+              "line": 363
+            },
+            {
+              "in": "__exit__",
+              "kind": "raise",
+              "line": 365
+            }
+          ],
           "hash": "bc394393985338e10894704593f4ecc2fdabe9e7d57b48f812e6208f13c11fe9",
           "path": "src/switchyard/harness/ollama_serve.py"
         },
@@ -912,6 +2880,28 @@
             "write_atomic",
             "write_receipt",
             "write_run"
+          ],
+          "failurePaths": [
+            {
+              "in": "_append_table",
+              "kind": "raise",
+              "line": 377
+            },
+            {
+              "in": "write_atomic",
+              "kind": "except",
+              "line": 400
+            },
+            {
+              "in": "write_atomic",
+              "kind": "except",
+              "line": 403
+            },
+            {
+              "in": "write_atomic",
+              "kind": "raise",
+              "line": 405
+            }
           ],
           "hash": "a126503ec7c77441cc1fb505c24e9e5feacb0958b3a5cb8b317be4728599a9bf",
           "importOrder": [
@@ -947,6 +2937,202 @@
             "real_adapters",
             "run_interleaved",
             "run_spec"
+          ],
+          "failurePaths": [
+            {
+              "kind": "except",
+              "line": 89
+            },
+            {
+              "in": "dry_run",
+              "kind": "raise",
+              "line": 144
+            },
+            {
+              "in": "run_interleaved",
+              "kind": "raise",
+              "line": 298
+            },
+            {
+              "in": "_halt",
+              "kind": "except",
+              "line": 586
+            },
+            {
+              "in": "_end_block",
+              "kind": "raise",
+              "line": 672
+            },
+            {
+              "in": "_resume_after_repair",
+              "kind": "except",
+              "line": 695
+            },
+            {
+              "in": "_resume_after_repair",
+              "kind": "raise",
+              "line": 701
+            },
+            {
+              "in": "_resume_after_repair",
+              "kind": "raise",
+              "line": 708
+            },
+            {
+              "in": "run_interleaved",
+              "kind": "except",
+              "line": 782
+            },
+            {
+              "in": "run_interleaved",
+              "kind": "except",
+              "line": 823
+            },
+            {
+              "in": "run_interleaved",
+              "kind": "raise",
+              "line": 843
+            },
+            {
+              "in": "run_interleaved",
+              "kind": "raise",
+              "line": 873
+            },
+            {
+              "in": "run_interleaved",
+              "kind": "raise",
+              "line": 902
+            },
+            {
+              "in": "run_interleaved",
+              "kind": "except",
+              "line": 915
+            },
+            {
+              "in": "run_interleaved",
+              "kind": "raise",
+              "line": 919
+            },
+            {
+              "in": "run_interleaved",
+              "kind": "raise",
+              "line": 955
+            },
+            {
+              "in": "run_interleaved",
+              "kind": "except",
+              "line": 983
+            },
+            {
+              "in": "run_interleaved",
+              "kind": "raise",
+              "line": 989
+            },
+            {
+              "in": "_cpu_sample",
+              "kind": "except",
+              "line": 1098
+            },
+            {
+              "in": "_summary",
+              "kind": "raise",
+              "line": 1378
+            },
+            {
+              "in": "_session",
+              "kind": "raise",
+              "line": 1574
+            },
+            {
+              "in": "_dataset_prompt",
+              "kind": "raise",
+              "line": 1655
+            },
+            {
+              "in": "_dataset_prompt",
+              "kind": "raise",
+              "line": 1678
+            },
+            {
+              "in": "_dataset_prompt",
+              "kind": "except",
+              "line": 1694
+            },
+            {
+              "in": "_dataset_prompt",
+              "kind": "raise",
+              "line": 1695
+            },
+            {
+              "in": "_dataset_prompt",
+              "kind": "except",
+              "line": 1696
+            },
+            {
+              "in": "_dataset_prompt",
+              "kind": "raise",
+              "line": 1698
+            },
+            {
+              "in": "_dataset_prompt",
+              "kind": "raise",
+              "line": 1699
+            },
+            {
+              "in": "_cache_dirs",
+              "kind": "raise",
+              "line": 1766
+            },
+            {
+              "in": "onexc",
+              "kind": "except",
+              "line": 1791
+            },
+            {
+              "in": "onexc",
+              "kind": "except",
+              "line": 1794
+            },
+            {
+              "in": "_check_run_id",
+              "kind": "raise",
+              "line": 1823
+            },
+            {
+              "in": "_refuse_repo_interpreter",
+              "kind": "except",
+              "line": 1902
+            },
+            {
+              "in": "_refuse_repo_interpreter",
+              "kind": "raise",
+              "line": 1904
+            },
+            {
+              "in": "_card_probe",
+              "kind": "raise",
+              "line": 1928
+            },
+            {
+              "in": "_start_state",
+              "kind": "except",
+              "line": 1952
+            },
+            {
+              "in": "run_spec",
+              "kind": "raise",
+              "line": 2028
+            },
+            {
+              "in": "run_spec",
+              "kind": "raise",
+              "line": 2035
+            },
+            {
+              "in": "run_spec",
+              "kind": "raise",
+              "line": 2080
+            }
           ],
           "hash": "c565cd563607548d0d98e040bdab29653b80cbe3d91e693f0f119c98109efb85",
           "importsFiles": [
@@ -1955,6 +4141,503 @@
             "load_spec",
             "validate_spec"
           ],
+          "failurePaths": [
+            {
+              "in": "validate_spec",
+              "kind": "raise",
+              "line": 41
+            },
+            {
+              "in": "validate_spec",
+              "kind": "raise",
+              "line": 44
+            },
+            {
+              "in": "validate_spec",
+              "kind": "raise",
+              "line": 46
+            },
+            {
+              "in": "validate_spec",
+              "kind": "raise",
+              "line": 49
+            },
+            {
+              "in": "validate_spec",
+              "kind": "raise",
+              "line": 52
+            },
+            {
+              "in": "validate_spec",
+              "kind": "raise",
+              "line": 54
+            },
+            {
+              "in": "validate_spec",
+              "kind": "raise",
+              "line": 66
+            },
+            {
+              "in": "validate_spec",
+              "kind": "raise",
+              "line": 71
+            },
+            {
+              "in": "_decision_metric",
+              "kind": "raise",
+              "line": 100
+            },
+            {
+              "in": "_prefix_caching",
+              "kind": "raise",
+              "line": 106
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 116
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 119
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 122
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 126
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 128
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 132
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 134
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 136
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 139
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 142
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 145
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 149
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 154
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 157
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 160
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 162
+            },
+            {
+              "in": "_interleaved",
+              "kind": "raise",
+              "line": 168
+            },
+            {
+              "in": "_warmups",
+              "kind": "raise",
+              "line": 178
+            },
+            {
+              "in": "_warmups",
+              "kind": "raise",
+              "line": 181
+            },
+            {
+              "in": "_warmups",
+              "kind": "raise",
+              "line": 184
+            },
+            {
+              "in": "_warmups",
+              "kind": "raise",
+              "line": 187
+            },
+            {
+              "in": "_warmups",
+              "kind": "raise",
+              "line": 189
+            },
+            {
+              "in": "_arm_storage",
+              "kind": "raise",
+              "line": 197
+            },
+            {
+              "in": "_arm_storage",
+              "kind": "raise",
+              "line": 200
+            },
+            {
+              "in": "_arm_storage",
+              "kind": "raise",
+              "line": 202
+            },
+            {
+              "in": "_arm_storage",
+              "kind": "raise",
+              "line": 207
+            },
+            {
+              "in": "_arm_storage",
+              "kind": "raise",
+              "line": 209
+            },
+            {
+              "in": "_arm_storage",
+              "kind": "raise",
+              "line": 212
+            },
+            {
+              "in": "_arm_storage",
+              "kind": "raise",
+              "line": 214
+            },
+            {
+              "in": "_arm_storage",
+              "kind": "raise",
+              "line": 216
+            },
+            {
+              "in": "_blocks",
+              "kind": "raise",
+              "line": 234
+            },
+            {
+              "in": "_blocks",
+              "kind": "raise",
+              "line": 237
+            },
+            {
+              "in": "_blocks",
+              "kind": "raise",
+              "line": 242
+            },
+            {
+              "in": "_blocks",
+              "kind": "raise",
+              "line": 244
+            },
+            {
+              "in": "_blocks",
+              "kind": "raise",
+              "line": 247
+            },
+            {
+              "in": "_blocks",
+              "kind": "raise",
+              "line": 250
+            },
+            {
+              "in": "_blocks",
+              "kind": "raise",
+              "line": 252
+            },
+            {
+              "in": "_blocks",
+              "kind": "raise",
+              "line": 257
+            },
+            {
+              "in": "_blocks",
+              "kind": "raise",
+              "line": 262
+            },
+            {
+              "in": "_blocks",
+              "kind": "raise",
+              "line": 264
+            },
+            {
+              "in": "_blocks",
+              "kind": "raise",
+              "line": 267
+            },
+            {
+              "in": "_blocks",
+              "kind": "raise",
+              "line": 270
+            },
+            {
+              "in": "_blocks",
+              "kind": "raise",
+              "line": 273
+            },
+            {
+              "in": "_blocks",
+              "kind": "raise",
+              "line": 275
+            },
+            {
+              "in": "_blocks",
+              "kind": "raise",
+              "line": 278
+            },
+            {
+              "in": "_fill_card",
+              "kind": "raise",
+              "line": 283
+            },
+            {
+              "in": "_fill_card",
+              "kind": "raise",
+              "line": 285
+            },
+            {
+              "in": "_fill_card",
+              "kind": "raise",
+              "line": 288
+            },
+            {
+              "in": "_fill_card",
+              "kind": "raise",
+              "line": 290
+            },
+            {
+              "in": "_fill_card",
+              "kind": "raise",
+              "line": 292
+            },
+            {
+              "in": "_fill_card",
+              "kind": "raise",
+              "line": 295
+            },
+            {
+              "in": "_fill_card",
+              "kind": "raise",
+              "line": 299
+            },
+            {
+              "in": "_fill_card",
+              "kind": "raise",
+              "line": 301
+            },
+            {
+              "in": "_fill_card",
+              "kind": "raise",
+              "line": 303
+            },
+            {
+              "in": "_confirm_num_predict",
+              "kind": "raise",
+              "line": 317
+            },
+            {
+              "in": "_pairs",
+              "kind": "raise",
+              "line": 323
+            },
+            {
+              "in": "_pairs",
+              "kind": "raise",
+              "line": 328
+            },
+            {
+              "in": "_pairs",
+              "kind": "raise",
+              "line": 330
+            },
+            {
+              "in": "_pairs",
+              "kind": "raise",
+              "line": 335
+            },
+            {
+              "in": "_pairs",
+              "kind": "raise",
+              "line": 339
+            },
+            {
+              "in": "_pairs",
+              "kind": "raise",
+              "line": 342
+            },
+            {
+              "in": "_pairs",
+              "kind": "raise",
+              "line": 344
+            },
+            {
+              "in": "_close",
+              "kind": "raise",
+              "line": 349
+            },
+            {
+              "in": "_e4b",
+              "kind": "raise",
+              "line": 360
+            },
+            {
+              "in": "_e4b",
+              "kind": "raise",
+              "line": 362
+            },
+            {
+              "in": "_e4b",
+              "kind": "raise",
+              "line": 364
+            },
+            {
+              "in": "_e4b",
+              "kind": "raise",
+              "line": 366
+            },
+            {
+              "in": "_e4b",
+              "kind": "raise",
+              "line": 368
+            },
+            {
+              "in": "_e4b",
+              "kind": "raise",
+              "line": 370
+            },
+            {
+              "in": "_e4b",
+              "kind": "raise",
+              "line": 373
+            },
+            {
+              "in": "_e4b",
+              "kind": "raise",
+              "line": 375
+            },
+            {
+              "in": "_e4b",
+              "kind": "raise",
+              "line": 377
+            },
+            {
+              "in": "_e4b",
+              "kind": "raise",
+              "line": 381
+            },
+            {
+              "in": "_e4b",
+              "kind": "raise",
+              "line": 384
+            },
+            {
+              "in": "_e4b",
+              "kind": "raise",
+              "line": 402
+            },
+            {
+              "in": "_e4b",
+              "kind": "raise",
+              "line": 407
+            },
+            {
+              "in": "_choice_rule",
+              "kind": "raise",
+              "line": 417
+            },
+            {
+              "in": "_choice_rule",
+              "kind": "raise",
+              "line": 421
+            },
+            {
+              "in": "_choice_rule",
+              "kind": "raise",
+              "line": 425
+            },
+            {
+              "in": "_choice_rule",
+              "kind": "raise",
+              "line": 428
+            },
+            {
+              "in": "_choice_rule",
+              "kind": "raise",
+              "line": 430
+            },
+            {
+              "in": "_choice_rule",
+              "kind": "raise",
+              "line": 433
+            },
+            {
+              "in": "_choice_rule",
+              "kind": "raise",
+              "line": 435
+            },
+            {
+              "in": "_choice_rule",
+              "kind": "raise",
+              "line": 438
+            },
+            {
+              "in": "_choice_rule",
+              "kind": "raise",
+              "line": 440
+            },
+            {
+              "in": "_choice_rule",
+              "kind": "raise",
+              "line": 442
+            },
+            {
+              "in": "_choice_rule",
+              "kind": "raise",
+              "line": 445
+            },
+            {
+              "in": "_offrig",
+              "kind": "raise",
+              "line": 451
+            },
+            {
+              "in": "_offrig",
+              "kind": "raise",
+              "line": 453
+            }
+          ],
           "hash": "815403c06d516ef432242df239ebe651fd66d5df2039e6b90f6b54d10dfb97c6",
           "importsFiles": [
             "src/switchyard/harness/e5.py",
@@ -1989,6 +4672,38 @@
             "repo_folder",
             "robocopy_argv"
           ],
+          "failurePaths": [
+            {
+              "in": "hot_snapshot",
+              "kind": "raise",
+              "line": 62
+            },
+            {
+              "in": "copy_unbuffered",
+              "kind": "raise",
+              "line": 99
+            },
+            {
+              "in": "physical_disk_script",
+              "kind": "raise",
+              "line": 106
+            },
+            {
+              "in": "parse_disk_json",
+              "kind": "raise",
+              "line": 125
+            },
+            {
+              "in": "query_physical_disk",
+              "kind": "raise",
+              "line": 142
+            },
+            {
+              "in": "describe_drive",
+              "kind": "except",
+              "line": 153
+            }
+          ],
           "hash": "6134ded5a84fa01482e2e4bfd144197fba1c2b00ee7c0767de8a4850c28f30db",
           "path": "src/switchyard/harness/storage.py"
         },
@@ -2002,6 +4717,48 @@
             "summarize",
             "within_band"
           ],
+          "failurePaths": [
+            {
+              "in": "schedule",
+              "kind": "raise",
+              "line": 28
+            },
+            {
+              "in": "schedule",
+              "kind": "raise",
+              "line": 30
+            },
+            {
+              "in": "percentile",
+              "kind": "raise",
+              "line": 47
+            },
+            {
+              "in": "percentile",
+              "kind": "raise",
+              "line": 49
+            },
+            {
+              "in": "within_band",
+              "kind": "raise",
+              "line": 64
+            },
+            {
+              "in": "schedule_aba",
+              "kind": "raise",
+              "line": 79
+            },
+            {
+              "in": "schedule_aba",
+              "kind": "raise",
+              "line": 81
+            },
+            {
+              "in": "relative_spread",
+              "kind": "raise",
+              "line": 102
+            }
+          ],
           "hash": "d32da389627e87f17a213605e3a669b762a218deaec0fbc035208293fc5d6c5f",
           "path": "src/switchyard/harness/timing.py"
         },
@@ -2014,6 +4771,142 @@
             "slot_probe",
             "summarize_slot",
             "windows_disk_number"
+          ],
+          "failurePaths": [
+            {
+              "kind": "except",
+              "line": 42
+            },
+            {
+              "in": "read_start_state",
+              "kind": "except",
+              "line": 105
+            },
+            {
+              "in": "read_start_state",
+              "kind": "except",
+              "line": 107
+            },
+            {
+              "in": "read_start_state",
+              "kind": "except",
+              "line": 113
+            },
+            {
+              "in": "read_start_state",
+              "kind": "except",
+              "line": 119
+            },
+            {
+              "in": "read_start_state",
+              "kind": "except",
+              "line": 123
+            },
+            {
+              "in": "disk_number_script",
+              "kind": "raise",
+              "line": 216
+            },
+            {
+              "in": "windows_disk_number",
+              "kind": "raise",
+              "line": 242
+            },
+            {
+              "in": "windows_disk_number",
+              "kind": "raise",
+              "line": 245
+            },
+            {
+              "in": "mb_s",
+              "kind": "except",
+              "line": 276
+            },
+            {
+              "in": "mb_s",
+              "kind": "except",
+              "line": 283
+            },
+            {
+              "in": "_number",
+              "kind": "except",
+              "line": 303
+            },
+            {
+              "in": "_top_other",
+              "kind": "except",
+              "line": 337
+            },
+            {
+              "in": "_top_other",
+              "kind": "except",
+              "line": 342
+            },
+            {
+              "in": "_top_other",
+              "kind": "except",
+              "line": 352
+            },
+            {
+              "in": "read_slot",
+              "kind": "except",
+              "line": 370
+            },
+            {
+              "in": "read_slot",
+              "kind": "except",
+              "line": 374
+            },
+            {
+              "in": "sample",
+              "kind": "except",
+              "line": 409
+            },
+            {
+              "in": "sample_ram",
+              "kind": "except",
+              "line": 511
+            },
+            {
+              "in": "_operator_stop_reason",
+              "kind": "except",
+              "line": 583
+            },
+            {
+              "in": "_operator_stop_reason",
+              "kind": "except",
+              "line": 589
+            },
+            {
+              "in": "_operator_stop_reason",
+              "kind": "except",
+              "line": 592
+            },
+            {
+              "in": "_sample_working_set",
+              "kind": "except",
+              "line": 608
+            },
+            {
+              "in": "_fire",
+              "kind": "except",
+              "line": 615
+            },
+            {
+              "in": "_fire",
+              "kind": "except",
+              "line": 618
+            },
+            {
+              "in": "read_bytes",
+              "kind": "except",
+              "line": 631
+            },
+            {
+              "in": "check",
+              "kind": "raise",
+              "line": 668
+            }
           ],
           "hash": "104daf9a13e9edceeaff36acedaa8cc4bb7ade5b84a7245c3306744d023cae25",
           "importsFiles": [
@@ -2031,6 +4924,43 @@
             "b_rows",
             "judge_control_rows"
           ],
+          "failurePaths": [
+            {
+              "in": "b_rows",
+              "kind": "raise",
+              "line": 80
+            },
+            {
+              "in": "b_rows",
+              "kind": "raise",
+              "line": 83
+            },
+            {
+              "in": "b_rows",
+              "kind": "raise",
+              "line": 89
+            },
+            {
+              "in": "judge_control_rows",
+              "kind": "raise",
+              "line": 157
+            },
+            {
+              "in": "judge_control_rows",
+              "kind": "raise",
+              "line": 165
+            },
+            {
+              "in": "judge_control_rows",
+              "kind": "raise",
+              "line": 169
+            },
+            {
+              "in": "judge_control_rows",
+              "kind": "raise",
+              "line": 178
+            }
+          ],
           "hash": "a86f64e47e6ee19c97bf04c8e7aa652c6e5aa3ef2ddc46f375618557d647f432",
           "importsFiles": [
             "src/switchyard/families.py",
@@ -2047,6 +4977,98 @@
             "import_receipts",
             "require_pin",
             "show"
+          ],
+          "failurePaths": [
+            {
+              "in": "e1_rerun2_rows",
+              "kind": "raise",
+              "line": 118
+            },
+            {
+              "in": "_e1_table_copy",
+              "kind": "raise",
+              "line": 132
+            },
+            {
+              "in": "_e1_table_copy",
+              "kind": "except",
+              "line": 138
+            },
+            {
+              "in": "_e1_table_copy",
+              "kind": "raise",
+              "line": 139
+            },
+            {
+              "in": "_offer_source",
+              "kind": "except",
+              "line": 148
+            },
+            {
+              "in": "require_pin",
+              "kind": "raise",
+              "line": 155
+            },
+            {
+              "in": "show",
+              "kind": "except",
+              "line": 161
+            },
+            {
+              "in": "show",
+              "kind": "raise",
+              "line": 162
+            },
+            {
+              "in": "_calibration",
+              "kind": "raise",
+              "line": 174
+            },
+            {
+              "in": "_ladder",
+              "kind": "except",
+              "line": 202
+            },
+            {
+              "in": "_ladder",
+              "kind": "raise",
+              "line": 203
+            },
+            {
+              "in": "_check_gold",
+              "kind": "raise",
+              "line": 224
+            },
+            {
+              "in": "_written_date",
+              "kind": "raise",
+              "line": 246
+            },
+            {
+              "in": "_written_date",
+              "kind": "raise",
+              "line": 249
+            },
+            {
+              "in": "_written_date",
+              "kind": "raise",
+              "line": 260
+            },
+            {
+              "in": "_unique",
+              "kind": "raise",
+              "line": 279
+            },
+            {
+              "in": "_git",
+              "kind": "except",
+              "line": 289
+            },
+            {
+              "in": "_git",
+              "kind": "raise",
+              "line": 291
+            }
           ],
           "hash": "5172cda9446e761997eb1dfae98bcf80c6405a7279e8e71d8acc609d95e4abc6",
           "importsFiles": [
@@ -2697,6 +5719,33 @@
             "quote_rule_of",
             "task_for_check"
           ],
+          "failurePaths": [
+            {
+              "in": "quote_rule_of",
+              "kind": "raise",
+              "line": 180
+            },
+            {
+              "in": "_as_rule",
+              "kind": "raise",
+              "line": 186
+            },
+            {
+              "in": "_as_rule",
+              "kind": "raise",
+              "line": 188
+            },
+            {
+              "in": "task_for_check",
+              "kind": "except",
+              "line": 230
+            },
+            {
+              "in": "task_for_check",
+              "kind": "raise",
+              "line": 231
+            }
+          ],
           "hash": "5822f9fa1e518310c192d32b1d7e77bc9f29a5e80622cdfcc52f2c93e1663d3d",
           "importOrder": [
             "src/switchyard/importers/common.py",
@@ -2727,6 +5776,18 @@
             "source_provenance",
             "spread",
             "wilson"
+          ],
+          "failurePaths": [
+            {
+              "in": "device_for_ollama",
+              "kind": "raise",
+              "line": 53
+            },
+            {
+              "in": "source_provenance",
+              "kind": "raise",
+              "line": 141
+            }
           ],
           "hash": "93691cf13ffade7b34b4c917d6d35947aa4f9a8ef4230fc25ee41d650edc6294",
           "path": "src/switchyard/importers/common.py"
@@ -2889,6 +5950,18 @@
             "nli_rows",
             "prereg_names_intel_igpu"
           ],
+          "failurePaths": [
+            {
+              "in": "nli_rows",
+              "kind": "raise",
+              "line": 28
+            },
+            {
+              "in": "nli_rows",
+              "kind": "raise",
+              "line": 31
+            }
+          ],
           "hash": "0042745f295ff2eceb8392087b9054a4d14d93d40342830a6184d97a4c70d3ca",
           "importOrder": [
             "src/switchyard/importers/common.py",
@@ -2906,6 +5979,43 @@
           "exports": [
             "offer_rows",
             "remote_option_allowed"
+          ],
+          "failurePaths": [
+            {
+              "in": "offer_rows",
+              "kind": "raise",
+              "line": 24
+            },
+            {
+              "in": "offer_rows",
+              "kind": "raise",
+              "line": 27
+            },
+            {
+              "in": "offer_rows",
+              "kind": "raise",
+              "line": 33
+            },
+            {
+              "in": "_gpu_row",
+              "kind": "raise",
+              "line": 55
+            },
+            {
+              "in": "_budget_rows",
+              "kind": "raise",
+              "line": 93
+            },
+            {
+              "in": "_budget_rows",
+              "kind": "raise",
+              "line": 96
+            },
+            {
+              "in": "_budget_rows",
+              "kind": "raise",
+              "line": 100
+            }
           ],
           "hash": "dc792261af707b3e4a8ee6fcdac94605da163411403c74ae57621f9eb6c3c406",
           "importOrder": [
@@ -2980,6 +6090,278 @@
             "server_config_env",
             "spawn_detached",
             "stop_pid"
+          ],
+          "failurePaths": [
+            {
+              "in": "port_of",
+              "kind": "raise",
+              "line": 251
+            },
+            {
+              "in": "log_byte_size",
+              "kind": "except",
+              "line": 364
+            },
+            {
+              "in": "read_log_from",
+              "kind": "except",
+              "line": 378
+            },
+            {
+              "in": "_log_text",
+              "kind": "except",
+              "line": 525
+            },
+            {
+              "in": "load_serve_start",
+              "kind": "except",
+              "line": 568
+            },
+            {
+              "in": "health",
+              "kind": "except",
+              "line": 591
+            },
+            {
+              "in": "pids_from_psutil",
+              "kind": "except",
+              "line": 693
+            },
+            {
+              "in": "stop_pid",
+              "kind": "raise",
+              "line": 739
+            },
+            {
+              "in": "spawn_detached",
+              "kind": "raise",
+              "line": 774
+            },
+            {
+              "in": "spawn_detached",
+              "kind": "raise",
+              "line": 776
+            },
+            {
+              "in": "spawn_detached",
+              "kind": "except",
+              "line": 779
+            },
+            {
+              "in": "spawn_detached",
+              "kind": "raise",
+              "line": 780
+            },
+            {
+              "in": "spawn_detached",
+              "kind": "except",
+              "line": 794
+            },
+            {
+              "in": "spawn_detached",
+              "kind": "raise",
+              "line": 796
+            },
+            {
+              "in": "spawn_detached",
+              "kind": "raise",
+              "line": 800
+            },
+            {
+              "in": "card_mib_from_text",
+              "kind": "except",
+              "line": 815
+            },
+            {
+              "in": "http_get",
+              "kind": "except",
+              "line": 857
+            },
+            {
+              "in": "http_get",
+              "kind": "except",
+              "line": 864
+            },
+            {
+              "in": "http_get",
+              "kind": "except",
+              "line": 870
+            },
+            {
+              "in": "environ_of",
+              "kind": "except",
+              "line": 894
+            },
+            {
+              "in": "_run",
+              "kind": "except",
+              "line": 913
+            },
+            {
+              "in": "prime",
+              "kind": "except",
+              "line": 985
+            },
+            {
+              "in": "_ensure_start",
+              "kind": "except",
+              "line": 1009
+            },
+            {
+              "in": "confirm_backend",
+              "kind": "raise",
+              "line": 1042
+            },
+            {
+              "in": "confirm_backend",
+              "kind": "raise",
+              "line": 1047
+            },
+            {
+              "in": "_live_env",
+              "kind": "except",
+              "line": 1084
+            },
+            {
+              "in": "_read_segment",
+              "kind": "except",
+              "line": 1115
+            },
+            {
+              "in": "_note_offset",
+              "kind": "except",
+              "line": 1133
+            },
+            {
+              "in": "_post_restart_fingerprint",
+              "kind": "except",
+              "line": 1144
+            },
+            {
+              "in": "_admit",
+              "kind": "except",
+              "line": 1184
+            },
+            {
+              "in": "_admit",
+              "kind": "raise",
+              "line": 1185
+            },
+            {
+              "in": "_admit",
+              "kind": "raise",
+              "line": 1187
+            },
+            {
+              "in": "_admit",
+              "kind": "except",
+              "line": 1191
+            },
+            {
+              "in": "_admit",
+              "kind": "raise",
+              "line": 1192
+            },
+            {
+              "in": "_admit",
+              "kind": "except",
+              "line": 1196
+            },
+            {
+              "in": "_admit",
+              "kind": "raise",
+              "line": 1204
+            },
+            {
+              "in": "_admit",
+              "kind": "raise",
+              "line": 1211
+            },
+            {
+              "in": "begin_measurement",
+              "kind": "raise",
+              "line": 1218
+            },
+            {
+              "in": "after_failure",
+              "kind": "raise",
+              "line": 1276
+            },
+            {
+              "in": "_listed",
+              "kind": "except",
+              "line": 1299
+            },
+            {
+              "in": "_restart",
+              "kind": "raise",
+              "line": 1306
+            },
+            {
+              "in": "_restart",
+              "kind": "raise",
+              "line": 1310
+            },
+            {
+              "in": "_restart",
+              "kind": "raise",
+              "line": 1316
+            },
+            {
+              "in": "_restart",
+              "kind": "raise",
+              "line": 1322
+            },
+            {
+              "in": "_restart",
+              "kind": "raise",
+              "line": 1326
+            },
+            {
+              "in": "_restart",
+              "kind": "raise",
+              "line": 1328
+            },
+            {
+              "in": "_restart",
+              "kind": "raise",
+              "line": 1330
+            },
+            {
+              "in": "_restart",
+              "kind": "except",
+              "line": 1341
+            },
+            {
+              "in": "_restart",
+              "kind": "raise",
+              "line": 1378
+            },
+            {
+              "in": "_restart",
+              "kind": "raise",
+              "line": 1419
+            },
+            {
+              "in": "_baseline_note",
+              "kind": "except",
+              "line": 1448
+            },
+            {
+              "in": "_fail",
+              "kind": "raise",
+              "line": 1472
+            },
+            {
+              "in": "environment",
+              "kind": "except",
+              "line": 1513
+            },
+            {
+              "in": "environment",
+              "kind": "except",
+              "line": 1523
+            }
           ],
           "hash": "58ab31555d518285facd5cd6aa2a970ebd66cc6534f9f0f7b86b6339cabe6e86",
           "importsFiles": [
@@ -3136,6 +6518,113 @@
             "validate_row",
             "validator"
           ],
+          "failurePaths": [
+            {
+              "in": "validate_row",
+              "kind": "raise",
+              "line": 96
+            },
+            {
+              "in": "validate_row",
+              "kind": "raise",
+              "line": 108
+            },
+            {
+              "in": "check_tree",
+              "kind": "except",
+              "line": 124
+            },
+            {
+              "in": "check_tree",
+              "kind": "except",
+              "line": 130
+            },
+            {
+              "in": "_rows_in",
+              "kind": "raise",
+              "line": 154
+            },
+            {
+              "in": "load_jsonl",
+              "kind": "except",
+              "line": 166
+            },
+            {
+              "in": "load_jsonl",
+              "kind": "raise",
+              "line": 167
+            },
+            {
+              "in": "_check_device_lost",
+              "kind": "raise",
+              "line": 219
+            },
+            {
+              "in": "_check_device_lost",
+              "kind": "raise",
+              "line": 221
+            },
+            {
+              "in": "_reject_home_paths",
+              "kind": "raise",
+              "line": 234
+            },
+            {
+              "in": "_reject_home_paths",
+              "kind": "raise",
+              "line": 236
+            },
+            {
+              "in": "_reject_home_paths",
+              "kind": "raise",
+              "line": 239
+            },
+            {
+              "in": "_reject_home_paths",
+              "kind": "raise",
+              "line": 241
+            },
+            {
+              "in": "_check_interval",
+              "kind": "raise",
+              "line": 302
+            },
+            {
+              "in": "_check_family",
+              "kind": "except",
+              "line": 309
+            },
+            {
+              "in": "_check_family",
+              "kind": "raise",
+              "line": 310
+            },
+            {
+              "in": "_check_family",
+              "kind": "raise",
+              "line": 314
+            },
+            {
+              "in": "_check_family",
+              "kind": "raise",
+              "line": 317
+            },
+            {
+              "in": "_check_residency",
+              "kind": "raise",
+              "line": 328
+            },
+            {
+              "in": "_check_residency",
+              "kind": "raise",
+              "line": 331
+            },
+            {
+              "in": "_check_residency",
+              "kind": "raise",
+              "line": 333
+            }
+          ],
           "hash": "324030a29998b4481b0cc8fffc46c853aa0acdafd7438416f0d626c92ca02d7f",
           "importsFiles": [
             "src/switchyard/families.py"
@@ -3239,6 +6728,13 @@
             "prefix_mode",
             "quality_bound",
             "ttft_bound_ms"
+          ],
+          "failurePaths": [
+            {
+              "in": "_is_stale",
+              "kind": "except",
+              "line": 656
+            }
           ],
           "hash": "259e3430dd9f316bdbb88eee5e7208ec3e295f7425e2e48a3487de79ebe57bc6",
           "path": "src/switchyard/router/policy.py",
@@ -3566,6 +7062,18 @@
           "exports": [
             "select"
           ],
+          "failurePaths": [
+            {
+              "in": "select",
+              "kind": "raise",
+              "line": 37
+            },
+            {
+              "in": "select",
+              "kind": "raise",
+              "line": 39
+            }
+          ],
           "hash": "f6b106284742c0549998d6ac07274ddebec172b70eaf426c60fdcfdc811d87ac",
           "importsFiles": [
             "src/switchyard/receipt.py",
@@ -3603,6 +7111,9 @@
       "outsideReads": 32,
       "outsideWrites": 9,
       "role": "code",
+      "testRunners": [
+        "pytest"
+      ],
       "testedBy": 26,
       "unresolvedSites": 0
     },
@@ -3620,7 +7131,8 @@
             "src/switchyard/harness/runner.py",
             "src/switchyard/harness/watch.py"
           ],
-          "path": "tests/conftest.py"
+          "path": "tests/conftest.py",
+          "testFramework": "pytest"
         },
         {
           "hash": "60ab4b4e76d75b65de76ffb35cb004748deb59d689037b53b593841bfff2115b",
@@ -3734,7 +7246,8 @@
             "src/switchyard/importers/common.py",
             "src/switchyard/receipt.py"
           ],
-          "path": "tests/test_aspire_judges.py"
+          "path": "tests/test_aspire_judges.py",
+          "testFramework": "pytest"
         },
         {
           "exports": [
@@ -3757,6 +7270,20 @@
             "test_without_a_ram_reading_the_release_check_stands_down"
           ],
           "hash": "f5f265972336ade72763c5350c4cb5b814005694456a687b7d028c1db0722d0c",
+          "importOrder": [
+            "src/switchyard/adapters/base.py",
+            "src/switchyard/cli.py",
+            "src/switchyard/harness/__init__.py",
+            "src/switchyard/harness/runner.py",
+            "src/switchyard/harness/marker.py",
+            "src/switchyard/harness/receipts.py",
+            "src/switchyard/harness/spec.py",
+            "src/switchyard/harness/timing.py",
+            "src/switchyard/harness/watch.py",
+            "src/switchyard/receipt.py",
+            "tests/test_harness.py",
+            "tests/test_openvino_adapter.py"
+          ],
           "importsFiles": [
             "src/switchyard/adapters/base.py",
             "src/switchyard/cli.py",
@@ -3771,7 +7298,8 @@
             "tests/test_harness.py",
             "tests/test_openvino_adapter.py"
           ],
-          "path": "tests/test_blocked.py"
+          "path": "tests/test_blocked.py",
+          "testFramework": "pytest"
         },
         {
           "exports": [
@@ -3786,7 +7314,8 @@
             "src/switchyard/cli.py",
             "tests/support.py"
           ],
-          "path": "tests/test_cli.py"
+          "path": "tests/test_cli.py",
+          "testFramework": "pytest"
         },
         {
           "exports": [
@@ -3835,7 +7364,8 @@
             "tests/test_openvino_adapter.py",
             "tests/test_run_path.py"
           ],
-          "path": "tests/test_compile_rejected_rest.py"
+          "path": "tests/test_compile_rejected_rest.py",
+          "testFramework": "pytest"
         },
         {
           "exports": [
@@ -3859,7 +7389,8 @@
           "importsFiles": [
             "src/switchyard/devices.py"
           ],
-          "path": "tests/test_devices.py"
+          "path": "tests/test_devices.py",
+          "testFramework": "pytest"
         },
         {
           "exports": [
@@ -3867,11 +7398,13 @@
             "test_a_cpu_backend_line_refuses_the_block_and_the_pilot",
             "test_a_dead_heartbeat_refuses_the_block_and_the_pilot_before_spawn",
             "test_a_digest_mismatch_refuses_the_block_and_the_pilot",
+            "test_a_dirty_tree_at_the_start_is_recorded_false",
             "test_a_full_block_refuses_null_tolerances_before_heartbeat",
             "test_a_generate_timeout_and_a_probe_timeout_are_refusals",
             "test_a_refused_slot_is_rerun_once_and_two_refusals_are_inconclusive",
             "test_a_repeat_limit_in_the_block_is_a_short_decode_rerun",
             "test_a_repeat_limit_in_the_pilot_is_a_missing_call_and_keeps_its_time",
+            "test_a_run_that_writes_output_keeps_the_clean_tree_from_the_start",
             "test_abort_stops_the_server_and_deletes_the_cache",
             "test_any_other_500_stays_fatal",
             "test_block_records_the_estimate_and_keeps_the_burn_out_of_the_verdict",
@@ -3900,6 +7433,7 @@
             "test_the_5090_companion_report_is_the_generate_that_finished",
             "test_the_block_receipt_carries_the_server_config_and_the_probe",
             "test_the_burn_stops_when_the_slot_ends_and_when_it_raises",
+            "test_the_cli_reads_git_once_before_the_first_device_call",
             "test_the_counting_prompt_is_the_shortest_prefix_at_the_token_target",
             "test_the_e4b_spec_loads_and_keeps_null_tolerances",
             "test_the_owned_server_stops_when_version_never_answers",
@@ -3911,7 +7445,7 @@
             "test_unsteady_warmup_refuses_clock_not_steady",
             "test_warm_until_steady_and_a_short_warm_is_not_steady"
           ],
-          "hash": "32eda41e692a26db17c5a80505b29718348aa9d2c732aa195e0cc9f15706a94d",
+          "hash": "e21c0490aaeebef97ae5da19a6199dfbd9c8b8eed7db24bbf29fbad14e20ff34",
           "importOrder": [
             "src/switchyard/adapters/base.py",
             "src/switchyard/adapters/ollama.py",
@@ -3938,7 +7472,8 @@
             "src/switchyard/harness/spec.py",
             "src/switchyard/harness/timing.py"
           ],
-          "path": "tests/test_e4b.py"
+          "path": "tests/test_e4b.py",
+          "testFramework": "pytest"
         },
         {
           "exports": [
@@ -3954,7 +7489,8 @@
             "src/switchyard/harness/e4b.py",
             "src/switchyard/harness/ollama_serve.py"
           ],
-          "path": "tests/test_e4b_capture_run.py"
+          "path": "tests/test_e4b_capture_run.py",
+          "testFramework": "pytest"
         },
         {
           "exports": [
@@ -4012,7 +7548,8 @@
             "src/switchyard/harness/spec.py",
             "src/switchyard/receipt.py"
           ],
-          "path": "tests/test_fill_card_live.py"
+          "path": "tests/test_fill_card_live.py",
+          "testFramework": "pytest"
         },
         {
           "exports": [
@@ -4027,7 +7564,8 @@
           "importsFiles": [
             "src/switchyard/guards.py"
           ],
-          "path": "tests/test_guards.py"
+          "path": "tests/test_guards.py",
+          "testFramework": "pytest"
         },
         {
           "exports": [
@@ -4141,7 +7679,8 @@
             "src/switchyard/scope.py",
             "tests/support.py"
           ],
-          "path": "tests/test_harness.py"
+          "path": "tests/test_harness.py",
+          "testFramework": "pytest"
         },
         {
           "exports": [
@@ -4198,7 +7737,8 @@
             "src/switchyard/receipt.py",
             "tests/support.py"
           ],
-          "path": "tests/test_importers.py"
+          "path": "tests/test_importers.py",
+          "testFramework": "pytest"
         },
         {
           "exports": [
@@ -4241,7 +7781,8 @@
             "src/switchyard/harness/count_budget.py",
             "tests/ollama_replay.py"
           ],
-          "path": "tests/test_ollama_fixtures.py"
+          "path": "tests/test_ollama_fixtures.py",
+          "testFramework": "pytest"
         },
         {
           "exports": [
@@ -4298,7 +7839,8 @@
             "src/switchyard/harness/watch.py",
             "src/switchyard/ollama_supervisor.py"
           ],
-          "path": "tests/test_ollama_supervisor.py"
+          "path": "tests/test_ollama_supervisor.py",
+          "testFramework": "pytest"
         },
         {
           "exports": [
@@ -4337,7 +7879,8 @@
             "src/switchyard/harness/runner.py",
             "src/switchyard/harness/watch.py"
           ],
-          "path": "tests/test_ollama_token_count.py"
+          "path": "tests/test_ollama_token_count.py",
+          "testFramework": "pytest"
         },
         {
           "exports": [
@@ -4420,7 +7963,9 @@
           "hash": "55eed7306a3b625a3bd786b8005f7494f1bf6cda2a63f5bd03368ce82c44f1a6",
           "importOrder": [
             "src/switchyard/adapters/__init__.py",
+            "src/switchyard/adapters/registry.py",
             "src/switchyard/adapters/base.py",
+            "src/switchyard/adapters/openvino.py",
             "src/switchyard/harness/runner.py",
             "src/switchyard/receipt.py",
             "src/switchyard/harness/receipts.py",
@@ -4429,12 +7974,15 @@
           "importsFiles": [
             "src/switchyard/adapters/__init__.py",
             "src/switchyard/adapters/base.py",
+            "src/switchyard/adapters/openvino.py",
+            "src/switchyard/adapters/registry.py",
             "src/switchyard/harness/receipts.py",
             "src/switchyard/harness/runner.py",
             "src/switchyard/harness/timing.py",
             "src/switchyard/receipt.py"
           ],
-          "path": "tests/test_openvino_adapter.py"
+          "path": "tests/test_openvino_adapter.py",
+          "testFramework": "pytest"
         },
         {
           "exports": [
@@ -4465,9 +8013,23 @@
             "test_until_steady_waits_until_every_arm_in_the_block_settles"
           ],
           "hash": "b7f11da6867592510f3320e2d8bae214ab0e768d8fd4806377f50c68ce5ea527",
+          "importOrder": [
+            "src/switchyard/adapters/__init__.py",
+            "src/switchyard/adapters/openvino.py",
+            "src/switchyard/adapters/base.py",
+            "src/switchyard/harness/__init__.py",
+            "src/switchyard/harness/watch.py",
+            "src/switchyard/harness/runner.py",
+            "src/switchyard/harness/spec.py",
+            "src/switchyard/harness/steady.py",
+            "src/switchyard/harness/storage.py",
+            "tests/test_harness.py",
+            "tests/test_openvino_adapter.py"
+          ],
           "importsFiles": [
             "src/switchyard/adapters/__init__.py",
             "src/switchyard/adapters/base.py",
+            "src/switchyard/adapters/openvino.py",
             "src/switchyard/harness/__init__.py",
             "src/switchyard/harness/runner.py",
             "src/switchyard/harness/spec.py",
@@ -4477,7 +8039,8 @@
             "tests/test_harness.py",
             "tests/test_openvino_adapter.py"
           ],
-          "path": "tests/test_phi_storage.py"
+          "path": "tests/test_phi_storage.py",
+          "testFramework": "pytest"
         },
         {
           "exports": [
@@ -4506,7 +8069,8 @@
             "src/switchyard/receipt.py",
             "tests/support.py"
           ],
-          "path": "tests/test_receipt.py"
+          "path": "tests/test_receipt.py",
+          "testFramework": "pytest"
         },
         {
           "exports": [
@@ -4537,7 +8101,8 @@
             "tests/test_harness.py",
             "tests/test_run_guard.py"
           ],
-          "path": "tests/test_rest_removed_stops.py"
+          "path": "tests/test_rest_removed_stops.py",
+          "testFramework": "pytest"
         },
         {
           "exports": [
@@ -4556,7 +8121,8 @@
           "importsFiles": [
             "src/switchyard/cli.py"
           ],
-          "path": "tests/test_route_cli.py"
+          "path": "tests/test_route_cli.py",
+          "testFramework": "pytest"
         },
         {
           "exports": [
@@ -4613,7 +8179,8 @@
             "src/switchyard/router/policy.py",
             "tests/router_rows.py"
           ],
-          "path": "tests/test_router_policy.py"
+          "path": "tests/test_router_policy.py",
+          "testFramework": "pytest"
         },
         {
           "exports": [
@@ -4653,9 +8220,10 @@
             "src/switchyard/cli.py",
             "src/switchyard/guards.py",
             "src/switchyard/harness/__init__.py",
+            "src/switchyard/harness/environment.py",
+            "src/switchyard/harness/runner.py",
             "src/switchyard/harness/marker.py",
             "src/switchyard/harness/receipts.py",
-            "src/switchyard/harness/runner.py",
             "src/switchyard/harness/spec.py",
             "src/switchyard/harness/watch.py",
             "src/switchyard/receipt.py",
@@ -4670,6 +8238,7 @@
             "src/switchyard/cli.py",
             "src/switchyard/guards.py",
             "src/switchyard/harness/__init__.py",
+            "src/switchyard/harness/environment.py",
             "src/switchyard/harness/marker.py",
             "src/switchyard/harness/receipts.py",
             "src/switchyard/harness/runner.py",
@@ -4680,7 +8249,8 @@
             "tests/test_openvino_adapter.py",
             "tests/test_run_path.py"
           ],
-          "path": "tests/test_run_guard.py"
+          "path": "tests/test_run_guard.py",
+          "testFramework": "pytest"
         },
         {
           "exports": [
@@ -4711,7 +8281,8 @@
             "src/switchyard/harness/spec.py",
             "src/switchyard/receipt.py"
           ],
-          "path": "tests/test_run_path.py"
+          "path": "tests/test_run_path.py",
+          "testFramework": "pytest"
         },
         {
           "exports": [
@@ -4741,7 +8312,8 @@
             "src/switchyard/tasks.py",
             "tests/support.py"
           ],
-          "path": "tests/test_task_scope.py"
+          "path": "tests/test_task_scope.py",
+          "testFramework": "pytest"
         }
       ],
       "globs": [
@@ -4751,6 +8323,9 @@
       "name": "tests",
       "origin": "authored",
       "role": "test",
+      "testRunners": [
+        "pytest"
+      ],
       "testedBy": 0,
       "unresolvedSites": 0
     }
@@ -4760,6 +8335,7 @@
       "checksCount": 0,
       "commands": [
         {
+          "dir": "",
           "job": "test",
           "programs": [
             "uv"
@@ -4767,6 +8343,7 @@
           "step": "Install"
         },
         {
+          "dir": "",
           "job": "test",
           "programs": [
             "uv"
@@ -4774,6 +8351,7 @@
           "step": "Test"
         },
         {
+          "dir": "",
           "job": "test",
           "programs": [
             "npx"
@@ -4781,6 +8359,7 @@
           "step": "Atlas check"
         },
         {
+          "dir": "",
           "job": "test",
           "programs": [
             "uv"
@@ -4790,6 +8369,24 @@
       ],
       "elsewhere": [],
       "file": ".github/workflows/ci.yml",
+      "jobs": [
+        {
+          "basis": "declared",
+          "name": "test",
+          "runsOn": [
+            {
+              "labels": [
+                "ubuntu-latest"
+              ],
+              "platform": {
+                "cpu": "x64",
+                "libc": "glibc",
+                "os": "linux"
+              }
+            }
+          ]
+        }
+      ],
       "landings": [],
       "mentions": [],
       "name": "CI",
@@ -4838,6 +8435,16 @@
         "releases": false
       },
       "stages": [],
+      "tests": [
+        {
+          "config": "pyproject.toml",
+          "coverage": true,
+          "files": 28,
+          "job": "test",
+          "runner": "pytest",
+          "step": "Test"
+        }
+      ],
       "triggers": [
         {
           "branches": [
@@ -4866,6 +8473,17 @@
         },
         {
           "event": "workflow_dispatch"
+        }
+      ],
+      "unresolvedChecks": [
+        {
+          "job": "test",
+          "manifest": "pyproject.toml",
+          "requires": ">=3.12,<3.13",
+          "rule": "D1-python",
+          "step": "Install",
+          "tool": "uv sync",
+          "why": "no setup-python step before it"
         }
       ],
       "uses": [
@@ -4926,9 +8544,9 @@
       "to": "src"
     }
   ],
-  "engine": "1.23.0",
+  "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "9056779144faa461f194029d59cbbb07fc6a609a",
+    "commit": "83145db7bacd33340e39ffe1e48d16cd30c1cf46",
     "tracked": 156
   },
   "landings": [
@@ -5137,6 +8755,22 @@
     {
       "exports": [
         "main"
+      ],
+      "failurePaths": [
+        {
+          "in": "main",
+          "kind": "except",
+          "line": 58
+        },
+        {
+          "in": "main",
+          "kind": "except",
+          "line": 84
+        },
+        {
+          "kind": "raise",
+          "line": 93
+        }
       ],
       "hash": "4e7c098a1a0e9c3b0a111c39c89c011f560404f70627a1222b6e96f629f14a84",
       "importsFiles": [
