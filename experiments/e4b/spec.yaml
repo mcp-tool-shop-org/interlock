@@ -1,0 +1,366 @@
+# Standards compliance
+#
+# PIN_PER_STEP: 2. The models, the digests the table already recorded, the
+#   devices, batch 1, the static shapes, the prompt rule, the 0.10 band, the
+#   estimator and its seed, the repeat count and its one extension, the
+#   refusal thresholds, the run's port, and the A-B-A order are in this file.
+# ANDON_AUTHORITY: 2. A non-zero step stops the sequence. Batch 8 NLI is
+#   refused. A refused slot is re-run once; two refusals in a pair make that
+#   pair inconclusive, and an inconclusive pair is never a pass.
+# NAMED_COMPENSATORS: 2. Unload is keep_alive 0. A fresh compile cache is
+#   deleted after unload. The run's Ollama is the harness's own child on
+#   127.0.0.1:11441, started and stopped by the run. No publish, no rental, no
+#   spend.
+# DECOMPOSE_BY_SECRETS: 2. This file is the pre-registration. The harness runs it.
+# UNCERTAINTY_GATED_HUMANS: 2. One grant and one NPU session, booked together,
+#   come from the Publisher. This spec does not start a device.
+# EXTERNAL_VERIFIER: n/a. R&D reviews this spec before any device time.
+
+# Drafted 2026-10-12 (Kimi, at the Publisher's request, R&D to confirm), after
+# E4 run 7 (valid, inconclusive; every alone spread over the half-band). E4 is
+# not amended and run 7's verdict stands. E4b replaces E4's global alone-spread
+# gate with slot-level refusals and a triplet-paired equivalence decision, per
+# R&D's accepted consult of the same date. The question does not change.
+# Changed numbers, all fixed here before any run: E4's warmups: 1 becomes
+# warmups: 0 with the warm-up moving to per-slot machinery in measurement: and
+# the stop rules; repeats: 5 becomes repeats: 10 with one pre-registered
+# extension to 15 (one repeat is one A-B-A triplet per pair); the 5090 measured
+# decode num_predict 128 becomes 1024 so the measured call outlives clock ramp;
+# the decision becomes the median log-ratio d_i with a BCa bootstrap 90% CI
+# against the +/-0.10 band, not-free on both sides; Wilcoxon signed-rank is
+# recorded as a footnote and never decides. A missing sm_clock or power reading
+# refused nothing in E4; here it refuses the slot. CPU performance is read by
+# typeperf, not psutil (psutil reports a constant nominal 3700 MHz on Windows).
+# House rules after the 2026-10-12 E4/E5 night findings, carried in. The
+# measurement run launches its own Ollama on a dedicated port, never the shared
+# 11434 (11490 is offrig's CPU indexer and is never touched); probes never
+# mutate (no generate as a liveness or stop probe); ending a session is a real
+# keep_alive: 0 unload. The decoupling probe igpu-after-cpu-burn is new; it
+# asks whether run 7's iGPU speed-up is CPU/package-side, it is recorded, and
+# it is never a gate. flank_tol is a placeholder, null until amended from a
+# pilot.
+id: E4b
+procedure: interleaved
+compile_cache: fresh
+order: aba
+question: >
+  While qwen3:8b decodes on the 5090, does a sustained NPU embedding load or a
+  sustained iGPU NLI load change that decode rate, and does the 5090 change
+  the NPU or iGPU latency? This is E4's question, unchanged.
+decision: >
+  One repeat is one A-B-A triplet per pair, and the triplet is the unit of
+  analysis. For triplet i the effect is
+  d_i = ln(B_i) - ln(mean(A_i, A_i+1)). That is the paired slot's measured
+  value against the mean of its two neighbouring alone slots, on the log
+  scale. The 5090 comparison is server-reported decode tokens per second
+  (eval_count / eval_duration), not wall clock; there a slower pair is a
+  negative d_i. The NPU and iGPU comparison is warm latency per call; there a
+  slower pair is a positive d_i. The estimate is the median of the d_i with
+  its 90% confidence interval from a BCa bootstrap of 50000 resamples at the
+  pre-registered seed; if BCa is undefined on a degenerate resample, the
+  percentile interval of the same resamples is the pre-registered fallback.
+  The router may schedule the pair freely only when the whole interval lies
+  inside the band, +/-0.10 on the log scale (0.905x to 1.105x). A consistent
+  speed-up shows coupling, so the pair is not free when the whole interval
+  lies beyond the band on either side. Anything else is inconclusive. When
+  the 10-triplet interval straddles a bound, one extension to 15 triplets is
+  allowed, run immediately in the same grant window under the identical
+  protocol, and the verdict is computed on the 15; extension_used is on the
+  receipt. A Wilcoxon signed-rank over the d_i is recorded as a footnote and
+  is never part of the decision. A slot that fails a refusal rule is re-run
+  once, in place; two refusals in one pair make that pair inconclusive, and
+  an inconclusive pair is not a pass.
+band: 0.10
+warmups: 0
+repeats: 10
+extension_repeats: 15
+estimator:
+  statistic: median
+  ci: 0.90
+  method: bca
+  resamples: 50000
+  seed: 20261012
+  fallback: percentile
+footnote: wilcoxon-signed-rank
+flank_tol: null
+measurement:
+  clock_step_mhz: 15
+  clock_tolerance_steps: 2
+  steady_samples: 10
+  steady_sample_ms: 200
+  warmup_min_s: 3
+  warmup_num_predict: 768
+  warmup_max_attempts: 2
+  call_gap_max_s: 1
+  load_refuse_s: 1.0
+  gpu_probe: "NVML pynvml nvmlDeviceGetClockInfo (SM) and nvmlDeviceGetPowerUsage, else nvidia-smi --query-gpu=clocks.sm,power.draw --format=csv,noheader"
+  cpu_counter: "\\Processor Information(_Total)\\% Processor Performance"
+  cpu_probe: "typeperf, no admin; slot start and slot end on every measured slot; 1 s cadence inside CPU-burn slots. psutil cpu_freq is not used (Windows reports a constant nominal 3700 MHz)."
+needs:
+  grant: true
+  npu_session: true
+  cpu_window: false
+  booked_together: true
+dataset:
+  name: e4-fixed-prompt
+  seed: "The switchyard counts the same cars on every pass. "
+  target_tokens: 256
+  rule: >
+    Repeat the seed until the model tokenizer counts at least 256 tokens, then
+    keep the shortest prefix of that repetition that still counts as 256. Use
+    that same prefix for every arm and every repeat. This is E4's prompt,
+    unchanged; the longer 5090 decode lives in num_predict, not in the prompt.
+metrics:
+  - decode_tok_s
+  - latency_ms
+  - prompt_tok_s
+  - gpu_temp_c
+  - sm_clock_mhz
+  - power_w
+  - cpu_perf_pct
+  - load_duration_s
+  - truncated_tokens
+stop_rules:
+  - A non-zero step stops the sequence. Later arms do not run. A failed step is
+    inconclusive, not a pass.
+  - Order is A-B-A per triplet. The alone slot runs, then the paired slot with
+    its companion session, then the alone slot again. One repeat is one triplet
+    per pair. Each repeat runs the pairs in the order the pairs block lists
+    them, then the decoupling probe. Cold is once per pair and stays out of the
+    analysis. A warmups of 0 means no arm-entry warm-up; the per-slot warm-up below
+    is the only warm-up.
+  - E4's single warm-up is replaced. Every measured slot has its own warm-up.
+    NPU and iGPU slots get one unmeasured warm call with identical inputs
+    (static shape 1x256, the fixed prompt) less than call_gap_max_s before the
+    measured call; this covers the re-entry cost E4 measured. 5090 slots get a
+    sustained unmeasured decode of warmup_num_predict tokens with the measured
+    call's options (same model, same num_ctx; only num_predict differs), at
+    least warmup_min_s long, ending less than call_gap_max_s before the
+    measured call.
+  - Until-steady rule. During the 5090 warm-up the harness samples clocks.sm
+    every steady_sample_ms. Steady is steady_samples consecutive samples each
+    within clock_step_mhz of the warm-up's running maximum. If not steady at
+    the end of the warm-up, the warm-up repeats once (warmup_max_attempts);
+    still unsteady refuses the slot as clock_not_steady. The measured call
+    starts within call_gap_max_s of the last steady sample. Clock locking is
+    never used; the routed card is a boost card and the measurement must be of
+    it. Thermal drift across the block is a known confound, named here. Early
+    triplets run cooler than late ones; the neighbouring-alone comparison
+    absorbs slow drift and the refusal rules absorb fast changes.
+  - Slot refusals, each recorded with its reason. A recorded load_duration_s
+    above 1.0 is a reload. A clocks.sm range above clock_tolerance_steps clock
+    steps inside the measured call. A missing sm_clock_mhz or power_w reading
+    (gpu_temp_c may still be null). clock_not_steady. An NPU or iGPU call whose
+    truncated_tokens is not 0 or 1 on its 1x256 static shape. A refused slot is
+    re-run once, in place, inside its triplet. Two refusals in one pair make
+    that pair inconclusive.
+  - The 5090 is sampled in every slot in which it generates, measured or
+    companion, and the same refusal rules read the companion's calls. A
+    companion is part of its slot's condition, and a companion call with
+    load_duration_s above 1.0 refuses the paired slot it accompanied.
+  - Decode rate is the server's eval_count / eval_duration. Prompt rate is
+    prompt_eval_count / prompt_eval_duration and is recorded, not the gate for
+    this experiment.
+  - The harness owns the companion session. It starts the companion arm, runs
+    the paired slot, then stops the session. Stop is an unload; keep_alive 0
+    for Ollama, the Intel lane's unload for OpenVINO. The companion 5090 load
+    is the 5090-alone arm's generate run back to back for the paired slot's
+    duration. The companion NPU load is bge-base embedding at 1x256, and the
+    companion iGPU load is DeBERTa NLI at 1x256, each run back to back.
+  - Inside the block the 5090's qwen3:8b stays loaded. It loads once at block
+    start and unloads once (keep_alive 0) at block end. Any other 5090 load
+    inside the block shows in load_duration_s and refuses its slot.
+  - compile_cache is fresh. Each arm gets its own cache directory for the run.
+    The harness deletes it after unload, including when a step fails. The
+    receipt records the relative path.
+  - Probes never mutate. Liveness and residency questions go to GET
+    /api/version and GET /api/ps only. A generate is never a probe. Ending a
+    session is keep_alive 0, never an empty generate.
+  - The measurement run launches its own Ollama on 127.0.0.1:11441 as the
+    harness's own unelevated child, with logging on. It never uses the shared
+    11434. 11490 is offrig's CPU indexer and is never touched. The receipt
+    records the start line (command, environment, flags) and the /api/version
+    reply at start and at stop. The harness stops the process tree at block end
+    and on abort. A port that will not bind refuses the run. Before the server
+    starts, the card is verified empty (no compute apps, VRAM within the
+    recorded desktop idle band).
+  - Per-slot SM clock and power come from the named gpu_probe and are sampled
+    every steady_sample_ms through every measured 5090 call. A missing reading
+    refuses the slot; E4's null-is-not-a-failure does not apply here.
+  - CPU performance is the named cpu_counter read by typeperf at slot start
+    and slot end of every measured slot, and once per second inside CPU-burn
+    slots.
+  - DeBERTa NLI runs at batch 1. Batch 8 is refused.
+  - The NPU load is bge-base, so this experiment does not wait on E2.
+  - Thinking is off. This spec does not grade thinking quality.
+  - The OpenVINO adapter belongs to the Intel lane. This spec names it.
+  - flank_tol is the optional local flank screen. While null the screen does
+    not run. Setting it is a committed spec amendment fixed from a pilot,
+    before a later run; it is the largest relative distance allowed between a
+    triplet's two alone slots.
+  - Rest between runs is the Publisher's scheduling decision, not a harness
+    rule; this spec carries E4's 2026-10-11 amendment and has no rest_s.
+  - Book one grant and one NPU session together. Do not place this block beside
+    a timed calibration or a ladder run. The watchdog heartbeat is the grant's.
+  - The receipt records, per slot. The raw value, load_duration_s,
+    truncated_tokens on Intel calls, the clock and power series path, the CPU
+    counter readings, and the refusal reason when refused. Per pair it records
+    the d_i list, the median, the 90% interval, the verdict, the Wilcoxon
+    statistic and p as a footnote, and extension_used.
+probes:
+  - id: igpu-after-cpu-burn
+    task: nli
+    device: iGPU
+    engine: openvino
+    model: cross-encoder/nli-deberta-v3-base
+    revision_or_digest: 6c749ce3425cd33b46d187e45b92bbf96ee12ec7
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x256"
+    measure: latency_ms
+    probe_rule: >
+      Once per repeat, after the igpu-5090 triplet: the harness burns CPU with
+      its own busy threads, matched to the block's recorded 5090 measured
+      slot's cpu_perf_pct for the duration of one 5090 measured decode, doing
+      no GPU work of any kind; then one measured iGPU call runs with the usual
+      re-entry warm call less than call_gap_max_s before it. The matched thread
+      count, the burn duration, the CPU samples and the iGPU latency are on the
+      receipt. The probe asks whether the iGPU speed-up E4 run 7 saw beside the
+      5090 is CPU/package-side: a similar speed-up after pure CPU burn says it
+      is. The probe is recorded and is never a gate.
+pairs:
+  - id: 5090-npu
+    alone: 5090-alone
+    paired: 5090-with-npu
+  - id: 5090-igpu
+    alone: 5090-alone
+    paired: 5090-with-igpu
+  - id: npu-5090
+    alone: npu-alone
+    paired: npu-with-5090
+  - id: igpu-5090
+    alone: igpu-alone
+    paired: igpu-with-5090
+arms:
+  - id: 5090-alone
+    task: generate
+    device: "5090"
+    engine: ollama
+    model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "0.35.1"
+    thinking_level: "off"
+    num_predict: 1024
+    num_ctx: null
+    batch: null
+    measure: decode_tok_s
+  - id: npu-alone
+    task: embed
+    device: NPU
+    engine: openvino
+    model: BAAI/bge-base-en-v1.5
+    revision_or_digest: unrecorded
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x256"
+    measure: latency_ms
+    revision_note: >
+      The probe receipt does not record a revision. The run records the revision
+      it loads. Do not copy in a revision from memory to fill this field.
+  - id: igpu-alone
+    task: nli
+    device: iGPU
+    engine: openvino
+    model: cross-encoder/nli-deberta-v3-base
+    revision_or_digest: 6c749ce3425cd33b46d187e45b92bbf96ee12ec7
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x256"
+    measure: latency_ms
+  - id: 5090-with-npu
+    task: generate
+    device: "5090"
+    engine: ollama
+    model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "0.35.1"
+    thinking_level: "off"
+    num_predict: 1024
+    num_ctx: null
+    batch: null
+    companion: npu-alone
+    companion_device: NPU
+    compare_to: 5090-alone
+    measure: decode_tok_s
+  - id: npu-with-5090
+    task: embed
+    device: NPU
+    engine: openvino
+    model: BAAI/bge-base-en-v1.5
+    revision_or_digest: unrecorded
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x256"
+    companion: 5090-alone
+    companion_device: "5090"
+    compare_to: npu-alone
+    measure: latency_ms
+  - id: 5090-with-igpu
+    task: generate
+    device: "5090"
+    engine: ollama
+    model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "0.35.1"
+    thinking_level: "off"
+    num_predict: 1024
+    num_ctx: null
+    batch: null
+    companion: igpu-alone
+    companion_device: iGPU
+    compare_to: 5090-alone
+    measure: decode_tok_s
+  - id: igpu-with-5090
+    task: nli
+    device: iGPU
+    engine: openvino
+    model: cross-encoder/nli-deberta-v3-base
+    revision_or_digest: 6c749ce3425cd33b46d187e45b92bbf96ee12ec7
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "2026.4.1"
+    thinking_level: "off"
+    num_predict: null
+    num_ctx: null
+    batch: 1
+    static_shape: "1x256"
+    companion: 5090-alone
+    companion_device: "5090"
+    compare_to: igpu-alone
+    measure: latency_ms
