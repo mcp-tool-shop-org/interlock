@@ -178,7 +178,7 @@
           "path": "experiments/e4/spec.yaml"
         },
         {
-          "hash": "39633071ed56a9c807eb9a4302cc61bb85ba8b9fb49cabd140aa35be81d0cfe0",
+          "hash": "80d70a188507c8b7aaf667818761f8dd2dd79d4b7547e462a362cc8637e095c6",
           "path": "experiments/e4b/spec.yaml"
         },
         {
@@ -217,7 +217,7 @@
           "path": ".python-version"
         },
         {
-          "hash": "87f77716b2f3a3f7181db2a703ff6c6643fd5ddcc80d26e6128f26d604793ccb",
+          "hash": "ec81bc16b17640c5e0ca848bd54509591d894b99aeed6070cc9a84b01c326e59",
           "path": "CHANGELOG.md"
         },
         {
@@ -225,7 +225,7 @@
           "path": "LICENSE"
         },
         {
-          "hash": "72a78a1cc04448a8b9654f9bc8627402859e47fd8a85033d3c8583c33b3c9def",
+          "hash": "8c66377470f33d2f4874968bfda4f7a181034fa744a718ebe0dfdbe5f9f73cb8",
           "path": "README.md"
         },
         {
@@ -237,11 +237,11 @@
           "path": "codecov.yml"
         },
         {
-          "hash": "95f74b356c155415449967a332eb9bcf00adc8f215e632d715190dfd7d502d1e",
+          "hash": "c5c3f06e29a3c8645c412e9f78eaebb141809e9074048fa06b0cb23528fe841d",
           "path": "pyproject.toml"
         },
         {
-          "hash": "e8b0ee59db5f983d2fb3f0d27d6d9682b0c5006455c4f67cc5fadd80a0062af2",
+          "hash": "ac7f0dec1cfc6b42a7fa65563f33510e80a838b7a68266f14ed9df5dbce2fcf9",
           "path": "uv.lock"
         }
       ],
@@ -402,7 +402,7 @@
             "main",
             "run_report"
           ],
-          "hash": "11e903def6b8db63992ca3257bb6c5cef489c75b59b96f60b67cdd842ce4769b",
+          "hash": "6b78395af2900d5bb4769eeecd0d2260a403ba9640380738457275e653b69ff2",
           "importOrder": [
             "src/switchyard/receipt.py",
             "src/switchyard/tasks.py",
@@ -412,6 +412,7 @@
             "src/switchyard/adapters/base.py",
             "src/switchyard/guards.py",
             "src/switchyard/harness/e4b.py",
+            "src/switchyard/harness/ollama_serve.py",
             "src/switchyard/harness/runner.py",
             "src/switchyard/harness/spec.py",
             "src/switchyard/ollama_supervisor.py",
@@ -421,6 +422,7 @@
             "src/switchyard/adapters/base.py",
             "src/switchyard/guards.py",
             "src/switchyard/harness/e4b.py",
+            "src/switchyard/harness/ollama_serve.py",
             "src/switchyard/harness/runner.py",
             "src/switchyard/harness/spec.py",
             "src/switchyard/importers/assemble.py",
@@ -459,7 +461,7 @@
                   }
                 },
                 {
-                  "line": 382,
+                  "line": 383,
                   "name": "receipt_paths",
                   "target": {
                     "file": "src/switchyard/receipt.py"
@@ -467,7 +469,7 @@
                   "via": "_count_rows"
                 },
                 {
-                  "line": 384,
+                  "line": 385,
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/switchyard/receipt.py"
@@ -528,35 +530,35 @@
               "calls": [
                 {
                   "branch": "args.dry_run",
-                  "line": 255,
+                  "line": 256,
                   "name": "dry_run",
                   "target": {
                     "file": "src/switchyard/harness/runner.py"
                   }
                 },
                 {
-                  "line": 268,
+                  "line": 269,
                   "name": "real_seams",
                   "target": {
                     "file": "src/switchyard/ollama_supervisor.py"
                   }
                 },
                 {
-                  "line": 270,
+                  "line": 271,
                   "name": "heartbeat_path",
                   "target": {
                     "file": "src/switchyard/harness/runner.py"
                   }
                 },
                 {
-                  "line": 267,
+                  "line": 268,
                   "name": "OllamaSupervisor",
                   "target": {
                     "file": "src/switchyard/ollama_supervisor.py"
                   }
                 },
                 {
-                  "line": 259,
+                  "line": 260,
                   "name": "run_spec",
                   "target": {
                     "file": "src/switchyard/harness/runner.py"
@@ -571,7 +573,7 @@
             {
               "calls": [
                 {
-                  "line": 283,
+                  "line": 284,
                   "name": "health_report",
                   "target": {
                     "file": "src/switchyard/ollama_supervisor.py"
@@ -586,20 +588,20 @@
             {
               "calls": [
                 {
-                  "line": 372,
+                  "line": 373,
                   "name": "read_text",
                   "target": null,
                   "via": "_load_jsonl"
                 },
                 {
-                  "line": 311,
+                  "line": 312,
                   "name": "Request",
                   "target": {
                     "file": "src/switchyard/router/policy.py"
                   }
                 },
                 {
-                  "line": 325,
+                  "line": 326,
                   "name": "decide",
                   "target": {
                     "file": "src/switchyard/router/policy.py"
@@ -614,7 +616,7 @@
             {
               "calls": [
                 {
-                  "line": 372,
+                  "line": 373,
                   "name": "read_text",
                   "target": null
                 }
@@ -627,14 +629,14 @@
             {
               "calls": [
                 {
-                  "line": 382,
+                  "line": 383,
                   "name": "receipt_paths",
                   "target": {
                     "file": "src/switchyard/receipt.py"
                   }
                 },
                 {
-                  "line": 384,
+                  "line": 385,
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/switchyard/receipt.py"
@@ -706,6 +708,7 @@
         {
           "exports": [
             "build_live_seams",
+            "capture_run",
             "card_models_at_ceiling",
             "collect_series",
             "count_owned",
@@ -713,6 +716,8 @@
             "execute_block",
             "generate_loop",
             "is_steady",
+            "live_sample_cpu",
+            "live_sample_gpu",
             "normalize_ollama",
             "note_vram",
             "ollama_pin",
@@ -745,7 +750,7 @@
             "urllib_exchange",
             "warm_5090"
           ],
-          "hash": "1840373a0680b1774649c21bf14dfee9d26457afc37d95a4ba8202c9dceaf707",
+          "hash": "f973f86659ea77857c34b0e0ec93abf5fab36fa0aea732a083e4472bc1c09840",
           "importOrder": [
             "src/switchyard/guards.py",
             "src/switchyard/harness/e4b_stats.py",
@@ -753,6 +758,7 @@
             "src/switchyard/harness/ollama_serve.py",
             "src/switchyard/harness/timing.py",
             "src/switchyard/harness/runner.py",
+            "src/switchyard/ollama_supervisor.py",
             "src/switchyard/harness/lock.py",
             "src/switchyard/adapters/openvino.py",
             "src/switchyard/adapters/base.py",
@@ -768,7 +774,8 @@
             "src/switchyard/harness/lock.py",
             "src/switchyard/harness/ollama_serve.py",
             "src/switchyard/harness/runner.py",
-            "src/switchyard/harness/timing.py"
+            "src/switchyard/harness/timing.py",
+            "src/switchyard/ollama_supervisor.py"
           ],
           "path": "src/switchyard/harness/e4b.py"
         },
@@ -826,7 +833,7 @@
             "runner_pid",
             "window_delta"
           ],
-          "hash": "4ded5ecb549c40ee50917913577bcb491162588502abcee252d0f484d90346d1",
+          "hash": "898f9e6d887a3d2bc8f43013fb67be4563720c98ea56a01b53c905959fb8517a",
           "importOrder": [
             "src/switchyard/adapters/base.py",
             "src/switchyard/ollama_supervisor.py",
@@ -880,6 +887,7 @@
             "assert_port_free",
             "cuda_dll",
             "get_json",
+            "log_tail",
             "parse_pin_json",
             "pin_install",
             "read_log_segment",
@@ -890,7 +898,7 @@
             "start_line",
             "stop_process_tree"
           ],
-          "hash": "5a7017300f35c356936701fcfa0e39e878810fdd87f8456dc1052614352a316d",
+          "hash": "bc394393985338e10894704593f4ecc2fdabe9e7d57b48f812e6208f13c11fe9",
           "path": "src/switchyard/harness/ollama_serve.py"
         },
         {
@@ -2973,7 +2981,7 @@
             "spawn_detached",
             "stop_pid"
           ],
-          "hash": "810b03e89a84df6e9ab4fca7e242275c6294e4e690ee0b0d2d67927164c02739",
+          "hash": "58ab31555d518285facd5cd6aa2a970ebd66cc6534f9f0f7b86b6339cabe6e86",
           "importsFiles": [
             "src/switchyard/guards.py"
           ],
@@ -2982,7 +2990,7 @@
             {
               "calls": [
                 {
-                  "line": 446,
+                  "line": 449,
                   "name": "splitlines",
                   "target": null
                 }
@@ -2995,7 +3003,7 @@
             {
               "calls": [
                 {
-                  "line": 664,
+                  "line": 667,
                   "name": "splitlines",
                   "target": null
                 }
@@ -3008,7 +3016,7 @@
             {
               "calls": [
                 {
-                  "line": 689,
+                  "line": 692,
                   "name": "net_connections",
                   "target": null
                 }
@@ -3022,13 +3030,13 @@
               "calls": [
                 {
                   "branch": "system == \"win32\"",
-                  "line": 664,
+                  "line": 667,
                   "name": "splitlines",
                   "target": null,
                   "via": "pids_from_windows"
                 },
                 {
-                  "line": 689,
+                  "line": 692,
                   "name": "net_connections",
                   "target": null,
                   "via": "pids_from_psutil"
@@ -3042,7 +3050,7 @@
             {
               "calls": [
                 {
-                  "line": 804,
+                  "line": 809,
                   "name": "splitlines",
                   "target": null
                 }
@@ -3055,7 +3063,7 @@
             {
               "calls": [
                 {
-                  "line": 804,
+                  "line": 809,
                   "name": "splitlines",
                   "target": null,
                   "via": "card_mib_from_text"
@@ -3069,7 +3077,7 @@
             {
               "calls": [
                 {
-                  "line": 888,
+                  "line": 893,
                   "name": "Process",
                   "target": null
                 }
@@ -3083,13 +3091,13 @@
               "calls": [
                 {
                   "branch": "system == \"win32\"",
-                  "line": 664,
+                  "line": 667,
                   "name": "splitlines",
                   "target": null,
                   "via": "pids_from_windows"
                 },
                 {
-                  "line": 689,
+                  "line": 692,
                   "name": "net_connections",
                   "target": null,
                   "via": "pids_from_psutil"
@@ -3103,7 +3111,7 @@
             {
               "calls": [
                 {
-                  "line": 804,
+                  "line": 809,
                   "name": "splitlines",
                   "target": null,
                   "via": "card_mib_from_text"
@@ -3595,7 +3603,7 @@
       "outsideReads": 31,
       "outsideWrites": 9,
       "role": "code",
-      "testedBy": 25,
+      "testedBy": 26,
       "unresolvedSites": 0
     },
     {
@@ -3860,6 +3868,7 @@
             "test_a_dead_heartbeat_refuses_the_block_and_the_pilot_before_spawn",
             "test_a_digest_mismatch_refuses_the_block_and_the_pilot",
             "test_a_full_block_refuses_null_tolerances_before_heartbeat",
+            "test_a_generate_timeout_and_a_probe_timeout_are_refusals",
             "test_a_refused_slot_is_rerun_once_and_two_refusals_are_inconclusive",
             "test_abort_stops_the_server_and_deletes_the_cache",
             "test_block_records_the_estimate_and_keeps_the_burn_out_of_the_verdict",
@@ -3870,8 +3879,11 @@
             "test_each_refusal_rule",
             "test_extension_runs_five_more_triplets_once",
             "test_intel_lane_reports_the_companion_truncation",
+            "test_live_sample_gpu_records_nvml_then_smi",
+            "test_live_seams_are_not_stubs",
             "test_live_seams_post_only_to_11441",
             "test_one_inconclusive_pair_does_not_decide_another",
+            "test_one_missing_pilot_clock_is_recorded_and_seventeen_good_calls_refuse",
             "test_owned_server_never_posts_to_a_shared_port",
             "test_partial_residency_refuses_the_block_and_the_pilot",
             "test_pilot_reports_the_rounded_range_and_stays_out_of_receipts",
@@ -3882,14 +3894,19 @@
             "test_stats_match_the_hand_counted_cases",
             "test_stop_session_unloads_with_keep_alive_0",
             "test_the_5090_companion_report_is_the_generate_that_finished",
+            "test_the_block_receipt_carries_the_server_config_and_the_probe",
+            "test_the_burn_stops_when_the_slot_ends_and_when_it_raises",
             "test_the_e4b_spec_loads_and_keeps_null_tolerances",
+            "test_the_owned_server_stops_when_version_never_answers",
+            "test_the_owned_server_waits_out_the_first_refused_version_calls",
+            "test_the_pilot_counts_its_prompt_only_once_the_owned_server_is_up",
             "test_the_spawned_environment_is_inherited_without_ollama_or_llama_arg",
             "test_threaded_sample_keeps_readings_from_during_the_call",
             "test_truncated_tokens_and_a_companion_reload_refuse_the_slot",
             "test_unsteady_warmup_refuses_clock_not_steady",
             "test_warm_until_steady_and_a_short_warm_is_not_steady"
           ],
-          "hash": "0117f87011a6f71d80d2b14aa11a13cab7fbe343b78330b41a6771ee8579ef5e",
+          "hash": "403c9ac8290f06ff35cc81f4a656caf2313e6204a183a941f893068d955afba7",
           "importOrder": [
             "src/switchyard/adapters/base.py",
             "src/switchyard/adapters/ollama.py",
@@ -3897,6 +3914,7 @@
             "src/switchyard/harness/e4b.py",
             "src/switchyard/harness/e4b_stats.py",
             "src/switchyard/harness/ollama_serve.py",
+            "src/switchyard/adapters/record_fixtures.py",
             "src/switchyard/harness/spec.py",
             "src/switchyard/harness/timing.py",
             "src/switchyard/cli.py",
@@ -3905,6 +3923,7 @@
           "importsFiles": [
             "src/switchyard/adapters/base.py",
             "src/switchyard/adapters/ollama.py",
+            "src/switchyard/adapters/record_fixtures.py",
             "src/switchyard/cli.py",
             "src/switchyard/guards.py",
             "src/switchyard/harness/e4b.py",
@@ -3915,6 +3934,22 @@
             "src/switchyard/harness/timing.py"
           ],
           "path": "tests/test_e4b.py"
+        },
+        {
+          "exports": [
+            "test_pin_install_refuses_an_empty_cuda_sha",
+            "test_read_git_is_clean_only_on_a_successful_empty_porcelain",
+            "test_read_git_refuses_a_non_zero_git_call",
+            "test_read_git_refuses_a_runner_that_captured_nothing",
+            "test_read_git_refuses_a_short_sha",
+            "test_the_live_runner_returns_the_child_stdout"
+          ],
+          "hash": "b720d4d8e71f30f5126c100bcabd0a46221f3f8e6c4c88a821daf01d65975689",
+          "importsFiles": [
+            "src/switchyard/harness/e4b.py",
+            "src/switchyard/harness/ollama_serve.py"
+          ],
+          "path": "tests/test_e4b_capture_run.py"
         },
         {
           "exports": [
@@ -4220,6 +4255,7 @@
             "test_a_version_or_backend_mismatch_after_restart_stops_the_run",
             "test_a_wait_sleeps_until_the_server_answers",
             "test_an_old_backend_line_before_the_offset_is_ignored",
+            "test_an_unreadable_log_size_does_not_read_the_old_log",
             "test_cli_health_output",
             "test_dry_run_states_the_restart_policy",
             "test_fill_card_retry_cap_and_mismatch_stop_between_models",
@@ -4238,7 +4274,7 @@
             "test_the_restart_cap_stops_the_run",
             "test_the_start_line_record_is_optional_and_filtered"
           ],
-          "hash": "43977b72af65db793aa667f6db02b99bf58fa95e356fc499b089a48e0bf922de",
+          "hash": "0623ca882345d701afe4ec31b30ec3100c107ada5cf1ed8776b09de4324c7321",
           "importOrder": [
             "src/switchyard/adapters/base.py",
             "src/switchyard/adapters/ollama.py",
@@ -4761,7 +4797,7 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 27
+          "files": 28
         },
         {
           "boundary": "src",
@@ -4887,8 +4923,8 @@
   ],
   "engine": "1.23.0",
   "generatedFrom": {
-    "commit": "495c87593528741acd02bcb27db5df5002fcac3d",
-    "tracked": 155
+    "commit": "8082da93e054b9c85e2ce7e405508ede439ad66c",
+    "tracked": 156
   },
   "landings": [
     {
@@ -5035,7 +5071,7 @@
   "overlaps": [],
   "submodules": [],
   "symlinks": [],
-  "testFiles": 45,
+  "testFiles": 46,
   "unassigned": [
     {
       "hash": "be418720d26ab2999db6b0a7e07f4f2d6532c8c35f3c2d5329f9ce506b82109f",
