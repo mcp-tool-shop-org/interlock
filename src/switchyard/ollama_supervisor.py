@@ -352,13 +352,16 @@ def env_from_log(text: str | None) -> dict[str, str]:
 
 
 def log_byte_size(path: str) -> int:
-    """Bytes in the server log. A missing log is empty, and the offset is zero."""
+    """Bytes in the server log. A missing log is empty, and the offset is zero.
+
+    Any other read error propagates. The restart must not treat it as an empty log.
+    """
 
     if not isinstance(path, str) or not path.strip():
         return 0
     try:
         return Path(path).stat().st_size
-    except OSError:
+    except FileNotFoundError:
         return 0
 
 
@@ -1114,15 +1117,21 @@ class OllamaSupervisor:
         return text
 
     def _note_offset(self) -> int | None:
+        """Bytes in the log before the spawn. None when there is no log seam.
+
+        A seam that raises, or that does not return a count, is not an empty
+        log. Zero is an empty log. The caller stops rather than read from zero.
+        """
+
         sizer = getattr(self.seams, "log_size", None)
         if not callable(sizer) or self.start is None:
             return None
         try:
             size = sizer(self.start.log_path)
         except Exception:
-            return 0
+            return None
         if isinstance(size, bool) or not isinstance(size, int) or size < 0:
-            return 0
+            return None
         return size
 
     def _post_restart_fingerprint(self, url: str) -> ServerFingerprint | None:
@@ -1137,6 +1146,8 @@ class OllamaSupervisor:
         self._segment_env = None
         self._backend_pending = False
         if self.log_offset is None:
+            if callable(getattr(self.seams, "log_size", None)):
+                return None
             return current
         segment = self._segment_text()
         if segment is None:
@@ -1365,6 +1376,7 @@ class OllamaSupervisor:
             raise SupervisorStop(baseline_note)
         current = self._post_restart_fingerprint(url)
         if not isinstance(current, ServerFingerprint):
+            unread = callable(getattr(self.seams, "log_size", None)) and self.log_offset is None
             self._fail(
                 url,
                 why,
@@ -1372,7 +1384,12 @@ class OllamaSupervisor:
                 new_pid,
                 started,
                 version,
-                "the Ollama environment could not be read after the restart; the run stops",
+                (
+                    "the Ollama log size could not be read, so the new segment is unknown; "
+                    "the run stops. The log from before the restart is not a match."
+                    if unread
+                    else "the Ollama environment could not be read after the restart; the run stops"
+                ),
             )
         mismatch = environment_mismatch(
             self._recorded,

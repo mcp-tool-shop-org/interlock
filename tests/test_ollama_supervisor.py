@@ -649,6 +649,36 @@ def test_an_old_backend_line_before_the_offset_is_ignored(tmp_path: Path):
     assert different.stopped == [10]
 
 
+def test_an_unreadable_log_size_does_not_read_the_old_log(monkeypatch):
+    prefix = (LINE + "\n").encode()
+    fresh = _config_line(World().start_record().env) + (LINE + "\n").encode()
+
+    def restart_with(size):
+        world = World()
+        world.log = prefix
+        world.append_on_spawn = fresh
+        world.log_size = size
+        return world
+
+    raised = restart_with(lambda _path: (_ for _ in ()).throw(OSError("unread")))
+    supervisor = _supervisor(raised)
+    with pytest.raises(SupervisorStop, match="log size"):
+        supervisor.after_failure(URL_5090, model="qwen3:8b", kind="transport")
+    assert raised.stopped == [10]
+    assert len(raised.spawned) == 1
+    assert supervisor.restarts[0].note and "log size" in supervisor.restarts[0].note
+
+    negative = restart_with(lambda _path: -1)
+    with pytest.raises(SupervisorStop, match="log size"):
+        _supervisor(negative).after_failure(URL_5090, model="qwen3:8b", kind="transport")
+    assert negative.stopped == [10]
+
+    monkeypatch.setattr(Path, "stat", lambda *_args, **_kwargs: (_ for _ in ()).throw(PermissionError("denied")))
+    with pytest.raises(PermissionError):
+        log_byte_size(LOG_PATH)
+    assert log_byte_size("") == 0
+
+
 def test_no_new_backend_line_yet_is_checked_after_the_first_load_before_the_sample_is_kept(tmp_path: Path):
     world = World()
     world.log = (LINE + "\n").encode()
