@@ -455,3 +455,18 @@ def test_a_generate_with_no_completion_limit_is_refused_before_any_request(value
     with pytest.raises(AdapterError, match="num_predict must be"):
         generate_body(missing)
     assert calls == []
+
+
+def test_a_long_target_takes_a_few_counts_not_one_per_repeat():
+    # E5's first live run spent over 30 minutes adding one seed at a time toward 118k tokens (2026-10-12).
+    seed = "The switchyard counts the same cars on every pass. "
+    calls = []
+
+    def count(prompt: str) -> int:
+        calls.append(len(prompt))
+        return len(prompt.split()) * 13 // 9  # about 13 tokens per 9 words, like the real seed
+
+    text, number, fit = fit_prompt_words(seed, 118_000, count)
+    assert number >= 118_000 and fit in ("exact", "shortest_at_or_above")
+    assert count(text[: text.rstrip().rfind(" ")]) < 118_000 or number == 118_000
+    assert len(calls) <= 25, len(calls)
