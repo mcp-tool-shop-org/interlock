@@ -64,8 +64,9 @@ decision: >
   negative d_i. The NPU and iGPU comparison is warm latency per call; there a
   slower pair is a positive d_i. The estimate is the Hodges-Lehmann estimate
   of the d_i (the median of the Walsh averages) with its exact Wilcoxon
-  signed-rank 90% confidence interval, which is distribution-free and exact at
-  10 or 15 triplets and needs no seed.
+  signed-rank confidence interval, taken as the narrowest exact interval with
+  confidence at least 90%, its achieved level recorded on the receipt. It is
+  distribution-free, exact at 10 or 15 triplets, and needs no seed.
   The router may schedule the pair freely only when the whole interval lies
   inside the band, +/-0.10 on the log scale (0.905x to 1.105x). A consistent
   speed-up shows coupling, so the pair is not free when the whole interval
@@ -139,8 +140,9 @@ stop_rules:
     inconclusive, not a pass.
   - Order is A-B-A per triplet. The alone slot runs, then the paired slot with
     its companion session, then the alone slot again. One repeat is one triplet
-    per pair. Each repeat runs the pairs in the order the pairs block lists
-    them, then the decoupling probe. Cold is once per pair and stays out of the
+    per pair. Repeat i (counting from 0) runs the pairs starting at
+    offset i mod 4 in the order the pairs block lists them, wrapping around, then
+    the decoupling probe. The rotation is fixed; there is no randomness. Cold is once per pair and stays out of the
     analysis. A warmups of 0 means no arm-entry warm-up; the per-slot warm-up below
     is the only warm-up.
   - E4's single warm-up is replaced. Every measured slot has its own warm-up.
@@ -241,8 +243,9 @@ probes:
     measure: latency_ms
     probe_rule: >
       Once per repeat, after the igpu-5090 triplet: the harness burns CPU with
-      its own busy threads, matched to the block's recorded 5090 measured
-      slot's cpu_perf_pct for the duration of one 5090 measured decode, doing
+      its own busy threads, matched on \Processor Information(_Total)\% Processor Utility
+      to the block's recorded 5090 measured slot, with % Processor Performance
+      recorded beside it, for the duration of one 5090 measured decode, doing
       no GPU work of any kind; then one measured iGPU call runs with the usual
       re-entry warm call less than call_gap_max_s before it. The matched thread
       count, the burn duration, the CPU samples and the iGPU latency are on the
