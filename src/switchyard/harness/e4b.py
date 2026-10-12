@@ -1156,7 +1156,6 @@ def run_pilot(spec: dict, seams, *, root: Path, run_id: str, repo: Path, calls: 
     if arm is None:
         raise E4bError("the pilot measures 5090-alone")
     measurement = _measurement(spec)
-    prompt = prepare_prompt(spec, seams.count_tokens)
     ranges = []
     full = []
     warm_short = 0
@@ -1167,6 +1166,8 @@ def run_pilot(spec: dict, seams, *, root: Path, run_id: str, repo: Path, calls: 
         try:
             seams.load_resident()
             _require_owned_server(spec, seams, running)
+            # The prompt is counted on the run-owned server, so only once it is up and proven.
+            prompt = prepare_prompt(spec, seams.count_tokens)
             for _index in range(calls):
                 warm = warm_5090(seams, arm, prompt, measurement, enforce=False)
                 if not warm["attempts"] or float(warm["attempts"][-1].get("elapsed_s") or 0) + 1e-9 < float(measurement["warmup_min_s"]):

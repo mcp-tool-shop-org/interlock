@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed: the E4b pilot counted its prompt on the run-owned server (11441) before starting it, so the count was refused (WinError 10061) and the pilot stopped before any device work. It now counts once the server is up and proven, as the block already did. Found live by the Publisher, 2026-10-12.
+
 - Fixed: E4b's live runner was a bare `subprocess.run`, which captures no output, so the 11434 pin read "" and the pilot refused ("the 11434 listener report is not JSON"); the receipt's git sha and clean flag read the same way. The default is now `capture_run` (captured, text). Another `test_fake_hides_platform` instance: the fakes returned stdout. Found live by the Publisher, 2026-10-12.
 - Fixed: `read_git` fails closed (R&D on #84). Both git calls must exit 0 and HEAD must be a 40-hex sha, and the tree is clean only on a successful, empty porcelain read; a runner that captured nothing used to record `git_sha ""` and `clean_tree true`. The pilot and the block read git before any device starts. `pin_install` refuses a CUDA sha that isn't a 64-hex digest.
 

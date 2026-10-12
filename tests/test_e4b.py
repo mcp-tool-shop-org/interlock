@@ -1497,3 +1497,28 @@ def test_a_card_that_is_not_empty_refuses_the_block_and_the_pilot_before_spawn(t
         opener=lambda method, url: {"version": "0.35.1"},
     )
     assert busy.card_models() == [5000]
+
+
+def test_the_pilot_counts_its_prompt_only_once_the_owned_server_is_up(tmp_path: Path):
+    # Live 2026-10-12: the pilot counted on 11441 before starting it, and the count was refused (WinError 10061).
+    spec = _spec([PAIRS[0]])
+    server = _Server()
+
+    def call(arm, *, num_predict, measured, kind, prompt):
+        payload = _clean(arm, num_predict=num_predict, kind=kind)
+        if kind == "measure":
+            payload["clocks_mhz"] = [2000.0, 2000.0]
+            payload["eval_count"] = 1024
+        return payload
+
+    seams = _seams(server, call)
+    counted = []
+
+    def count(text):
+        assert "start" in server.events, "the prompt was counted before the run-owned server started"
+        counted.append(text)
+        return len(text.split())
+
+    seams.count_tokens = count
+    run_pilot(spec, seams, root=tmp_path, run_id="pilot-order", repo=tmp_path, calls=PILOT_CALLS)
+    assert counted
