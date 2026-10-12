@@ -112,7 +112,7 @@ def _fresh(tmp_path: Path) -> Path:
 
 
 class _Transport:
-    def __init__(self, seams, *, show_error=None, explode=False, spill_shared=False, spill_prompt=False, missing_shared=False, missing_prompt=False, abort_at=None):
+    def __init__(self, seams, *, show_error=None, explode=False, spill_shared=False, spill_prompt=False, missing_shared=False, missing_prompt=False, abort_at=None, stick=False, linear=None, cold_disagrees=False):
         self.seams = seams
         self.show_error = show_error
         self.explode = explode
@@ -121,19 +121,31 @@ class _Transport:
         self.missing_shared = missing_shared
         self.missing_prompt = missing_prompt
         self.abort_at = abort_at
+        self.stick = stick
+        self.linear = linear
+        self.cold_disagrees = cold_disagrees
         self.calls = []
         self.unloads = []
         self.abort_unloads = []
+        self.order = []
         self.loaded = None
         self.trace = None
         self.state = {"ctx": None, "confirm": False, "busy": False}
 
+    def cancel(self):
+        self.order.append("cancel")
+
     def card_mib(self):
+        if self.stick and self.seams is not None and self.seams.over:
+            return 30500
         if not self.state["busy"]:
             return 1500
         ctx = self.state["ctx"]
         if self.abort_at is not None and isinstance(ctx, int) and ctx >= self.abort_at:
             return 30500
+        if self.linear is not None and isinstance(ctx, int):
+            base, per_ctx = self.linear
+            return base + per_ctx * ctx
         return 20000
 
     def shared_mib(self):
@@ -168,6 +180,7 @@ class _Transport:
         if body.get("keep_alive") == 0 and body.get("prompt") == "":
             if self.seams.over and self.state["busy"]:
                 self.abort_unloads.append(self.state["ctx"])
+            self.order.append("unload")
             self.unloads.append(body["model"])
             self.loaded = None
             self.state["busy"] = False
@@ -180,7 +193,10 @@ class _Transport:
             raise RuntimeError("generate exploded")
         self.seams.sample()
         if body.get("raw"):
-            return {"prompt_eval_count": 100000}
+            count = 100000
+            if self.cold_disagrees and self.loaded is None:
+                count = 100001
+            return {"prompt_eval_count": count}
         self.loaded = {"name": body["model"], "size": 1000, "size_vram": 1000}
         rate = self._rate()
         payload = {"eval_count": 1, "eval_duration": 1_000_000_000, "total_duration": 5_000_000}
@@ -264,6 +280,9 @@ def test_a_clean_search_records_the_confirmed_window(tmp_path: Path):
     assert row["settings"]["ggml_cuda_sha"] == "unrecorded"
     assert row["settings"]["dedicated_mib"] == 12
     assert row["settings"]["prompt_token_method"].startswith("prompt_eval_count")
+    assert row["settings"]["prompt_tokens"] == 100000
+    assert row["settings"]["prompt_token_search"] == 100000
+    assert row["settings"]["prompt_token_cold"] == 100000
     assert row["gpu_resident"] is True
     assert row["model"]["size"] == row["model"]["size_vram"] == 1000
     assert row["model_family"] == "qwen"
@@ -296,7 +315,59 @@ def test_the_sampler_unloads_when_the_window_reaches_abort_mib(tmp_path: Path):
     assert 31200 not in _ctxs(transport)
     assert 31200 not in row["settings"]["aborted_windows"]
     assert transport.abort_unloads == [8192]
+    assert transport.order[:2] == ["cancel", "unload"]
+    assert row["settings"]["after_unload_mib"] == [{"ctx": 8192, "mib": 1500}]
+    assert "after the unload" not in row["notes"]
+    assert "predicted_over" not in row["settings"]
     assert transport.unloads
+
+
+def test_a_window_whose_card_does_not_fall_after_unload_is_noted(tmp_path: Path):
+    transport = _Transport(None, abort_at=8192, stick=True)
+    seams = _seams(transport)
+    _repo, rows = _run(tmp_path, transport, seams=seams)
+    row = rows[0]
+    assert transport.order[:2] == ["cancel", "unload"]
+    assert {"ctx": 8192, "mib": 30500} in row["settings"]["after_unload_mib"]
+    assert "8192 stayed at 30500 MiB after the unload" in row["notes"]
+    assert row["settings"]["max_resident_ctx"] != 8192
+
+
+def test_a_doubling_step_predicted_over_is_skipped_and_the_first_window_still_loads(tmp_path: Path):
+    transport = _Transport(None, linear=(10000, 2))
+    seams = _seams(transport)
+    _repo, rows = _run(tmp_path, transport, seams=seams, max_ctx=32768)
+    row = rows[0]
+    ctxs = _ctxs(transport)
+    assert ctxs[0] == 4096
+    assert 8192 in ctxs
+    assert 16384 in row["settings"]["predicted_over"]
+    assert 16384 not in ctxs
+    assert 31200 not in ctxs
+    assert row["settings"]["max_resident_ctx"] not in row["settings"]["predicted_over"]
+    assert row["settings"]["max_resident_ctx"] == 10240
+
+
+def test_a_cold_recount_mismatch_refuses_the_confirmation(tmp_path: Path):
+    transport = _Transport(None, cold_disagrees=True)
+    seams = _seams(transport)
+    with pytest.raises(RunnerError, match="the search counted 100000 and a cold load counted 100001"):
+        _run(tmp_path, transport, seams=seams)
+    raw = [
+        index
+        for index, (_method, _url, body) in enumerate(transport.calls)
+        if isinstance(body, dict) and body.get("raw") is True
+    ]
+    unloads = [
+        index
+        for index, (_method, _url, body) in enumerate(transport.calls)
+        if isinstance(body, dict) and body.get("prompt") == "" and body.get("keep_alive") == 0
+    ]
+    assert raw and unloads and unloads[0] < raw[-1]
+    assert not any(
+        isinstance(body, dict) and body.get("raw") is not True and body.get("prompt") not in (None, "", SEED)
+        for _method, _url, body in transport.calls
+    )
 
 
 def test_shared_growth_steps_the_candidate_back(tmp_path: Path):

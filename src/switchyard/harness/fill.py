@@ -6,10 +6,16 @@ uses ``num_predict`` 1. Confirmation counts a prefix of about 90 percent of
 the candidate with the served model's ``prompt_eval_count``, then generates
 it with shift and truncate false.
 
-The sampler aborts at ``abort_mib``. It unloads with ``keep_alive`` 0 and
-records the window as over. The spec ceiling is not a probe. Nothing here
-rests between models. A missing shared-memory reading or a missing prompt
-rate is a spill, which the pure search already treats as a step back.
+The sampler aborts at ``abort_mib``. It closes the in-flight request, then
+unloads with ``keep_alive`` 0, then reads the card once more. A window whose
+card does not fall is recorded with that note. Before a load, two measured
+windows extrapolate the next card reading; a window predicted to reach
+``abort_mib`` is ``predicted_over`` and is not loaded. The first window has
+no line yet, so it still loads. The spec ceiling is not a probe. Nothing
+here rests between models. A missing shared-memory reading or a missing
+prompt rate is a spill, which the pure search already treats as a step back.
+A confirmation prefix is counted again from a cold load, and a disagreement
+refuses the model.
 
 Tests pass fakes. The real nvidia-smi and counter readers run only when a
 caller builds :func:`real_fill_seams` and then calls them.
@@ -40,6 +46,7 @@ from switchyard.receipt import validate_row
 
 UNRECORDED = "unrecorded"
 ABORT_ERROR = "card memory reached abort_mib"
+PREDICTED_OVER = "predicted_over"
 MEMORY_ARGV = ("nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits")
 DRIVER_ARGV = ("nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader,nounits")
 CUDA_ARGV = ("nvidia-smi", "--query-gpu=cuda_version", "--format=csv,noheader,nounits")
@@ -50,6 +57,10 @@ _MIB = 1024 * 1024
 
 class _WindowOver(Exception):
     """The sampler reached abort_mib while this window was in flight."""
+
+
+class _CountRefused(Exception):
+    """The cold re-count of a confirmation prefix disagreed with the search."""
 
 
 @dataclass
@@ -132,8 +143,9 @@ class CardSampler:
 
     ``threaded`` false means the transport calls :meth:`sample` itself, so a
     test can abort on one deterministic reading. The production sampler waits
-    ``sample_ms`` between readings. Reaching ``abort_mib`` unloads and marks
-    the window over. The reading is not compared with the spec ceiling.
+    ``sample_ms`` between readings. Reaching ``abort_mib`` runs ``on_abort``,
+    which closes the request before the unload. The reading is not compared
+    with the spec ceiling.
     """
 
     def __init__(self, seams: FillSeams, abort_mib: int, sample_ms: int, on_abort) -> None:
@@ -431,6 +443,43 @@ def _over(peak: int | None) -> Observation:
     return Observation(False, peak, error=ABORT_ERROR)
 
 
+def _predict_mib(measured: list[tuple[int, int]], ctx: int) -> int | None:
+    """Card MiB for ``ctx`` from the last two measured windows of this model.
+
+    One window mixes the weights with that window's cache, so it is not a
+    line yet and the caller loads it. Two windows give MiB per context token.
+    The next step rounds up when the slope climbs, so a fraction of a MiB
+    still counts as reaching ``abort_mib``.
+    """
+
+    points: list[tuple[int, int]] = []
+    for seen, mib in measured:
+        if points and points[-1][0] == seen:
+            points[-1] = (seen, mib)
+        else:
+            points.append((seen, mib))
+    if len(points) < 2:
+        return None
+    (left_ctx, left_mib), (right_ctx, right_mib) = points[-2], points[-1]
+    span = right_ctx - left_ctx
+    if span == 0:
+        return None
+    rise = right_mib - left_mib
+    steps = ctx - right_ctx
+    if steps == 0:
+        return right_mib
+    if rise > 0 and steps > 0:
+        return right_mib + (rise * steps + span - 1) // span
+    return right_mib + (rise * steps) // span
+
+
+def _stuck_note(ctx: int | None, reading: int | None) -> str:
+    window = "the window" if ctx is None else str(ctx)
+    if reading is None:
+        return f"{window} had no card reading after the unload"
+    return f"{window} stayed at {reading} MiB after the unload"
+
+
 def run_fill_card(
     spec: dict,
     *,
@@ -586,14 +635,30 @@ def _measure_model(
         )
 
     aborted: list[int] = []
-    prompts: dict[int, tuple[int, str]] = {}
+    predicted_over: list[int] = []
+    measured: list[tuple[int, int]] = []
+    after_unload: list[tuple[int | None, int | None]] = []
+    prompts: dict[int, tuple[int, str, int, int]] = {}
     sizes: dict[int, tuple[int, int, bool]] = {}
     dedicated_by_ctx: dict[int, int] = {}
     shift = spec.get("shift") is False
     truncate = spec.get("truncate") is False
+    current: dict[str, int | None] = {"ctx": None}
 
     def on_abort() -> None:
-        adapter.unload(model, "5090")
+        try:
+            cancel = getattr(adapter, "cancel", None)
+            if callable(cancel):
+                cancel()
+        finally:
+            try:
+                adapter.unload(model, "5090")
+            finally:
+                try:
+                    reading = _optional_int(seams.card_mib())
+                except Exception:
+                    reading = None
+                after_unload.append((current["ctx"], reading))
 
     sampler = CardSampler(seams, spec["abort_mib"], sample_ms, on_abort)
 
@@ -614,6 +679,7 @@ def _measure_model(
         return counted
 
     def observe(ctx: int, kind: str) -> Observation:
+        current["ctx"] = ctx
         prompt = seed
         if kind == "confirm":
             target = max(1, int(ctx * fraction))
@@ -627,7 +693,25 @@ def _measure_model(
                     aborted.append(ctx)
                     return _over(sampler.peak)
                 return Observation(False, sampler.peak, error=str(exc))
-            prompts[ctx] = (tokens, _prompt_method(fit))
+            if _count_leaves_loaded(entry.get("keep_alive")):
+                adapter.unload(model, "5090")
+            try:
+                cold_tokens = count(text, ctx)
+            except _WindowOver:
+                aborted.append(ctx)
+                return _over(sampler.peak)
+            except AdapterError as exc:
+                if sampler.over:
+                    aborted.append(ctx)
+                    return _over(sampler.peak)
+                return Observation(False, sampler.peak, error=str(exc))
+            if cold_tokens != tokens:
+                if _count_leaves_loaded(entry.get("keep_alive")):
+                    adapter.unload(model, "5090")
+                raise _CountRefused(
+                    f"the search counted {tokens} and a cold load counted {cold_tokens}"
+                )
+            prompts[ctx] = (cold_tokens, _prompt_method(fit), tokens, cold_tokens)
             if _count_leaves_loaded(entry.get("keep_alive")):
                 adapter.unload(model, "5090")
             prompt = text
@@ -674,12 +758,19 @@ def _measure_model(
         )
 
     def probe(ctx: int, kind: str) -> Observation:
+        predicted = _predict_mib(measured, ctx)
+        if predicted is not None and predicted >= spec["abort_mib"]:
+            predicted_over.append(ctx)
+            return Observation(False, predicted, error=PREDICTED_OVER)
         sampler.reset()
         try:
-            return sampler.cover(lambda: observe(ctx, kind))
+            obs = sampler.cover(lambda: observe(ctx, kind))
         except _WindowOver:
             aborted.append(ctx)
-            return _over(sampler.peak)
+            obs = _over(sampler.peak)
+        if kind == "load" and isinstance(obs.peak_mib, int):
+            measured.append((ctx, obs.peak_mib))
+        return obs
 
     try:
         found = search(
@@ -710,11 +801,45 @@ def _measure_model(
             flash=flash,
             kv=kv,
             ggml=ggml,
+            after_unload=after_unload,
+            predicted_over=predicted_over,
+        )
+    except _CountRefused as exc:
+        return _row(
+            spec,
+            entry,
+            grant=grant,
+            spec_rel=spec_rel,
+            run_id=run_id,
+            date=date,
+            notes=_join(str(exc), notes),
+            aborted=True,
+            version=version,
+            driver=driver,
+            cuda=cuda,
+            baseline=baseline,
+            quant=quant,
+            default_ctx=default_ctx,
+            flash=flash,
+            kv=kv,
+            ggml=ggml,
+            after_unload=after_unload,
+            predicted_over=predicted_over,
+            aborted_windows=aborted,
+            sample_ms=sample_ms,
         )
 
     prompt_meta = prompts.get(found.max_ctx) if found.max_ctx is not None else None
     size_meta = sizes.get(found.max_ctx) if found.max_ctx is not None else None
     dedicated = dedicated_by_ctx.get(found.max_ctx) if found.max_ctx is not None else None
+    stuck = [
+        _stuck_note(ctx, reading)
+        for ctx, reading in after_unload
+        if reading is None or reading >= spec["abort_mib"]
+    ]
+    recorded = _join(found.reason, notes)
+    if stuck:
+        recorded = _join(recorded, "; ".join(stuck))
     return _row(
         spec,
         entry,
@@ -722,7 +847,7 @@ def _measure_model(
         spec_rel=spec_rel,
         run_id=run_id,
         date=date,
-        notes=_join(found.reason, notes),
+        notes=recorded,
         aborted=False,
         version=version,
         driver=driver,
@@ -739,6 +864,8 @@ def _measure_model(
         dedicated=dedicated,
         aborted_windows=aborted,
         sample_ms=sample_ms,
+        after_unload=after_unload,
+        predicted_over=predicted_over,
     )
 
 
@@ -768,11 +895,13 @@ def _row(
     kv: str = UNRECORDED,
     ggml: str = UNRECORDED,
     found=None,
-    prompt_meta: tuple[int, str] | None = None,
+    prompt_meta: tuple[int, str, int, int] | None = None,
     size_meta: tuple[int, int, bool] | None = None,
     dedicated: int | None = None,
     aborted_windows: list[int] | None = None,
     sample_ms: int | None = None,
+    after_unload: list[tuple[int | None, int | None]] | None = None,
+    predicted_over: list[int] | None = None,
 ) -> dict:
     num_predict = spec.get("confirm_num_predict", 1)
     if isinstance(num_predict, bool) or not isinstance(num_predict, int):
@@ -810,9 +939,15 @@ def _row(
         settings["search_calls"] = [[kind, ctx] for kind, ctx in found.calls]
     if aborted_windows:
         settings["aborted_windows"] = list(aborted_windows)
+    if after_unload:
+        settings["after_unload_mib"] = [{"ctx": ctx, "mib": mib} for ctx, mib in after_unload]
+    if predicted_over:
+        settings["predicted_over"] = list(predicted_over)
     if prompt_meta is not None:
         settings["prompt_tokens"] = prompt_meta[0]
         settings["prompt_token_method"] = prompt_meta[1]
+        settings["prompt_token_search"] = prompt_meta[2]
+        settings["prompt_token_cold"] = prompt_meta[3]
     if dedicated is not None:
         settings["dedicated_mib"] = dedicated
     model = {

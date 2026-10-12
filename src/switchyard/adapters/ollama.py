@@ -16,6 +16,7 @@ The default transport sets no timeout. A caller that wants one passes
 from __future__ import annotations
 
 import json
+import threading
 from urllib.request import Request, urlopen
 
 from switchyard.adapters.base import AdapterError, StepRequest, StepResult
@@ -119,16 +120,59 @@ def quantization_level(payload: dict) -> str:
     return level
 
 
-def default_transport(method: str, url: str, body: dict | None, timeout: float | None = None) -> dict:
+class _Flight:
+    """The response currently being read, so another thread can close it."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._close = None
+
+    def arm(self, close) -> None:
+        with self._lock:
+            self._close = close
+
+    def disarm(self) -> None:
+        with self._lock:
+            self._close = None
+
+    def cancel(self) -> None:
+        with self._lock:
+            close = self._close
+        if close is None:
+            return
+        try:
+            close()
+        except Exception:
+            return
+
+
+def default_transport(
+    method: str,
+    url: str,
+    body: dict | None,
+    timeout: float | None = None,
+    flight: _Flight | None = None,
+) -> dict:
     data = None if body is None else json.dumps(body).encode("utf-8")
     request = Request(url, data=data, method=method)
     if data is not None:
         request.add_header("Content-Type", "application/json")
     if timeout is None:
         with urlopen(request) as response:
-            return json.loads(response.read().decode("utf-8"))
+            return _read_response(response, flight)
     with urlopen(request, timeout=timeout) as response:
+        return _read_response(response, flight)
+
+
+def _read_response(response, flight: _Flight | None) -> dict:
+    closer = getattr(response, "close", None)
+    if flight is not None and callable(closer):
+        flight.arm(closer)
+    try:
         return json.loads(response.read().decode("utf-8"))
+    finally:
+        if flight is not None:
+            flight.disarm()
 
 
 def _rate(count: object, duration_ns: object) -> float | None:
@@ -140,14 +184,23 @@ def _rate(count: object, duration_ns: object) -> float | None:
 class OllamaAdapter:
     def __init__(self, *, transport=None, device: str = "5090", timeout: float | None = None):
         self.timeout = timeout
+        self._flight = _Flight()
         if transport is None:
             def bound(method: str, url: str, body: dict | None) -> dict:
-                return default_transport(method, url, body, timeout=timeout)
+                return default_transport(method, url, body, timeout=timeout, flight=self._flight)
 
             self.transport = bound
         else:
             self.transport = transport
         self.device = device
+
+    def cancel(self) -> None:
+        """Close the in-flight request. The unload comes after this returns."""
+
+        self._flight.cancel()
+        closer = getattr(self.transport, "cancel", None)
+        if callable(closer):
+            closer()
 
     def count_tokens(
         self,

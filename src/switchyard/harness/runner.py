@@ -175,6 +175,9 @@ def dry_run(spec_path: Path, repo: Path) -> str:
         lines.append("the sampler aborts at abort_mib and does not wait for the watchdog")
         lines.append("quant is read from /api/show at run time")
         lines.append("confirmation prefix counted at run time with prompt_eval_count")
+        lines.append("the final prefix is counted again from a cold load")
+        lines.append("an abort closes the request, then unloads, then reads the card again")
+        lines.append("a window predicted to reach abort_mib is predicted_over and is not loaded")
         lines.append("one model at a time; unloaded between models; rest is not taken here")
         lines.append("the ceiling is never loaded")
     else:
