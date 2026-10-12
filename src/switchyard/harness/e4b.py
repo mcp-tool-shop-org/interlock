@@ -1365,18 +1365,29 @@ def _clocks_missing(clocks) -> bool:
     return not isinstance(clocks, list) or not clocks or any(item is None for item in clocks)
 
 
-def _header(spec, seams, repo, running, caches, prompt, *, aborted: bool) -> dict:
+def _git_at_start(seams, repo: Path, git: dict | None) -> dict:
+    """The sha and clean flag from before this run writes. A passed dict is not read again."""
+
+    if git is not None:
+        return git
+    read = getattr(seams, "git", None)
+    if read:
+        return read(repo)
+    return {"git_sha": None, "clean_tree": None}
+
+
+def _header(spec, seams, repo, running, caches, prompt, *, aborted: bool, git: dict | None = None) -> dict:
     from switchyard.ollama_supervisor import server_config_env
 
-    git = seams.git(repo) if getattr(seams, "git", None) else {"git_sha": None, "clean_tree": None}
+    recorded = git if git is not None else {"git_sha": None, "clean_tree": None}
     vram = note_vram(getattr(seams, "vram", None))
     segment = _log_text(seams, running)
     config = server_config_env(segment)
     header = {
         "kind": "e4b-header",
         "id": spec["id"],
-        "git_sha": git.get("git_sha"),
-        "clean_tree": git.get("clean_tree"),
+        "git_sha": recorded.get("git_sha"),
+        "clean_tree": recorded.get("clean_tree"),
         "argv": list(getattr(running, "argv", []) or []),
         "environment": receipt_environment(dict(getattr(running, "environment", {}) or {})),
         "version_start": getattr(running, "version_start", None),
@@ -1405,7 +1416,7 @@ def _write_jsonl(path: Path, rows: list[dict]) -> None:
     path.write_text(body, encoding="utf-8")
 
 
-def run_block(spec: dict, seams, *, root: Path, run_id: str, repo: Path) -> list[dict]:
+def run_block(spec: dict, seams, *, root: Path, run_id: str, repo: Path, git: dict | None = None) -> list[dict]:
     """One E4b block. The server's process tree stops on the way out, including on abort."""
 
     _check_run_id(run_id)
@@ -1413,6 +1424,8 @@ def run_block(spec: dict, seams, *, root: Path, run_id: str, repo: Path) -> list
     receipt = root / "receipts" / f"{run_id}.jsonl"
     if receipt.exists():
         raise E4bError(f"receipts/{run_id}.jsonl already exists")
+    # Before caches, the server, and the receipt. The header keeps this read.
+    recorded = _git_at_start(seams, repo, git)
     arms = {arm["id"]: arm for arm in spec["arms"]}
     caches = [_make_cache(root, run_id, arm_id) for arm_id in arms]
     rows: list[dict] = []
@@ -1443,7 +1456,7 @@ def run_block(spec: dict, seams, *, root: Path, run_id: str, repo: Path) -> list
     finally:
         _delete_caches(root, caches)
         if started and running is not None:
-            header = _header(spec, seams, repo, running, caches, prompt, aborted=aborted)
+            header = _header(spec, seams, repo, running, caches, prompt, aborted=aborted, git=recorded)
             _write_jsonl(receipt, [header, *rows])
     return rows
 
@@ -1460,7 +1473,9 @@ def _rows_of(body: dict) -> list[dict]:
     return rows
 
 
-def run_pilot(spec: dict, seams, *, root: Path, run_id: str, repo: Path, calls: int = PILOT_CALLS) -> dict:
+def run_pilot(
+    spec: dict, seams, *, root: Path, run_id: str, repo: Path, calls: int = PILOT_CALLS, git: dict | None = None
+) -> dict:
     """5090-alone only. Rows go to pilot-e4b/ and never into receipts/ or the table."""
 
     _check_run_id(run_id)
@@ -1470,6 +1485,8 @@ def run_pilot(spec: dict, seams, *, root: Path, run_id: str, repo: Path, calls: 
     arm = next((item for item in spec["arms"] if item["id"] == "5090-alone"), None)
     if arm is None:
         raise E4bError("the pilot measures 5090-alone")
+    # Before the server and before pilot-e4b/ is written. The document keeps this read.
+    recorded = _git_at_start(seams, repo, git)
     measurement = _measurement(spec)
     ranges = []
     full = []
@@ -1533,7 +1550,6 @@ def run_pilot(spec: dict, seams, *, root: Path, run_id: str, repo: Path, calls: 
             f"it needs at least {needed}. {PILOT_CLOCK_RULE}"
         )
     summary = pilot_summary(ranges, full, step=float(measurement.get("clock_step_mhz") or CLOCK_STEP_MHZ))
-    git = seams.git(repo) if getattr(seams, "git", None) else {"git_sha": None, "clean_tree": None}
     document = {
         "kind": "e4b-pilot",
         "calls": calls,
@@ -1541,8 +1557,8 @@ def run_pilot(spec: dict, seams, *, root: Path, run_id: str, repo: Path, calls: 
         "warmup_num_predict": measurement.get("warmup_num_predict"),
         "warmups_under_min_s": warm_short,
         "ranges_mhz": ranges,
-        "git_sha": git.get("git_sha"),
-        "clean_tree": git.get("clean_tree"),
+        "git_sha": recorded.get("git_sha"),
+        "clean_tree": recorded.get("clean_tree"),
         "argv": list(getattr(running, "argv", []) or []),
         "environment": receipt_environment(dict(getattr(running, "environment", {}) or {})),
         "version_start": getattr(running, "version_start", None),
@@ -1590,11 +1606,11 @@ def run_from_cli(
     name = run_id or ("e4b-pilot" if pilot else "e4b-block")
     if seams is None:
         seams = build_live_seams(root, name, spec, pilot=pilot)
-    if getattr(seams, "git", None):
-        seams.git(repo)  # refuse an unreadable sha or tree before any device starts
+    # One read, before any device. The pilot document and the block receipt keep it.
+    recorded = seams.git(repo) if getattr(seams, "git", None) else None
     if pilot:
-        return run_pilot(spec, seams, root=root, run_id=name, repo=repo)
-    rows = run_block(spec, seams, root=root, run_id=name, repo=repo)
+        return run_pilot(spec, seams, root=root, run_id=name, repo=repo, git=recorded)
+    rows = run_block(spec, seams, root=root, run_id=name, repo=repo, git=recorded)
     if notes:
         receipt = root / "receipts" / f"{name}.jsonl"
         if receipt.is_file():

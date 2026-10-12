@@ -12,6 +12,11 @@ build/
 # experiment harness compile caches (created under the repo root)
 compile-cache/
 
+# E4b run output. The next run's start check must not see it.
+# Receipts stay tracked; they are committed.
+pilot-e4b/
+logs/
+
 # run-start markers (receipts/<run_id>.run.json): local state, not receipts
 receipts/*.run.json
 receipts/*.stop
