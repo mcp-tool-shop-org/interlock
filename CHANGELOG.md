@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- README: labelled a prototype research instrument ahead of making the repository public; install from a clone until the first release.
+
 - E4b: a paired Intel slot with no 5090 companion call spanning the measurement is refused as `companion_not_covering` instead of falling back to the latest companion call (R&D on #92).
 
 - A paired NPU or iGPU slot waits until its 5090 companion is sustained before the Intel warm-up: one warm decode of 768 tokens, at least 3 s, steady inside the 22.5 MHz band, then the next decode is underway. The companion call that is judged is the one whose time span covers the Intel measured call. A companion that never gets steady refuses the slot as `clock_not_steady`. `interlock run --pairs` runs a subset of the spec's pairs and records that subset on the receipt (R&D, 2026-10-12, after e4b-block-2).
