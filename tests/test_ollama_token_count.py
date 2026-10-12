@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-from switchyard.adapters.base import AdapterError
-from switchyard.adapters.ollama import OllamaAdapter
+from switchyard.adapters.base import AdapterError, StepRequest
+from switchyard.adapters.ollama import OllamaAdapter, generate_body
 from switchyard.guards import GuardError
 from switchyard.harness.e5 import SearchError, fit_prompt_words
 from switchyard.harness.runner import RunnerError, dry_run, run_spec
@@ -439,3 +439,19 @@ def test_dry_run_names_the_count_and_does_not_call_it(tmp_path: Path, monkeypatc
     assert "heartbeat not read; adapters not called" in e4_text
     assert "devices not started (--dry-run)" in e4_text
     assert called == []
+
+
+@pytest.mark.parametrize("value", [0, None, True, -1, "1"])
+def test_a_generate_with_no_completion_limit_is_refused_before_any_request(value):
+    # Ollama reads num_predict 0, null or missing as no limit (E4, 2026-10-11).
+    calls = []
+    adapter = OllamaAdapter(transport=lambda *args: calls.append(args) or {}, device="5090")
+    request = StepRequest(step_id="s", task="generate", model="qwen3:8b", device="5090", engine="ollama",
+                          settings={"prompt": "hi", "num_predict": value})
+    with pytest.raises(AdapterError, match="num_predict must be"):
+        generate_body(request)
+    missing = StepRequest(step_id="s", task="generate", model="qwen3:8b", device="5090", engine="ollama",
+                          settings={"prompt": "hi"})
+    with pytest.raises(AdapterError, match="num_predict must be"):
+        generate_body(missing)
+    assert calls == []

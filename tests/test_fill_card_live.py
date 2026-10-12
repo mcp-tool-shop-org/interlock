@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from switchyard.adapters.base import AdapterError
 from switchyard.adapters.ollama import OllamaAdapter
 from switchyard.guards import GuardError, require_card_empty, require_grant, require_heartbeat
 from switchyard.harness.fill import (
@@ -759,3 +760,17 @@ def test_the_sampler_loop_stops_at_abort_without_a_device():
     quiet.sample()
     quiet._loop()
     assert quiet.peak == 10
+
+
+@pytest.mark.parametrize("value", [0, None, True])
+def test_a_confirmation_with_no_completion_limit_is_refused(tmp_path: Path, value):
+    repo = tmp_path / "repo"
+    spec = _spec([_model()])
+    spec["confirm_num_predict"] = value
+    spec_path = _bind(repo, spec)
+    transport = _Transport(None)
+    seams = _seams(transport)
+    with pytest.raises((ValueError, AdapterError, RunnerError)):
+        run_spec(spec_path, root=repo, grant="g", adapters={"ollama": OllamaAdapter(transport=transport)},
+                 heartbeat=_fresh(tmp_path), date="2026-10-11", run_id="fill-np", seams=seams)
+    assert not any(isinstance(body, dict) and body.get("prompt") not in (None, "") for _m, _u, body in transport.calls)

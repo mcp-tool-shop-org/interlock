@@ -75,9 +75,21 @@ def _given(settings: dict, key: str, default: object) -> object:
     return default if value is None else value
 
 
+def _require_num_predict(value) -> None:
+    """Refuse a generate with no completion limit before any request.
+
+    Ollama reads ``num_predict`` 0, null or missing as no limit and generates
+    until the context fills, which is what stalled E4's first run.
+    """
+
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise AdapterError(f"num_predict must be a whole number of at least 1, not {value!r}")
+
+
 def generate_body(request: StepRequest) -> dict:
     refuse_cloud(request.model)
     settings = request.settings
+    _require_num_predict(settings.get("num_predict"))
     options = {
         "num_predict": settings.get("num_predict"),
         "temperature": _given(settings, "temperature", 0),

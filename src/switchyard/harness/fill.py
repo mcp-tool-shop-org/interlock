@@ -725,8 +725,8 @@ def _measure_model(
         )
 
     num_predict = spec.get("confirm_num_predict", 1)
-    if isinstance(num_predict, bool) or not isinstance(num_predict, int) or num_predict < 0:
-        num_predict = 1
+    if isinstance(num_predict, bool) or not isinstance(num_predict, int) or num_predict < 1:
+        raise ValueError(f"confirm_num_predict must be a whole number of at least 1, not {num_predict!r}")
     fraction = float(spec["confirm_prompt_fraction"])
     sample_ms = spec.get("sample_ms", 200)
     if isinstance(sample_ms, bool) or not isinstance(sample_ms, int) or sample_ms < 1:
@@ -1084,8 +1084,8 @@ def _row(
     one_window_bound: list[tuple[int, int]] | None = None,
 ) -> dict:
     num_predict = spec.get("confirm_num_predict", 1)
-    if isinstance(num_predict, bool) or not isinstance(num_predict, int):
-        num_predict = 1
+    if isinstance(num_predict, bool) or not isinstance(num_predict, int) or num_predict < 1:
+        raise ValueError(f"confirm_num_predict must be a whole number of at least 1, not {num_predict!r}")
     settings = {
         "thinking_level": None,
         "num_predict": num_predict,

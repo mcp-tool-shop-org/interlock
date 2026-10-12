@@ -1432,7 +1432,8 @@ def _session(
 def _count_settings(arm: dict) -> dict:
     """Load options the token count shares with the measurement.
 
-    ``num_predict`` is not copied: the count asks the server for no completion.
+    ``num_predict`` is not copied: the count asks for a single completion token
+    (``COUNT_NUM_PREDICT``), never 0, which Ollama reads as no limit.
     ``num_ctx`` is copied even when it is null, so both calls resolve the same
     context from ``/api/show``.
     """
