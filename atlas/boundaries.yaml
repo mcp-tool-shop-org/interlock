@@ -1,4 +1,4 @@
-summary: "switchyard routes each job to a model, engine and device from a receipt-backed table."
+summary: "interlock routes each job to a model, engine and device from a receipt-backed table."
 boundaries:
   - name: .github
     globs:
