@@ -23,7 +23,9 @@ The first window still loads. If the weight size or the baseline cannot be
 read, or the share is not positive, or that window is not fully resident,
 the second window is not loaded and the row stops. An aborted window is
 not a measurement. The next load waits until that abort's unload and card
-re-read have finished. The spec ceiling is not a probe.
+re-read have finished. The unload call itself stops after about 60 seconds.
+If it expires, the run stops with a note that the model may still be
+resident. The spec ceiling is not a probe.
 Nothing here rests between models. A missing shared-memory reading or a
 missing prompt rate is a spill, which the pure search already treats as a
 step back. A confirmation prefix is counted again from a cold load, and a
@@ -43,7 +45,12 @@ from pathlib import Path
 from typing import Callable
 
 from switchyard.adapters.base import AdapterError, StepRequest
-from switchyard.adapters.ollama import context_length, quantization_level, url_for
+from switchyard.adapters.ollama import (
+    UNLOAD_TIMEOUT_NOTE,
+    context_length,
+    quantization_level,
+    url_for,
+)
 from switchyard.cli import announce_run
 from switchyard.families import stamp_family
 from switchyard.guards import GuardError, require_card_empty, require_grant, require_heartbeat
@@ -79,6 +86,10 @@ class _CountRefused(Exception):
 
 class _NoBound(Exception):
     """The next window has no share that can be trusted, so it is not loaded."""
+
+
+class _UnloadTimeout(Exception):
+    """The unload did not return. The model may still be resident."""
 
 
 @dataclass
@@ -216,8 +227,9 @@ class CardSampler:
     def wait_for_abort(self) -> None:
         """Block until an in-flight abort has finished unloading and re-reading.
 
-        There is no timeout. The settle bound is about 10 seconds and the
-        unload is on top of that, so a shorter wait would return early.
+        There is no timeout on this wait. The unload call stops after about
+        60 seconds, and the settle bound is about 10 seconds on top of that.
+        A shorter wait would return while the card is still settling.
         """
 
         self._abort_done.wait()
@@ -606,7 +618,10 @@ def run_fill_card(
                     notes=notes,
                 )
             finally:
-                _unload(adapter, entry["model"])
+                extra = _unload(adapter, entry["model"])
+            if extra and extra not in (row.get("notes") or ""):
+                row["notes"] = _join(row.get("notes") or "", extra)
+                row["aborted"] = True
             rows.append(row)
             if row.get("aborted"):
                 stop_note = row.get("notes") or "fill-card step failed"
@@ -626,11 +641,28 @@ def run_fill_card(
     return rows
 
 
-def _unload(adapter, model: str) -> None:
+def _unload(adapter, model: str, *, quiet: bool = True) -> str | None:
+    """Unload one model.
+
+    The end-of-model unload stays quiet, as it always has, so a missing
+    server does not hide the row. A timeout is not quiet: the note says the
+    model may still be resident, and the caller stops the run. Passing
+    ``quiet`` false re-raises any other failure.
+    """
+
     try:
         adapter.unload(model, "5090")
+    except AdapterError as exc:
+        if str(exc) == UNLOAD_TIMEOUT_NOTE:
+            return UNLOAD_TIMEOUT_NOTE
+        if quiet:
+            return None
+        raise
     except Exception:
-        return
+        if quiet:
+            return None
+        raise
+    return None
 
 
 def _iso(epoch: float) -> str:
@@ -737,6 +769,7 @@ def _measure_model(
     shift = spec.get("shift") is False
     truncate = spec.get("truncate") is False
     current: dict[str, int | None] = {"ctx": None}
+    hung: dict[str, str | None] = {"note": None}
 
     def on_abort() -> None:
         try:
@@ -745,9 +778,17 @@ def _measure_model(
                 cancel()
         finally:
             try:
-                adapter.unload(model, "5090")
+                note = _unload(adapter, model)
+                if note:
+                    hung["note"] = note
             finally:
                 after_unload.append((current["ctx"], _settled_card(seams, spec["abort_mib"])))
+
+    def stop_if_unload_timed_out() -> None:
+        note = _unload(adapter, model, quiet=False)
+        if note:
+            hung["note"] = note
+            raise _UnloadTimeout(note)
 
     sampler = CardSampler(seams, spec["abort_mib"], sample_ms, on_abort)
 
@@ -783,7 +824,7 @@ def _measure_model(
                     return _over(sampler.peak)
                 return Observation(False, sampler.peak, error=str(exc))
             if _count_leaves_loaded(entry.get("keep_alive")):
-                adapter.unload(model, "5090")
+                stop_if_unload_timed_out()
             try:
                 cold_tokens = count(text, ctx)
             except _WindowOver:
@@ -796,13 +837,13 @@ def _measure_model(
                 return Observation(False, sampler.peak, error=str(exc))
             if cold_tokens != tokens:
                 if _count_leaves_loaded(entry.get("keep_alive")):
-                    adapter.unload(model, "5090")
+                    stop_if_unload_timed_out()
                 raise _CountRefused(
                     f"the search counted {tokens} and a cold load counted {cold_tokens}"
                 )
             prompts[ctx] = (cold_tokens, _prompt_method(fit), tokens, cold_tokens)
             if _count_leaves_loaded(entry.get("keep_alive")):
-                adapter.unload(model, "5090")
+                stop_if_unload_timed_out()
             prompt = text
         settings = {
             "prompt": prompt,
@@ -848,6 +889,8 @@ def _measure_model(
 
     def probe(ctx: int, kind: str) -> Observation:
         sampler.wait_for_abort()
+        if hung["note"]:
+            raise _UnloadTimeout(hung["note"])
         points = _measured_points(measured)
         predicted = _predict_mib(measured, ctx) if len(points) >= 2 else None
         if len(points) == 1 and ctx != points[0][0]:
@@ -871,6 +914,8 @@ def _measure_model(
             measured.append((ctx, obs.peak_mib))
             resident_at[ctx] = bool(obs.resident)
         sampler.wait_for_abort()
+        if hung["note"]:
+            raise _UnloadTimeout(hung["note"])
         return obs
 
     try:
@@ -907,7 +952,7 @@ def _measure_model(
             weights_mib=weights_mib,
             one_window_bound=one_window_bound,
         )
-    except _NoBound as exc:
+    except (_NoBound, _UnloadTimeout) as exc:
         return _row(
             spec,
             entry,

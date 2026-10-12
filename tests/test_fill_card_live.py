@@ -113,7 +113,7 @@ def _fresh(tmp_path: Path) -> Path:
 
 
 class _Transport:
-    def __init__(self, seams, *, show_error=None, explode=False, spill_shared=False, spill_prompt=False, missing_shared=False, missing_prompt=False, abort_at=None, stick=False, linear=None, cold_disagrees=False, omit_tags=False, tag_bytes=None, busy_mib=20000, hide_baseline=False, settle_high=0, self_sample=True, split_vram=False, hold_abort=False, slow_unload=0):
+    def __init__(self, seams, *, show_error=None, explode=False, spill_shared=False, spill_prompt=False, missing_shared=False, missing_prompt=False, abort_at=None, stick=False, linear=None, cold_disagrees=False, omit_tags=False, tag_bytes=None, busy_mib=20000, hide_baseline=False, settle_high=0, self_sample=True, split_vram=False, hold_abort=False, slow_unload=0, hang_unload=False):
         self.seams = seams
         self.show_error = show_error
         self.explode = explode
@@ -134,6 +134,8 @@ class _Transport:
         self.split_vram = split_vram
         self.hold_abort = hold_abort
         self.slow_unload = slow_unload
+        self.hang_unload = hang_unload
+        self._hang = threading.Event()
         self.settle_reads = 0
         self.events = []
         self._release = threading.Event()
@@ -207,6 +209,10 @@ class _Transport:
         if not isinstance(body, dict):
             return {}
         if body.get("keep_alive") == 0 and body.get("prompt") == "":
+            if self.hang_unload and self.seams is not None and self.seams.over:
+                self.order.append("unload-hang")
+                self._hang.wait()
+                return {}
             if self.slow_unload:
                 time.sleep(self.slow_unload)
             if self.seams.over and self.state["busy"]:
@@ -272,10 +278,13 @@ def _seams(transport: _Transport) -> FillSeams:
     return seams
 
 
-def _run(tmp_path, transport, *, models=None, max_ctx=8192, grant="g", seams=None, folder="repo"):
+def _run(tmp_path, transport, *, models=None, max_ctx=8192, grant="g", seams=None, folder="repo", unload_timeout=None):
     repo = tmp_path / folder
     spec_path = _bind(repo, _spec(models or [_model()], max_ctx=max_ctx))
-    adapter = OllamaAdapter(transport=transport)
+    adapter_kwargs = {}
+    if unload_timeout is not None:
+        adapter_kwargs["unload_timeout"] = unload_timeout
+    adapter = OllamaAdapter(transport=transport, **adapter_kwargs)
     rows = run_spec(
         spec_path,
         root=repo,
@@ -490,6 +499,22 @@ def test_the_next_load_waits_until_the_abort_has_settled(tmp_path: Path):
     assert {"ctx": 8192, "mib": 1500} in rows[0]["settings"]["after_unload_mib"]
 
 
+def test_a_hanging_unload_stops_before_the_next_load(tmp_path: Path):
+    """The abort's unload never returns. The run stops, and the next size does not load."""
+
+    transport = _Transport(None, abort_at=8192, self_sample=False, hold_abort=True, hang_unload=True)
+    seams = _seams(transport)
+    seams.threaded = True
+    started = time.monotonic()
+    with pytest.raises(RunnerError, match="the model may still be resident"):
+        _run(tmp_path, transport, seams=seams, unload_timeout=0.3)
+    assert time.monotonic() - started < 3
+    ctxs = _ctxs(transport)
+    assert 8192 in ctxs
+    assert 6144 not in ctxs
+    assert "unload-hang" in transport.order
+
+
 def test_a_card_that_falls_while_the_unload_settles_is_not_noted(tmp_path: Path):
     transport = _Transport(None, abort_at=8192, settle_high=3)
     seams = _seams(transport)
@@ -659,6 +684,7 @@ def test_dry_run_names_the_confirmation_count(monkeypatch):
     assert "one measured window bounds the next context from that window's share" in text
     assert "a second window with no bound stops the row" in text
     assert "the next load waits until the abort has finished" in text
+    assert "an unload that does not finish within 60 seconds stops the run; the model may still be resident" in text
     assert "heartbeat not read; adapters not called" in text
     assert "devices not started (--dry-run)" in text
     assert "rest_s" not in text

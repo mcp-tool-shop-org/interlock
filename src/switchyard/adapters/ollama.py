@@ -12,7 +12,9 @@ Neither one is wall clock. ``think`` keeps the level string when it is not
 The default transport sets no timeout. A caller that wants one passes
 ``timeout`` on the adapter. ``cancel`` shuts the open socket down before the
 response is read, so a load can be closed while it is still running. Closing
-the socket does not free memory the server has already allocated.
+the socket does not free memory the server has already allocated. The unload
+call has its own timeout, about 60 seconds. If that expires, the model may
+still be resident.
 """
 
 from __future__ import annotations
@@ -26,6 +28,8 @@ import time
 from urllib.parse import urlsplit
 
 _CANCEL_POLL_S = 0.2
+UNLOAD_TIMEOUT_S = 60.0
+UNLOAD_TIMEOUT_NOTE = "the unload timed out; the model may still be resident"
 
 from switchyard.adapters.base import AdapterError, StepRequest, StepResult
 
@@ -241,7 +245,7 @@ def _wait_for_reply(conn: http.client.HTTPConnection, ticket: _Ticket, timeout: 
         if ticket.cancelled.is_set():
             raise AdapterError("the request was closed")
         if deadline is not None and time.monotonic() >= deadline:
-            raise AdapterError("the request was closed")
+            raise AdapterError("the request timed out")
         sock = getattr(conn, "sock", None)
         if sock is None:
             raise AdapterError("the request was closed")
@@ -263,12 +267,23 @@ def _rate(count: object, duration_ns: object) -> float | None:
 
 
 class OllamaAdapter:
-    def __init__(self, *, transport=None, device: str = "5090", timeout: float | None = None):
+    def __init__(
+        self,
+        *,
+        transport=None,
+        device: str = "5090",
+        timeout: float | None = None,
+        unload_timeout: float = UNLOAD_TIMEOUT_S,
+    ):
         self.timeout = timeout
+        self.unload_timeout = unload_timeout
+        self._unload_gave_up = False
+        self._default_transport = transport is None
         self._flight = _Flight()
         if transport is None:
-            def bound(method: str, url: str, body: dict | None) -> dict:
-                return default_transport(method, url, body, timeout=timeout, flight=self._flight)
+            def bound(method: str, url: str, body: dict | None, timeout: float | None = None) -> dict:
+                chosen = self.timeout if timeout is None else timeout
+                return default_transport(method, url, body, timeout=chosen, flight=self._flight)
 
             self.transport = bound
         else:
@@ -429,13 +444,45 @@ class OllamaAdapter:
         )
 
     def unload(self, model: str, device: str | None = None) -> None:
+        """Ask the server to drop the model.
+
+        This call has its own deadline, separate from a generate. A generate
+        can sit for as long as the load takes. An unload that never returns
+        would leave the model resident and the caller waiting. When the
+        deadline passes, the error says the model may still be resident.
+        A later unload does not wait out the deadline again.
+        """
+
         refuse_cloud(model)
+        if self._unload_gave_up:
+            raise AdapterError(UNLOAD_TIMEOUT_NOTE)
         url = url_for(device or self.device)
-        self.transport(
-            "POST",
-            f"{url}/api/generate",
-            {"model": model, "prompt": "", "stream": False, "keep_alive": 0},
-        )
+        body = {"model": model, "prompt": "", "stream": False, "keep_alive": 0}
+        limit = self.unload_timeout
+        error: list[BaseException] = []
+
+        def invoke() -> None:
+            try:
+                if self._default_transport:
+                    self.transport("POST", f"{url}/api/generate", body, timeout=limit)
+                else:
+                    self.transport("POST", f"{url}/api/generate", body)
+            except Exception as exc:
+                error.append(exc)
+
+        worker = threading.Thread(target=invoke, name="ollama-unload", daemon=True)
+        worker.start()
+        worker.join(limit)
+        if worker.is_alive():
+            self._unload_gave_up = True
+            self.cancel()
+            raise AdapterError(UNLOAD_TIMEOUT_NOTE)
+        if error:
+            exc = error[0]
+            if isinstance(exc, AdapterError) and str(exc) == "the request timed out":
+                self._unload_gave_up = True
+                raise AdapterError(UNLOAD_TIMEOUT_NOTE) from exc
+            raise exc
 
     def start_session(self, request: StepRequest) -> None:
         """Begin a companion load.
