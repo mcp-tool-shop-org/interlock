@@ -1,0 +1,57 @@
+{
+  "ollama_version": "0.35.1",
+  "model": "qwen3:8b",
+  "digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "date": "2026-10-12",
+  "case": "think_off",
+  "request": {
+    "method": "POST",
+    "path": "/api/generate",
+    "body": {
+      "model": "qwen3:8b",
+      "prompt": "hi",
+      "stream": false,
+      "keep_alive": "5m",
+      "options": {
+        "num_predict": 1,
+        "temperature": 0
+      },
+      "think": false
+    }
+  },
+  "behaviour": "reply",
+  "response": {
+    "model": "qwen3:8b",
+    "created_at": "2026-10-12T06:33:40.2618405Z",
+    "response": "Hello",
+    "done": true,
+    "done_reason": "length",
+    "context": [
+      151644,
+      872,
+      198,
+      6023,
+      608,
+      2152,
+      5854,
+      766,
+      151645,
+      198,
+      151644,
+      77091,
+      198,
+      151667,
+      271,
+      151668,
+      271,
+      9707
+    ],
+    "total_duration": 2805746100,
+    "load_duration": 2716836400,
+    "prompt_eval_count": 17,
+    "prompt_eval_cached_count": 0,
+    "prompt_eval_duration": 86725000,
+    "eval_count": 1,
+    "eval_duration": 1000
+  }
+}

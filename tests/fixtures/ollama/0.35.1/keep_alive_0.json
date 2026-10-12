@@ -1,0 +1,25 @@
+{
+  "ollama_version": "0.35.1",
+  "model": "qwen3:8b",
+  "digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "date": "2026-10-12",
+  "case": "keep_alive_0",
+  "request": {
+    "method": "POST",
+    "path": "/api/generate",
+    "body": {
+      "model": "qwen3:8b",
+      "prompt": "",
+      "stream": false,
+      "keep_alive": 0
+    }
+  },
+  "behaviour": "reply",
+  "response": {
+    "model": "qwen3:8b",
+    "created_at": "2026-10-12T06:33:19.5674849Z",
+    "response": "",
+    "done": true,
+    "done_reason": "unload"
+  }
+}
