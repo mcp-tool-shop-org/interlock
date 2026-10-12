@@ -238,6 +238,10 @@ def import_receipt(root: Path, run_id: str) -> list[dict]:
     and never reach the table.
     """
 
+    from switchyard.harness.lifecycle import is_quarantined
+
+    if is_quarantined(root, run_id):
+        return []
     path = root / "receipts" / f"{run_id}.jsonl"
     loaded = load_jsonl(path)
     aborted = [row for row in loaded if row.get("aborted") is True]

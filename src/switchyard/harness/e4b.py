@@ -29,13 +29,16 @@ import math
 import re
 import os
 import shutil
+import stat
 import subprocess
 import threading
 import time
+import traceback
 from pathlib import Path
 
 from switchyard.guards import require_card_empty, require_grant, require_heartbeat, require_npu_session
 from switchyard.harness.e4b_stats import bootstrap_median, decide, effect
+from switchyard.harness.lifecycle import move_aside, refuse_strays, require_free, resolve_run_id, utc_now
 from switchyard.harness.ollama_serve import (
     HOST,
     PORT,
@@ -839,11 +842,48 @@ def _make_cache(root: Path, run_id: str, arm_id: str) -> str:
     return path.relative_to(root).as_posix()
 
 
-def _delete_caches(root: Path, relative: list[str]) -> None:
+def _clear_readonly(function, path, _exc) -> None:
+    # OpenVINO writes compiled blobs read-only; on Windows rmtree then fails with WinError 5.
+    os.chmod(path, stat.S_IWRITE)
+    function(path)
+
+
+def _delete_caches(root: Path, relative: list[str]) -> list[str]:
+    """Remove the run's compile caches. A cache that won't go is reported, never raised:
+    a cleanup failure must not cost the receipt."""
+
+    failed = []
     for rel in relative:
         path = root / rel
-        if path.exists():
-            shutil.rmtree(path)
+        if not path.exists():
+            continue
+        try:
+            shutil.rmtree(path, onexc=_clear_readonly)
+        except OSError as exc:
+            failed.append(f"{rel}: {exc}")
+    return failed
+
+
+def _safe_caches(root: Path, relative: list[str]) -> list[str]:
+    """Cleanup never raises. A failure is a note on the receipt, not a lost receipt."""
+
+    try:
+        return _delete_caches(root, relative)
+    except Exception as exc:
+        return [f"compile-cache: {exc}"]
+
+
+def _note_cleanup(path: Path, failures: list[str]) -> None:
+    if not failures or not path.is_file():
+        return
+    try:
+        lines = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+        if not lines:
+            return
+        lines[0]["compile_cache_cleanup_failed"] = failures
+        _write_jsonl(path, lines)
+    except (OSError, json.JSONDecodeError):
+        return
 
 
 def _write_series(path: Path, clocks: list, power: list) -> None:
@@ -1233,9 +1273,41 @@ def _extend_pair(seams, pair, arms, prompt, measurement, root, run_id, *, start_
     return found
 
 
+def _partial_pairs(spec: dict, per_pair: dict) -> list[dict]:
+    """Slots that finished before a stop. No verdict: the header carries aborted."""
+
+    rows = []
+    for pair in spec["pairs"]:
+        state = per_pair[pair["id"]]
+        if not state["slots"] and not state["effects"]:
+            continue
+        rows.append(
+            {
+                "kind": "e4b-pair",
+                "pair": pair["id"],
+                "slots": state["slots"],
+                "d_i": list(state["effects"]),
+                "refusal_events": state["events"],
+            }
+        )
+    return rows
+
+
 def execute_block(spec: dict, seams, *, root: Path, run_id: str) -> dict:
     """The measured block. Refusals, the estimate, and the burn probe land on the receipt."""
 
+    try:
+        return _execute_block_loop(spec, seams, root=root, run_id=run_id)
+    except BaseException as exc:
+        # KeyboardInterrupt is an abort too. The rows finished so far travel with it.
+        snap = getattr(_execute_block_loop, "last_partial", None)
+        _execute_block_loop.last_partial = None
+        if isinstance(snap, dict):
+            exc.e4b_partial = snap
+        raise
+
+
+def _execute_block_loop(spec: dict, seams, *, root: Path, run_id: str) -> dict:
     measurement = _measurement(spec)
     prompt = prepare_prompt(spec, seams.count_tokens)
     arms = {arm["id"]: arm for arm in spec["arms"]}
@@ -1252,6 +1324,12 @@ def execute_block(spec: dict, seams, *, root: Path, run_id: str) -> dict:
     durations: list[float] = []
     probe_arm = _probe_arm(spec)
     for item in items:
+        _execute_block_loop.last_partial = {
+            "prompt": prompt,
+            "cold": list(cold),
+            "pairs": _partial_pairs(spec, per_pair),
+            "probes": list(probes),
+        }
         if item["kind"] == "cold":
             cold.append(
                 perform_slot(
@@ -1322,6 +1400,7 @@ def execute_block(spec: dict, seams, *, root: Path, run_id: str) -> dict:
         record["pair"] = pair["id"]
         record["slots"] = state["slots"]
         pairs_out.append(record)
+    _execute_block_loop.last_partial = None
     return {"prompt": prompt, "cold": cold, "pairs": pairs_out, "probes": probes}
 
 
@@ -1416,16 +1495,55 @@ def _write_jsonl(path: Path, rows: list[dict]) -> None:
     path.write_text(body, encoding="utf-8")
 
 
-def run_block(spec: dict, seams, *, root: Path, run_id: str, repo: Path, git: dict | None = None) -> list[dict]:
+def _park(
+    root: Path,
+    run_id: str,
+    *,
+    sha: str | None,
+    started: str,
+    exc: BaseException | None,
+    trace: str | None,
+    quarantine: Path | None,
+) -> None:
+    """Move the receipt and the partial outputs aside. A failure here does not replace the stop."""
+
+    try:
+        move_aside(
+            root,
+            run_id,
+            sha=sha,
+            started=started,
+            ended=utc_now(),
+            exc_type=type(exc).__name__ if exc is not None else None,
+            message=str(exc) if exc is not None else "",
+            traceback_text=trace,
+            include_receipt=True,
+            setting=quarantine,
+        )
+    except Exception:
+        return
+
+
+def run_block(
+    spec: dict,
+    seams,
+    *,
+    root: Path,
+    run_id: str,
+    repo: Path,
+    git: dict | None = None,
+    quarantine: Path | None = None,
+) -> list[dict]:
     """One E4b block. The server's process tree stops on the way out, including on abort."""
 
     _check_run_id(run_id)
     _require_amended(spec)
+    require_free(root, run_id, quarantine)
+    refuse_strays(root)
     receipt = root / "receipts" / f"{run_id}.jsonl"
-    if receipt.exists():
-        raise E4bError(f"receipts/{run_id}.jsonl already exists")
     # Before caches, the server, and the receipt. The header keeps this read.
     recorded = _git_at_start(seams, repo, git)
+    started_at = utc_now()
     arms = {arm["id"]: arm for arm in spec["arms"]}
     caches = [_make_cache(root, run_id, arm_id) for arm_id in arms]
     rows: list[dict] = []
@@ -1433,31 +1551,70 @@ def run_block(spec: dict, seams, *, root: Path, run_id: str, repo: Path, git: di
     aborted = False
     running = None
     prompt = ""
+    error: BaseException | None = None
+    trace: str | None = None
+    cleanup_errors: list[str] = []
     _require_ready(seams)
     try:
         with seams.server as running:
             started = True
             _probe(seams, "GET", "/api/version")
             _probe(seams, "GET", "/api/ps")
+            body_error: BaseException | None = None
             try:
                 seams.load_resident()
                 _require_owned_server(spec, seams, running)
                 body = execute_block(spec, seams, root=root, run_id=run_id)
                 rows = _rows_of(body)
                 prompt = body["prompt"]
+            except BaseException as exc:
+                body_error = exc
+                raise
             finally:
-                try:
-                    seams.unload_resident()
-                finally:
-                    _probe(seams, "GET", "/api/version")
-    except Exception:
+                if body_error is None:
+                    try:
+                        seams.unload_resident()
+                    finally:
+                        _probe(seams, "GET", "/api/version")
+                else:
+                    # A cleanup error must not replace the abort or drop its partial rows.
+                    try:
+                        seams.unload_resident()
+                    except Exception as exc:
+                        cleanup_errors.append(f"unload_resident: {exc}")
+                    try:
+                        _probe(seams, "GET", "/api/version")
+                    except Exception as exc:
+                        cleanup_errors.append(f"GET /api/version: {exc}")
+    except BaseException as exc:
         aborted = True
-        raise
+        error = exc
+        trace = traceback.format_exc()
+        partial = getattr(exc, "e4b_partial", None)
+        if isinstance(partial, dict):
+            rows = _rows_of(partial)
+            prompt = partial.get("prompt") or prompt
     finally:
-        _delete_caches(root, caches)
+        # The receipt lands before cleanup. Cleanup cannot raise past it.
         if started and running is not None:
             header = _header(spec, seams, repo, running, caches, prompt, aborted=aborted, git=recorded)
-            _write_jsonl(receipt, [header, *rows])
+            header["run_id"] = run_id
+            if cleanup_errors:
+                header["cleanup_errors"] = cleanup_errors
+            try:
+                _write_jsonl(receipt, [header, *rows])
+            except OSError:
+                if error is None:
+                    raise
+            else:
+                _note_cleanup(receipt, _safe_caches(root, caches))
+                if aborted:
+                    sha = recorded.get("git_sha") if isinstance(recorded, dict) else None
+                    _park(root, run_id, sha=sha, started=started_at, exc=error, trace=trace, quarantine=quarantine)
+        else:
+            _safe_caches(root, caches)
+    if error is not None:
+        raise error
     return rows
 
 
@@ -1474,14 +1631,22 @@ def _rows_of(body: dict) -> list[dict]:
 
 
 def run_pilot(
-    spec: dict, seams, *, root: Path, run_id: str, repo: Path, calls: int = PILOT_CALLS, git: dict | None = None
+    spec: dict,
+    seams,
+    *,
+    root: Path,
+    run_id: str,
+    repo: Path,
+    calls: int = PILOT_CALLS,
+    git: dict | None = None,
+    quarantine: Path | None = None,
 ) -> dict:
     """5090-alone only. Rows go to pilot-e4b/ and never into receipts/ or the table."""
 
     _check_run_id(run_id)
+    require_free(root, run_id, quarantine)
+    refuse_strays(root)
     destination = pilot_destination(root, run_id)
-    if destination.exists():
-        raise E4bError(f"pilot file {destination.name} already exists")
     arm = next((item for item in spec["arms"] if item["id"] == "5090-alone"), None)
     if arm is None:
         raise E4bError("the pilot measures 5090-alone")
@@ -1494,6 +1659,9 @@ def run_pilot(
     missing = 0
     call_intervals: list[float] = []
     spent_rows: list[dict] = []
+    started_at = utc_now()
+    stopped: list = []
+    cleanup_errors: list[str] = []
     _require_ready(seams)
     with seams.server as running:
         _probe(seams, "GET", "/api/version")
@@ -1541,8 +1709,38 @@ def run_pilot(
                 count = measured.get("eval_count")
                 predict = arm.get("num_predict")
                 full.append(isinstance(count, int) and not isinstance(count, bool) and count >= predict)
+        except BaseException as exc:
+            stopped.append(exc)
+            stopped.append(traceback.format_exc())
         finally:
-            seams.unload_resident()
+            if stopped:
+                try:
+                    seams.unload_resident()
+                except Exception as exc:
+                    cleanup_errors.append(f"unload_resident: {exc}")
+            else:
+                seams.unload_resident()
+    if stopped:
+        parked = {
+            "kind": "e4b-pilot",
+            "run_id": run_id,
+            "aborted": True,
+            "calls": calls,
+            "good_calls": len(ranges),
+            "missing_calls": missing,
+            "ranges_mhz": ranges,
+            "time_spent": spent_rows,
+            "git_sha": recorded.get("git_sha"),
+            "clean_tree": recorded.get("clean_tree"),
+        }
+        if cleanup_errors:
+            parked["cleanup_errors"] = cleanup_errors
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(json.dumps(parked, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+        _safe_caches(root, [f"compile-cache/{run_id}"])
+        sha = recorded.get("git_sha") if isinstance(recorded, dict) else None
+        _park(root, run_id, sha=sha, started=started_at, exc=stopped[0], trace=stopped[1], quarantine=quarantine)
+        raise stopped[0]
     needed = PILOT_MIN_GOOD if calls >= PILOT_MIN_GOOD else calls
     if len(ranges) < needed:
         raise E4bError(
@@ -1552,6 +1750,8 @@ def run_pilot(
     summary = pilot_summary(ranges, full, step=float(measurement.get("clock_step_mhz") or CLOCK_STEP_MHZ))
     document = {
         "kind": "e4b-pilot",
+        "run_id": run_id,
+        "aborted": False,
         "calls": calls,
         "num_predict": arm.get("num_predict"),
         "warmup_num_predict": measurement.get("warmup_num_predict"),
@@ -1577,6 +1777,7 @@ def run_pilot(
     document.update(note_vram(getattr(seams, "vram", None)))
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(document, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    _safe_caches(root, [f"compile-cache/{run_id}"])
     return document
 
 
@@ -1592,6 +1793,7 @@ def run_from_cli(
     pilot: bool,
     seams,
     notes: str = "",
+    quarantine: Path | None = None,
 ) -> list | dict:
     """Flag checks, then the pilot or the block. Null tolerances refuse before any device."""
 
@@ -1603,14 +1805,20 @@ def run_from_cli(
         require_npu_session(npu_session, device="NPU")
         require_npu_session(npu_session, device="iGPU")
         _require_amended(spec)
-    name = run_id or ("e4b-pilot" if pilot else "e4b-block")
+    # Stray series and a taken name are refused here, before a device starts.
+    name = resolve_run_id(
+        root,
+        base="e4b-pilot" if pilot else "e4b-block",
+        explicit=run_id,
+        setting=quarantine,
+    )
     if seams is None:
         seams = build_live_seams(root, name, spec, pilot=pilot)
     # One read, before any device. The pilot document and the block receipt keep it.
     recorded = seams.git(repo) if getattr(seams, "git", None) else None
     if pilot:
-        return run_pilot(spec, seams, root=root, run_id=name, repo=repo, git=recorded)
-    rows = run_block(spec, seams, root=root, run_id=name, repo=repo, git=recorded)
+        return run_pilot(spec, seams, root=root, run_id=name, repo=repo, git=recorded, quarantine=quarantine)
+    rows = run_block(spec, seams, root=root, run_id=name, repo=repo, git=recorded, quarantine=quarantine)
     if notes:
         receipt = root / "receipts" / f"{name}.jsonl"
         if receipt.is_file():

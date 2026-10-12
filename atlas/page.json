@@ -20,24 +20,32 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 0,
-      "changed": 4,
+      "added": 3,
+      "changed": 9,
       "moved": 0,
-      "parts": 3,
+      "parts": 4,
       "removed": 0
     },
     "items": [
       {
+        "kind": "landing",
+        "sentence": "receipts/ is now also read by tests/test_run_lifecycle.py.",
+        "subjects": [
+          "receipts/",
+          "tests/test_run_lifecycle.py"
+        ]
+      },
+      {
         "kind": "counts",
-        "sentence": "Nothing structural changed since 2026-10-12; 4 files changed content.",
+        "sentence": "3 files added and 9 changed content, across 4 parts.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "9056779144faa461f194029d59cbbb07fc6a609a",
-      "generatedAt": "2026-10-12T18:34:15.240Z"
+      "commit": "83145db7bacd33340e39ffe1e48d16cd30c1cf46",
+      "generatedAt": "2026-10-12T19:15:48.029Z"
     },
-    "unchanged": true
+    "unchanged": false
   },
   "changesTogether": [
     {
@@ -73,7 +81,7 @@
     {
       "a": "src/switchyard/harness/receipts.py",
       "b": "src/switchyard/receipt.py",
-      "either": 12,
+      "either": 13,
       "partLabels": [
         "src",
         "src"
@@ -88,7 +96,7 @@
     {
       "a": "src/switchyard/harness/runner.py",
       "b": "tests/test_harness.py",
-      "either": 26,
+      "either": 27,
       "partLabels": [
         "src",
         "tests"
@@ -122,9 +130,9 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 8 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 1,
-  "commit": "83145db7bacd33340e39ffe1e48d16cd30c1cf46",
+  "commit": "0d6e91613a740788c5187791a641571cc3e1a8e4",
   "defaultBranch": "main",
-  "derived": "7 parts, mostly Python (78 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.",
+  "derived": "7 parts, mostly Python (81 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.",
   "doors": [
     {
       "checks": [],
@@ -139,12 +147,12 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 28
+          "files": 30
         },
         {
           "boundary": "src",
           "depth": 1,
-          "files": 46
+          "files": 47
         }
       ],
       "runs": [
@@ -176,7 +184,7 @@
         {
           "boundary": "src",
           "depth": 0,
-          "files": 42
+          "files": 43
         }
       ],
       "runs": [
@@ -195,11 +203,11 @@
   "edges": [],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-12T19:15:48.029Z",
+  "generatedAt": "2026-10-12T20:25:58.283Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "3 writes and 4 reads use paths built at run time and are not named here.",
-    "9 writes and 29 reads go to a path their caller passes, not to this repository.",
+    "12 writes and 37 reads go to a path their caller passes, not to this repository.",
     "3 reads go to the directory the command is run in (receipts/), not to this repository.",
     "19 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 16 more.",
     "Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window."
@@ -227,9 +235,9 @@
   "startReason": "This path follows switchyard (a command people run) from its entry, since CI runs only tests.",
   "summary": "switchyard routes each job to a model, engine and device from a receipt-backed table.",
   "summaryFrom": "person",
-  "testFiles": 46,
+  "testFiles": 48,
   "testedBy": {
-    "src": 26
+    "src": 28
   },
   "unnamedWrites": 3,
   "unread": [],

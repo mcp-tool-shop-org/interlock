@@ -53,6 +53,21 @@ switchyard check
 
 That validates every receipt under `receipts/` and `table/routing.jsonl`. An empty tree is fine. A home-directory path in a receipt is not.
 
+## Run lifecycle
+
+A run ends in one of two states. A finished run leaves `receipts/<run-id>.jsonl` and, for E4b, its series beside it. A run that stops partway writes that receipt first, with the calls that finished and `aborted: true`, then moves the receipt, the series, the log and the run marker into `aborted/<run-id>-<sha>/` with a `NOTE.json` (the run id, the harness sha, the start and end, the exception, and the files). `aborted/` is gitignored. It is not a result: `switchyard import` does not read it, and those runs never reach the routing table.
+
+`receipts/` must not hold a `*-series/` directory that has no receipt. The next run refuses to start while one is there, and names `switchyard runs quarantine <run-id>`.
+
+```
+switchyard runs list
+switchyard runs quarantine <run-id>
+```
+
+`list` prints each run id and a state: `complete`, `aborted`, or `stray`. `quarantine` moves a stray into `aborted/` with a note that it was set aside by hand. Neither command starts Ollama or a device. `--quarantine` chooses the set-aside directory; the default is `aborted/` under the run root.
+
+With no `--run-id`, E4b uses `e4b-block` or `e4b-pilot`, then `<base>-2`, `<base>-3`, and so on. The chosen id is the first line of the run and a field on the receipt. A name already used by a receipt, a series directory, a log, a compile cache, or a quarantined run is refused.
+
 ## Threat model
 
 switchyard touches local devices and local HTTP, and the network only to download a model that an experiment spec already named, from that model's publisher.

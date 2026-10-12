@@ -733,8 +733,11 @@ def test_abort_stops_the_server_and_deletes_the_cache(tmp_path: Path):
     assert server.stopped is True
     assert "unload" in seams.loads
     assert not (tmp_path / "compile-cache" / "abort" / "5090-alone").exists()
-    header = _rows(tmp_path / "receipts" / "abort.jsonl")[0]
+    assert not (tmp_path / "receipts" / "abort.jsonl").exists()
+    parked = next((tmp_path / "aborted").glob("abort-*"))
+    header = _rows(parked / "abort.jsonl")[0]
     assert header["aborted"] is True
+    assert header["run_id"] == "abort"
 
 
 def test_stop_session_unloads_with_keep_alive_0():

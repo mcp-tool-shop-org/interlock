@@ -178,7 +178,7 @@
           "path": "experiments/e4/spec.yaml"
         },
         {
-          "hash": "eb336979cbecdd8bc745d3c8a71726170f6dbaec75a75bbc752a98247cfa741f",
+          "hash": "13193fcadfeb251fef47abb2301ee9b90e749ab0b0d7929fe96c9825aa08904d",
           "path": "experiments/e4b/spec.yaml"
         },
         {
@@ -209,7 +209,7 @@
           "path": ".gitattributes"
         },
         {
-          "hash": "8cd13c5d921e69478648cabef33530a9c2634fe0e40faf4ef4be86767e71a33b",
+          "hash": "6172cf28ceaf39d209a5f2dc2caefb0e25f1ed5d919be3e9baad755cb8ea52c1",
           "path": ".gitignore"
         },
         {
@@ -217,7 +217,7 @@
           "path": ".python-version"
         },
         {
-          "hash": "ccd873edc337c2a5c78858acd3e3d470f3a9430f2b99a10f837fbc395a2a1a63",
+          "hash": "5abecebd4075951e5453deba5d7e61c788abb17588985f07f9ad24547c5271e7",
           "path": "CHANGELOG.md"
         },
         {
@@ -225,7 +225,7 @@
           "path": "LICENSE"
         },
         {
-          "hash": "8c66377470f33d2f4874968bfda4f7a181034fa744a718ebe0dfdbe5f9f73cb8",
+          "hash": "2343b634bfa4c7e506c287b60168dda13cf27ba672b8829ee2532132d9d58987",
           "path": "README.md"
         },
         {
@@ -1278,39 +1278,50 @@
             {
               "in": "_take_min_metrics",
               "kind": "raise",
-              "line": 142
+              "line": 160
             },
             {
               "in": "_take_min_metrics",
               "kind": "except",
-              "line": 146
+              "line": 164
             },
             {
               "in": "_take_min_metrics",
               "kind": "raise",
-              "line": 147
+              "line": 165
+            },
+            {
+              "in": "_cmd_runs_quarantine",
+              "kind": "except",
+              "line": 282
+            },
+            {
+              "in": "_cmd_runs_quarantine",
+              "kind": "except",
+              "line": 286
             },
             {
               "in": "_cmd_run",
               "kind": "except",
-              "line": 275
+              "line": 336
             },
             {
               "in": "_cmd_route",
               "kind": "except",
-              "line": 308
+              "line": 369
             }
           ],
-          "hash": "6b78395af2900d5bb4769eeecd0d2260a403ba9640380738457275e653b69ff2",
+          "hash": "1bf23f14e9b35a80a5ded3353701c786cfe1c2deee28d459e2cc143697bc2462",
           "importOrder": [
             "src/switchyard/receipt.py",
             "src/switchyard/tasks.py",
             "src/switchyard/importers/assemble.py",
             "src/switchyard/importers/gaps.py",
             "src/switchyard/importers/pins.py",
+            "src/switchyard/harness/lifecycle.py",
+            "src/switchyard/harness/e4b.py",
             "src/switchyard/adapters/base.py",
             "src/switchyard/guards.py",
-            "src/switchyard/harness/e4b.py",
             "src/switchyard/harness/ollama_serve.py",
             "src/switchyard/harness/runner.py",
             "src/switchyard/harness/spec.py",
@@ -1321,6 +1332,7 @@
             "src/switchyard/adapters/base.py",
             "src/switchyard/guards.py",
             "src/switchyard/harness/e4b.py",
+            "src/switchyard/harness/lifecycle.py",
             "src/switchyard/harness/ollama_serve.py",
             "src/switchyard/harness/runner.py",
             "src/switchyard/harness/spec.py",
@@ -1337,7 +1349,7 @@
             {
               "calls": [
                 {
-                  "line": 107,
+                  "line": 125,
                   "name": "TASKS",
                   "passed": true,
                   "target": {
@@ -1353,14 +1365,14 @@
             {
               "calls": [
                 {
-                  "line": 157,
+                  "line": 175,
                   "name": "check_tree",
                   "target": {
                     "file": "src/switchyard/receipt.py"
                   }
                 },
                 {
-                  "line": 383,
+                  "line": 444,
                   "name": "receipt_paths",
                   "target": {
                     "file": "src/switchyard/receipt.py"
@@ -1368,7 +1380,7 @@
                   "via": "_count_rows"
                 },
                 {
-                  "line": 385,
+                  "line": 446,
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/switchyard/receipt.py"
@@ -1384,7 +1396,7 @@
             {
               "calls": [
                 {
-                  "line": 172,
+                  "line": 190,
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/switchyard/receipt.py"
@@ -1399,21 +1411,21 @@
             {
               "calls": [
                 {
-                  "line": 190,
+                  "line": 208,
                   "name": "import_receipts",
                   "target": {
                     "file": "src/switchyard/importers/assemble.py"
                   }
                 },
                 {
-                  "line": 195,
+                  "line": 213,
                   "name": "load_candidates",
                   "target": {
                     "file": "src/switchyard/importers/gaps.py"
                   }
                 },
                 {
-                  "line": 204,
+                  "line": 222,
                   "name": "render_gaps",
                   "target": {
                     "file": "src/switchyard/importers/gaps.py"
@@ -1428,36 +1440,102 @@
             {
               "calls": [
                 {
+                  "line": 267,
+                  "name": "list_runs",
+                  "target": {
+                    "file": "src/switchyard/harness/lifecycle.py"
+                  }
+                },
+                {
+                  "line": 267,
+                  "name": "format_runs",
+                  "target": {
+                    "file": "src/switchyard/harness/lifecycle.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_cmd_runs_list"
+            },
+            {
+              "calls": [
+                {
+                  "line": 279,
+                  "name": "read_git",
+                  "target": {
+                    "file": "src/switchyard/harness/e4b.py"
+                  }
+                },
+                {
+                  "line": 279,
+                  "name": "capture_run",
+                  "passed": true,
+                  "target": {
+                    "file": "src/switchyard/harness/e4b.py"
+                  }
+                },
+                {
+                  "line": 285,
+                  "name": "quarantine_stray",
+                  "target": {
+                    "file": "src/switchyard/harness/lifecycle.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_cmd_runs_quarantine"
+            },
+            {
+              "calls": [
+                {
                   "branch": "args.dry_run",
-                  "line": 256,
+                  "line": 303,
                   "name": "dry_run",
                   "target": {
                     "file": "src/switchyard/harness/runner.py"
                   }
                 },
                 {
-                  "line": 269,
+                  "line": 305,
+                  "name": "load_spec",
+                  "target": {
+                    "file": "src/switchyard/harness/spec.py"
+                  }
+                },
+                {
+                  "line": 309,
+                  "name": "resolve_run_id",
+                  "target": {
+                    "file": "src/switchyard/harness/lifecycle.py"
+                  }
+                },
+                {
+                  "line": 329,
                   "name": "real_seams",
                   "target": {
                     "file": "src/switchyard/ollama_supervisor.py"
                   }
                 },
                 {
-                  "line": 271,
+                  "line": 331,
                   "name": "heartbeat_path",
                   "target": {
                     "file": "src/switchyard/harness/runner.py"
                   }
                 },
                 {
-                  "line": 268,
+                  "line": 328,
                   "name": "OllamaSupervisor",
                   "target": {
                     "file": "src/switchyard/ollama_supervisor.py"
                   }
                 },
                 {
-                  "line": 260,
+                  "line": 320,
                   "name": "run_spec",
                   "target": {
                     "file": "src/switchyard/harness/runner.py"
@@ -1472,7 +1550,7 @@
             {
               "calls": [
                 {
-                  "line": 284,
+                  "line": 345,
                   "name": "health_report",
                   "target": {
                     "file": "src/switchyard/ollama_supervisor.py"
@@ -1487,20 +1565,20 @@
             {
               "calls": [
                 {
-                  "line": 373,
+                  "line": 434,
                   "name": "read_text",
                   "target": null,
                   "via": "_load_jsonl"
                 },
                 {
-                  "line": 312,
+                  "line": 373,
                   "name": "Request",
                   "target": {
                     "file": "src/switchyard/router/policy.py"
                   }
                 },
                 {
-                  "line": 326,
+                  "line": 387,
                   "name": "decide",
                   "target": {
                     "file": "src/switchyard/router/policy.py"
@@ -1515,7 +1593,7 @@
             {
               "calls": [
                 {
-                  "line": 373,
+                  "line": 434,
                   "name": "read_text",
                   "target": null
                 }
@@ -1528,14 +1606,14 @@
             {
               "calls": [
                 {
-                  "line": 383,
+                  "line": 444,
                   "name": "receipt_paths",
                   "target": {
                     "file": "src/switchyard/receipt.py"
                   }
                 },
                 {
-                  "line": 385,
+                  "line": 446,
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/switchyard/receipt.py"
@@ -1753,6 +1831,8 @@
           "path": "src/switchyard/harness/count_budget.py"
         },
         {
+          "entry": "run_from_cli",
+          "entryRule": 4,
           "exports": [
             "build_live_seams",
             "call_time_spent",
@@ -1803,380 +1883,1752 @@
             {
               "in": "round_up_mhz",
               "kind": "raise",
-              "line": 84
+              "line": 87
             },
             {
               "in": "round_up_mhz",
               "kind": "raise",
-              "line": 86
+              "line": 89
             },
             {
               "in": "parse_typeperf",
               "kind": "except",
-              "line": 127
+              "line": 130
             },
             {
               "in": "_first_number",
               "kind": "except",
-              "line": 148
+              "line": 151
             },
             {
               "in": "sample_gpu",
               "kind": "except",
-              "line": 159
+              "line": 162
             },
             {
               "in": "sample_gpu",
               "kind": "except",
-              "line": 165
+              "line": 168
             },
             {
               "in": "collect_series",
               "kind": "raise",
-              "line": 302
+              "line": 305
             },
             {
               "in": "collect_series",
               "kind": "raise",
-              "line": 304
+              "line": 307
             },
             {
               "in": "_json_object",
               "kind": "except",
-              "line": 442
+              "line": 445
             },
             {
               "in": "counting_prompt",
               "kind": "raise",
-              "line": 455
+              "line": 458
             },
             {
               "in": "counting_prompt",
               "kind": "raise",
-              "line": 457
+              "line": 460
             },
             {
               "in": "counting_prompt",
               "kind": "raise",
-              "line": 465
+              "line": 468
             },
             {
               "in": "counting_prompt",
               "kind": "raise",
-              "line": 469
+              "line": 472
             },
             {
               "in": "prepare_prompt",
               "kind": "raise",
-              "line": 478
+              "line": 481
             },
             {
               "in": "prepare_prompt",
               "kind": "raise",
-              "line": 480
+              "line": 483
             },
             {
               "in": "_out",
               "kind": "raise",
-              "line": 504
+              "line": 507
             },
             {
               "in": "_out",
               "kind": "raise",
-              "line": 509
+              "line": 512
             },
             {
               "in": "read_git",
               "kind": "raise",
-              "line": 514
+              "line": 517
             },
             {
               "in": "ollama_pin",
               "kind": "raise",
-              "line": 545
+              "line": 548
             },
             {
               "in": "ollama_pin",
               "kind": "raise",
-              "line": 549
+              "line": 552
             },
             {
               "in": "ollama_pin",
               "kind": "raise",
-              "line": 551
+              "line": 554
             },
             {
               "in": "prove_owned_server",
               "kind": "raise",
-              "line": 588
+              "line": 591
             },
             {
               "in": "prove_owned_server",
               "kind": "raise",
-              "line": 594
+              "line": 597
             },
             {
               "in": "prove_owned_server",
               "kind": "raise",
-              "line": 596
+              "line": 599
             },
             {
               "in": "note_vram",
               "kind": "except",
-              "line": 638
+              "line": 641
             },
             {
               "in": "schedule_e4b",
               "kind": "raise",
-              "line": 653
+              "line": 656
             },
             {
               "in": "schedule_e4b",
               "kind": "raise",
-              "line": 655
+              "line": 658
             },
             {
               "in": "run_burn",
               "kind": "raise",
-              "line": 690
+              "line": 693
             },
             {
               "in": "pilot_summary",
               "kind": "raise",
-              "line": 722
+              "line": 725
             },
             {
               "in": "pilot_summary",
               "kind": "raise",
-              "line": 724
+              "line": 727
             },
             {
               "in": "pilot_destination",
               "kind": "raise",
-              "line": 743
+              "line": 746
             },
             {
               "in": "_require_amended",
               "kind": "raise",
-              "line": 815
+              "line": 818
             },
             {
               "in": "_check_run_id",
               "kind": "raise",
-              "line": 820
+              "line": 823
             },
             {
               "in": "_measurement",
               "kind": "raise",
-              "line": 826
+              "line": 829
+            },
+            {
+              "in": "_delete_caches",
+              "kind": "except",
+              "line": 862
+            },
+            {
+              "in": "_safe_caches",
+              "kind": "except",
+              "line": 872
+            },
+            {
+              "in": "_note_cleanup",
+              "kind": "except",
+              "line": 885
             },
             {
               "in": "_probe",
               "kind": "raise",
-              "line": 860
+              "line": 900
             },
             {
               "in": "_probe",
               "kind": "raise",
-              "line": 863
+              "line": 903
             },
             {
               "in": "perform_slot",
               "kind": "raise",
-              "line": 942
+              "line": 982
             },
             {
               "in": "perform_slot",
               "kind": "except",
-              "line": 1020
+              "line": 1060
             },
             {
               "in": "perform_slot",
               "kind": "raise",
-              "line": 1023
+              "line": 1063
             },
             {
               "in": "perform_slot",
               "kind": "raise",
-              "line": 1036
+              "line": 1076
             },
             {
               "in": "_stop_started",
               "kind": "except",
-              "line": 1047
+              "line": 1087
             },
             {
               "in": "_stop_started",
               "kind": "raise",
-              "line": 1049
+              "line": 1089
+            },
+            {
+              "in": "execute_block",
+              "kind": "except",
+              "line": 1301
             },
             {
               "in": "execute_block",
               "kind": "raise",
-              "line": 1276
+              "line": 1306
             },
             {
-              "in": "run_block",
+              "in": "_execute_block_loop",
               "kind": "raise",
-              "line": 1426
+              "line": 1353
+            },
+            {
+              "in": "_park",
+              "kind": "except",
+              "line": 1522
             },
             {
               "in": "run_block",
               "kind": "except",
-              "line": 1453
+              "line": 1572
+            },
+            {
+              "in": "run_block",
+              "kind": "except",
+              "line": 1587
             },
             {
               "in": "run_block",
               "kind": "raise",
-              "line": 1455
+              "line": 1589
+            },
+            {
+              "in": "run_block",
+              "kind": "raise",
+              "line": 1598
             },
             {
               "in": "run_pilot",
               "kind": "raise",
-              "line": 1484
-            },
-            {
-              "in": "run_pilot",
-              "kind": "raise",
-              "line": 1487
+              "line": 1633
             },
             {
               "in": "run_pilot",
               "kind": "except",
-              "line": 1509
+              "line": 1657
             },
             {
               "in": "run_pilot",
               "kind": "raise",
-              "line": 1511
+              "line": 1659
             },
             {
               "in": "run_pilot",
               "kind": "except",
-              "line": 1521
+              "line": 1669
             },
             {
               "in": "run_pilot",
               "kind": "raise",
-              "line": 1523
+              "line": 1671
+            },
+            {
+              "in": "run_pilot",
+              "kind": "except",
+              "line": 1692
             },
             {
               "in": "run_pilot",
               "kind": "raise",
-              "line": 1548
+              "line": 1715
+            },
+            {
+              "in": "run_pilot",
+              "kind": "raise",
+              "line": 1718
             },
             {
               "in": "_refuse_base",
               "kind": "raise",
-              "line": 1629
+              "line": 1809
             },
             {
               "in": "_refuse_base",
               "kind": "raise",
-              "line": 1631
+              "line": 1811
             },
             {
               "in": "owned_generate",
               "kind": "raise",
-              "line": 1651
+              "line": 1831
             },
             {
               "in": "unload_owned",
               "kind": "raise",
-              "line": 1662
+              "line": 1842
             },
             {
               "in": "count_owned",
               "kind": "raise",
-              "line": 1681
+              "line": 1861
             },
             {
               "in": "urllib_exchange",
               "kind": "except",
-              "line": 1806
+              "line": 1986
             },
             {
               "in": "urllib_exchange",
               "kind": "raise",
-              "line": 1808
+              "line": 1988
             },
             {
               "in": "urllib_exchange",
               "kind": "except",
-              "line": 1809
+              "line": 1989
             },
             {
               "in": "urllib_exchange",
               "kind": "raise",
-              "line": 1814
+              "line": 1994
             },
             {
               "in": "urllib_exchange",
               "kind": "raise",
-              "line": 1818
+              "line": 1998
             },
             {
               "in": "urllib_exchange",
               "kind": "raise",
-              "line": 1820
+              "line": 2000
             },
             {
               "in": "owned_probe",
               "kind": "raise",
-              "line": 1833
+              "line": 2013
             },
             {
               "in": "call",
               "kind": "raise",
-              "line": 1882
+              "line": 2062
             },
             {
               "in": "run",
               "kind": "except",
-              "line": 2003
+              "line": 2183
             },
             {
               "in": "stop_companion",
               "kind": "raise",
-              "line": 2020
+              "line": 2200
             },
             {
               "in": "companion_report",
               "kind": "raise",
-              "line": 2033
+              "line": 2213
             },
             {
               "in": "companion_report",
               "kind": "raise",
-              "line": 2035
+              "line": 2215
             }
           ],
-          "hash": "8504d460470d774e7d4562d85cb99f3a31e148062a051cc645f73d216566acc7",
-          "importOrder": [
-            "src/switchyard/guards.py",
-            "src/switchyard/harness/e4b_stats.py",
-            "src/switchyard/harness/ollama_serve.py",
-            "src/switchyard/harness/timing.py",
-            "src/switchyard/harness/runner.py",
-            "src/switchyard/ollama_supervisor.py",
-            "src/switchyard/harness/lock.py",
-            "src/switchyard/adapters/openvino.py",
-            "src/switchyard/adapters/base.py",
-            "src/switchyard/adapters/record_fixtures.py"
-          ],
+          "hash": "e5f2796f7b603a44bf1e6ece7a23785d93720bd010c82ab18281295b7a67d6b7",
           "importsFiles": [
             "src/switchyard/adapters/base.py",
             "src/switchyard/adapters/openvino.py",
             "src/switchyard/adapters/record_fixtures.py",
             "src/switchyard/guards.py",
             "src/switchyard/harness/e4b_stats.py",
+            "src/switchyard/harness/lifecycle.py",
             "src/switchyard/harness/lock.py",
             "src/switchyard/harness/ollama_serve.py",
             "src/switchyard/harness/runner.py",
             "src/switchyard/harness/timing.py",
             "src/switchyard/ollama_supervisor.py"
           ],
-          "path": "src/switchyard/harness/e4b.py"
+          "path": "src/switchyard/harness/e4b.py",
+          "sequences": [
+            {
+              "calls": [
+                {
+                  "line": 108,
+                  "name": "splitlines",
+                  "target": null
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "parse_nvidia_smi"
+            },
+            {
+              "calls": [
+                {
+                  "line": 121,
+                  "name": "splitlines",
+                  "target": null
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "parse_typeperf"
+            },
+            {
+              "calls": [
+                {
+                  "line": 108,
+                  "name": "splitlines",
+                  "target": null,
+                  "via": "parse_nvidia_smi"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "sample_gpu"
+            },
+            {
+              "calls": [
+                {
+                  "line": 176,
+                  "name": "nvmlInit",
+                  "target": null
+                },
+                {
+                  "line": 177,
+                  "name": "nvmlDeviceGetHandleByIndex",
+                  "target": null
+                },
+                {
+                  "line": 178,
+                  "name": "nvmlDeviceGetClockInfo",
+                  "target": null
+                },
+                {
+                  "line": 179,
+                  "name": "nvmlDeviceGetPowerUsage",
+                  "target": null
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "read_nvml"
+            },
+            {
+              "calls": [
+                {
+                  "branch": "isinstance(completed, str)",
+                  "line": 121,
+                  "name": "splitlines",
+                  "target": null,
+                  "via": "parse_typeperf"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "typeperf_once"
+            },
+            {
+              "calls": [
+                {
+                  "line": 108,
+                  "name": "splitlines",
+                  "target": null,
+                  "via": "parse_nvidia_smi"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "live_sample_gpu"
+            },
+            {
+              "calls": [
+                {
+                  "branch": "isinstance(completed, str)",
+                  "line": 121,
+                  "name": "splitlines",
+                  "target": null,
+                  "via": "parse_typeperf"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "live_sample_cpu"
+            },
+            {
+              "calls": [
+                {
+                  "line": 515,
+                  "name": "as_posix",
+                  "target": null
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "read_git"
+            },
+            {
+              "calls": [
+                {
+                  "line": 571,
+                  "name": "splitlines",
+                  "target": null
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "segment_names_cuda_v13"
+            },
+            {
+              "calls": [
+                {
+                  "line": 571,
+                  "name": "splitlines",
+                  "target": null,
+                  "via": "segment_names_cuda_v13"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "prove_owned_server"
+            },
+            {
+              "calls": [
+                {
+                  "line": 609,
+                  "name": "heartbeat_path",
+                  "target": {
+                    "file": "src/switchyard/harness/runner.py"
+                  }
+                },
+                {
+                  "line": 612,
+                  "name": "require_heartbeat",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  }
+                },
+                {
+                  "line": 617,
+                  "name": "require_card_empty",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_require_ready"
+            },
+            {
+              "calls": [
+                {
+                  "line": 629,
+                  "name": "read_log_segment",
+                  "target": {
+                    "file": "src/switchyard/harness/ollama_serve.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_log_text"
+            },
+            {
+              "calls": [
+                {
+                  "line": 629,
+                  "name": "read_log_segment",
+                  "target": {
+                    "file": "src/switchyard/harness/ollama_serve.py"
+                  },
+                  "via": "_log_text"
+                },
+                {
+                  "line": 633,
+                  "name": "probe",
+                  "target": null
+                },
+                {
+                  "line": 571,
+                  "name": "splitlines",
+                  "target": null,
+                  "via": "segment_names_cuda_v13"
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_require_owned_server"
+            },
+            {
+              "calls": [
+                {
+                  "line": 728,
+                  "name": "percentile",
+                  "target": {
+                    "file": "src/switchyard/harness/timing.py"
+                  }
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "pilot_summary"
+            },
+            {
+              "calls": [
+                {
+                  "line": 877,
+                  "name": "is_file",
+                  "target": null
+                },
+                {
+                  "line": 880,
+                  "name": "read_text",
+                  "target": null
+                },
+                {
+                  "line": 1494,
+                  "name": "write_text",
+                  "target": null,
+                  "via": "_write_jsonl"
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_note_cleanup"
+            },
+            {
+              "calls": [
+                {
+                  "line": 895,
+                  "name": "write_text",
+                  "target": null
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_write_series"
+            },
+            {
+              "calls": [
+                {
+                  "line": 901,
+                  "name": "probe",
+                  "target": null
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_probe"
+            },
+            {
+              "calls": [
+                {
+                  "line": 998,
+                  "name": "start_companion",
+                  "target": null
+                },
+                {
+                  "line": 1000,
+                  "name": "sample_cpu",
+                  "target": null
+                },
+                {
+                  "line": 1032,
+                  "name": "stop_companion",
+                  "target": null
+                },
+                {
+                  "line": 1034,
+                  "name": "companion_report",
+                  "target": null
+                },
+                {
+                  "line": 895,
+                  "name": "write_text",
+                  "target": null,
+                  "via": "_write_series"
+                },
+                {
+                  "branch": "not _is_repeat_limit(exc)",
+                  "line": 1086,
+                  "name": "stop_companion",
+                  "target": null,
+                  "via": "_stop_started"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "perform_slot"
+            },
+            {
+              "calls": [
+                {
+                  "line": 1086,
+                  "name": "stop_companion",
+                  "target": null
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_stop_started"
+            },
+            {
+              "calls": [
+                {
+                  "line": 895,
+                  "name": "write_text",
+                  "target": null,
+                  "via": "_write_series"
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_slot_row"
+            },
+            {
+              "calls": [
+                {
+                  "line": 998,
+                  "name": "start_companion",
+                  "target": null,
+                  "via": "perform_slot"
+                },
+                {
+                  "line": 1000,
+                  "name": "sample_cpu",
+                  "target": null,
+                  "via": "perform_slot"
+                },
+                {
+                  "line": 1032,
+                  "name": "stop_companion",
+                  "target": null,
+                  "via": "perform_slot"
+                },
+                {
+                  "line": 1034,
+                  "name": "companion_report",
+                  "target": null,
+                  "via": "perform_slot"
+                },
+                {
+                  "line": 895,
+                  "name": "write_text",
+                  "target": null,
+                  "via": "_write_series"
+                },
+                {
+                  "branch": "not _is_repeat_limit(exc)",
+                  "line": 1086,
+                  "name": "stop_companion",
+                  "target": null,
+                  "via": "_stop_started"
+                },
+                {
+                  "line": 1167,
+                  "name": "effect",
+                  "target": {
+                    "file": "src/switchyard/harness/e4b_stats.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_triplet"
+            },
+            {
+              "calls": [
+                {
+                  "line": 1205,
+                  "name": "sample_cpu",
+                  "target": null
+                },
+                {
+                  "line": 998,
+                  "name": "start_companion",
+                  "target": null,
+                  "via": "perform_slot"
+                },
+                {
+                  "line": 1000,
+                  "name": "sample_cpu",
+                  "target": null,
+                  "via": "perform_slot"
+                },
+                {
+                  "line": 1032,
+                  "name": "stop_companion",
+                  "target": null,
+                  "via": "perform_slot"
+                },
+                {
+                  "line": 1034,
+                  "name": "companion_report",
+                  "target": null,
+                  "via": "perform_slot"
+                },
+                {
+                  "line": 895,
+                  "name": "write_text",
+                  "target": null,
+                  "via": "_write_series"
+                },
+                {
+                  "branch": "not _is_repeat_limit(exc)",
+                  "line": 1086,
+                  "name": "stop_companion",
+                  "target": null,
+                  "via": "_stop_started"
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_run_probe"
+            },
+            {
+              "calls": [
+                {
+                  "line": 1255,
+                  "name": "decide",
+                  "target": {
+                    "file": "src/switchyard/harness/e4b_stats.py"
+                  }
+                },
+                {
+                  "line": 1256,
+                  "name": "bootstrap_median",
+                  "target": {
+                    "file": "src/switchyard/harness/e4b_stats.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_analyze"
+            },
+            {
+              "calls": [
+                {
+                  "line": 998,
+                  "name": "start_companion",
+                  "target": null,
+                  "via": "perform_slot"
+                },
+                {
+                  "line": 1000,
+                  "name": "sample_cpu",
+                  "target": null,
+                  "via": "perform_slot"
+                },
+                {
+                  "line": 1032,
+                  "name": "stop_companion",
+                  "target": null,
+                  "via": "perform_slot"
+                },
+                {
+                  "line": 1034,
+                  "name": "companion_report",
+                  "target": null,
+                  "via": "perform_slot"
+                },
+                {
+                  "line": 895,
+                  "name": "write_text",
+                  "target": null,
+                  "via": "_write_series"
+                },
+                {
+                  "branch": "not _is_repeat_limit(exc)",
+                  "line": 1086,
+                  "name": "stop_companion",
+                  "target": null,
+                  "via": "_stop_started"
+                },
+                {
+                  "line": 1167,
+                  "name": "effect",
+                  "target": {
+                    "file": "src/switchyard/harness/e4b_stats.py"
+                  },
+                  "via": "_triplet"
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_extend_pair"
+            },
+            {
+              "calls": [
+                {
+                  "line": 998,
+                  "name": "start_companion",
+                  "target": null,
+                  "via": "perform_slot"
+                },
+                {
+                  "line": 1000,
+                  "name": "sample_cpu",
+                  "target": null,
+                  "via": "perform_slot"
+                },
+                {
+                  "line": 1032,
+                  "name": "stop_companion",
+                  "target": null,
+                  "via": "perform_slot"
+                },
+                {
+                  "line": 1034,
+                  "name": "companion_report",
+                  "target": null,
+                  "via": "perform_slot"
+                },
+                {
+                  "line": 895,
+                  "name": "write_text",
+                  "target": null,
+                  "via": "_write_series"
+                },
+                {
+                  "branch": "not _is_repeat_limit(exc)",
+                  "line": 1086,
+                  "name": "stop_companion",
+                  "target": null,
+                  "via": "_stop_started"
+                },
+                {
+                  "line": 1205,
+                  "name": "sample_cpu",
+                  "target": null,
+                  "via": "_run_probe"
+                },
+                {
+                  "line": 1167,
+                  "name": "effect",
+                  "target": {
+                    "file": "src/switchyard/harness/e4b_stats.py"
+                  },
+                  "via": "_triplet"
+                },
+                {
+                  "line": 1255,
+                  "name": "decide",
+                  "target": {
+                    "file": "src/switchyard/harness/e4b_stats.py"
+                  },
+                  "via": "_analyze"
+                },
+                {
+                  "line": 1256,
+                  "name": "bootstrap_median",
+                  "target": {
+                    "file": "src/switchyard/harness/e4b_stats.py"
+                  },
+                  "via": "_analyze"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "execute_block"
+            },
+            {
+              "calls": [
+                {
+                  "line": 998,
+                  "name": "start_companion",
+                  "target": null,
+                  "via": "perform_slot"
+                },
+                {
+                  "line": 1000,
+                  "name": "sample_cpu",
+                  "target": null,
+                  "via": "perform_slot"
+                },
+                {
+                  "line": 1032,
+                  "name": "stop_companion",
+                  "target": null,
+                  "via": "perform_slot"
+                },
+                {
+                  "line": 1034,
+                  "name": "companion_report",
+                  "target": null,
+                  "via": "perform_slot"
+                },
+                {
+                  "line": 895,
+                  "name": "write_text",
+                  "target": null,
+                  "via": "_write_series"
+                },
+                {
+                  "branch": "not _is_repeat_limit(exc)",
+                  "line": 1086,
+                  "name": "stop_companion",
+                  "target": null,
+                  "via": "_stop_started"
+                },
+                {
+                  "line": 1205,
+                  "name": "sample_cpu",
+                  "target": null,
+                  "via": "_run_probe"
+                },
+                {
+                  "line": 1167,
+                  "name": "effect",
+                  "target": {
+                    "file": "src/switchyard/harness/e4b_stats.py"
+                  },
+                  "via": "_triplet"
+                },
+                {
+                  "line": 1255,
+                  "name": "decide",
+                  "target": {
+                    "file": "src/switchyard/harness/e4b_stats.py"
+                  },
+                  "via": "_analyze"
+                },
+                {
+                  "line": 1256,
+                  "name": "bootstrap_median",
+                  "target": {
+                    "file": "src/switchyard/harness/e4b_stats.py"
+                  },
+                  "via": "_analyze"
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_execute_block_loop"
+            },
+            {
+              "calls": [
+                {
+                  "line": 1425,
+                  "name": "splitlines",
+                  "target": null
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_server_config_line"
+            },
+            {
+              "calls": [
+                {
+                  "line": 629,
+                  "name": "read_log_segment",
+                  "target": {
+                    "file": "src/switchyard/harness/ollama_serve.py"
+                  },
+                  "via": "_log_text"
+                },
+                {
+                  "line": 1463,
+                  "name": "server_config_env",
+                  "target": {
+                    "file": "src/switchyard/ollama_supervisor.py"
+                  }
+                },
+                {
+                  "line": 1470,
+                  "name": "receipt_environment",
+                  "target": {
+                    "file": "src/switchyard/harness/ollama_serve.py"
+                  }
+                },
+                {
+                  "line": 1425,
+                  "name": "splitlines",
+                  "target": null,
+                  "via": "_server_config_line"
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_header"
+            },
+            {
+              "calls": [
+                {
+                  "line": 1494,
+                  "name": "write_text",
+                  "target": null
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_write_jsonl"
+            },
+            {
+              "calls": [
+                {
+                  "line": 1515,
+                  "name": "utc_now",
+                  "target": {
+                    "file": "src/switchyard/harness/lifecycle.py"
+                  }
+                },
+                {
+                  "line": 1510,
+                  "name": "move_aside",
+                  "target": {
+                    "file": "src/switchyard/harness/lifecycle.py"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_park"
+            },
+            {
+              "calls": [
+                {
+                  "line": 1540,
+                  "name": "require_free",
+                  "target": {
+                    "file": "src/switchyard/harness/lifecycle.py"
+                  }
+                },
+                {
+                  "line": 1541,
+                  "name": "refuse_strays",
+                  "target": {
+                    "file": "src/switchyard/harness/lifecycle.py"
+                  }
+                },
+                {
+                  "line": 1545,
+                  "name": "utc_now",
+                  "target": {
+                    "file": "src/switchyard/harness/lifecycle.py"
+                  }
+                },
+                {
+                  "line": 609,
+                  "name": "heartbeat_path",
+                  "target": {
+                    "file": "src/switchyard/harness/runner.py"
+                  },
+                  "via": "_require_ready"
+                },
+                {
+                  "line": 612,
+                  "name": "require_heartbeat",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  },
+                  "via": "_require_ready"
+                },
+                {
+                  "line": 617,
+                  "name": "require_card_empty",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  },
+                  "via": "_require_ready"
+                },
+                {
+                  "line": 901,
+                  "name": "probe",
+                  "target": null,
+                  "via": "_probe"
+                },
+                {
+                  "line": 1562,
+                  "name": "load_resident",
+                  "target": null
+                },
+                {
+                  "line": 629,
+                  "name": "read_log_segment",
+                  "target": {
+                    "file": "src/switchyard/harness/ollama_serve.py"
+                  },
+                  "via": "_log_text"
+                },
+                {
+                  "line": 633,
+                  "name": "probe",
+                  "target": null,
+                  "via": "_require_owned_server"
+                },
+                {
+                  "line": 571,
+                  "name": "splitlines",
+                  "target": null,
+                  "via": "segment_names_cuda_v13"
+                },
+                {
+                  "line": 998,
+                  "name": "start_companion",
+                  "target": null,
+                  "via": "perform_slot"
+                },
+                {
+                  "line": 1000,
+                  "name": "sample_cpu",
+                  "target": null,
+                  "via": "perform_slot"
+                },
+                {
+                  "line": 1032,
+                  "name": "stop_companion",
+                  "target": null,
+                  "via": "perform_slot"
+                },
+                {
+                  "line": 1034,
+                  "name": "companion_report",
+                  "target": null,
+                  "via": "perform_slot"
+                },
+                {
+                  "line": 895,
+                  "name": "write_text",
+                  "target": null,
+                  "via": "_write_series"
+                },
+                {
+                  "branch": "not _is_repeat_limit(exc)",
+                  "line": 1086,
+                  "name": "stop_companion",
+                  "target": null,
+                  "via": "_stop_started"
+                },
+                {
+                  "line": 1205,
+                  "name": "sample_cpu",
+                  "target": null,
+                  "via": "_run_probe"
+                },
+                {
+                  "line": 1167,
+                  "name": "effect",
+                  "target": {
+                    "file": "src/switchyard/harness/e4b_stats.py"
+                  },
+                  "via": "_triplet"
+                },
+                {
+                  "line": 1255,
+                  "name": "decide",
+                  "target": {
+                    "file": "src/switchyard/harness/e4b_stats.py"
+                  },
+                  "via": "_analyze"
+                },
+                {
+                  "line": 1256,
+                  "name": "bootstrap_median",
+                  "target": {
+                    "file": "src/switchyard/harness/e4b_stats.py"
+                  },
+                  "via": "_analyze"
+                },
+                {
+                  "line": 1569,
+                  "name": "unload_resident",
+                  "target": null
+                },
+                {
+                  "line": 1463,
+                  "name": "server_config_env",
+                  "target": {
+                    "file": "src/switchyard/ollama_supervisor.py"
+                  },
+                  "via": "_header"
+                },
+                {
+                  "line": 1470,
+                  "name": "receipt_environment",
+                  "target": {
+                    "file": "src/switchyard/harness/ollama_serve.py"
+                  },
+                  "via": "_header"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "run_block",
+              "truncated": true
+            },
+            {
+              "calls": [
+                {
+                  "line": 1628,
+                  "name": "require_free",
+                  "target": {
+                    "file": "src/switchyard/harness/lifecycle.py"
+                  }
+                },
+                {
+                  "line": 1629,
+                  "name": "refuse_strays",
+                  "target": {
+                    "file": "src/switchyard/harness/lifecycle.py"
+                  }
+                },
+                {
+                  "line": 1643,
+                  "name": "utc_now",
+                  "target": {
+                    "file": "src/switchyard/harness/lifecycle.py"
+                  }
+                },
+                {
+                  "line": 609,
+                  "name": "heartbeat_path",
+                  "target": {
+                    "file": "src/switchyard/harness/runner.py"
+                  },
+                  "via": "_require_ready"
+                },
+                {
+                  "line": 612,
+                  "name": "require_heartbeat",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  },
+                  "via": "_require_ready"
+                },
+                {
+                  "line": 617,
+                  "name": "require_card_empty",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  },
+                  "via": "_require_ready"
+                },
+                {
+                  "line": 901,
+                  "name": "probe",
+                  "target": null,
+                  "via": "_probe"
+                },
+                {
+                  "line": 1650,
+                  "name": "load_resident",
+                  "target": null
+                },
+                {
+                  "line": 629,
+                  "name": "read_log_segment",
+                  "target": {
+                    "file": "src/switchyard/harness/ollama_serve.py"
+                  },
+                  "via": "_log_text"
+                },
+                {
+                  "line": 633,
+                  "name": "probe",
+                  "target": null,
+                  "via": "_require_owned_server"
+                },
+                {
+                  "line": 571,
+                  "name": "splitlines",
+                  "target": null,
+                  "via": "segment_names_cuda_v13"
+                },
+                {
+                  "line": 1696,
+                  "name": "unload_resident",
+                  "target": null
+                },
+                {
+                  "branch": "stopped",
+                  "line": 1515,
+                  "name": "utc_now",
+                  "target": {
+                    "file": "src/switchyard/harness/lifecycle.py"
+                  },
+                  "via": "_park"
+                },
+                {
+                  "branch": "stopped",
+                  "line": 1510,
+                  "name": "move_aside",
+                  "target": {
+                    "file": "src/switchyard/harness/lifecycle.py"
+                  },
+                  "via": "_park"
+                },
+                {
+                  "line": 728,
+                  "name": "percentile",
+                  "target": {
+                    "file": "src/switchyard/harness/timing.py"
+                  },
+                  "via": "pilot_summary"
+                },
+                {
+                  "line": 1735,
+                  "name": "receipt_environment",
+                  "target": {
+                    "file": "src/switchyard/harness/ollama_serve.py"
+                  }
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "run_pilot"
+            },
+            {
+              "calls": [
+                {
+                  "line": 1774,
+                  "name": "require_unmodified",
+                  "target": {
+                    "file": "src/switchyard/harness/lock.py"
+                  }
+                },
+                {
+                  "line": 1775,
+                  "name": "require_grant",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  }
+                },
+                {
+                  "line": 1777,
+                  "name": "require_npu_session",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  }
+                },
+                {
+                  "line": 1781,
+                  "name": "resolve_run_id",
+                  "target": {
+                    "file": "src/switchyard/harness/lifecycle.py"
+                  }
+                },
+                {
+                  "line": 2107,
+                  "name": "resolve_pin",
+                  "target": {
+                    "file": "src/switchyard/harness/ollama_serve.py"
+                  },
+                  "via": "build_live_seams"
+                },
+                {
+                  "line": 2115,
+                  "name": "Server",
+                  "target": {
+                    "file": "src/switchyard/harness/ollama_serve.py"
+                  },
+                  "via": "build_live_seams"
+                },
+                {
+                  "line": 1949,
+                  "name": "open",
+                  "target": null,
+                  "via": "spawn_ollama"
+                },
+                {
+                  "line": 2121,
+                  "name": "stop_process_tree",
+                  "target": {
+                    "file": "src/switchyard/harness/ollama_serve.py"
+                  },
+                  "via": "build_live_seams"
+                },
+                {
+                  "line": 2241,
+                  "name": "heartbeat_path",
+                  "target": {
+                    "file": "src/switchyard/harness/runner.py"
+                  },
+                  "via": "build_live_seams"
+                },
+                {
+                  "line": 1790,
+                  "name": "git",
+                  "target": null
+                },
+                {
+                  "branch": "pilot",
+                  "line": 1628,
+                  "name": "require_free",
+                  "target": {
+                    "file": "src/switchyard/harness/lifecycle.py"
+                  },
+                  "via": "run_pilot"
+                },
+                {
+                  "branch": "pilot",
+                  "line": 1629,
+                  "name": "refuse_strays",
+                  "target": {
+                    "file": "src/switchyard/harness/lifecycle.py"
+                  },
+                  "via": "run_pilot"
+                },
+                {
+                  "branch": "pilot",
+                  "line": 1643,
+                  "name": "utc_now",
+                  "target": {
+                    "file": "src/switchyard/harness/lifecycle.py"
+                  },
+                  "via": "run_pilot"
+                },
+                {
+                  "branch": "pilot",
+                  "line": 609,
+                  "name": "heartbeat_path",
+                  "target": {
+                    "file": "src/switchyard/harness/runner.py"
+                  },
+                  "via": "_require_ready"
+                },
+                {
+                  "branch": "pilot",
+                  "line": 612,
+                  "name": "require_heartbeat",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  },
+                  "via": "_require_ready"
+                },
+                {
+                  "branch": "pilot",
+                  "line": 617,
+                  "name": "require_card_empty",
+                  "target": {
+                    "file": "src/switchyard/guards.py"
+                  },
+                  "via": "_require_ready"
+                },
+                {
+                  "branch": "pilot",
+                  "line": 901,
+                  "name": "probe",
+                  "target": null,
+                  "via": "_probe"
+                },
+                {
+                  "branch": "pilot",
+                  "line": 1650,
+                  "name": "load_resident",
+                  "target": null,
+                  "via": "run_pilot"
+                },
+                {
+                  "branch": "pilot",
+                  "line": 629,
+                  "name": "read_log_segment",
+                  "target": {
+                    "file": "src/switchyard/harness/ollama_serve.py"
+                  },
+                  "via": "_log_text"
+                },
+                {
+                  "branch": "pilot",
+                  "line": 633,
+                  "name": "probe",
+                  "target": null,
+                  "via": "_require_owned_server"
+                },
+                {
+                  "branch": "pilot",
+                  "line": 571,
+                  "name": "splitlines",
+                  "target": null,
+                  "via": "segment_names_cuda_v13"
+                },
+                {
+                  "branch": "pilot",
+                  "line": 1696,
+                  "name": "unload_resident",
+                  "target": null,
+                  "via": "run_pilot"
+                },
+                {
+                  "branch": "pilot",
+                  "line": 1515,
+                  "name": "utc_now",
+                  "target": {
+                    "file": "src/switchyard/harness/lifecycle.py"
+                  },
+                  "via": "_park"
+                },
+                {
+                  "branch": "pilot",
+                  "line": 1510,
+                  "name": "move_aside",
+                  "target": {
+                    "file": "src/switchyard/harness/lifecycle.py"
+                  },
+                  "via": "_park"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "run_from_cli",
+              "truncated": true
+            },
+            {
+              "calls": [
+                {
+                  "line": 1935,
+                  "name": "is_set",
+                  "target": null
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "generate_loop"
+            },
+            {
+              "calls": [
+                {
+                  "line": 1949,
+                  "name": "open",
+                  "target": null
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "spawn_ollama"
+            },
+            {
+              "calls": [
+                {
+                  "line": 2014,
+                  "name": "get_json",
+                  "target": {
+                    "file": "src/switchyard/harness/ollama_serve.py"
+                  }
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "owned_probe"
+            },
+            {
+              "calls": [
+                {
+                  "line": 2107,
+                  "name": "resolve_pin",
+                  "target": {
+                    "file": "src/switchyard/harness/ollama_serve.py"
+                  }
+                },
+                {
+                  "line": 2115,
+                  "name": "Server",
+                  "target": {
+                    "file": "src/switchyard/harness/ollama_serve.py"
+                  }
+                },
+                {
+                  "line": 1949,
+                  "name": "open",
+                  "target": null,
+                  "via": "spawn_ollama"
+                },
+                {
+                  "line": 2121,
+                  "name": "stop_process_tree",
+                  "target": {
+                    "file": "src/switchyard/harness/ollama_serve.py"
+                  }
+                },
+                {
+                  "line": 2241,
+                  "name": "heartbeat_path",
+                  "target": {
+                    "file": "src/switchyard/harness/runner.py"
+                  }
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "build_live_seams"
+            }
+          ]
         },
         {
           "exports": [
@@ -2660,6 +4112,362 @@
           "path": "src/switchyard/harness/fill.py"
         },
         {
+          "entry": "artefacts",
+          "entryRule": 4,
+          "exports": [
+            "artefacts",
+            "choose_run_id",
+            "format_runs",
+            "is_quarantined",
+            "list_runs",
+            "matching_quarantine",
+            "move_aside",
+            "quarantine_root_for",
+            "quarantine_stray",
+            "refuse_strays",
+            "require_free",
+            "resolve_run_id",
+            "run_id_from_quarantine",
+            "state_of",
+            "stray_series",
+            "utc_now"
+          ],
+          "failurePaths": [
+            {
+              "in": "_check_name",
+              "kind": "raise",
+              "line": 41
+            },
+            {
+              "in": "_rel",
+              "kind": "except",
+              "line": 47
+            },
+            {
+              "in": "require_free",
+              "kind": "raise",
+              "line": 87
+            },
+            {
+              "in": "refuse_strays",
+              "kind": "raise",
+              "line": 116
+            },
+            {
+              "in": "choose_run_id",
+              "kind": "raise",
+              "line": 133
+            },
+            {
+              "in": "run_id_from_quarantine",
+              "kind": "except",
+              "line": 159
+            },
+            {
+              "in": "quarantine_stray",
+              "kind": "raise",
+              "line": 290
+            },
+            {
+              "in": "quarantine_stray",
+              "kind": "raise",
+              "line": 292
+            },
+            {
+              "in": "quarantine_stray",
+              "kind": "raise",
+              "line": 306
+            }
+          ],
+          "hash": "b66d8387b3914135ce138635996ccc016ac8e8d133fb0481f138b9d33e0c28e2",
+          "path": "src/switchyard/harness/lifecycle.py",
+          "sequences": [
+            {
+              "calls": [
+                {
+                  "line": 34,
+                  "name": "is_absolute",
+                  "target": null
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "quarantine_root_for"
+            },
+            {
+              "calls": [
+                {
+                  "line": 46,
+                  "name": "relative_to",
+                  "target": null
+                },
+                {
+                  "line": 48,
+                  "name": "as_posix",
+                  "target": null
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_rel"
+            },
+            {
+              "calls": [
+                {
+                  "line": 34,
+                  "name": "is_absolute",
+                  "target": null,
+                  "via": "quarantine_root_for"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "matching_quarantine"
+            },
+            {
+              "calls": [
+                {
+                  "line": 46,
+                  "name": "relative_to",
+                  "target": null,
+                  "via": "_rel"
+                },
+                {
+                  "line": 48,
+                  "name": "as_posix",
+                  "target": null,
+                  "via": "_rel"
+                },
+                {
+                  "line": 34,
+                  "name": "is_absolute",
+                  "target": null,
+                  "via": "quarantine_root_for"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "artefacts"
+            },
+            {
+              "calls": [
+                {
+                  "line": 46,
+                  "name": "relative_to",
+                  "target": null,
+                  "via": "_rel"
+                },
+                {
+                  "line": 48,
+                  "name": "as_posix",
+                  "target": null,
+                  "via": "_rel"
+                },
+                {
+                  "line": 34,
+                  "name": "is_absolute",
+                  "target": null,
+                  "via": "quarantine_root_for"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "require_free"
+            },
+            {
+              "calls": [
+                {
+                  "line": 46,
+                  "name": "relative_to",
+                  "target": null,
+                  "via": "_rel"
+                },
+                {
+                  "line": 48,
+                  "name": "as_posix",
+                  "target": null,
+                  "via": "_rel"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "refuse_strays"
+            },
+            {
+              "calls": [
+                {
+                  "branch": "explicit is not None",
+                  "line": 46,
+                  "name": "relative_to",
+                  "target": null,
+                  "via": "_rel"
+                },
+                {
+                  "branch": "explicit is not None",
+                  "line": 48,
+                  "name": "as_posix",
+                  "target": null,
+                  "via": "_rel"
+                },
+                {
+                  "branch": "explicit is not None",
+                  "line": 34,
+                  "name": "is_absolute",
+                  "target": null,
+                  "via": "quarantine_root_for"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "choose_run_id"
+            },
+            {
+              "calls": [
+                {
+                  "branch": "explicit is not None",
+                  "line": 46,
+                  "name": "relative_to",
+                  "target": null,
+                  "via": "_rel"
+                },
+                {
+                  "branch": "explicit is not None",
+                  "line": 48,
+                  "name": "as_posix",
+                  "target": null,
+                  "via": "_rel"
+                },
+                {
+                  "branch": "explicit is not None",
+                  "line": 34,
+                  "name": "is_absolute",
+                  "target": null,
+                  "via": "quarantine_root_for"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "resolve_run_id"
+            },
+            {
+              "calls": [
+                {
+                  "line": 34,
+                  "name": "is_absolute",
+                  "target": null,
+                  "via": "quarantine_root_for"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "is_quarantined"
+            },
+            {
+              "calls": [
+                {
+                  "line": 34,
+                  "name": "is_absolute",
+                  "target": null,
+                  "via": "quarantine_root_for"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "state_of"
+            },
+            {
+              "calls": [
+                {
+                  "line": 34,
+                  "name": "is_absolute",
+                  "target": null,
+                  "via": "quarantine_root_for"
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_ids_under"
+            },
+            {
+              "calls": [
+                {
+                  "line": 34,
+                  "name": "is_absolute",
+                  "target": null,
+                  "via": "quarantine_root_for"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "list_runs"
+            },
+            {
+              "calls": [
+                {
+                  "line": 34,
+                  "name": "is_absolute",
+                  "target": null,
+                  "via": "quarantine_root_for"
+                },
+                {
+                  "line": 46,
+                  "name": "relative_to",
+                  "target": null,
+                  "via": "_rel"
+                },
+                {
+                  "line": 48,
+                  "name": "as_posix",
+                  "target": null,
+                  "via": "_rel"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "move_aside"
+            },
+            {
+              "calls": [
+                {
+                  "line": 34,
+                  "name": "is_absolute",
+                  "target": null,
+                  "via": "quarantine_root_for"
+                },
+                {
+                  "line": 46,
+                  "name": "relative_to",
+                  "target": null,
+                  "via": "_rel"
+                },
+                {
+                  "line": 48,
+                  "name": "as_posix",
+                  "target": null,
+                  "via": "_rel"
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "quarantine_stray"
+            }
+          ]
+        },
+        {
           "exports": [
             "require_unmodified"
           ],
@@ -2885,37 +4693,39 @@
             {
               "in": "_append_table",
               "kind": "raise",
-              "line": 377
+              "line": 381
             },
             {
               "in": "write_atomic",
               "kind": "except",
-              "line": 400
+              "line": 404
             },
             {
               "in": "write_atomic",
               "kind": "except",
-              "line": 403
+              "line": 407
             },
             {
               "in": "write_atomic",
               "kind": "raise",
-              "line": 405
+              "line": 409
             }
           ],
-          "hash": "a126503ec7c77441cc1fb505c24e9e5feacb0958b3a5cb8b317be4728599a9bf",
+          "hash": "dadc726e3d704f05fcf9a0b5b2a1c53bc5b22b62dce9693176188df88e2a50d9",
           "importOrder": [
             "src/switchyard/harness/__init__.py",
             "src/switchyard/harness/environment.py",
             "src/switchyard/harness/timing.py",
             "src/switchyard/families.py",
             "src/switchyard/importers/gaps.py",
-            "src/switchyard/receipt.py"
+            "src/switchyard/receipt.py",
+            "src/switchyard/harness/lifecycle.py"
           ],
           "importsFiles": [
             "src/switchyard/families.py",
             "src/switchyard/harness/__init__.py",
             "src/switchyard/harness/environment.py",
+            "src/switchyard/harness/lifecycle.py",
             "src/switchyard/harness/timing.py",
             "src/switchyard/importers/gaps.py",
             "src/switchyard/receipt.py"
@@ -3121,20 +4931,20 @@
             {
               "in": "run_spec",
               "kind": "raise",
-              "line": 2028
+              "line": 2030
             },
             {
               "in": "run_spec",
               "kind": "raise",
-              "line": 2035
+              "line": 2037
             },
             {
               "in": "run_spec",
               "kind": "raise",
-              "line": 2080
+              "line": 2082
             }
           ],
-          "hash": "c565cd563607548d0d98e040bdab29653b80cbe3d91e693f0f119c98109efb85",
+          "hash": "d932efa80dc0d6d8ef12dd9ed016791035522202091f33d345f5401e6a1ea02b",
           "importsFiles": [
             "src/switchyard/adapters/base.py",
             "src/switchyard/adapters/offrig_calibrate.py",
@@ -3958,7 +5768,7 @@
                   "via": "_refuse_repo_interpreter"
                 },
                 {
-                  "line": 2009,
+                  "line": 2010,
                   "name": "load_spec",
                   "target": {
                     "file": "src/switchyard/harness/spec.py"
@@ -3966,7 +5776,7 @@
                 },
                 {
                   "branch": "spec.get(\"id\") == \"E4b\"",
-                  "line": 2013,
+                  "line": 2014,
                   "name": "run_from_cli",
                   "target": {
                     "file": "src/switchyard/harness/e4b.py"
@@ -3974,7 +5784,7 @@
                 },
                 {
                   "branch": "pilot",
-                  "line": 2028,
+                  "line": 2030,
                   "name": "E4bError",
                   "target": {
                     "file": "src/switchyard/harness/e4b.py"
@@ -3998,7 +5808,7 @@
                   "via": "check_flags"
                 },
                 {
-                  "line": 2030,
+                  "line": 2032,
                   "name": "require_unmodified",
                   "target": {
                     "file": "src/switchyard/harness/lock.py"
@@ -4006,26 +5816,26 @@
                 },
                 {
                   "branch": "receipt.exists()",
-                  "line": 2035,
+                  "line": 2037,
                   "name": "GuardError",
                   "target": {
                     "file": "src/switchyard/guards.py"
                   }
                 },
                 {
-                  "line": 2042,
+                  "line": 2044,
                   "name": "resolve",
                   "target": null
                 },
                 {
-                  "line": 2044,
+                  "line": 2046,
                   "name": "RunMarker",
                   "target": {
                     "file": "src/switchyard/harness/marker.py"
                   }
                 },
                 {
-                  "line": 2052,
+                  "line": 2054,
                   "name": "write",
                   "receiver": "RunMarker",
                   "target": {
@@ -4034,7 +5844,7 @@
                 },
                 {
                   "branch": "spec[\"procedure\"] == \"fill-card\"",
-                  "line": 2057,
+                  "line": 2059,
                   "name": "for_engine",
                   "target": {
                     "file": "src/switchyard/adapters/registry.py"
@@ -4042,7 +5852,7 @@
                 },
                 {
                   "branch": "spec[\"procedure\"] == \"fill-card\"",
-                  "line": 2061,
+                  "line": 2063,
                   "name": "quiet_fill_seams",
                   "target": {
                     "file": "src/switchyard/harness/fill.py"
@@ -4050,7 +5860,7 @@
                 },
                 {
                   "branch": "spec[\"procedure\"] == \"fill-card\"",
-                  "line": 2063,
+                  "line": 2065,
                   "name": "real_fill_seams",
                   "target": {
                     "file": "src/switchyard/harness/fill.py"
@@ -4058,7 +5868,7 @@
                 },
                 {
                   "branch": "spec[\"procedure\"] == \"fill-card\"",
-                  "line": 2064,
+                  "line": 2066,
                   "name": "run_fill_card",
                   "target": {
                     "file": "src/switchyard/harness/fill.py"
@@ -4066,7 +5876,7 @@
                 },
                 {
                   "branch": "spec[\"procedure\"] != \"interleaved\"",
-                  "line": 2080,
+                  "line": 2082,
                   "name": "GuardError",
                   "target": {
                     "file": "src/switchyard/guards.py"
@@ -4137,6 +5947,8 @@
           ]
         },
         {
+          "entry": "load_spec",
+          "entryRule": 4,
           "exports": [
             "load_spec",
             "validate_spec"
@@ -4643,7 +6455,22 @@
             "src/switchyard/harness/e5.py",
             "src/switchyard/tasks.py"
           ],
-          "path": "src/switchyard/harness/spec.py"
+          "path": "src/switchyard/harness/spec.py",
+          "sequences": [
+            {
+              "calls": [
+                {
+                  "line": 31,
+                  "name": "read_text",
+                  "target": null
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "load_spec"
+            }
+          ]
         },
         {
           "exports": [
@@ -7094,11 +8921,11 @@
       "origin": "authored",
       "outsidePlaces": [
         {
-          "reads": 29,
+          "reads": 37,
           "where": [
             "caller"
           ],
-          "writes": 9
+          "writes": 12
         },
         {
           "reads": 3,
@@ -7108,13 +8935,13 @@
           "writes": 0
         }
       ],
-      "outsideReads": 32,
-      "outsideWrites": 9,
+      "outsideReads": 40,
+      "outsideWrites": 12,
       "role": "code",
       "testRunners": [
         "pytest"
       ],
-      "testedBy": 26,
+      "testedBy": 28,
       "unresolvedSites": 0
     },
     {
@@ -7435,7 +9262,7 @@
             "test_the_burn_stops_when_the_slot_ends_and_when_it_raises",
             "test_the_cli_reads_git_once_before_the_first_device_call",
             "test_the_counting_prompt_is_the_shortest_prefix_at_the_token_target",
-            "test_the_e4b_spec_loads_and_keeps_null_tolerances",
+            "test_the_e4b_spec_loads_with_the_pilot_tolerances",
             "test_the_owned_server_stops_when_version_never_answers",
             "test_the_owned_server_waits_out_the_first_refused_version_calls",
             "test_the_pilot_counts_its_prompt_only_once_the_owned_server_is_up",
@@ -7445,7 +9272,7 @@
             "test_unsteady_warmup_refuses_clock_not_steady",
             "test_warm_until_steady_and_a_short_warm_is_not_steady"
           ],
-          "hash": "e21c0490aaeebef97ae5da19a6199dfbd9c8b8eed7db24bbf29fbad14e20ff34",
+          "hash": "7f36987b2ad486acc2f17a924d331414dbced9b539697c94045af4362c1ba1d4",
           "importOrder": [
             "src/switchyard/adapters/base.py",
             "src/switchyard/adapters/ollama.py",
@@ -7457,7 +9284,8 @@
             "src/switchyard/harness/spec.py",
             "src/switchyard/harness/timing.py",
             "src/switchyard/cli.py",
-            "src/switchyard/harness/runner.py"
+            "src/switchyard/harness/runner.py",
+            "src/switchyard/harness/__init__.py"
           ],
           "importsFiles": [
             "src/switchyard/adapters/base.py",
@@ -7465,6 +9293,7 @@
             "src/switchyard/adapters/record_fixtures.py",
             "src/switchyard/cli.py",
             "src/switchyard/guards.py",
+            "src/switchyard/harness/__init__.py",
             "src/switchyard/harness/e4b.py",
             "src/switchyard/harness/e4b_stats.py",
             "src/switchyard/harness/ollama_serve.py",
@@ -7474,6 +9303,18 @@
           ],
           "path": "tests/test_e4b.py",
           "testFramework": "pytest"
+        },
+        {
+          "exports": [
+            "test_a_cache_that_will_not_go_is_reported_not_raised",
+            "test_a_read_only_compiled_blob_is_removed"
+          ],
+          "hash": "b706f180375ec7cf40919744e178351d7d83829eacabd402cb81ef44f2b8487e",
+          "importsFiles": [
+            "src/switchyard/harness/__init__.py",
+            "src/switchyard/harness/e4b.py"
+          ],
+          "path": "tests/test_e4b_cache_cleanup.py"
         },
         {
           "exports": [
@@ -8254,6 +10095,31 @@
         },
         {
           "exports": [
+            "test_a_quarantined_run_is_excluded_from_the_table",
+            "test_a_run_whose_cleanup_fails_still_writes_its_receipt",
+            "test_a_stopped_pilot_is_quarantined",
+            "test_a_stopped_run_keeps_finished_rows_in_quarantine",
+            "test_a_stray_series_refuses_before_any_device",
+            "test_an_explicit_run_id_in_use_is_refused",
+            "test_an_omitted_run_id_is_the_first_line",
+            "test_an_omitted_run_id_picks_the_next_free_one",
+            "test_runs_list_reports_complete_aborted_and_stray",
+            "test_runs_quarantine_moves_a_stray_and_writes_the_hand_note"
+          ],
+          "hash": "bfa30ada930ecb7affa6bd0fa086d88b73c1e4de08c2ac0aae747acaa0b012ad",
+          "importsFiles": [
+            "src/switchyard/cli.py",
+            "src/switchyard/harness/e4b.py",
+            "src/switchyard/harness/lifecycle.py",
+            "src/switchyard/harness/receipts.py",
+            "src/switchyard/receipt.py",
+            "tests/test_e4b.py"
+          ],
+          "path": "tests/test_run_lifecycle.py",
+          "testFramework": "pytest"
+        },
+        {
+          "exports": [
             "test_a_5090_run_proceeds_after_both_card_checks",
             "test_a_clean_run_writes_a_receipt_check_accepts",
             "test_a_fill_card_run_refuses_a_missing_heartbeat_before_the_adapter",
@@ -8399,7 +10265,7 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 28
+          "files": 30
         },
         {
           "boundary": "src",
@@ -8408,7 +10274,7 @@
             "file": "src/switchyard/harness/runner.py",
             "from": "tests/conftest.py"
           },
-          "files": 46
+          "files": 47
         }
       ],
       "readers": [],
@@ -8439,7 +10305,7 @@
         {
           "config": "pyproject.toml",
           "coverage": true,
-          "files": 28,
+          "files": 30,
           "job": "test",
           "runner": "pytest",
           "step": "Test"
@@ -8508,7 +10374,7 @@
         {
           "boundary": "src",
           "depth": 0,
-          "files": 42
+          "files": 43
         }
       ],
       "readers": [],
@@ -8546,8 +10412,8 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "83145db7bacd33340e39ffe1e48d16cd30c1cf46",
-    "tracked": 156
+    "commit": "0d6e91613a740788c5187791a641571cc3e1a8e4",
+    "tracked": 159
   },
   "landings": [
     {
@@ -8652,6 +10518,12 @@
           "call": "literal",
           "confidence": "ast",
           "fromTests": true
+        },
+        {
+          "by": "tests/test_run_lifecycle.py",
+          "call": "literal",
+          "confidence": "ast",
+          "fromTests": true
         }
       ],
       "target": "receipts",
@@ -8694,7 +10566,7 @@
   "overlaps": [],
   "submodules": [],
   "symlinks": [],
-  "testFiles": 46,
+  "testFiles": 48,
   "unassigned": [
     {
       "hash": "be418720d26ab2999db6b0a7e07f4f2d6532c8c35f3c2d5329f9ce506b82109f",

@@ -1989,6 +1989,7 @@ def run_spec(
     supervisor=None,
     pilot: bool = False,
     e4b_seams=None,
+    quarantine: Path | None = None,
 ) -> list[dict]:
     """Run a committed spec. Every refusal lands before device contact.
 
@@ -2021,6 +2022,7 @@ def run_spec(
             pilot=pilot,
             seams=e4b_seams,
             notes=notes,
+            quarantine=quarantine,
         )
     if pilot:
         from switchyard.harness.e4b import E4bError
