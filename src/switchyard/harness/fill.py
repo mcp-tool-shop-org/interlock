@@ -868,6 +868,7 @@ def run_fill_card(
     rows: list[dict] = []
     stop_note = None
     retries: dict[str, int] = {}
+    pending_retry: set[str] = set()
     index = 0
     models = list(spec["models"])
     try:
@@ -912,11 +913,18 @@ def run_fill_card(
                 stop_note = row.get("notes") or "fill-card step failed"
                 break
             if resumed == "retry":
+                pending_retry.add(entry["model"])
                 continue
             if resumed == "next":
                 rows.append(row)
                 index += 1
                 continue
+            if resumed is None and not row.get("aborted"):
+                if entry["model"] in pending_retry:
+                    row["settings"]["retried"] = True
+                    pending_retry.discard(entry["model"])
+                if supervisor is not None and supervisor.consume_cold_after_restart():
+                    row["settings"]["cold_after_restart"] = True
             rows.append(row)
             if row.get("aborted"):
                 stop_note = row.get("notes") or "fill-card step failed"
@@ -1016,12 +1024,33 @@ def _measure_model(
             return
         if not version or version == UNRECORDED:
             return
+        flash = flash_value or UNRECORDED
+        kv = kv_value or UNRECORDED
+        sha = ""
+        line = ""
+        ensure = getattr(supervisor, "_ensure_start", None)
+        start = ensure() if callable(ensure) else None
+        if start is not None:
+            if not flash or flash == UNRECORDED:
+                flash = start.env.get("OLLAMA_FLASH_ATTENTION") or flash
+            if not kv or kv == UNRECORDED:
+                kv = start.env.get("OLLAMA_KV_CACHE_TYPE") or kv
+        try:
+            live = supervisor.seams.environment(url_for("5090"))
+        except Exception:
+            live = None
+        if isinstance(live, ServerFingerprint):
+            if live.ggml_cuda_sha256 and live.ggml_cuda_sha256 != UNRECORDED:
+                sha = live.ggml_cuda_sha256
+            if live.backend_line and live.backend_line != UNRECORDED:
+                line = live.backend_line
         supervisor.remember(
             ServerFingerprint(
                 version=version,
-                cuda_backend=cuda,
-                flash_attention=flash_value or UNRECORDED,
-                kv_cache_type=kv_value or UNRECORDED,
+                flash_attention=flash,
+                kv_cache_type=kv,
+                ggml_cuda_sha256=sha,
+                backend_line=line,
                 baseline_mib=baseline,
                 model=model,
             )

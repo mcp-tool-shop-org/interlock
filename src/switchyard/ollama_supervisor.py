@@ -7,16 +7,22 @@ that is a real hang, or a 5xx while the server is down. A long request
 whose version still answers, and whose model is still listed, is left
 alone.
 
-The process that is stopped is the one listening on that port. Nothing
-is killed by name. The other port's server is not touched. The tray app
-is not touched unless it is the listener. ``ollama serve`` is started
-detached, with ``OLLAMA_HOST`` on that port and the flash-attention and
-KV-cache values the run recorded. switchyard does not sign in.
+Only port 11434 is restarted. Port 11490 is offrig's CPU indexer, and no
+grant covers it. Health still reports it. A down 11490 stops the run.
 
-The 2026-10-09 design draft waited on a grant ledger, refused the CPU
-port, and capped restarts at one. The 2026-10-12 brief is the rule this
-module implements: both ports, at most two restarts a run, on a run the
-harness has already admitted. The harness still requires the grant.
+The process that is stopped is the one listening on 11434. Nothing is
+killed by name. The other port's server is not touched. The tray app is
+not touched unless it is the listener. Immediately before that stop, the
+restart re-checks the grant, the watchdog heartbeat, and that ``/api/ps``
+lists no model from another session.
+
+``ollama serve`` is replayed from the start line recorded at run start:
+the argv, every ``OLLAMA_*`` and ``LLAMA_ARG_*`` variable, and the log
+file. Stdout is appended to that log. switchyard does not sign in. There
+is no ``OLLAMA_CUDA_BACKEND`` variable. The CUDA check is the sha256 of
+the loaded ``ggml-cuda`` library and the server log's ``load_backend``
+line. Flash attention and the KV cache type come from the start line and
+are read again from the log after the restart.
 
 Tests pass fakes. The command's seams are the only ones that can spawn
 a process, and a test never calls them.
@@ -24,6 +30,7 @@ a process, and a test never calls them.
 
 from __future__ import annotations
 
+import hashlib
 import http.client
 import json
 import os
@@ -31,9 +38,11 @@ import re
 import subprocess
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from urllib.parse import urlsplit
+
+from switchyard.guards import GuardError, require_grant, require_heartbeat
 
 URL_5090 = "http://127.0.0.1:11434"
 URL_CPU = "http://127.0.0.1:11490"
@@ -43,6 +52,9 @@ UNRECORDED = "unrecorded"
 
 _PID_IN_SS = re.compile(r"pid=(\d+)")
 _STATUS_5XX = re.compile(r"\b(?:status|http)\s+5\d\d\b")
+_BACKEND_LINE = re.compile(r"load_backend: loaded CUDA backend from \S+")
+_ENV_IN_LOG = re.compile(r"\b(OLLAMA_[A-Z0-9_]+|LLAMA_ARG_[A-Z0-9_]+)[=:]([^\s,\]]+)")
+SERVE_RECORD_ENV = "SWITCHYARD_OLLAMA_SERVE"
 
 
 class SupervisorStop(Exception):
@@ -72,23 +84,45 @@ class Health:
 
 
 @dataclass(frozen=True)
+class ServeStart:
+    """The start line recorded at run start and replayed exactly.
+
+    ``env`` keeps ``OLLAMA_*`` and ``LLAMA_ARG_*`` only. ``library_path`` is
+    the loaded ``ggml-cuda`` library whose sha256 is compared after a restart.
+    """
+
+    argv: tuple[str, ...]
+    env: dict[str, str]
+    log_path: str
+    library_path: str = ""
+    ggml_cuda_sha256: str = ""
+    backend_line: str = ""
+
+
+@dataclass(frozen=True)
 class ServerFingerprint:
-    """What the run recorded, and what a restart must still match."""
+    """What the run recorded, and what a restart must still match.
+
+    ``ggml_cuda_sha256`` is the loaded CUDA library, not the driver version
+    from nvidia-smi. ``backend_line`` is the server log's ``load_backend``
+    line. Flash attention and the KV cache type are the start line's values,
+    read again from the log after the restart.
+    """
 
     version: str
-    cuda_backend: str
     flash_attention: str
     kv_cache_type: str
+    ggml_cuda_sha256: str
+    backend_line: str
     baseline_mib: int | None = None
     model: str | None = None
 
     def serve_env(self, port: int) -> dict[str, str]:
-        """The environment of ``ollama serve``. Host is this port.
+        """Flash attention and the KV cache type, when the run recorded them.
 
-        Flash attention and the KV cache type are passed through when the
-        run recorded them. An unrecorded value is left unset. The CUDA
-        backend is checked after the restart; it is also passed through
-        when it was recorded, under ``OLLAMA_CUDA_BACKEND``.
+        The restart itself replays :class:`ServeStart`. This env is the
+        recorded pair, not a stand-in for the start line. An unrecorded
+        value is left unset. There is no ``OLLAMA_CUDA_BACKEND``.
         """
 
         env = {"OLLAMA_HOST": f"127.0.0.1:{int(port)}"}
@@ -96,8 +130,6 @@ class ServerFingerprint:
             env["OLLAMA_FLASH_ATTENTION"] = self.flash_attention
         if _recorded(self.kv_cache_type):
             env["OLLAMA_KV_CACHE_TYPE"] = self.kv_cache_type
-        if _recorded(self.cuda_backend):
-            env["OLLAMA_CUDA_BACKEND"] = self.cuda_backend
         return env
 
 
@@ -159,6 +191,8 @@ class SupervisorSeams:
     clock: object = time.monotonic
     sleep: object = time.sleep
     now: object = None
+    wall: object = time.time
+    load_start: object = None
 
     def __post_init__(self) -> None:
         if self.now is None:
@@ -222,14 +256,32 @@ def owners(processes: list[Process], port: int) -> list[Process]:
     return found
 
 
+def ollama_env(raw: dict | None) -> dict[str, str]:
+    """``OLLAMA_*`` and ``LLAMA_ARG_*`` only. Other variables are not replayed."""
+
+    if not isinstance(raw, dict):
+        return {}
+    kept: dict[str, str] = {}
+    for key, value in raw.items():
+        name = str(key)
+        if name.startswith("OLLAMA_") or name.startswith("LLAMA_ARG_"):
+            kept[name] = "" if value is None else str(value)
+    return kept
+
+
 def environment_mismatch(recorded: ServerFingerprint, current: ServerFingerprint) -> str | None:
-    """The field that moved, or None when the restart is still the same server."""
+    """The field that moved, or None when the restart is still the same server.
+
+    The driver CUDA version is not compared. A restart cannot change it, so
+    that check would always pass.
+    """
 
     pairs = (
         ("version", recorded.version, current.version),
-        ("cuda_backend", recorded.cuda_backend, current.cuda_backend),
         ("flash_attention", recorded.flash_attention, current.flash_attention),
         ("kv_cache_type", recorded.kv_cache_type, current.kv_cache_type),
+        ("CUDA library sha", recorded.ggml_cuda_sha256, current.ggml_cuda_sha256),
+        ("backend line", recorded.backend_line, current.backend_line),
     )
     for name, before, after in pairs:
         if before != after:
@@ -238,6 +290,128 @@ def environment_mismatch(recorded: ServerFingerprint, current: ServerFingerprint
                 "the run stops. A restart that changes the backend is not measurement-neutral."
             )
     return None
+
+
+def foreign_models(payload: object, model: str | None) -> list[str]:
+    """Models ``/api/ps`` lists that are not this run's. An unreadable payload lists none.
+
+    A down server does not answer, and that is not another session. A payload
+    that answers with a different model is another session.
+    """
+
+    if not isinstance(payload, dict):
+        return []
+    models = payload.get("models")
+    if not isinstance(models, list):
+        return []
+    foreign: list[str] = []
+    for item in models:
+        name = ""
+        if isinstance(item, str):
+            name = item
+        elif isinstance(item, dict):
+            raw = item.get("name") or item.get("model") or ""
+            name = raw if isinstance(raw, str) else ""
+        if not name:
+            continue
+        if model and model_listed({"models": [item if isinstance(item, dict) else {"name": name}]}, model):
+            continue
+        foreign.append(name)
+    return foreign
+
+
+def backend_line_from_log(text: str | None) -> str:
+    """The last ``load_backend`` line, or empty when the log does not have one."""
+
+    if not isinstance(text, str) or not text:
+        return ""
+    found = _BACKEND_LINE.findall(text)
+    return found[-1] if found else ""
+
+
+def env_from_log(text: str | None) -> dict[str, str]:
+    """``OLLAMA_*`` and ``LLAMA_ARG_*`` values written in a server log."""
+
+    if not isinstance(text, str) or not text:
+        return {}
+    return {key: value for key, value in _ENV_IN_LOG.findall(text)}
+
+
+def file_sha256(path: str | Path) -> str:
+    """Sha256 of a file. The caller catches a missing library."""
+
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 16), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _log_text(path: str) -> str:
+    """The server log, or empty when it cannot be read. The path is local."""
+
+    if not isinstance(path, str) or not path.strip():
+        return ""
+    try:
+        return Path(path).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
+def _overlay_start(found: ServerFingerprint, start: ServeStart | None) -> ServerFingerprint:
+    """Fill empty before-side fields from the start line. Never a stand-in for a later read."""
+
+    if start is None:
+        return found
+    flash = found.flash_attention
+    kv = found.kv_cache_type
+    sha = found.ggml_cuda_sha256
+    line = found.backend_line
+    if not _recorded(flash):
+        flash = start.env.get("OLLAMA_FLASH_ATTENTION") or flash
+    if not _recorded(kv):
+        kv = start.env.get("OLLAMA_KV_CACHE_TYPE") or kv
+    if not _recorded(sha):
+        sha = start.ggml_cuda_sha256 or sha
+    if not _recorded(line):
+        line = start.backend_line or line
+    return replace(
+        found,
+        flash_attention=flash or "",
+        kv_cache_type=kv or "",
+        ggml_cuda_sha256=sha or "",
+        backend_line=line or "",
+    )
+
+
+def load_serve_start(path: str | Path | None = None) -> ServeStart | None:
+    """The Publisher's start-line record. Unset means no record, and no restart.
+
+    The path is ``SWITCHYARD_OLLAMA_SERVE`` when ``path`` is omitted. Nothing
+    is fetched. A missing file is no record.
+    """
+
+    chosen = path if path is not None else os.environ.get(SERVE_RECORD_ENV)
+    if not chosen:
+        return None
+    file = Path(chosen)
+    try:
+        data = json.loads(file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    argv = data.get("argv")
+    if not isinstance(argv, list) or not argv:
+        return None
+    return ServeStart(
+        argv=tuple(str(part) for part in argv),
+        env=ollama_env(data.get("env") if isinstance(data.get("env"), dict) else {}),
+        log_path=str(data.get("log_path") or ""),
+        library_path=str(data.get("library_path") or ""),
+        ggml_cuda_sha256=str(data.get("ggml_cuda_sha256") or ""),
+        backend_line=str(data.get("backend_line") or ""),
+    )
 
 
 def health(url: str, *, timeout: float = 5.0, get=None) -> Health:
@@ -290,7 +464,11 @@ def restart_policy_lines(config: SupervisorConfig | None = None) -> list[str]:
             "or /api/ps shows no progress"
         ),
         "ollama restart: a slow request whose version answers and whose model is listed is left alone",
-        "ollama restart: ports 127.0.0.1:11434 and 127.0.0.1:11490; only the listener on that port is stopped",
+        "ollama restart: only 127.0.0.1:11434 is restarted; 11490 is reported and never stopped",
+        "ollama restart: the grant, the heartbeat, and /api/ps are re-checked before anything is stopped",
+        "ollama restart: the recorded start line is replayed, and the log is appended",
+        "ollama restart: the CUDA library sha, the backend log line, flash attention, and the KV cache type must match",
+        "ollama restart: the first measured step after a restart stays out of the warm percentiles",
         "ollama restart: the tray app is not stopped unless it owns the port",
         f"ollama restart: wait up to {chosen.restart_deadline_s:g} s to become healthy, then the card must be back at baseline",
         "ollama restart: switchyard does not sign in",
@@ -409,13 +587,31 @@ def serve_argv(platform: str | None = None, *, localappdata: str | None = None) 
     return [exe, "serve"]
 
 
-def spawn_detached(argv: list[str], env: dict, *, popen=None, platform: str | None = None) -> int:
-    """Start ``argv`` in its own session and return the pid. The caller supplies ``popen`` in tests."""
+def spawn_detached(
+    argv: list[str],
+    env: dict,
+    log_path: str,
+    *,
+    popen=None,
+    platform: str | None = None,
+) -> int:
+    """Start ``argv`` in its own session, appending stdout and stderr to ``log_path``.
+
+    The caller supplies ``popen`` in tests. The log is never discarded.
+    """
 
     if any("signin" in str(part).lower() for part in argv):
         raise SupervisorStop(SIGNIN_NOTE)
+    if not isinstance(log_path, str) or not log_path.strip():
+        raise SupervisorStop("the recorded Ollama start line has no log file. " + SIGNIN_NOTE)
+    try:
+        handle = open(log_path, "a", encoding="utf-8")
+    except OSError as exc:
+        raise SupervisorStop(
+            f"the Ollama log could not be opened ({exc}). " + SIGNIN_NOTE
+        ) from exc
     system = platform or sys.platform
-    flags: dict = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL, "env": env}
+    flags: dict = {"stdout": handle, "stderr": handle, "env": env}
     if system == "win32":
         flags["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0x00000008) | getattr(
             subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200
@@ -423,9 +619,14 @@ def spawn_detached(argv: list[str], env: dict, *, popen=None, platform: str | No
     else:
         flags["start_new_session"] = True
     launcher = popen or subprocess.Popen
-    proc = launcher(list(argv), **flags)
+    try:
+        proc = launcher(list(argv), **flags)
+    except Exception:
+        handle.close()
+        raise
     pid = getattr(proc, "pid", None)
     if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
+        handle.close()
         raise SupervisorStop("ollama serve did not return a pid. " + SIGNIN_NOTE)
     return pid
 
@@ -539,6 +740,10 @@ class OllamaSupervisor:
         seams: SupervisorSeams,
         fingerprint: ServerFingerprint | None = None,
         config: SupervisorConfig | None = None,
+        *,
+        grant: str | None = None,
+        heartbeat: Path | str | None = None,
+        start: ServeStart | None = None,
     ) -> None:
         self.seams = seams
         self.config = config or SupervisorConfig()
@@ -546,6 +751,10 @@ class OllamaSupervisor:
         self.restarts: list[RestartRecord] = []
         self._open = False
         self._epoch = 0
+        self._cold_after = False
+        self.grant = grant
+        self.heartbeat = None if heartbeat is None else Path(heartbeat)
+        self.start = start
 
     @property
     def recorded(self) -> ServerFingerprint | None:
@@ -558,8 +767,13 @@ class OllamaSupervisor:
             self._recorded = fingerprint
 
     def prime(self, url: str) -> None:
-        """Record the server once, before a step. A down server stays unrecorded."""
+        """Record the server once, before a step. A down server stays unrecorded.
 
+        An empty flash-attention, KV-cache, library-sha, or backend-line read
+        is filled from the start line. The read after a restart is not.
+        """
+
+        self._ensure_start()
         if self._recorded is not None:
             return
         try:
@@ -568,7 +782,61 @@ class OllamaSupervisor:
             return
         if not isinstance(found, ServerFingerprint) or not found.version:
             return
-        self._recorded = found
+        self._recorded = _overlay_start(found, self.start)
+
+    def consume_cold_after_restart(self) -> bool:
+        """True once, for the next kept sample after a restart that came back."""
+
+        if not self._cold_after:
+            return False
+        self._cold_after = False
+        return True
+
+    def _ensure_start(self) -> ServeStart | None:
+        """Load the start line the first time a restart or a prime needs it."""
+
+        if self.start is not None:
+            return self.start
+        loader = getattr(self.seams, "load_start", None)
+        if not callable(loader):
+            return None
+        try:
+            found = loader()
+        except Exception:
+            return None
+        if isinstance(found, ServeStart):
+            self.start = found
+        return self.start
+
+    def _admit(self, url: str, model: str | None) -> None:
+        """Grant, heartbeat, and ``/api/ps``, the same checks as admission.
+
+        An unreadable ``/api/ps`` is not another session. A payload that names
+        a different model is, and the restart is refused before anything stops.
+        """
+
+        try:
+            require_grant(self.grant, uses_5090=True)
+        except GuardError as exc:
+            raise SupervisorStop(str(exc)) from exc
+        if self.heartbeat is None:
+            raise SupervisorStop("REFUSED: watchdog heartbeat is missing")
+        wall = self.seams.wall if callable(getattr(self.seams, "wall", None)) else time.time
+        try:
+            require_heartbeat(Path(self.heartbeat), float(wall()))
+        except GuardError as exc:
+            raise SupervisorStop(str(exc)) from exc
+        try:
+            payload = self.seams.ps(url)
+        except Exception:
+            payload = None
+        foreign = foreign_models(payload, model)
+        if foreign:
+            listed = ", ".join(foreign)
+            raise SupervisorStop(
+                f"/api/ps lists {listed}, which is not this run's model; "
+                "a restart that would drop another session is refused"
+            )
 
     def begin_measurement(self) -> int:
         if self._open:
@@ -638,7 +906,7 @@ class OllamaSupervisor:
             why = "down"
         else:
             return Decision("leave", note="the failure is not a transport, a timeout, or a 5xx")
-        record = self._restart(url, why)
+        record = self._restart(url, why, model)
         return Decision("restarted", record=record)
 
     def _once(self, url: str) -> Health:
@@ -651,26 +919,42 @@ class OllamaSupervisor:
             return False
         return model_listed(payload, model)
 
-    def _restart(self, url: str, why: str) -> RestartRecord:
+    def _restart(self, url: str, why: str, model: str | None = None) -> RestartRecord:
+        port = port_of(url)
+        if port == 11490:
+            raise SupervisorStop(
+                "Ollama on port 11490 is not restarted. It is the CPU indexer, and no grant covers it."
+            )
         if self._recorded is None:
             raise SupervisorStop(
                 "the run has no recorded Ollama environment, so a restart would not be "
                 "measurement-neutral. " + SIGNIN_NOTE
             )
+        self._ensure_start()
+        if self.start is None:
+            raise SupervisorStop(
+                "the run has no recorded Ollama start line, so a restart would not replay it. "
+                + SIGNIN_NOTE
+            )
+        self._admit(url, model)
+        argv = list(self.start.argv)
+        if any("signin" in str(part).lower() for part in argv):
+            raise SupervisorStop(SIGNIN_NOTE)
+        if not isinstance(self.start.log_path, str) or not self.start.log_path.strip():
+            raise SupervisorStop("the recorded Ollama start line has no log file. " + SIGNIN_NOTE)
         if len(self.restarts) >= self.config.max_restarts:
             raise SupervisorStop(
                 f"restart cap of {self.config.max_restarts} reached; the run stops"
             )
-        port = port_of(url)
-        argv = list(self.seams.argv())
-        if any("signin" in str(part).lower() for part in argv):
-            raise SupervisorStop(SIGNIN_NOTE)
         owned = owners(list(self.seams.processes()), port)
         old_pids = [row.pid for row in owned]
         for pid in old_pids:
             self.seams.stop(pid)
         started = float(self.seams.clock())
-        new_pid = self.seams.spawn(argv, self._recorded.serve_env(port))
+        try:
+            new_pid = self.seams.spawn(argv, dict(self.start.env), self.start.log_path)
+        except SupervisorStop as exc:
+            self._fail(url, why, old_pids, None, started, None, str(exc))
         if not isinstance(new_pid, int) or isinstance(new_pid, bool) or new_pid <= 0:
             self._fail(
                 url,
@@ -734,6 +1018,7 @@ class OllamaSupervisor:
         )
         if mismatch:
             raise SupervisorStop(mismatch)
+        self._cold_after = True
         return record
 
     def _wait_until_healthy(self, url, why, old_pids, new_pid, started):
@@ -812,19 +1097,43 @@ def real_seams(*, run=None, platform: str | None = None, popen=None, connection=
     def stop(pid: int) -> None:
         stop_pid(pid, run=run, platform=system)
 
-    def spawn(argv: list[str], env: dict) -> int:
-        base = dict(os.environ)
+    def spawn(argv: list[str], env: dict, log_path: str) -> int:
+        base = {
+            key: value
+            for key, value in os.environ.items()
+            if not str(key).startswith("OLLAMA_") and not str(key).startswith("LLAMA_ARG_")
+        }
         base.update(env)
-        return spawn_detached(argv, base, popen=popen, platform=system)
+        return spawn_detached(argv, base, log_path, popen=popen, platform=system)
 
     def environment(url: str) -> ServerFingerprint:
         found = health(url, get=health_get)
-        cuda = read_cuda(run=run) or UNRECORDED
+        start = None
+        try:
+            start = load_serve_start()
+        except Exception:
+            start = None
+        sha = ""
+        flash = ""
+        kv = ""
+        line = ""
+        if isinstance(start, ServeStart):
+            if start.library_path:
+                try:
+                    sha = file_sha256(start.library_path)
+                except OSError:
+                    sha = ""
+            text = _log_text(start.log_path)
+            line = backend_line_from_log(text)
+            logged = env_from_log(text)
+            flash = logged.get("OLLAMA_FLASH_ATTENTION", "")
+            kv = logged.get("OLLAMA_KV_CACHE_TYPE", "")
         return ServerFingerprint(
             version=found.version or "",
-            cuda_backend=cuda,
-            flash_attention=UNRECORDED,
-            kv_cache_type=UNRECORDED,
+            flash_attention=flash,
+            kv_cache_type=kv,
+            ggml_cuda_sha256=sha,
+            backend_line=line,
             baseline_mib=read_card_mib(run=run),
         )
 
@@ -843,4 +1152,5 @@ def real_seams(*, run=None, platform: str | None = None, popen=None, connection=
         ps=ps,
         environment=environment,
         argv=lambda: serve_argv(system),
+        load_start=load_serve_start,
     )

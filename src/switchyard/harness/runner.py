@@ -270,7 +270,9 @@ def run_interleaved(
     ``compile_rejected`` row (ruling on #36), scoped the same way and never
     retried. Every row records ``settings.run_window`` (the run's start and
     latest end, from ``wall``) so a later run can read how long this one
-    lasted.
+    lasted. The first kept sample after an Ollama restart is marked
+    ``cold_after_restart`` and left out of the warm percentiles. A sample
+    kept on a retry is marked ``retried``.
 
     A watcher thread guards the run from outside the main thread, which a
     native call can hold for an hour. A compile that runs past
@@ -322,6 +324,7 @@ def run_interleaved(
     records: list[dict] = []
     seen: dict[str, int] = {}
     retry_counts: dict[tuple, int] = {}
+    retried_keys: set[tuple] = set()
     finished: list[str] = []
     capability: dict[str, str] = {}
     off_devices: set[str] = set()
@@ -396,6 +399,15 @@ def run_interleaved(
             validate_row(row)
         return row
 
+    def _restart_marks(extra: dict, arm_id: str) -> None:
+        """The kept sample after a restart is cold, and a retried sample says so."""
+
+        samples = [row for row in records if row["step_id"] == arm_id]
+        if any(row.get("cold_after_restart") for row in samples):
+            extra["cold_after_restart"] = True
+        if any(row.get("retried") for row in samples):
+            extra["retried"] = True
+
     def _finished_row(arm_id: str, *, partial: bool, gone: set[str]) -> dict:
         extra = _extra_settings(spec, arms[arm_id], records, run_id, gone, cache_report)
         extra.update(_prompt_counts(arms[arm_id], prompt_cache))
@@ -403,6 +415,7 @@ def run_interleaved(
         extra.update(_blocked_extra(arm_id))
         _rerun_settings(extra, spec, arms[arm_id], records, stream)
         extra["cpu_percent_max"] = _cpu_percent_max(records, arm_id)
+        _restart_marks(extra, arm_id)
         genai = _genai_summary(records, arm_id)
         if genai:
             extra["genai"] = genai
@@ -467,6 +480,7 @@ def run_interleaved(
         extra.update(_blocked_extra(arm_id))
         _rerun_settings(extra, spec, arm, records, stream)
         extra["cpu_percent_max"] = _cpu_percent_max(records, arm_id)
+        _restart_marks(extra, arm_id)
         genai = _genai_summary(records, arm_id)
         if genai:
             extra["genai"] = genai
@@ -685,6 +699,7 @@ def run_interleaved(
         used = retry_counts.get(key, 0)
         if used < retry_budget(spec):
             retry_counts[key] = used + 1
+            retried_keys.add(key)
             stream.queue.appendleft((slot, block_id))
             return
         stream.note(slot, None)
@@ -887,6 +902,10 @@ def run_interleaved(
                                 stream.note(slot, None)
                                 pending = None
                             else:
+                                if supervisor is not None and supervisor.consume_cold_after_restart():
+                                    sample["cold_after_restart"] = True
+                                if (slot.step_id, slot.phase, slot.round_index) in retried_keys:
+                                    sample["retried"] = True
                                 records.append(sample)
                                 if slot.phase == "cold" and result.latency_ms is not None:
                                     cold_calls[arm["id"]] = result.latency_ms / 1000
@@ -1323,7 +1342,11 @@ def _record(
 
 def _summary(records: list[dict], arm_id: str):
     cold = [row for row in records if row["step_id"] == arm_id and row["phase"] == "cold"]
-    repeats = [row for row in records if row["step_id"] == arm_id and row["phase"] == "repeat"]
+    repeats = [
+        row
+        for row in records
+        if row["step_id"] == arm_id and row["phase"] == "repeat" and not row.get("cold_after_restart")
+    ]
     cold_row = cold[-1] if cold else None
     units = [
         row["throughput_unit"]
@@ -1970,6 +1993,11 @@ def run_spec(
     if receipt.exists():
         raise GuardError(f"REFUSED: receipts/{name}.jsonl already exists; pass --run-id for another name")
     wall = wall or time.time
+    if supervisor is not None:
+        if grant and not getattr(supervisor, "grant", None):
+            supervisor.grant = grant
+        if getattr(supervisor, "heartbeat", None) is None and heartbeat is not None:
+            supervisor.heartbeat = heartbeat
     spec_rel = spec_path.resolve().relative_to(root.resolve()).as_posix()
     devices = {"5090"} if spec["procedure"] == "fill-card" else _spec_devices(spec)
     marker = RunMarker(

@@ -245,7 +245,7 @@ def _arm_id(row: dict) -> str:
 def _cmd_run(args: argparse.Namespace) -> int:
     from switchyard.adapters.base import AdapterError
     from switchyard.guards import GuardError
-    from switchyard.harness.runner import RunnerError, dry_run, run_spec
+    from switchyard.harness.runner import RunnerError, dry_run, heartbeat_path, run_spec
     from switchyard.harness.spec import SpecError
 
     try:
@@ -262,7 +262,11 @@ def _cmd_run(args: argparse.Namespace) -> int:
             cpu_window=args.cpu_window,
             run_id=args.run_id,
             notes=args.notes,
-            supervisor=OllamaSupervisor(real_seams()),
+            supervisor=OllamaSupervisor(
+                real_seams(),
+                grant=args.grant,
+                heartbeat=heartbeat_path(None),
+            ),
         )
     except (AdapterError, GuardError, RunnerError, SpecError, OSError) as exc:
         print(str(exc), file=sys.stderr)

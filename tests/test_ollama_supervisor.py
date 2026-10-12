@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import tempfile
 import time
 from pathlib import Path
 
@@ -26,14 +27,20 @@ from switchyard.ollama_supervisor import (
     OllamaSupervisor,
     Process,
     RestartRefused,
+    ServeStart,
     ServerFingerprint,
     SupervisorConfig,
     SupervisorSeams,
     SupervisorStop,
     _load_psutil,
     card_mib_from_text,
+    backend_line_from_log,
     environment_mismatch,
+    env_from_log,
     failure_kind,
+    file_sha256,
+    foreign_models,
+    load_serve_start,
     health,
     health_report,
     http_get,
@@ -55,6 +62,11 @@ from switchyard.ollama_supervisor import (
 
 ROOT = Path(__file__).resolve().parents[1]
 SEED = "alpha beta "
+# Fixture prefix from the publisher's note. Not a measurement of the installed library.
+SHA = "6d3128e946bc9c95" + "00" * 24
+LINE = "load_backend: loaded CUDA backend from cuda_v13"
+LOG_PATH = "E:/AI/ollama-cu134/system-11434.log"
+MODELS_DIR = "E:\\AI-Models\\Ollama"
 
 
 class World:
@@ -65,7 +77,8 @@ class World:
         self.up = False
         self.hold_up = False
         self.version = "0.35.1"
-        self.cuda = "13.0"
+        self.sha = SHA
+        self.backend_line = LINE
         self.flash = "true"
         self.kv = "q8_0"
         self.baseline = 1500
@@ -73,7 +86,10 @@ class World:
         self.ps_models = []
         self.ps_payload = None
         self.version_after_spawn = None
-        self.cuda_after_spawn = None
+        self.sha_after_spawn = None
+        self.line_after_spawn = None
+        self.flash_after_spawn = None
+        self.kv_after_spawn = None
         self.card_after_spawn = None
         self.keep_down_after_spawn = False
         self.spawn_pid = None
@@ -92,11 +108,29 @@ class World:
     def fingerprint(self) -> ServerFingerprint:
         return ServerFingerprint(
             version="0.35.1",
-            cuda_backend="13.0",
             flash_attention=self.flash,
             kv_cache_type=self.kv,
+            ggml_cuda_sha256=self.sha,
+            backend_line=self.backend_line,
             baseline_mib=self.baseline,
             model="qwen3:8b",
+        )
+
+    def start_record(self) -> ServeStart:
+        """The recorded start line. The log path is a string. This fake never opens it."""
+
+        return ServeStart(
+            argv=tuple(self.argv_value or ["ollama", "serve"]),
+            env={
+                "OLLAMA_HOST": "127.0.0.1:11434",
+                "OLLAMA_MODELS": MODELS_DIR,
+                "OLLAMA_FLASH_ATTENTION": "true",
+                "OLLAMA_KV_CACHE_TYPE": "q8_0",
+            },
+            log_path=LOG_PATH,
+            library_path="lib/ollama/cuda_v13/ggml-cuda.dll",
+            ggml_cuda_sha256=SHA,
+            backend_line=LINE,
         )
 
     def health_get(self, url, timeout):
@@ -114,8 +148,8 @@ class World:
         self.stopped.append(pid)
         self.processes = [row for row in self.processes if row.pid != pid]
 
-    def spawn(self, argv, env):
-        self.spawned.append((list(argv), dict(env)))
+    def spawn(self, argv, env, log_path=None):
+        self.spawned.append((list(argv), dict(env), log_path))
         pid = self.next_pid if self.spawn_pid is None else self.spawn_pid
         if self.spawn_pid is None:
             self.next_pid += 1
@@ -125,8 +159,14 @@ class World:
             self.processes.append(Process(pid=pid, name="ollama", port=port, listening=True))
         if self.version_after_spawn:
             self.version = self.version_after_spawn
-        if self.cuda_after_spawn:
-            self.cuda = self.cuda_after_spawn
+        if self.sha_after_spawn is not None:
+            self.sha = self.sha_after_spawn
+        if self.line_after_spawn is not None:
+            self.backend_line = self.line_after_spawn
+        if self.flash_after_spawn is not None:
+            self.flash = self.flash_after_spawn
+        if self.kv_after_spawn is not None:
+            self.kv = self.kv_after_spawn
         if self.card_after_spawn is not None:
             self.card = self.card_after_spawn
         if not self.keep_down_after_spawn:
@@ -146,9 +186,10 @@ class World:
         del url
         return ServerFingerprint(
             version=self.version,
-            cuda_backend=self.cuda,
             flash_attention=self.flash,
             kv_cache_type=self.kv,
+            ggml_cuda_sha256=self.sha,
+            backend_line=self.backend_line,
             baseline_mib=self.baseline,
         )
 
@@ -180,11 +221,30 @@ class World:
         )
 
 
-def _supervisor(world: World, *, fingerprint=True, config=None) -> OllamaSupervisor:
+def _pulse() -> Path:
+    path = Path(tempfile.mkdtemp(prefix="sw-hb-")) / "_watchdog_HEARTBEAT"
+    path.write_text("pulse", encoding="utf-8")
+    now = time.time()
+    os.utime(path, (now, now))
+    return path
+
+
+def _supervisor(
+    world: World,
+    *,
+    fingerprint=True,
+    config=None,
+    grant: str | None = "grant-t",
+    heartbeat: Path | None = None,
+    start: bool = True,
+) -> OllamaSupervisor:
     return OllamaSupervisor(
         world.seams(),
         fingerprint=world.fingerprint() if fingerprint else None,
         config=config or world.config,
+        grant=grant,
+        heartbeat=_pulse() if heartbeat is None else heartbeat,
+        start=world.start_record() if start else None,
     )
 
 
@@ -218,7 +278,7 @@ def _bind(repo: Path, spec: dict) -> Path:
     return path
 
 
-def _arm(arm_id: str, device: str = "CPU") -> dict:
+def _arm(arm_id: str, device: str = "5090") -> dict:
     return {
         "id": arm_id,
         "task": "generate",
@@ -321,17 +381,21 @@ def test_a_down_server_is_restarted_and_the_next_step_runs(tmp_path: Path):
     assert script.calls[0] == "A"
     assert "B" in script.calls
     assert len(world.spawned) == 1
-    assert world.stopped == [20]
-    assert any(row.pid == 10 for row in world.processes)
+    assert world.stopped == [10]
+    assert any(row.pid == 20 for row in world.processes)
     assert any(row.pid == 30 for row in world.processes)
     assert supervisor.restarts[0].why == "down"
-    assert supervisor.restarts[0].port == 11490
-    env = world.spawned[0][1]
-    assert env["OLLAMA_HOST"] == "127.0.0.1:11490"
+    assert supervisor.restarts[0].port == 11434
+    argv, env, log_path = world.spawned[0]
+    assert argv == list(supervisor.start.argv)
+    assert env == supervisor.start.env
+    assert env["OLLAMA_HOST"] == "127.0.0.1:11434"
+    assert env["OLLAMA_MODELS"] == MODELS_DIR
     assert env["OLLAMA_FLASH_ATTENTION"] == "true"
     assert env["OLLAMA_KV_CACHE_TYPE"] == "q8_0"
-    assert env["OLLAMA_CUDA_BACKEND"] == "13.0"
-    assert "signin" not in " ".join(world.spawned[0][0])
+    assert "OLLAMA_CUDA_BACKEND" not in env
+    assert log_path == LOG_PATH
+    assert "signin" not in " ".join(argv)
     assert rows
     assert all(row["settings"]["ollama_restarts"][0]["why"] == "down" for row in rows)
     failed = _marker(repo)["failed_steps"]
@@ -373,13 +437,182 @@ def test_a_hung_request_restarts_when_the_model_is_not_listed():
     world = World()
     world.up = True
     world.hold_up = True
-    world.ps_models = ["other:7b"]
+    world.ps_models = []
     decision = _supervisor(world).after_failure(URL_5090, model="qwen3:8b", kind="timeout")
     assert decision.action == "restarted"
     assert decision.record is not None
     assert decision.record.why == "hung"
-    world.ps_payload = None
     assert world.stopped == [10]
+
+
+def test_a_restart_is_refused_when_api_ps_lists_another_model():
+    world = World()
+    world.up = True
+    world.hold_up = True
+    world.ps_models = ["other:7b"]
+    supervisor = _supervisor(world)
+    with pytest.raises(SupervisorStop, match="other:7b"):
+        supervisor.after_failure(URL_5090, model="qwen3:8b", kind="timeout")
+    assert world.stopped == []
+    assert world.spawned == []
+    assert supervisor.restarts == []
+
+    down = World()
+    down.ps = lambda url: None
+    decision = _supervisor(down).after_failure(URL_5090, model="qwen3:8b", kind="transport")
+    assert decision.action == "restarted"
+    assert down.stopped == [10]
+
+
+def test_a_restart_is_refused_when_the_grant_or_heartbeat_has_lapsed():
+    missing = World()
+    bare = _supervisor(missing, grant="")
+    with pytest.raises(SupervisorStop, match="grant"):
+        bare.after_failure(URL_5090, model="qwen3:8b", kind="transport")
+    assert missing.stopped == []
+    assert bare.restarts == []
+
+    stale_world = World()
+    stale = _supervisor(stale_world)
+    old = time.time() - 3600
+    os.utime(stale.heartbeat, (old, old))
+    with pytest.raises(SupervisorStop, match="heartbeat"):
+        stale.after_failure(URL_5090, model="qwen3:8b", kind="transport")
+    assert stale_world.stopped == []
+    assert stale.restarts == []
+
+
+def test_port_11490_is_never_stopped():
+    world = World()
+    supervisor = _supervisor(world)
+    with pytest.raises(SupervisorStop, match="11490"):
+        supervisor.after_failure(URL_CPU, model="qwen3:8b", kind="transport")
+    assert world.stopped == []
+    assert world.spawned == []
+    assert supervisor.restarts == []
+
+    healthy = World()
+    healthy.up = True
+    healthy.hold_up = True
+    decision = _supervisor(healthy).after_failure(URL_CPU, model="qwen3:8b", kind="server")
+    assert decision.action == "leave"
+    assert healthy.stopped == []
+
+
+def test_a_different_cuda_library_sha_stops_the_run():
+    world = World()
+    world.sha_after_spawn = "0" * 64
+    supervisor = _supervisor(world)
+    with pytest.raises(SupervisorStop, match="CUDA library sha"):
+        supervisor.after_failure(URL_5090, model="qwen3:8b", kind="transport")
+    assert world.stopped == [10]
+    assert len(world.spawned) == 1
+    assert len(supervisor.restarts) == 1
+    assert supervisor.restarts[0].note and "CUDA library sha" in supervisor.restarts[0].note
+
+
+def test_the_replayed_environment_equals_the_recorded_start_line():
+    world = World()
+    world.argv_value = ["cmd", "/c", "ollama", "serve"]
+    supervisor = _supervisor(world)
+    decision = supervisor.after_failure(URL_5090, model="qwen3:8b", kind="transport")
+    assert decision.action == "restarted"
+    argv, env, log_path = world.spawned[0]
+    assert argv == ["cmd", "/c", "ollama", "serve"]
+    assert env == supervisor.start.env
+    assert env["OLLAMA_MODELS"] == MODELS_DIR
+    assert env["OLLAMA_HOST"] == "127.0.0.1:11434"
+    assert "OLLAMA_CUDA_BACKEND" not in env
+    assert log_path == supervisor.start.log_path == LOG_PATH
+
+
+def test_the_first_step_after_a_restart_stays_out_of_the_warm_percentiles(tmp_path: Path):
+    world = World()
+    script = Script([None, AdapterError("connection refused"), 100.0, 10.0])
+    spec = _interleaved([_arm("A")], retry=1, repeats=2)
+    repo, rows, _supervisor_ran = _run(tmp_path, script, world, spec, run_id="cold-1")
+    assert rows[0]["latency"]["warm_p50_ms"] == 10
+    assert rows[0]["settings"]["cold_after_restart"] is True
+    assert rows[0]["settings"]["retried"] is True
+    assert _marker(repo, "cold-1")["failed_steps"][0]["inconclusive"] is True
+
+
+def test_prime_fills_an_empty_read_from_the_start_line_and_a_later_read_does_not():
+    world = World()
+    world.flash = ""
+    world.kv = ""
+    world.sha = ""
+    world.backend_line = ""
+    supervisor = _supervisor(world, fingerprint=False)
+    supervisor.prime(URL_5090)
+    assert supervisor.recorded is not None
+    assert supervisor.recorded.flash_attention == "true"
+    assert supervisor.recorded.kv_cache_type == "q8_0"
+    assert supervisor.recorded.ggml_cuda_sha256 == SHA
+    assert supervisor.recorded.backend_line == LINE
+    world.flash = "false"
+    supervisor.prime(URL_5090)
+    assert supervisor.recorded.flash_attention == "true"
+    assert supervisor.seams.environment(URL_5090).flash_attention == "false"
+
+
+def test_a_restart_without_a_start_line_or_a_log_stops_before_any_kill():
+    world = World()
+    missing = _supervisor(world, start=False)
+    with pytest.raises(SupervisorStop, match="no recorded Ollama start line"):
+        missing.after_failure(URL_5090, model="qwen3:8b", kind="transport")
+    assert world.stopped == []
+    assert missing.restarts == []
+
+    quiet = World()
+    nolog = _supervisor(quiet)
+    nolog.start = ServeStart(argv=("ollama", "serve"), env=dict(nolog.start.env), log_path="  ")
+    with pytest.raises(SupervisorStop, match="no log file"):
+        nolog.after_failure(URL_5090, model="qwen3:8b", kind="transport")
+    assert quiet.stopped == []
+    assert nolog.restarts == []
+
+
+def test_the_start_line_record_is_optional_and_filtered(tmp_path: Path, monkeypatch):
+    monkeypatch.delenv("SWITCHYARD_OLLAMA_SERVE", raising=False)
+    assert load_serve_start() is None
+    assert load_serve_start(tmp_path / "missing.json") is None
+    bad = tmp_path / "bad.json"
+    bad.write_text("nope", encoding="utf-8")
+    assert load_serve_start(bad) is None
+    empty = tmp_path / "empty.json"
+    empty.write_text("[]", encoding="utf-8")
+    assert load_serve_start(empty) is None
+    good = tmp_path / "good.json"
+    library = tmp_path / "ggml-cuda.dll"
+    library.write_bytes(b"fixture-bytes")
+    good.write_text(
+        json.dumps(
+            {
+                "argv": ["ollama", "serve"],
+                "env": {
+                    "OLLAMA_HOST": "127.0.0.1:11434",
+                    "PATH": "drop-me",
+                    "LLAMA_ARG_N_GPU_LAYERS": "99",
+                },
+                "log_path": str(tmp_path / "serve.log"),
+                "library_path": str(library),
+            }
+        ),
+        encoding="utf-8",
+    )
+    loaded = load_serve_start(good)
+    assert loaded is not None
+    assert loaded.env == {"OLLAMA_HOST": "127.0.0.1:11434", "LLAMA_ARG_N_GPU_LAYERS": "99"}
+    assert len(file_sha256(library)) == 64
+    assert foreign_models(None, "qwen3:8b") == []
+    assert foreign_models({"models": "nope"}, "qwen3:8b") == []
+    assert foreign_models({"models": ["other:7b"]}, "qwen3:8b") == ["other:7b"]
+    assert foreign_models({"models": [{"name": "qwen3:8b"}]}, "qwen3:8b") == []
+    assert backend_line_from_log("") == ""
+    assert backend_line_from_log("noise\n" + LINE) == LINE
+    assert env_from_log("OLLAMA_FLASH_ATTENTION:true")["OLLAMA_FLASH_ATTENTION"] == "true"
+    assert env_from_log(None) == {}
 
 
 def test_only_the_port_owner_is_stopped():
@@ -403,10 +636,11 @@ def test_a_version_or_backend_mismatch_after_restart_stops_the_run(tmp_path: Pat
     assert len(supervisor.restarts) == 1
     assert supervisor.restarts[0].version == "9.9.9"
 
-    cuda = World()
-    cuda.cuda_after_spawn = "12.0"
-    with pytest.raises(SupervisorStop, match="cuda_backend changed"):
-        _supervisor(cuda).after_failure(URL_CPU, model="qwen3:8b", kind="transport")
+    moved = World()
+    moved.line_after_spawn = "load_backend: loaded CUDA backend from cuda_v12"
+    with pytest.raises(SupervisorStop, match="backend line"):
+        _supervisor(moved).after_failure(URL_5090, model="qwen3:8b", kind="transport")
+    assert moved.stopped == [10]
 
     script = Script([AdapterError("connection refused")])
     harness = World()
@@ -490,10 +724,10 @@ def test_the_receipt_carries_the_restart_record(tmp_path: Path):
     repo, rows, supervisor = _run(tmp_path, script, world, _interleaved([_arm("A"), _arm("B")]), run_id="receipt-1")
     record = supervisor.restarts[0].as_dict()
     assert record["when"] == "2026-10-12T12:00:00Z"
-    assert record["port"] == 11490
+    assert record["port"] == 11434
     assert record["why"] == "down"
-    assert record["old_pid"] == 20
-    assert isinstance(record["new_pid"], int) and record["new_pid"] != 20
+    assert record["old_pid"] == 10
+    assert isinstance(record["new_pid"], int) and record["new_pid"] != 10
     assert record["seconds_to_healthy"] == 0
     assert record["version"] == "0.35.1"
     marker = _marker(repo, "receipt-1")
@@ -580,7 +814,7 @@ def test_restart_records_a_deadline_a_bad_pid_and_a_card_that_stays_high():
     assert "does not sign in" in (missed.restarts[-1].note or "")
 
     recorded = _supervisor(World())
-    recorded.seams.spawn = lambda argv, env: None
+    recorded.seams.spawn = lambda argv, env, log_path=None: None
     with pytest.raises(SupervisorStop, match="did not return a pid"):
         recorded.after_failure(URL_5090, model="qwen3:8b", kind="transport")
     assert recorded.restarts[-1].new_pid is None
@@ -604,7 +838,7 @@ def test_restart_records_a_deadline_a_bad_pid_and_a_card_that_stays_high():
     assert stopped.restarts[-1].note.startswith("the card did not return")
 
 
-def test_health_parsers_and_process_lookup_use_fakes():
+def test_health_parsers_and_process_lookup_use_fakes(tmp_path: Path):
     assert health(URL_5090, get=lambda url, timeout: (200, {"version": "0.35.1"}, None)) == Health(
         True, "0.35.1", None
     )
@@ -631,14 +865,19 @@ def test_health_parsers_and_process_lookup_use_fakes():
     assert model_listed({"models": []}, "qwen3:8b") is False
     assert model_listed(None, "qwen3:8b") is False
 
-    recorded = ServerFingerprint("0.35.1", "13.0", "true", "q8_0", 1500)
+    recorded = ServerFingerprint("0.35.1", "true", "q8_0", SHA, LINE, 1500)
     assert environment_mismatch(recorded, recorded) is None
     assert "flash_attention" in environment_mismatch(
-        recorded, ServerFingerprint("0.35.1", "13.0", "false", "q8_0", 1500)
+        recorded, ServerFingerprint("0.35.1", "false", "q8_0", SHA, LINE, 1500)
+    )
+    assert "CUDA library sha" in environment_mismatch(
+        recorded, ServerFingerprint("0.35.1", "true", "q8_0", "0" * 64, LINE, 1500)
     )
     assert recorded.serve_env(11434)["OLLAMA_HOST"] == "127.0.0.1:11434"
-    blank = ServerFingerprint("0.35.1", "unrecorded", "unrecorded", "unrecorded")
+    assert "OLLAMA_CUDA_BACKEND" not in recorded.serve_env(11434)
+    blank = ServerFingerprint("0.35.1", "unrecorded", "unrecorded", "unrecorded", "unrecorded")
     assert "OLLAMA_CUDA_BACKEND" not in blank.serve_env(11490)
+    assert "OLLAMA_FLASH_ATTENTION" not in blank.serve_env(11490)
     with pytest.raises(SupervisorStop):
         port_of("http://127.0.0.1:1")
 
@@ -702,12 +941,29 @@ def test_health_parsers_and_process_lookup_use_fakes():
         seen["flags"] = kwargs
         return _Proc()
 
-    assert spawn_detached(["ollama", "serve"], {"OLLAMA_HOST": "127.0.0.1:11434"}, popen=popen, platform="linux") == 55
+    log = tmp_path / "serve.log"
+    assert spawn_detached(
+        ["ollama", "serve"],
+        {"OLLAMA_HOST": "127.0.0.1:11434"},
+        str(log),
+        popen=popen,
+        platform="linux",
+    ) == 55
     assert seen["flags"]["start_new_session"] is True
-    assert spawn_detached(["ollama", "serve"], {"A": "b"}, popen=popen, platform="win32") == 55
+    assert seen["flags"]["stdout"] is seen["flags"]["stderr"]
+    assert seen["flags"]["stdout"] is not subprocess.DEVNULL
+    seen["flags"]["stdout"].close()
+    assert log.read_text(encoding="utf-8") == ""
+    win_log = tmp_path / "serve-win.log"
+    assert spawn_detached(["ollama", "serve"], {"A": "b"}, str(win_log), popen=popen, platform="win32") == 55
     assert "creationflags" in seen["flags"]
+    seen["flags"]["stdout"].close()
     with pytest.raises(SupervisorStop, match="does not sign in"):
-        spawn_detached(["ollama", "signin"], {}, popen=popen, platform="linux")
+        spawn_detached(["ollama", "signin"], {}, str(tmp_path / "unused.log"), popen=popen, platform="linux")
+    with pytest.raises(SupervisorStop, match="no log file"):
+        spawn_detached(["ollama", "serve"], {}, "  ", popen=popen, platform="linux")
+    with pytest.raises(SupervisorStop, match="could not be opened"):
+        spawn_detached(["ollama", "serve"], {}, str(tmp_path), popen=popen, platform="linux")
 
     windows_argv = " ".join(serve_argv("win32", localappdata="/opt/ollama-root"))
     assert "ollama-root" in windows_argv
@@ -825,9 +1081,10 @@ def _fill_spec(models: list[dict], **extra) -> dict:
 
 
 class _Transport:
-    def __init__(self, seams, *, show_errors=0):
+    def __init__(self, seams, *, show_errors=0, flash_in_show=True):
         self.seams = seams
         self.show_errors = show_errors
+        self.flash_in_show = flash_in_show
         self.loaded = None
         self.unloads = []
         self.shown = None
@@ -865,7 +1122,7 @@ class _Transport:
             return {
                 "model_info": {"qwen3.context_length": 4096},
                 "details": {"quantization_level": "Q4_K_M"},
-                "parameters": "flash_attn true\nkv_cache_type q8_0\n",
+                "parameters": "flash_attn true\nkv_cache_type q8_0\n" if self.flash_in_show else "",
             }
         if not isinstance(body, dict):
             return {}
@@ -948,6 +1205,32 @@ def test_fill_card_retry_cap_and_mismatch_stop_between_models(tmp_path: Path):
     assert len(rows) == 1
     assert rows[0].get("aborted") is not True
     assert rows[0]["settings"]["max_resident_ctx"] == 8192
+    assert rows[0]["settings"]["retried"] is True
+    assert rows[0]["settings"]["cold_after_restart"] is True
+
+    live = World()
+    live.sha = "abc123"
+    live.backend_line = ""
+    live_supervisor = _supervisor(live, fingerprint=False)
+    live_transport = _Transport(None, flash_in_show=False)
+    live_repo = tmp_path / "fill-live"
+    live_path = _bind(live_repo, _fill_spec([_model()]))
+    run_spec(
+        live_path,
+        root=live_repo,
+        grant="g",
+        adapters={"ollama": OllamaAdapter(transport=live_transport)},
+        heartbeat=_fresh(tmp_path),
+        date="2026-10-12",
+        run_id="fill-live",
+        seams=_fill_seams(live_transport),
+        supervisor=live_supervisor,
+    )
+    assert live_supervisor.recorded is not None
+    assert live_supervisor.recorded.flash_attention == "true"
+    assert live_supervisor.recorded.ggml_cuda_sha256 == "abc123"
+    assert live_supervisor.recorded.backend_line == ""
+    assert live.stopped == []
 
     cap_world = World()
     cap_transport = _Transport(None, show_errors=3)
@@ -966,7 +1249,7 @@ def test_fill_card_retry_cap_and_mismatch_stop_between_models(tmp_path: Path):
     assert marker["failed_steps"][0]["inconclusive"] is True
 
 
-def test_real_seams_and_the_remaining_fakes_do_not_touch_a_server():
+def test_real_seams_and_the_remaining_fakes_do_not_touch_a_server(tmp_path: Path, monkeypatch):
     def run(argv, capture_output, text, timeout, check):
         del capture_output, text, timeout, check
         joined = " ".join(str(part) for part in argv)
@@ -1001,20 +1284,71 @@ def test_real_seams_and_the_remaining_fakes_do_not_touch_a_server():
     class _Proc:
         pid = 44
 
+    log = tmp_path / "serve.log"
+    log.write_text(
+        "load_backend: loaded CUDA backend from cuda_v13\n"
+        "OLLAMA_FLASH_ATTENTION=false OLLAMA_KV_CACHE_TYPE=q8_0\n",
+        encoding="utf-8",
+    )
+    library = tmp_path / "ggml-cuda.dll"
+    library.write_bytes(b"fixture-bytes")
+    record_path = tmp_path / "serve.json"
+    record_path.write_text(
+        json.dumps(
+            {
+                "argv": ["ollama", "serve"],
+                "env": {
+                    "OLLAMA_HOST": "127.0.0.1:11434",
+                    "OLLAMA_MODELS": "E:/AI-Models/Ollama",
+                    "OLLAMA_FLASH_ATTENTION": "true",
+                    "HOME": "dropped",
+                },
+                "log_path": str(log),
+                "library_path": str(library),
+                "ggml_cuda_sha256": "not-the-file",
+                "backend_line": "not-the-log",
+            }
+        ),
+        encoding="utf-8",
+    )
+
     def popen(argv, **kwargs):
         assert kwargs["env"]["OLLAMA_HOST"] == "127.0.0.1:11434"
+        assert kwargs["env"]["OLLAMA_MODELS"] == "E:/AI-Models/Ollama"
+        assert "C:/should-not-replay" not in kwargs["env"].values()
+        assert "HOME" not in kwargs["env"] or kwargs["env"].get("HOME") != "dropped"
+        kwargs["stdout"].close()
         return _Proc()
 
+    monkeypatch.setenv("OLLAMA_MODELS", "C:/should-not-replay")
+    monkeypatch.setenv("OLLAMA_HOST", "127.0.0.1:9")
     seams = real_seams(run=run, platform="linux", popen=popen, connection=_Connection)
     status, payload, error = seams.health_get(URL_5090, 1)
     assert (status, payload["version"], error) == (200, "0.35.1", None)
     assert [row.pid for row in seams.processes()] == [9, 9]
     seams.stop(9)
-    assert seams.spawn(["ollama", "serve"], {"OLLAMA_HOST": "127.0.0.1:11434"}) == 44
+    assert seams.spawn(
+        ["ollama", "serve"],
+        {"OLLAMA_HOST": "127.0.0.1:11434", "OLLAMA_MODELS": "E:/AI-Models/Ollama"},
+        str(log),
+    ) == 44
     found = seams.environment(URL_5090)
     assert found.version == "0.35.1"
-    assert found.cuda_backend == "13.0"
-    assert found.flash_attention == "unrecorded"
+    assert found.flash_attention == ""
+    assert found.ggml_cuda_sha256 == ""
+    monkeypatch.setenv("SWITCHYARD_OLLAMA_SERVE", str(record_path))
+    read_back = seams.environment(URL_5090)
+    assert read_back.ggml_cuda_sha256 == file_sha256(library)
+    assert read_back.ggml_cuda_sha256 != "not-the-file"
+    assert read_back.backend_line == "load_backend: loaded CUDA backend from cuda_v13"
+    assert read_back.flash_attention == "false"
+    assert read_back.kv_cache_type == "q8_0"
+    gone = dict(json.loads(record_path.read_text(encoding="utf-8")))
+    gone["library_path"] = str(tmp_path / "missing.dll")
+    record_path.write_text(json.dumps(gone), encoding="utf-8")
+    missed = seams.environment(URL_5090)
+    assert missed.ggml_cuda_sha256 == ""
+    assert missed.backend_line.startswith("load_backend")
     assert seams.card_mib() == 100
     assert seams.ps(URL_5090)["models"][0]["name"] == "qwen3:8b"
 
@@ -1105,7 +1439,13 @@ def test_real_seams_and_the_remaining_fakes_do_not_touch_a_server():
         pid = 0
 
     with pytest.raises(SupervisorStop, match="did not return a pid"):
-        spawn_detached(["ollama", "serve"], {}, popen=lambda argv, **kwargs: _Zero(), platform="linux")
+        spawn_detached(
+            ["ollama", "serve"],
+            {},
+            str(tmp_path / "zero.log"),
+            popen=lambda argv, **kwargs: _Zero(),
+            platform="linux",
+        )
 
     supervisor = OllamaSupervisor(World().seams())
     supervisor.begin_measurement()
