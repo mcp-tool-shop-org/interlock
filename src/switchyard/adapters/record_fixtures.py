@@ -3,13 +3,15 @@
 The Publisher runs this against the local server. Seat B does not. A call that
 does not answer within the timeout is stored as ``no_reply`` and is not waited
 out. ``-cloud`` models are refused. The card must be idle before the first
-call and after every call that can load a model.
+call and after every call that can load a model. Each request is written to
+stderr as it is sent. The prompt is not.
 """
 
 from __future__ import annotations
 
 import http.client
 import json
+import sys
 import time
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -26,22 +28,56 @@ IDLE_CEILING_MIB = 4096
 SETTLE_S = 10.0
 SETTLE_STEP_S = 0.2
 
-# Calls that can leave a model resident are followed by an unload and a fresh baseline check.
-_LOADS = frozenset(
-    {
-        "num_predict_1",
-        "num_predict_0",
-        "num_predict_null",
-        "num_predict_missing",
-        "raw_true",
-        "truncate_over_num_ctx",
-        "think_off",
-        "shift_false",
-        "companion_start",
-    }
-)
 # Captured while num_predict_1 is still resident, before that unload.
 _WHILE_LOADED = "ps_loaded"
+
+
+def _leaves_resident(case: Case) -> bool:
+    """A generate can load a model. The keep_alive 0 unload shape does not.
+
+    A companion stop is a generate. It has no options and an empty prompt, and
+    it is not the unload: on the rig it loaded the model.
+    """
+
+    if case.method != "POST" or case.path != "/api/generate":
+        return False
+    body = case.body if isinstance(case.body, dict) else {}
+    return not (
+        body.get("keep_alive") == 0
+        and body.get("prompt") in ("", None)
+        and "companion" not in body
+        and "options" not in body
+    )
+
+
+def _request_line(method: str, url: str, body) -> str:
+    """One stderr line for a request. The prompt is not included."""
+
+    path = urlsplit(url).path or url
+    parts: list[str] = []
+    if isinstance(body, dict):
+        if body.get("keep_alive") == 0:
+            parts.append("keep_alive=0")
+        if "companion" in body:
+            parts.append(f"companion={body.get('companion')}")
+        options = body.get("options")
+        if isinstance(options, dict) and "num_predict" in options:
+            parts.append(f"num_predict={options.get('num_predict')!r}")
+        if body.get("raw") is True:
+            parts.append("raw")
+        if "think" in body:
+            parts.append(f"think={body.get('think')!r}")
+        if "shift" in body:
+            parts.append(f"shift={body.get('shift')!r}")
+        if body.get("truncate") is False:
+            parts.append("truncate=false")
+    suffix = (" " + " ".join(parts)) if parts else ""
+    return f"{method} {path}{suffix}"
+
+
+def _log_request(method: str, url: str, body) -> None:
+    sys.stderr.write(_request_line(method, url, body) + "\n")
+    sys.stderr.flush()
 
 
 class RecordError(Exception):
@@ -166,8 +202,10 @@ def record_fixtures(
     ``transport(method, url, body, timeout)`` returns a dict, or None when the
     call does not answer. ``card_mib()`` is the card reading in MiB. The grant
     and the heartbeat are checked before any request. The first request is the
-    empty-card probe. After a load, the unload is sent before the card is
-    checked again, and a refusal still sends that unload.
+    empty-card probe. A generate other than the unload shape, including a
+    companion stop, is a load: the unload is sent and the card is polled before
+    the next idle check. A refusal after that load still sends the unload.
+    Every request is written to stderr.
     """
 
     if timeout <= 0:
@@ -176,17 +214,22 @@ def record_fixtures(
     refuse_model(model)
     host = host.rstrip("/")
     refuse_unless_baseline([], card_mib(), ceiling=ceiling)
-    ps = transport("GET", f"{host}/api/ps", None, timeout)
+
+    def call(method, url, body, timeout):
+        _log_request(method, url, body)
+        return transport(method, url, body, timeout)
+
+    ps = call("GET", f"{host}/api/ps", None, timeout)
     models = ps.get("models") if isinstance(ps, dict) else None
     _require_empty(models)
 
-    version_payload = transport("GET", f"{host}/api/version", None, timeout)
+    version_payload = call("GET", f"{host}/api/version", None, timeout)
     version = version_payload.get("version") if isinstance(version_payload, dict) else None
     if not isinstance(version, str) or not version.strip():
         raise RecordError("Ollama did not report a version")
     version = version.strip()
 
-    tags = transport("GET", f"{host}/api/tags", None, timeout)
+    tags = call("GET", f"{host}/api/tags", None, timeout)
     digest = _digest(tags, model)
     folder = out_dir / version
     folder.mkdir(parents=True, exist_ok=True)
@@ -194,7 +237,7 @@ def record_fixtures(
 
     def capture(case: Case) -> None:
         started = time.perf_counter()
-        payload = transport(case.method, f"{host}{case.path}", request_body(case, model), timeout)
+        payload = call(case.method, f"{host}{case.path}", request_body(case, model), timeout)
         elapsed = time.perf_counter() - started
         behaviour, response = _observed(case, payload)
         document = fixture_document(
@@ -219,12 +262,12 @@ def record_fixtures(
         """Immediate check. Used only before the first load, when the card should already be idle."""
 
         refuse_unless_baseline([], card_mib(), ceiling=ceiling)
-        again = transport("GET", f"{host}/api/ps", None, timeout)
+        again = call("GET", f"{host}/api/ps", None, timeout)
         loaded = again.get("models") if isinstance(again, dict) else ["unreadable"]
         _require_empty(loaded)
 
     def send_unload() -> None:
-        payload = transport("POST", f"{host}/api/generate", _unload_body(model), timeout)
+        payload = call("POST", f"{host}/api/generate", _unload_body(model), timeout)
         if payload is None:
             raise RecordError("the unload timed out; the model may still be resident")
 
@@ -234,7 +277,7 @@ def record_fixtures(
         waited = 0.0
         while True:
             reading = card_mib()
-            again = transport("GET", f"{host}/api/ps", None, timeout)
+            again = call("GET", f"{host}/api/ps", None, timeout)
             models = again.get("models") if isinstance(again, dict) else None
             card_ok = isinstance(reading, int) and not isinstance(reading, bool) and reading <= ceiling
             empty = isinstance(models, list) and len(models) == 0
@@ -252,8 +295,10 @@ def record_fixtures(
 
         nonlocal resident
         send_unload()
-        settle()
+        # The unload is on the wire. A later refusal must not depend on settle
+        # finishing before release() will skip a second send.
         resident = False
+        settle()
 
     def release() -> None:
         """Best-effort unload so a refusal does not leave the model resident."""
@@ -263,7 +308,7 @@ def record_fixtures(
             return
         resident = False
         try:
-            transport("POST", f"{host}/api/generate", _unload_body(model), timeout)
+            call("POST", f"{host}/api/generate", _unload_body(model), timeout)
         except Exception:
             return
 
@@ -272,7 +317,7 @@ def record_fixtures(
         resident = True
         capture(case)
 
-    quiet = [case for case in CASES if case.name not in _LOADS and case.name != _WHILE_LOADED]
+    quiet = [case for case in CASES if not _leaves_resident(case) and case.name != _WHILE_LOADED]
     try:
         for case in quiet:
             capture(case)
@@ -283,7 +328,7 @@ def record_fixtures(
         for case in CASES:
             if case.name in written:
                 continue
-            if case.name in _LOADS:
+            if _leaves_resident(case):
                 capture_loaded(case)
                 unload()
             else:

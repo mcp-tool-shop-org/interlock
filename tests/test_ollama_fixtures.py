@@ -423,3 +423,70 @@ def test_an_error_after_a_load_still_unloads(tmp_path: Path):
     with pytest.raises(RecordError, match="boom"):
         _record(tmp_path, transport=transport, card_mib=lambda: 100, sleep=lambda _seconds: None)
     assert isinstance(calls[-1], dict) and calls[-1].get("keep_alive") == 0
+
+
+def _is_companion_stop(body) -> bool:
+    return isinstance(body, dict) and body.get("companion") == "stop"
+
+
+def _is_unload(body) -> bool:
+    return (
+        isinstance(body, dict)
+        and body.get("keep_alive") == 0
+        and "companion" not in body
+        and "options" not in body
+    )
+
+
+def test_a_companion_stop_that_loads_waits_for_the_card_to_fall(tmp_path: Path):
+    seen = {"stop": False}
+    highs = {"n": 0}
+    sleeps: list[float] = []
+    calls = []
+    base = _recording_transport([])
+
+    def card():
+        if not seen["stop"]:
+            return 100
+        highs["n"] += 1
+        return 11908 if highs["n"] <= 3 else 100
+
+    def transport(method, url, body, timeout):
+        calls.append(body)
+        if _is_companion_stop(body):
+            seen["stop"] = True
+        return base(method, url, body, timeout)
+
+    written = _record(tmp_path, transport=transport, card_mib=card, sleep=lambda seconds: sleeps.append(seconds))
+    assert len(written) == len(CASES)
+    assert highs["n"] >= 4
+    assert sleeps == [SETTLE_STEP_S, SETTLE_STEP_S, SETTLE_STEP_S]
+    stop_at = next(index for index, body in enumerate(calls) if _is_companion_stop(body))
+    assert any(_is_unload(body) for body in calls[stop_at + 1 :])
+
+
+def test_a_companion_stop_that_loads_still_unloads_when_the_card_never_falls(tmp_path: Path, capsys):
+    seen = {"stop": False}
+    calls = []
+    base = _recording_transport([])
+
+    def transport(method, url, body, timeout):
+        calls.append(body)
+        if _is_companion_stop(body):
+            seen["stop"] = True
+        return base(method, url, body, timeout)
+
+    with pytest.raises(RecordError, match="above 4096"):
+        _record(
+            tmp_path,
+            transport=transport,
+            card_mib=lambda: 11908 if seen["stop"] else 100,
+            sleep=lambda _seconds: None,
+        )
+    stop_at = next(index for index, body in enumerate(calls) if _is_companion_stop(body))
+    assert any(_is_unload(body) for body in calls[stop_at + 1 :])
+    err = capsys.readouterr().err
+    stop_line = err.find("companion=stop")
+    assert stop_line != -1
+    assert "POST /api/generate" in err
+    assert "keep_alive=0" in err[stop_line:]
