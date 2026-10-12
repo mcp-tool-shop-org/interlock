@@ -1,6 +1,6 @@
 import sys
 
-from switchyard.harness.e4b import capture_run
+from interlock.harness.e4b import capture_run
 
 
 def test_the_live_runner_returns_the_child_stdout():
@@ -13,8 +13,8 @@ import types
 
 import pytest
 
-from switchyard.harness.e4b import E4bError, read_git
-from switchyard.harness.ollama_serve import ServeError, pin_install
+from interlock.harness.e4b import E4bError, read_git
+from interlock.harness.ollama_serve import ServeError, pin_install
 
 SHA = "0123456789abcdef0123456789abcdef01234567"
 

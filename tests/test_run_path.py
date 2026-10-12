@@ -14,10 +14,10 @@ from pathlib import Path
 import pytest
 import yaml
 
-from switchyard.adapters.base import AdapterError, StepResult
-from switchyard.cli import main
-from switchyard.guards import GuardError
-from switchyard.harness.runner import (
+from interlock.adapters.base import AdapterError, StepResult
+from interlock.cli import main
+from interlock.guards import GuardError
+from interlock.harness.runner import (
     RunnerError,
     devices_not_started,
     dry_run,
@@ -25,8 +25,8 @@ from switchyard.harness.runner import (
     real_adapters,
     run_spec,
 )
-from switchyard.harness.spec import SpecError
-from switchyard.receipt import check_tree, load_jsonl
+from interlock.harness.spec import SpecError
+from interlock.receipt import check_tree, load_jsonl
 
 ROOT = Path(__file__).resolve().parents[1]
 E5 = ROOT / "experiments" / "e5" / "spec.yaml"
@@ -338,7 +338,7 @@ def test_the_command_runs_and_refuses_a_name_collision(tmp_path: Path, monkeypat
     repo = tmp_path / "repo"
     spec_path = _bind(repo, _spec([_arm("A", "CPU")]))
     fake = Fake({"A": [_result(10), _result(11), _result(12)]})
-    monkeypatch.setattr("switchyard.harness.runner.for_engine", lambda engine: fake)
+    monkeypatch.setattr("interlock.harness.runner.for_engine", lambda engine: fake)
     assert main(["run", str(spec_path), "--root", str(repo), "--run-id", "cli-run"]) == 0
     assert (repo / "receipts" / "cli-run.jsonl").is_file()
     assert main(["run", str(spec_path), "--root", str(repo), "--run-id", "cli-run"]) == 1
@@ -352,14 +352,14 @@ def test_the_command_refuses_a_missing_token_before_building_adapters(tmp_path: 
     def explode(engine):
         raise AssertionError("an adapter was built before the guards")
 
-    monkeypatch.setattr("switchyard.harness.runner.for_engine", explode)
+    monkeypatch.setattr("interlock.harness.runner.for_engine", explode)
     assert main(["run", str(spec_path), "--root", str(repo)]) == 1
 
 
 def test_real_adapters_uses_the_registry_per_engine(monkeypatch):
     seen = []
     monkeypatch.setattr(
-        "switchyard.harness.runner.for_engine", lambda engine: seen.append(engine) or engine
+        "interlock.harness.runner.for_engine", lambda engine: seen.append(engine) or engine
     )
     adapters = real_adapters({"arms": [{"engine": "ollama"}, {"engine": "openvino"}, {"engine": "ollama"}]})
     assert adapters == {"ollama": "ollama", "openvino": "openvino"}

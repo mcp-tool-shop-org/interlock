@@ -16,6 +16,7 @@
 # EXTERNAL_VERIFIER: n/a. R&D reviews this spec before any device time.
 
 # Amendment, 2026-10-10, before any E3 run (R&D rulings on switchyard issue #36).
+# Amended 2026-10-12 (Publisher): the tool is renamed interlock; commands updated.
 #
 # Per-call bound. The adapter's fixed 60 s per-call bound is replaced by a
 # per-arm bound on every device, the rule E2 adopted the same day. A cold

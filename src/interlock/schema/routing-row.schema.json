@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "interlock/routing-row",
+  "title": "interlock routing row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "task",
+    "model",
+    "engine",
+    "device",
+    "settings",
+    "quality",
+    "latency",
+    "date",
+    "repeats",
+    "provisional",
+    "provenance"
+  ],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "task": {
+      "enum": [
+        "embed",
+        "rerank",
+        "nli",
+        "generate",
+        "engine",
+        "offer",
+        "verify:grounded",
+        "verify:reasoning",
+        "verify:math-ladder",
+        "judge:planted-error",
+        "judge:same-meaning-rewrite"
+      ]
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repo_or_tag", "revision_or_digest", "quant", "licence"],
+      "properties": {
+        "repo_or_tag": {"type": "string", "minLength": 1},
+        "revision_or_digest": {"type": "string", "minLength": 1},
+        "quant": {"type": "string", "minLength": 1},
+        "licence": {"type": "string", "minLength": 1},
+        "size": {"type": ["integer", "null"], "minimum": 0},
+        "size_vram": {"type": ["integer", "null"], "minimum": 0}
+      }
+    },
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "minLength": 1}
+      }
+    },
+    "device": {
+      "anyOf": [
+        {"enum": ["NPU", "CPU", "iGPU", "5090"]},
+        {"type": "string", "pattern": "^runpod:[A-Za-z0-9][A-Za-z0-9 ._+()-]{0,80}$"}
+      ]
+    },
+    "settings": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["thinking_level", "num_predict", "num_ctx", "batch", "static_shape", "precision"],
+      "properties": {
+        "thinking_level": {"type": ["string", "null"]},
+        "num_predict": {"type": ["integer", "null"], "minimum": 0},
+        "num_ctx": {"type": ["integer", "null"], "minimum": 0},
+        "batch": {"type": ["integer", "null"], "minimum": 1},
+        "static_shape": {"type": ["string", "null"]},
+        "precision": {"type": ["string", "null"]},
+        "quote_rule": {"type": ["integer", "null"], "minimum": 1},
+        "quote_rule_source": {"type": ["string", "null"]},
+        "offrig_version": {"type": ["string", "null"]},
+        "price_snapshot": {"type": ["string", "null"], "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+        "prompt_tokens": {"type": ["integer", "null"], "minimum": 0},
+        "prompt_token_method": {"type": ["string", "null"]},
+        "prompt_token_search": {"type": ["integer", "null"], "minimum": 0},
+        "prompt_token_cold": {"type": ["integer", "null"], "minimum": 0},
+        "truncated_tokens": {"type": ["integer", "null"], "minimum": 0}
+      }
+    },
+    "quality": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/metric"}
+    },
+    "latency": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["cold_ms", "warm_p50_ms", "warm_p95_ms", "throughput", "compile_ms"],
+      "properties": {
+        "cold_ms": {"type": ["number", "null"], "minimum": 0},
+        "warm_p50_ms": {"type": ["number", "null"], "minimum": 0},
+        "warm_p95_ms": {"type": ["number", "null"], "minimum": 0},
+        "throughput": {"type": ["number", "null"]},
+        "throughput_unit": {"type": ["string", "null"]},
+        "compile_ms": {"type": ["number", "null"], "minimum": 0},
+        "first_call_ms": {"type": ["number", "null"], "minimum": 0},
+        "compile_warm_reload_ms": {"type": ["number", "null"], "minimum": 0}
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "date": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+    "repeats": {"type": "integer", "minimum": 1},
+    "provisional": {"type": "boolean"},
+    "provenance": {"$ref": "#/$defs/provenance"},
+    "outcome": {"type": "string", "enum": ["device_lost", "hang", "native_binary_rejected", "compile_rejected", "compile_timeout"]},
+    "parity_valid": {"type": "boolean"},
+    "partial": {"type": "boolean"},
+    "aborted": {"type": "boolean"},
+    "descriptive": {"type": "boolean"},
+    "model_family": {"type": ["string", "null"]},
+    "gpu_resident": {"type": ["boolean", "null"]},
+    "cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seconds", "tokens"],
+      "properties": {
+        "seconds": {"type": ["number", "null"], "minimum": 0},
+        "tokens": {"type": ["integer", "null"], "minimum": 0}
+      }
+    },
+    "per_type": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/metric"}
+    },
+    "notes": {"type": "string"}
+  },
+  "$defs": {
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value", "n", "interval", "dataset_hash"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "value": {"type": ["number", "null"]},
+        "n": {"type": "integer", "minimum": 0},
+        "interval": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["low", "high", "method"],
+          "properties": {
+            "low": {"type": "number"},
+            "high": {"type": "number"},
+            "method": {"type": "string", "minLength": 1}
+          }
+        },
+        "dataset_hash": {"type": "string", "minLength": 1}
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "required": ["source_receipt_path", "commit_sha"],
+          "properties": {
+            "source_receipt_path": {"type": "string", "minLength": 1},
+            "commit_sha": {"type": ["string", "null"]},
+            "content_sha256": {"type": "string", "minLength": 1}
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": ["experiment_spec", "run_id"],
+          "properties": {
+            "experiment_spec": {"type": "string", "minLength": 1},
+            "run_id": {"type": "string", "minLength": 1}
+          }
+        }
+      ]
+    }
+  }
+}

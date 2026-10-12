@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from switchyard.adapters.base import AdapterError
-from switchyard.adapters.ollama import COUNT_TIMEOUT_NOTE, OllamaAdapter
-from switchyard.adapters.ollama_cases import (
+from interlock.adapters.base import AdapterError
+from interlock.adapters.ollama import COUNT_TIMEOUT_NOTE, OllamaAdapter
+from interlock.adapters.ollama_cases import (
     CASES,
     MODEL,
     NO_LIMIT_NOTE,
@@ -24,7 +24,7 @@ from switchyard.adapters.ollama_cases import (
     request_body,
     sent_parameters,
 )
-from switchyard.adapters.record_fixtures import (
+from interlock.adapters.record_fixtures import (
     SETTLE_STEP_S,
     RecordError,
     _observed,
@@ -32,7 +32,7 @@ from switchyard.adapters.record_fixtures import (
     read_card_mib,
     record_fixtures,
 )
-from switchyard.harness.count_budget import PREFILL_TOKENS_PER_S, count_timeout_s, roster_timeout
+from interlock.harness.count_budget import PREFILL_TOKENS_PER_S, count_timeout_s, roster_timeout
 from tests.ollama_replay import ReplayTransport, replay
 
 ROOT = Path(__file__).resolve().parents[1]

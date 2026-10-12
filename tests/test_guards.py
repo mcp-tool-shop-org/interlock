@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from switchyard.guards import (
+from interlock.guards import (
     HEARTBEAT_MAX_AGE_S,
     GuardError,
     assess_step,
@@ -62,8 +62,8 @@ def test_card_must_be_empty():
 def test_assess_step_refuses_the_wrong_flag_and_unknown_devices():
     granted = assess_step(device="5090", grant="the grant")
     assert granted["grant"] == "the grant"
-    session = assess_step(device="NPU", npu_session="switchyard E1")
-    assert session["npu_session"] == "switchyard E1"
+    session = assess_step(device="NPU", npu_session="interlock E1")
+    assert session["npu_session"] == "interlock E1"
     heavy = assess_step(device="CPU", cpu_heavy=True, cpu_window="quiet")
     assert heavy["cpu_window"] == "quiet"
     with pytest.raises(GuardError, match="--grant"):

@@ -10,12 +10,12 @@ import threading
 
 import pytest
 
-from switchyard.adapters.base import AdapterError
-from switchyard.harness.marker import marker_path
-from switchyard.harness.runner import RunnerError
-from switchyard.harness.spec import SpecError, validate_spec
-from switchyard.harness.watch import EXIT_OPERATOR_STOP, WatchHooks, read_start_state
-from switchyard.receipt import load_jsonl
+from interlock.adapters.base import AdapterError
+from interlock.harness.marker import marker_path
+from interlock.harness.runner import RunnerError
+from interlock.harness.spec import SpecError, validate_spec
+from interlock.harness.watch import EXIT_OPERATOR_STOP, WatchHooks, read_start_state
+from interlock.receipt import load_jsonl
 from tests.test_harness import _result, _spec as _harness_spec
 from tests.test_run_guard import BlockingAdapter, Clock, Exits, _hooks, _invoke, _spec
 
@@ -64,7 +64,7 @@ def test_a_failing_start_state_is_unrecorded_and_never_fails_the_run(tmp_path):
 
 
 def test_read_start_state_reads_the_card_only_for_a_5090_run(monkeypatch):
-    import switchyard.harness.watch as watch
+    import interlock.harness.watch as watch
 
     calls = []
 
@@ -83,7 +83,7 @@ def test_read_start_state_reads_the_card_only_for_a_5090_run(monkeypatch):
 
 
 def test_read_start_state_marks_missing_values_unrecorded(monkeypatch):
-    import switchyard.harness.watch as watch
+    import interlock.harness.watch as watch
 
     def missing(*a, **k):
         raise FileNotFoundError("nvidia-smi")
@@ -95,7 +95,7 @@ def test_read_start_state_marks_missing_values_unrecorded(monkeypatch):
 
 
 def test_read_start_state_survives_an_odd_nvidia_smi(monkeypatch):
-    import switchyard.harness.watch as watch
+    import interlock.harness.watch as watch
 
     class Odd:
         returncode = 0
@@ -229,7 +229,7 @@ def test_generate_rows_record_the_effective_prefix_caching(tmp_path):
         def run(self, request):
             return _result(5, throughput=9.0, resolved={"prefix_caching": "library default (uncontrolled)"})
 
-    from switchyard.harness.runner import run_interleaved
+    from interlock.harness.runner import run_interleaved
 
     rows = run_interleaved(
         {"openvino": Gen()}, grant=None, npu_session=None, cpu_window=None, root=repo, repo=repo,

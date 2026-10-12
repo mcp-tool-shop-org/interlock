@@ -418,16 +418,16 @@ before.
   new version**, not the first draft. The Downloads folder isn't
   durable.
   - Master: the Downloads master PNG (1328×1328, on a white margin) →
-    `assets/logo/switchyard-master.png`.
+    `assets/logo/interlock-master.png`.
   - The icon set `switchyard_{16,32,64,128,256,512}.png` (cropped to the dark tile) →
-    `assets/logo/switchyard_<n>.png`.
+    `assets/logo/interlock_<n>.png`.
   - **Also the brand repo (org convention), approved by the Director:** switchyard goes public soon. Open a
     PR to `mcp-tool-shop-org/brand` adding `logos/switchyard/readme.png` (the 512 icon). Its pre-commit hook
     regenerates `manifest.json`; commit both together, per brand's README "Adding a Logo Manually". The
     Publisher merges.
   - The switchyard README header uses
     `https://raw.githubusercontent.com/mcp-tool-shop-org/brand/main/logos/switchyard/readme.png` at width 256,
-    as rnd does. Until the brand PR merges, it uses the in-repo `assets/logo/switchyard_512.png`.
+    as rnd does. Until the brand PR merges, it uses the in-repo `assets/logo/interlock_512.png`.
 - **A snapshot of this brief:** add `docs/handoff/` with this brief and the four feedback files from "Read
   first". Rewrite absolute home-directory paths as plain references, so no home-directory path is
   committed. Note the date and the memory path they came from. The brief stays authoritative in memory, and

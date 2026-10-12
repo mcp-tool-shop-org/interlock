@@ -15,12 +15,12 @@ from pathlib import Path
 import pytest
 import yaml
 
-from switchyard.adapters.base import AdapterError, StepResult
-from switchyard.adapters.ollama import OllamaAdapter
-from switchyard.harness.fill import FillSeams, quiet_fill_seams
-from switchyard.harness.runner import RunnerError, dry_run, run_spec
-from switchyard.harness.watch import WatchHooks
-from switchyard.ollama_supervisor import (
+from interlock.adapters.base import AdapterError, StepResult
+from interlock.adapters.ollama import OllamaAdapter
+from interlock.harness.fill import FillSeams, quiet_fill_seams
+from interlock.harness.runner import RunnerError, dry_run, run_spec
+from interlock.harness.watch import WatchHooks
+from interlock.ollama_supervisor import (
     URL_5090,
     URL_CPU,
     Health,
@@ -798,7 +798,7 @@ def test_a_restart_without_a_start_line_or_a_log_stops_before_any_kill():
 
 
 def test_the_start_line_record_is_optional_and_filtered(tmp_path: Path, monkeypatch):
-    monkeypatch.delenv("SWITCHYARD_OLLAMA_SERVE", raising=False)
+    monkeypatch.delenv("INTERLOCK_OLLAMA_SERVE", raising=False)
     assert load_serve_start() is None
     assert load_serve_start(tmp_path / "missing.json") is None
     bad = tmp_path / "bad.json"
@@ -973,8 +973,8 @@ def test_cli_health_output(monkeypatch, capsys):
             return 200, {"version": "0.35.1"}, None
         return None, None, "connection refused"
 
-    monkeypatch.setattr("switchyard.ollama_supervisor.http_get_version", fake)
-    from switchyard.cli import main
+    monkeypatch.setattr("interlock.ollama_supervisor.http_get_version", fake)
+    from interlock.cli import main
 
     code = main(["ollama-health"])
     out = capsys.readouterr().out
@@ -988,7 +988,7 @@ def test_cli_health_output(monkeypatch, capsys):
         del url, timeout, connection
         return 200, {"version": "0.35.1"}, None
 
-    monkeypatch.setattr("switchyard.ollama_supervisor.http_get_version", both)
+    monkeypatch.setattr("interlock.ollama_supervisor.http_get_version", both)
     assert main(["ollama-health"]) == 0
     assert "11490 healthy 0.35.1" in capsys.readouterr().out
 
@@ -997,7 +997,7 @@ def test_dry_run_states_the_restart_policy():
     text = dry_run(ROOT / "experiments" / "e5" / "spec.yaml", ROOT)
     assert "ollama restart: at most 2 per run" in text
     assert "between steps only, never during a measurement" in text
-    assert "switchyard does not sign in" in text
+    assert "interlock does not sign in" in text
     assert "heartbeat not read; adapters not called" in text
     interleaved = dry_run(ROOT / "experiments" / "e4" / "spec.yaml", ROOT)
     assert "at most 2 per run" in interleaved
@@ -1563,7 +1563,7 @@ def test_real_seams_and_the_remaining_fakes_do_not_touch_a_server(tmp_path: Path
     assert found.version == "0.35.1"
     assert found.flash_attention == ""
     assert found.ggml_cuda_sha256 == ""
-    monkeypatch.setenv("SWITCHYARD_OLLAMA_SERVE", str(record_path))
+    monkeypatch.setenv("INTERLOCK_OLLAMA_SERVE", str(record_path))
     read_back = seams.environment(URL_5090)
     assert read_back.ggml_cuda_sha256 == file_sha256(library)
     assert read_back.ggml_cuda_sha256 != "not-the-file"
