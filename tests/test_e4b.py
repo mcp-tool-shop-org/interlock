@@ -691,6 +691,32 @@ def test_the_judged_companion_call_spans_the_intel_measurement(tmp_path: Path):
     assert warm_calls[0][2] == 768
 
 
+def test_no_covering_companion_call_refuses_companion_not_covering(tmp_path: Path, monkeypatch):
+    # R&D on #92: falling back to the latest companion call would judge block 2's ramp again.
+    import interlock.harness.e4b as e4b_module
+
+    spec = _spec([PAIRS[2]])
+
+    def call(arm, *, num_predict, measured, kind, prompt):
+        payload = _clean(arm, num_predict=num_predict, kind=kind)
+        if kind == "warm" and arm["id"] == "5090-alone":
+            payload["clocks_mhz"] = [2000.0] * 16
+            payload["elapsed_s"] = 3.2
+        return payload
+
+    monkeypatch.setattr(e4b_module, "_covering_call", lambda calls, span: None)
+    seams = _seams(_Server(), call)
+    reported = []
+    original = seams.companion_report
+    seams.companion_report = lambda companion: reported.append(companion) or original(companion)
+    run_block(spec, seams, root=tmp_path, run_id="not-covering", repo=tmp_path)
+    pair = next(row for row in _rows(tmp_path / "receipts" / "not-covering.jsonl") if row["kind"] == "e4b-pair")
+    paired = next(slot for slot in pair["slots"] if slot["role"] == "paired")
+    assert "companion_not_covering" in paired["attempt_reasons"]
+    assert paired["refusal"] == "companion_not_covering"
+    assert not reported
+
+
 def test_an_unsteady_5090_companion_refuses_clock_not_steady(tmp_path: Path):
     spec = _spec([PAIRS[2]])
 

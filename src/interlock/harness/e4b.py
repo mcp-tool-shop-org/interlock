@@ -1152,6 +1152,7 @@ def perform_slot(
                 measure_span = (measure_began, _clock_now(seams))
             cpu_end = seams.sample_cpu("performance")
             report = None
+            not_covering = False
             if companion is not None:
                 phase_now = "companion"
                 kind = _stop_kind(companion)
@@ -1162,12 +1163,18 @@ def perform_slot(
                 judged = _covering_call(companion_calls, measure_span)
                 if isinstance(judged, dict) and isinstance(judged.get("result"), dict):
                     report = judged["result"]
+                elif companion.get("device") == "5090" and not companion_unsteady and phase != "cold":
+                    # No 5090 companion call spans the Intel measurement: refuse rather than judge the latest
+                    # call, which is what block 2 did (R&D on #92).
+                    not_covering = True
                 elif not companion_unsteady:
                     report = seams.companion_report(companion)
             if measured is None:
                 measured = {"value": None, "clocks_mhz": None, "power_w": None}
             if companion_unsteady and phase != "cold":
                 reason = "clock_not_steady"
+            elif not_covering:
+                reason = "companion_not_covering"
             elif phase != "cold":
                 reason = slot_refusal(
                     arm,

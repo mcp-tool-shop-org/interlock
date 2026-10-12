@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- E4b: a paired Intel slot with no 5090 companion call spanning the measurement is refused as `companion_not_covering` instead of falling back to the latest companion call (R&D on #92).
+
 - A paired NPU or iGPU slot waits until its 5090 companion is sustained before the Intel warm-up: one warm decode of 768 tokens, at least 3 s, steady inside the 22.5 MHz band, then the next decode is underway. The companion call that is judged is the one whose time span covers the Intel measured call. A companion that never gets steady refuses the slot as `clock_not_steady`. `interlock run --pairs` runs a subset of the spec's pairs and records that subset on the receipt (R&D, 2026-10-12, after e4b-block-2).
 - Renamed from switchyard to interlock before the first release. The name switchyard is taken on PyPI and by NVIDIA's NeMo Switchyard, and PyPI refuses the project name interlock, so nothing had been released under either name. The distribution name is `mcptoolshop-interlock`. The import path and the command are `interlock`. `INTERLOCK_*` is the environment prefix; `SWITCHYARD_*` still works for this release and warns.
 - E4b reads git once, before the run writes anything, and the pilot document and the block receipt keep that sha and clean-tree flag. A later read used to see the run's own `pilot-e4b/` or `logs/` and record a clean tree as dirty. Those two directories are ignored so the next run's start check does not see them. Receipts stay tracked. A dirty tree at the start is still recorded false, and a spec that differs from its committed blob is still refused.
