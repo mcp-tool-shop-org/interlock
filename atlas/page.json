@@ -23,7 +23,7 @@
       "added": 0,
       "changed": 4,
       "moved": 0,
-      "parts": 4,
+      "parts": 3,
       "removed": 0
     },
     "items": [
@@ -34,8 +34,8 @@
       }
     ],
     "since": {
-      "commit": "8082da93e054b9c85e2ce7e405508ede439ad66c",
-      "generatedAt": "2026-10-12T18:03:13.713Z"
+      "commit": "9056779144faa461f194029d59cbbb07fc6a609a",
+      "generatedAt": "2026-10-12T18:34:15.240Z"
     },
     "unchanged": true
   },
@@ -117,11 +117,12 @@
     }
   ],
   "changesTogetherNote": [
+    "1 file changed together with its own test, as expected.",
     "Confidence is low: fewer than 25 source files reach 10 revisions in the window.",
     "Window: 180 days; a pair counts from 3 shared commits, since 8 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
-  "changesTogetherWithTests": 0,
-  "commit": "9056779144faa461f194029d59cbbb07fc6a609a",
+  "changesTogetherWithTests": 1,
+  "commit": "83145db7bacd33340e39ffe1e48d16cd30c1cf46",
   "defaultBranch": "main",
   "derived": "7 parts, mostly Python (78 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.",
   "doors": [
@@ -192,9 +193,9 @@
   "duplicatesLead": null,
   "duplicatesNote": [],
   "edges": [],
-  "engine": "1.23.0",
+  "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-12T18:34:15.240Z",
+  "generatedAt": "2026-10-12T19:15:48.029Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "3 writes and 4 reads use paths built at run time and are not named here.",

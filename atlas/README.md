@@ -1,6 +1,6 @@
 # switchyard: how it works
 
-Mapped at 2026-10-12 from commit 9056779 by Atlas 1.23.0.
+Mapped at 2026-10-12 from commit 83145db by Atlas 1.24.0.
 
 ## What this is
 
@@ -8,7 +8,7 @@ switchyard routes each job to a model, engine and device from a receipt-backed t
 
 7 parts, mostly Python (78 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.
 
-## What changed since 2026-10-12 (8082da9)
+## What changed since 2026-10-12 (9056779)
 
 Nothing structural changed since 2026-10-12; 4 files changed content.
 
@@ -42,6 +42,8 @@ CI writes nothing this map can see.
 - **src/switchyard/harness/receipts.py** and **src/switchyard/receipt.py** changed together in 7 of 12 commits, inside the src part.
 - **src/switchyard/harness/runner.py** and **tests/test_harness.py** changed together in 14 of 26 commits, and the tests part imports the src part.
 - **src/switchyard/adapters/ollama.py** and **tests/test_fill_card_live.py** changed together in 4 of 8 commits, and the tests part imports the src part.
+
+1 file changed together with its own test, as expected.
 
 Confidence is low: fewer than 25 source files reach 10 revisions in the window.
 
