@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The Ollama prompt fit estimates the seed repeats from the seed's own count, then trims only past the longest prefix known to be short. It used to add one seed per count, which took thousands of counts at a 118k-token target: E5's first live run spent over 30 minutes on one model without a row.
 - The Ollama token count asks for one completion token, never zero. Ollama 0.35.1 reads `num_predict` 0 as no limit and generates until the context fills. E4's first live run (2026-10-11) sat at full card power for 12 minutes without writing a row. The zero-then-retry path is gone.
 
 ## 0.1.0 — prototype

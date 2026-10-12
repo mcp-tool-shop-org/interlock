@@ -152,6 +152,12 @@ def fit_prompt_words(seed: str, target_tokens: int, count_tokens) -> tuple[str, 
     still at least the target. The result is ``(prefix, count, fit)`` where
     ``fit`` is ``exact`` or ``shortest_at_or_above``.
 
+    The number of repeats is estimated from the seed's own count, so a long
+    target takes a few counts, not one count per repeat. Adding one seed at a
+    time cost thousands of counts at a 118k-token target, each re-reading the
+    whole prompt (E5's first live run, 2026-10-12). The trim then searches only
+    the words past the longest prefix already known to be short.
+
     A longer prefix is assumed to count as at least as many tokens, the same
     assumption :func:`fit_prompt` makes for characters. This trim is the Ollama
     dataset rule. Engines with a local tokenizer keep :func:`fit_prompt`.
@@ -161,15 +167,32 @@ def fit_prompt_words(seed: str, target_tokens: int, count_tokens) -> tuple[str, 
         raise SearchError("a prompt seed is required")
     if isinstance(target_tokens, bool) or not isinstance(target_tokens, int) or target_tokens < 1:
         raise SearchError("a prompt needs at least one token")
-    block = seed
+    per_seed = _as_count(count_tokens(seed))
+    repeats = max(1, -(-target_tokens // per_seed)) if per_seed > 0 else 1
+    if len(seed) * repeats > 1_000_000:
+        raise SearchError("the seed never reaches the token target")
+    short_len = 0  # the longest prefix length known to count below the target
+    if repeats > 1:
+        below = seed * (repeats - 1)
+        if _as_count(count_tokens(below)) < target_tokens:
+            short_len = len(below)
+        else:
+            repeats = repeats - 1
+    block = seed * repeats
     counted = _as_count(count_tokens(block))
     while counted < target_tokens:
-        block += seed
+        short_len = len(block)
+        per = max(1, counted // repeats)
+        more = max(1, -(-(target_tokens - counted) // per))
+        block += seed * more
+        repeats += more
         if len(block) > 1_000_000:
             raise SearchError("the seed never reaches the token target")
         counted = _as_count(count_tokens(block))
     cuts = _word_cuts(block)
     low = 0
+    while low < len(cuts) - 1 and cuts[low] <= short_len:
+        low += 1
     high = len(cuts) - 1
     best_text, best_count = block, counted
     while low < high:
