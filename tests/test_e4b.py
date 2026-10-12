@@ -310,11 +310,12 @@ def _rows(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
 
 
-def test_the_e4b_spec_loads_and_keeps_null_tolerances():
+def test_the_e4b_spec_loads_with_the_pilot_tolerances():
+    # R&D's amendment from pilot e4b-pilot.json at 0ea9506: the p95 within-call range 15.35 rounds up to 22.5.
     spec = load_spec(E4B)
     assert spec["id"] == "E4b"
-    assert spec["measurement"]["clock_tolerance_mhz"] is None
-    assert spec["measurement"]["steady_band_mhz"] is None
+    assert spec["measurement"]["clock_tolerance_mhz"] == 22.5
+    assert spec["measurement"]["steady_band_mhz"] == 22.5
     assert spec["repeats"] == 10
     assert spec["extension_repeats"] == 15
     load_spec(E4)
@@ -356,8 +357,8 @@ def test_dry_run_names_the_e4b_rules_and_the_pilot(capsys):
         "50000",
         "20261012",
         "not a gate",
-        "clock_tolerance_mhz null until the pilot amendment",
-        "steady_band_mhz null until the pilot amendment",
+        "clock_tolerance_mhz: 22.5",
+        "steady_band_mhz: 22.5",
         "switchyard run experiments/e4b/spec.yaml --pilot",
         "heartbeat not read; adapters not called",
         "devices not started (--dry-run)",
@@ -387,8 +388,9 @@ def test_dry_run_names_the_e4b_rules_and_the_pilot(capsys):
     assert "--pilot is only for E4b" in capsys.readouterr().err
 
 
-def test_a_full_block_refuses_null_tolerances_before_heartbeat(monkeypatch, capsys):
-    from switchyard.cli import main
+def test_a_full_block_refuses_null_tolerances_before_heartbeat(monkeypatch):
+    # The committed spec now carries the pilot's values, so the refusal is checked on a copy with them nulled.
+    from switchyard.harness import e4b
 
     def explode(*args, **kwargs):
         raise AssertionError("live seams were built")
@@ -398,9 +400,12 @@ def test_a_full_block_refuses_null_tolerances_before_heartbeat(monkeypatch, caps
         "switchyard.harness.runner.require_heartbeat",
         lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("heartbeat")),
     )
-    code = main(["run", str(E4B), "--root", str(ROOT), "--grant", "grant", "--npu-session", "session"])
-    assert code == 1
-    assert "null until the pilot amendment" in capsys.readouterr().err
+    for field in ("clock_tolerance_mhz", "steady_band_mhz"):
+        spec = load_spec(E4B)
+        spec["measurement"][field] = None
+        with pytest.raises(E4bError, match="null until the pilot amendment"):
+            e4b._require_amended(spec)
+    e4b._require_amended(load_spec(E4B))
 
 
 def test_schedule_rotates_and_the_probe_follows_igpu_5090():
