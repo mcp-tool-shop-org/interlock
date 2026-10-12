@@ -32,6 +32,10 @@
 # holds. The fit is that prefix, not a repeated seed. Sampling is unchanged.
 # E4b's rates are not comparable to E4's. Each call records how its time was
 # spent, load then prompt eval then decode, so a cut-off warm-up stays visible.
+# Amended 2026-10-12 (R&D, from pilot e4b-pilot.json at 0ea9506): 20 of 20
+# good calls, all full length, NVML at 0.205 s. Within-call SM ranges were 13x0,
+# 7, 7, 8, 8, 15, 15, 22 MHz; the 95th percentile 15.35 rounds up to the 7.5 MHz
+# step, so clock_tolerance_mhz and steady_band_mhz are both 22.5.
 # Drafted 2026-10-12 (Kimi, at the Publisher's request, R&D to confirm), after
 # E4 run 7 (valid, inconclusive; every alone spread over the half-band). E4 is
 # not amended and run 7's verdict stands. E4b replaces E4's global alone-spread
@@ -102,8 +106,8 @@ footnote: percentile-bootstrap-of-the-median (50000 resamples, seed 20261012); n
 flank_tol: null
 measurement:
   clock_step_mhz: 7.5
-  clock_tolerance_mhz: null
-  steady_band_mhz: null
+  clock_tolerance_mhz: 22.5
+  steady_band_mhz: 22.5
   pilot: >
     Before the first E4b block, under a grant: 5090-alone, about 20 measured
     calls at num_predict 1024 with the per-slot warm-up. clock_tolerance_mhz
