@@ -6,10 +6,10 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator
 
-from switchyard.cli import main
+from interlock.cli import main
 
 ROOT = Path(__file__).resolve().parents[1]
-DECISION = json.loads((ROOT / "src" / "switchyard" / "schema" / "route-decision.v1.json").read_text(encoding="utf-8"))
+DECISION = json.loads((ROOT / "src" / "interlock" / "schema" / "route-decision.v1.json").read_text(encoding="utf-8"))
 
 
 def write_table(tmp_path: Path, rows: list[dict]) -> None:

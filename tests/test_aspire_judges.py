@@ -9,9 +9,9 @@ import json
 
 import pytest
 
-from switchyard.importers.aspire_judges import AspireImportError, b_rows, judge_control_rows
-from switchyard.importers.common import ImportError_, sha256_bytes, wilson
-from switchyard.receipt import validate_row
+from interlock.importers.aspire_judges import AspireImportError, b_rows, judge_control_rows
+from interlock.importers.common import ImportError_, sha256_bytes, wilson
+from interlock.receipt import validate_row
 
 DIGEST = "8039dd90c1138d772437a0779a33b7349efd5d9cca71edcd26e4dd463f90439d"
 

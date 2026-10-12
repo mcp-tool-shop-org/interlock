@@ -12,6 +12,7 @@
 # EXTERNAL_VERIFIER: n/a. R&D reviews this spec before any device time.
 
 # Amendment, 2026-10-11 (maintainer). Rest is the Publisher's scheduling decision between consecutive long runs, not a harness rule; rest_s below is no longer read.
+# Amended 2026-10-12 (Publisher): the tool is renamed interlock; commands updated.
 # Amendment, 2026-10-12. The spill counter is \GPU Adapter Memory(*)\Shared Usage on the 5090 adapter instance whose Dedicated Usage matches nvidia-smi memory.used, at the baseline taken immediately before the window and again after the load. No match, or more than one, is a missing reading, and a missing reading is a spill. The gate is that shared delta. The dedicated delta is recorded and is not a gate. The runner pid may be recorded and does not gate. The search cap is min(max_ctx, the trained context length). A window above the trained length is not loaded. A trained-length window that is not resident is halved to one grain, then bisected upward. The spill reference is the lowest resident window. Flash attention, the KV cache type, the server default context and the backend library are read from the server log named by SWITCHYARD_OLLAMA_LOG. A missing log leaves those four fields unrecorded with a reason. The ggml-cuda sha is the sha256 of ggml-cuda.dll under the exe's lib\ollama\cuda_v13, and the exe is SWITCHYARD_OLLAMA_EXE. Driver CUDA is the nvidia-smi header, not a cuda_version query.
 id: E5
 procedure: fill-card

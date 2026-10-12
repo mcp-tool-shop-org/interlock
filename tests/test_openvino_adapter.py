@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from switchyard.adapters import registry
-from switchyard.adapters.base import AdapterError, NativeBinaryRejected, StepRequest
-from switchyard.adapters import openvino as ovm
+from interlock.adapters import registry
+from interlock.adapters.base import AdapterError, NativeBinaryRejected, StepRequest
+from interlock.adapters import openvino as ovm
 
 
 class FakeClock:
@@ -817,8 +817,8 @@ def _harness_spec(arms):
 
 
 def _run_harness(tmp_path, adapter, arms, notes=""):
-    from switchyard.harness.runner import run_interleaved
-    from switchyard.receipt import load_jsonl
+    from interlock.harness.runner import run_interleaved
+    from interlock.receipt import load_jsonl
 
     repo = _repo(tmp_path / "repo")
     spec_path = _commit_spec(repo, _harness_spec(arms))
@@ -1212,8 +1212,8 @@ def test_igpu_dynamic_shape_opt_in_compiles_and_is_recorded(tmp_path, monkeypatc
 
 
 def test_dynamic_shape_is_recorded_on_the_row():
-    from switchyard.harness.receipts import measured_row
-    from switchyard.harness.timing import Summary
+    from interlock.harness.receipts import measured_row
+    from interlock.harness.timing import Summary
 
     arm = {
         "id": "igpu",

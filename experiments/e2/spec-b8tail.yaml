@@ -1,6 +1,7 @@
 # E2 batch-8 tail (R&D, 2026-10-10). Runs after experiments/e2/spec.yaml, same session, one try per arm.
 
 # Amendment, 2026-10-10, after the first tail run (R&D rulings on switchyard issue #36).
+# Amended 2026-10-12 (Publisher): the tool is renamed interlock; commands updated.
 #
 # Outcome. An NPU compile that the driver compiler refuses, raised inside
 # compile_model with "[NPU_VCL] Compiler returned msg" and code 0x78000007, is

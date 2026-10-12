@@ -7,16 +7,16 @@ from pathlib import Path
 
 import pytest
 
-from switchyard.cli import main
-from switchyard.harness.e4b import run_block, run_from_cli, run_pilot
-from switchyard.harness.lifecycle import (
+from interlock.cli import main
+from interlock.harness.e4b import run_block, run_from_cli, run_pilot
+from interlock.harness.lifecycle import (
     LifecycleError,
     format_runs,
     list_runs,
     move_aside,
 )
-from switchyard.harness.receipts import import_receipt
-from switchyard.receipt import receipt_paths
+from interlock.harness.receipts import import_receipt
+from interlock.receipt import receipt_paths
 from test_e4b import E4B, ROOT, _Server, _clean, _rows, _seams, _spec, PAIRS
 
 
@@ -120,9 +120,9 @@ def test_an_omitted_run_id_picks_the_next_free_one(tmp_path: Path):
 
 
 def test_an_omitted_run_id_is_the_first_line(tmp_path: Path, monkeypatch, capsys):
-    monkeypatch.setattr("switchyard.ollama_supervisor.real_seams", lambda **kwargs: object())
-    monkeypatch.setattr("switchyard.ollama_supervisor.OllamaSupervisor", lambda *args, **kwargs: object())
-    monkeypatch.setattr("switchyard.harness.runner.run_spec", lambda *args, **kwargs: [])
+    monkeypatch.setattr("interlock.ollama_supervisor.real_seams", lambda **kwargs: object())
+    monkeypatch.setattr("interlock.ollama_supervisor.OllamaSupervisor", lambda *args, **kwargs: object())
+    monkeypatch.setattr("interlock.harness.runner.run_spec", lambda *args, **kwargs: [])
     assert main(["run", str(E4B), "--root", str(tmp_path), "--grant", "g", "--npu-session", "s"]) == 0
     assert capsys.readouterr().out == "run id: e4b-block\n"
 
@@ -131,7 +131,7 @@ def test_a_run_whose_cleanup_fails_still_writes_its_receipt(tmp_path: Path, monk
     def refuse(path, onexc=None):
         raise PermissionError(5, "Access is denied", str(path))
 
-    monkeypatch.setattr("switchyard.harness.e4b.shutil.rmtree", refuse)
+    monkeypatch.setattr("interlock.harness.e4b.shutil.rmtree", refuse)
     run_block(
         _spec([PAIRS[0]]),
         _seams(_Server(), _call({"n": 0})),
@@ -277,7 +277,7 @@ def test_a_stray_series_refuses_before_any_device(tmp_path: Path):
             pilot=False,
             seams=_seams(_Server(), _call(counter)),
         )
-    assert "switchyard runs quarantine left" in str(caught.value)
+    assert "interlock runs quarantine left" in str(caught.value)
     assert counter["n"] == 0
 
 

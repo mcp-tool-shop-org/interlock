@@ -12,13 +12,13 @@ from pathlib import Path
 
 import pytest
 
-from switchyard.importers.calibration import calibration_rows, quote_rule_of
-from switchyard.importers.common import ImportError_
-from switchyard.importers.ladder import ladder_rows
-from switchyard.importers.nli import nli_rows
-from switchyard.importers.offers import offer_rows, remote_option_allowed
-from switchyard.importers.probe import probe_rows
-from switchyard.receipt import validate_row
+from interlock.importers.calibration import calibration_rows, quote_rule_of
+from interlock.importers.common import ImportError_
+from interlock.importers.ladder import ladder_rows
+from interlock.importers.nli import nli_rows
+from interlock.importers.offers import offer_rows, remote_option_allowed
+from interlock.importers.probe import probe_rows
+from interlock.receipt import validate_row
 
 _METRICS = {
     "rows": [
@@ -82,7 +82,7 @@ def _tiers():
 
 
 def test_calibration_copies_the_published_interval_and_infers_quote_rule_1():
-    from switchyard.importers.calibration import INFERRED_QUOTE_RULE_SOURCE
+    from interlock.importers.calibration import INFERRED_QUOTE_RULE_SOURCE
 
     manifest = _manifest()
     rows = calibration_rows(
@@ -259,7 +259,7 @@ def test_probe_skips_error_rows_and_gpu_1():
 
 
 def test_gap_report_names_the_missing_field_on_a_partial_row():
-    from switchyard.importers.gaps import render_gaps
+    from interlock.importers.gaps import render_gaps
 
     rows = [
         {
@@ -312,7 +312,7 @@ def test_gap_report_names_the_missing_field_on_a_partial_row():
 
 
 def test_a_pinned_revision_matches_the_unpinned_candidate_and_a_miss_does_not():
-    from switchyard.importers.gaps import open_gaps
+    from interlock.importers.gaps import open_gaps
 
     candidate = {
         "id": "E1-bge-NPU",
@@ -339,7 +339,7 @@ def test_a_pinned_revision_matches_the_unpinned_candidate_and_a_miss_does_not():
 
 
 def test_import_command_writes_jsonl_and_the_gap_report(tmp_path: Path, monkeypatch, capsys):
-    from switchyard.cli import main
+    from interlock.cli import main
     from tests.support import row
 
     table = tmp_path / "table"
@@ -365,7 +365,7 @@ def test_import_command_writes_jsonl_and_the_gap_report(tmp_path: Path, monkeypa
         seen.update(kwargs)
         return [row()], ["one skip"]
 
-    monkeypatch.setattr("switchyard.importers.assemble.import_receipts", fake_import)
+    monkeypatch.setattr("interlock.importers.assemble.import_receipts", fake_import)
     assert main(["import", "--root", str(tmp_path)]) == 0
     assert seen["local_root"] == tmp_path.resolve()
     written = (table / "routing.jsonl").read_text(encoding="utf-8")
@@ -375,7 +375,7 @@ def test_import_command_writes_jsonl_and_the_gap_report(tmp_path: Path, monkeypa
 
 
 def test_table_filters_by_task(tmp_path: Path, capsys):
-    from switchyard.cli import main
+    from interlock.cli import main
 
     table = tmp_path / "table"
     table.mkdir()
@@ -450,8 +450,8 @@ def _commit_auditor(repo: Path, files: dict[str, bytes], *, extra: dict[str, byt
 
 
 def test_aspire_import_records_the_pin_path_and_content_sha256(tmp_path: Path):
-    from switchyard.importers.assemble import _aspire_b
-    from switchyard.importers.common import sha256_bytes
+    from interlock.importers.assemble import _aspire_b
+    from interlock.importers.common import sha256_bytes
 
     repo = tmp_path / "aspire"
     files = _b_receipts()
@@ -476,7 +476,7 @@ def test_aspire_import_records_the_pin_path_and_content_sha256(tmp_path: Path):
 
 
 def test_aspire_import_refuses_a_missing_readout_and_an_undated_selection(tmp_path: Path):
-    from switchyard.importers.assemble import _aspire_b
+    from interlock.importers.assemble import _aspire_b
 
     missing = tmp_path / "missing"
     files = _b_receipts()
@@ -503,9 +503,9 @@ def test_aspire_import_refuses_a_missing_readout_and_an_undated_selection(tmp_pa
 
 
 def test_import_reads_a_pinned_tree_and_refuses_a_missing_ladder(tmp_path: Path):
-    from switchyard.importers.assemble import import_receipts
-    from switchyard.importers.common import sha256_bytes
-    from switchyard.importers.pins import LADDER_RUNS
+    from interlock.importers.assemble import import_receipts
+    from interlock.importers.common import sha256_bytes
+    from interlock.importers.pins import LADDER_RUNS
 
     rnd = tmp_path / "rnd"
     chain = rnd / "experiments/verifier-gold/calibration/results/2026-10-09-chain"
@@ -625,7 +625,7 @@ def _commit_more(repo: Path) -> str:
 
 
 def test_a_missing_pin_is_refused(tmp_path: Path):
-    from switchyard.importers.assemble import require_pin
+    from interlock.importers.assemble import require_pin
 
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(["git", "config", "user.email", "dev@example.com"], cwd=tmp_path, check=True)
@@ -638,7 +638,7 @@ def test_a_missing_pin_is_refused(tmp_path: Path):
 
 
 def test_local_e1_rows_join_an_import_only_when_a_root_is_passed(monkeypatch):
-    from switchyard.importers import assemble
+    from interlock.importers import assemble
 
     monkeypatch.setattr(assemble, "require_pin", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(assemble, "_PROBES", ())
@@ -654,7 +654,7 @@ def test_local_e1_rows_join_an_import_only_when_a_root_is_passed(monkeypatch):
 
 
 def test_an_e1_copy_drops_artifacts_and_refuses_an_unmarked_row():
-    from switchyard.importers.assemble import _e1_table_copy
+    from interlock.importers.assemble import _e1_table_copy
     from tests.support import row
 
     kept = _e1_table_copy(row(parity_valid=True, artifacts={"vector": [1, 2, 3]}))
@@ -691,7 +691,7 @@ def test_an_e1_copy_drops_artifacts_and_refuses_an_unmarked_row():
 
 
 def test_e1_rerun2_copies_47_rows_and_leaves_the_receipt_files_alone():
-    from switchyard.importers.assemble import _E1_RERUN2, e1_rerun2_rows
+    from interlock.importers.assemble import _E1_RERUN2, e1_rerun2_rows
 
     root = Path(__file__).resolve().parents[1]
     before = [(root / rel).read_bytes() for rel in _E1_RERUN2]

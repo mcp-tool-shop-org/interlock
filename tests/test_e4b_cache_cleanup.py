@@ -1,7 +1,7 @@
 import os
 import stat
 
-from switchyard.harness import e4b
+from interlock.harness import e4b
 
 
 def test_a_read_only_compiled_blob_is_removed(tmp_path):

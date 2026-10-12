@@ -5,11 +5,11 @@ from pathlib import Path
 
 from jsonschema import Draft202012Validator
 
-from switchyard.cli import main
-from switchyard.router.policy import decode_bound, prefix_mode
+from interlock.cli import main
+from interlock.router.policy import decode_bound, prefix_mode
 
 ROOT = Path(__file__).resolve().parents[1]
-DECISION = json.loads((ROOT / "src" / "switchyard" / "schema" / "route-decision.v1.json").read_text(encoding="utf-8"))
+DECISION = json.loads((ROOT / "src" / "interlock" / "schema" / "route-decision.v1.json").read_text(encoding="utf-8"))
 PLAN = json.loads((ROOT / "tests" / "fixtures" / "offrig-plan-input.8f2a94a.json").read_text(encoding="utf-8"))
 
 

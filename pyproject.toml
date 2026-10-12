@@ -1,5 +1,5 @@
 [project]
-name = "switchyard"
+name = "interlock"
 version = "0.1.0"
 description = "Prototype. Device-aware model router. Each job is sent to a model, engine and device named by a receipt."
 readme = "README.md"
@@ -21,7 +21,7 @@ intel = [
 ]
 
 [project.scripts]
-switchyard = "switchyard.cli:main"
+interlock = "interlock.cli:main"
 
 [dependency-groups]
 dev = [
@@ -40,8 +40,8 @@ default-groups = ["dev"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "--cov=switchyard --cov-report=term-missing --cov-fail-under=90"
+addopts = "--cov=interlock --cov-report=term-missing --cov-fail-under=90"
 
 [tool.coverage.run]
-source = ["switchyard"]
+source = ["interlock"]
 omit = ["*/schema/*"]

@@ -1,6 +1,6 @@
 """Record Ollama request and response fixtures.
 
-Run this on the rig, from the switchyard repo, against the local server.
+Run this on the rig, from the interlock repo, against the local server.
 It requires a 5090 grant, a fresh watchdog heartbeat, and an idle card.
 It does not pick a cloud model.
 
@@ -19,8 +19,8 @@ import sys
 import time
 from pathlib import Path
 
-from switchyard.adapters.ollama_cases import case_by_name
-from switchyard.adapters.record_fixtures import (
+from interlock.adapters.ollama_cases import case_by_name
+from interlock.adapters.record_fixtures import (
     IDLE_CEILING_MIB,
     RECORD_TIMEOUT_S,
     RecordError,
@@ -28,7 +28,7 @@ from switchyard.adapters.record_fixtures import (
     read_card_mib,
     record_fixtures,
 )
-from switchyard.harness.runner import heartbeat_path
+from interlock.harness.runner import heartbeat_path
 
 
 def main(

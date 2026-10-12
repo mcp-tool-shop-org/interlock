@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from hypothesis import given, settings, strategies as st
 
-from switchyard.router.policy import (
+from interlock.router.policy import (
     EXCLUDED_OUTCOMES,
     Decision,
     Refusal,
@@ -573,7 +573,7 @@ def test_experiment_of_reads_the_spec_directory_only():
 
 
 def test_mismatched_5090_rows_and_thin_runners_are_named():
-    from switchyard.router.policy import _keeps
+    from interlock.router.policy import _keeps
 
     igpu = measured(
         "ig",
@@ -669,7 +669,7 @@ def test_mismatched_5090_rows_and_thin_runners_are_named():
 
 
 def test_the_policy_does_not_read_the_clock_or_a_file():
-    text = (ROOT / "src" / "switchyard" / "router" / "policy.py").read_text(encoding="utf-8")
+    text = (ROOT / "src" / "interlock" / "router" / "policy.py").read_text(encoding="utf-8")
     assert "date.today" not in text
     assert "datetime.now" not in text
     assert "open(" not in text

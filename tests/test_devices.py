@@ -1,6 +1,6 @@
 import pytest
 
-from switchyard.devices import CPU, IGPU, NPU, DeviceRefused, resolve_device
+from interlock.devices import CPU, IGPU, NPU, DeviceRefused, resolve_device
 
 INTEL_GPU = {"id": "GPU.0", "full_name": "Intel(R) Graphics (iGPU)"}
 NVIDIA_0 = {"id": "GPU.0", "full_name": "NVIDIA GeForce RTX 5090"}

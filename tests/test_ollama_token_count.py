@@ -14,13 +14,13 @@ from pathlib import Path
 import pytest
 import yaml
 
-from switchyard.adapters.base import AdapterError, StepRequest
-from switchyard.adapters.ollama import OllamaAdapter, generate_body
-from switchyard.adapters.ollama_cases import require_recorded_behaviour
-from switchyard.guards import GuardError
-from switchyard.harness.e5 import SearchError, fit_prompt_words
-from switchyard.harness.runner import RunnerError, dry_run, run_spec
-from switchyard.harness.watch import WatchHooks
+from interlock.adapters.base import AdapterError, StepRequest
+from interlock.adapters.ollama import OllamaAdapter, generate_body
+from interlock.adapters.ollama_cases import require_recorded_behaviour
+from interlock.guards import GuardError
+from interlock.harness.e5 import SearchError, fit_prompt_words
+from interlock.harness.runner import RunnerError, dry_run, run_spec
+from interlock.harness.watch import WatchHooks
 
 ROOT = Path(__file__).resolve().parents[1]
 E4 = ROOT / "experiments" / "e4" / "spec.yaml"
@@ -197,7 +197,7 @@ def _run(tmp_path: Path, spec: dict, transport: _Transport, monkeypatch=None):
     events: list[str] = []
     adapter_transport = transport
     if monkeypatch is not None:
-        from switchyard.harness import runner as runner_mod
+        from interlock.harness import runner as runner_mod
 
         real_heartbeat = runner_mod.require_heartbeat
 
@@ -434,7 +434,7 @@ def test_dry_run_names_the_count_and_does_not_call_it(tmp_path: Path, monkeypatc
         lambda *_args, **_kwargs: called.append("count"),
     )
     monkeypatch.setattr(
-        "switchyard.adapters.ollama.default_transport",
+        "interlock.adapters.ollama.default_transport",
         lambda *_args, **_kwargs: called.append("transport"),
     )
     repo = tmp_path / "repo"

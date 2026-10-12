@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from switchyard.receipt import ReceiptError, check_tree, validate_row
+from interlock.receipt import ReceiptError, check_tree, validate_row
 from tests.support import row
 
 
