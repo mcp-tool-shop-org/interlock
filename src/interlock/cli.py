@@ -51,7 +51,10 @@ def main(argv: list[str] | None = None) -> int:
         except ValueError as exc:
             print(str(exc), file=sys.stderr)
             return 1
-    parser = argparse.ArgumentParser(prog="interlock", description="Route a job from measured receipts.")
+    parser = argparse.ArgumentParser(
+        prog="interlock",
+        description="interlock: local AI device router. Route a job from measured receipts.",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     check = sub.add_parser(

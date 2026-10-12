@@ -1,4 +1,6 @@
-# interlock
+<img src="assets/logo.png" width="200" alt="interlock">
+
+# interlock: local AI device router
 
 <img src="assets/logo/interlock-wordmark.png" width="560" alt="interlock: a rail crossing routing jobs to devices">
 
@@ -7,6 +9,18 @@
 Railway interlocking stops a train being routed into a conflicting path. This tool does that for devices: it sends each job to a model, an engine and a device.
 
 You give it a task (embed, rerank, NLI, verify, generate) and the constraints that matter (quality, latency, context, thinking level). It answers with a model, an engine, a device and the settings, and it shows the receipt behind every number. OpenVINO's AUTO and HETERO plugins can pick a device once you have already picked the model. Nothing in that stack picks the model. That gap is the product.
+
+## Install
+
+```
+pip install mcptoolshop-interlock
+```
+
+```
+uv tool install mcptoolshop-interlock
+```
+
+The distribution name is `mcptoolshop-interlock`. The import and the command are `interlock`.
 
 What this program is allowed to touch is in the [threat model](#threat-model).
 
