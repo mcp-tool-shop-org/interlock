@@ -1,25 +1,29 @@
 # interlock: how it works
 
-Mapped at 2026-10-12 from commit 9b2b9ac by Atlas 1.24.0.
+Mapped at 2026-10-12 from commit 6a4b675 by Atlas 1.24.0.
 
 ## What this is
 
-switchyard routes each job to a model, engine and device from a receipt-backed table. (written by a person)
+interlock routes each job to a model, engine and device from a receipt-backed table. (written by a person)
 
-7 parts, mostly Python (81 files). Work enters through 2 doors; the busiest is CI, which reaches 2 parts. People run switchyard.
+7 parts, mostly Python (84 files). Work enters through 3 doors; the busiest is CI, which reaches 2 parts. It publishes to PyPI. People run interlock.
 
-## What changed since 2026-10-12 (0d6e916)
+## What changed since 2026-10-12 (9b2b9ac)
 
-- receipts/e4b-block-2-series/5090-igpu-0-alone-after-5090-alone.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
-- receipts/e4b-block-2-series/5090-igpu-0-alone-before-5090-alone.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
-- receipts/e4b-block-2-series/5090-igpu-0-paired-5090-with-igpu.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
-- And 61 more new files that belong to no part.
-- 64 files added and 3 changed content, across 3 parts.
+- Release (.github/workflows/release.yml) is a new door. It starts when a release is published; or by hand. It checks src/interlock/.
+- interlock (pyproject.toml) is a new command. It runs src/interlock/cli.py.
+- switchyard (pyproject.toml) is no longer a command.
+- CHANGELOG.md is now read by tests/test_old_name.py.
+- docs/handoff/ is now read by tests/test_old_name.py.
+- experiments/ is now also read by tests/test_old_name.py.
+- And 9 more new writers and readers of places.
+- 42 files added, 37 removed, 23 moved and 40 changed content, across 7 parts.
 
 ## What comes in
 
 1. **CI.** On a pull request to main; on a push to main touching 11 paths; or by hand. Runs tests/.
-2. **switchyard** (a command people run). Runs src/switchyard/cli.py.
+2. **Release.** When a release is published; or by hand. Checks src/interlock/.
+3. **interlock** (a command people run). Runs src/interlock/cli.py.
 
 ## What happens through CI
 
@@ -33,19 +37,21 @@ CI writes nothing this map can see.
 
 ## The other doors
 
-**switchyard** (a command people run) runs src/switchyard/cli.py.
+**Release** checks src/interlock/ and publishes to PyPI.
+
+**interlock** (a command people run) runs src/interlock/cli.py.
 
 ## What breaks what
 
-- **src** is imported only from tests, by 1 part (tests), and sits on the path of 2 doors.
+- **src** is imported only from tests, by 1 part (tests), and sits on the path of 3 doors.
 
 ## What tends to change together
 
-- **src/switchyard/adapters/openvino.py** and **tests/test_openvino_adapter.py** changed together in 17 of 22 commits, and the tests part imports the src part.
-- **src/switchyard/harness/fill.py** and **tests/test_fill_card_live.py** changed together in 5 of 7 commits, and the tests part imports the src part.
-- **src/switchyard/harness/receipts.py** and **src/switchyard/receipt.py** changed together in 7 of 13 commits, inside the src part.
-- **src/switchyard/harness/runner.py** and **tests/test_harness.py** changed together in 14 of 27 commits, and the tests part imports the src part.
-- **src/switchyard/adapters/ollama.py** and **tests/test_fill_card_live.py** changed together in 4 of 8 commits, and the tests part imports the src part.
+- **src/switchyard/adapters/openvino.py** and **tests/test_openvino_adapter.py** changed together in 17 of 22 commits.
+- **src/switchyard/harness/fill.py** and **tests/test_fill_card_live.py** changed together in 5 of 7 commits.
+- **src/switchyard/harness/receipts.py** and **src/switchyard/receipt.py** changed together in 7 of 13 commits.
+- **src/switchyard/harness/runner.py** and **tests/test_harness.py** changed together in 14 of 27 commits.
+- **src/switchyard/adapters/ollama.py** and **tests/test_fill_card_live.py** changed together in 4 of 8 commits.
 
 1 file changed together with its own test, as expected.
 
@@ -75,9 +81,9 @@ People write .github/, assets/, docs/, experiments/ and the repository root; 3 w
 
 ## Where to start
 
-src/switchyard/cli.py → src/switchyard/receipt.py → src/switchyard/families.py
+src/interlock/cli.py → src/interlock/receipt.py → src/interlock/families.py
 
-Read those in order to follow one run of switchyard end to end. This path follows switchyard (a command people run) from its entry, since CI runs only tests.
+Read those in order to follow one run of interlock end to end. This path follows interlock (a command people run) from its entry, since CI runs only tests.
 
 ## What this map cannot see
 
