@@ -21,6 +21,10 @@ ALLOW_PREFIXES = (
     ("receipts/", "receipts are records of what ran"),
     ("table/", "the routing table is a record of what ran"),
     ("docs/handoff/", "the 2026-10-09 build handoff records the name chosen that day"),
+    (
+        "atlas/",
+        "the generated map records that the old command is gone, and the GitHub repo is still the old name",
+    ),
 )
 ALLOW_FILES = (
     ("CHANGELOG.md", "changelog history, and the Unreleased line that records the rename"),
