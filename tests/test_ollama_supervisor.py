@@ -1126,7 +1126,8 @@ def test_health_parsers_and_process_lookup_use_fakes(tmp_path: Path):
     def windows(argv, capture_output, text, timeout, check):
         assert "Get-NetTCPConnection" in argv[-1]
         assert "-LocalPort 11434" in argv[-1]
-        assert "-State Listen" in argv[-1]
+        assert "RemotePort -eq 0" in argv[-1]
+        assert "-State Listen" not in argv[-1]
         return subprocess.CompletedProcess(argv, 0, stdout="4242\n", stderr="")
 
     assert listening_pids(11434, run=windows, platform="win32") == [4242]

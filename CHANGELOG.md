@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed: the 11434 listener lookups (E4b's pin, E5's runner, the supervisor) no longer filter on `-State Listen`. On Windows build 26340 a listening socket reports state 0, so the E4b pilot refused with "the 11434 listener report is not JSON". They now take the socket on the port that has no remote port. Found live by the Publisher, 2026-10-12.
+
 - If the Ollama log's size cannot be read, a restart stops the run instead of checking the whole log. A missing log is still an empty log.
 - After an Ollama restart, the `load_backend` line is taken from the log bytes written after the spawn. A line from the previous server is not a match. When the new server has not written one yet, the check runs after the first model load and before that sample is kept. At the start of a run, the recorded `OLLAMA_*` and `LLAMA_ARG_*` set is compared with the live server. A mismatch disables restarts for that run and is written on the marker. After a restart the same full set is compared. An unreadable `/api/ps` during a hang, while health still answers, refuses the restart.
 - E4b runs on its own Ollama at 127.0.0.1:11441, pinned to the install that is listening on 11434, and stops that process tree at block end and on abort. 11434 and 11490 are not opened. Probes are GET /api/version and GET /api/ps only. Ending a companion session unloads with keep_alive 0; an empty generate is no longer a stop. Each slot has its own warm-up, a 5090 slot waits until the clock is steady, and a refused slot is re-run once. The pair verdict is the Hodges-Lehmann estimate with an exact Wilcoxon interval. `switchyard run experiments/e4b/spec.yaml --pilot` writes the clock pilot under pilot-e4b/ and does not write receipts or the routing table. E4's noise gate is unchanged.
