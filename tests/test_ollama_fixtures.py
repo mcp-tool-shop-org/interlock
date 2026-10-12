@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
@@ -22,19 +24,48 @@ from switchyard.adapters.ollama_cases import (
 )
 from switchyard.adapters.record_fixtures import (
     RecordError,
+    _observed,
     http_exchange,
     read_card_mib,
     record_fixtures,
 )
+from switchyard.harness.count_budget import PREFILL_TOKENS_PER_S, count_timeout_s, roster_timeout
 from tests.ollama_replay import ReplayTransport, replay
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_ROOT = ROOT / "tests" / "fixtures" / "ollama"
 
 
+def _beat(tmp_path: Path) -> Path:
+    path = tmp_path / "_watchdog_HEARTBEAT"
+    path.write_text("pulse", encoding="utf-8")
+    now = time.time()
+    os.utime(path, (now, now))
+    return path
+
+
+def _record(tmp_path: Path, **kwargs):
+    beat = kwargs.pop("heartbeat", None)
+    if beat is None:
+        beat = _beat(tmp_path)
+    values = {
+        "model": "qwen3:8b",
+        "host": "http://127.0.0.1:11434",
+        "out_dir": tmp_path,
+        "timeout": 15,
+        "ceiling": 4096,
+        "today": "2026-10-12",
+        "grant": "grant-t",
+        "heartbeat": beat,
+        "now": time.time(),
+    }
+    values.update(kwargs)
+    return record_fixtures(**values)
+
+
 def _document(case):
     if case.behaviour == "no_reply":
-        response = None
+        response = {"done": True, "eval_count": 64}
     elif case.behaviour == "error":
         response = {"error": "the prompt exceeds the context length"}
     elif case.name == "raw_true":
@@ -58,6 +89,10 @@ def test_replay_of_each_recorded_fixture(tmp_path: Path):
     documents = [_document(case) for case in CASES]
     for document in documents:
         if document["behaviour"] == "no_reply":
+            assert document["response"]["eval_count"] > 1
+            body = document["request"]["body"]
+            assert body["options"]["num_ctx"] == 64
+            assert body["shift"] is False
             with pytest.raises(RecordedNoReply, match="no reply"):
                 replay(document)
             continue
@@ -82,7 +117,10 @@ def test_replay_of_each_recorded_fixture(tmp_path: Path):
                 catalog = case_by_name(document["case"])
                 if catalog.behaviour == "no_reply":
                     assert document["behaviour"] == "no_reply"
-                    assert document["response"] is None
+                    assert document["response"]["eval_count"] > 1
+                    body = document["request"]["body"]
+                    assert body["options"]["num_ctx"] == 64
+                    assert body["shift"] is False
                 else:
                     replay(document)
 
@@ -92,7 +130,7 @@ def test_every_ollama_option_the_adapter_can_send_has_a_fixture():
     assert missing == frozenset()
 
 
-def test_the_recorder_command_refuses_a_cloud_model(capsys):
+def test_the_recorder_command_refuses_a_cloud_model(capsys, tmp_path: Path):
     import importlib.util
 
     path = ROOT / "scripts" / "record_ollama_fixtures.py"
@@ -100,14 +138,20 @@ def test_the_recorder_command_refuses_a_cloud_model(capsys):
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(module)
+    beat = tmp_path / "_watchdog_HEARTBEAT"
+    beat.write_text("pulse", encoding="utf-8")
     code = module.main(
-        ["--model", "qwen3:8b:cloud"],
+        ["--model", "qwen3:8b:cloud", "--grant", "grant-t"],
         transport=lambda *_args: {},
         card_mib=lambda: 100,
         today="2026-10-12",
+        heartbeat=beat,
+        now=time.time(),
     )
     assert code == 2
     assert "cloud" in capsys.readouterr().err
+    with pytest.raises(SystemExit):
+        module.main(["--model", "qwen3:8b"])
 
 
 def test_the_recorder_refuses_a_cloud_model(tmp_path: Path):
@@ -118,13 +162,28 @@ def test_the_recorder_refuses_a_cloud_model(tmp_path: Path):
         return {}
 
     with pytest.raises(RecordError, match="cloud"):
-        record_fixtures(
-            model="qwen3:8b:cloud",
-            host="http://127.0.0.1:11434",
-            out_dir=tmp_path,
-            timeout=15,
-            ceiling=4096,
-            today="2026-10-12",
+        _record(tmp_path, model="qwen3:8b:cloud", transport=transport, card_mib=lambda: 100)
+    assert called == []
+
+
+def test_the_recorder_refuses_to_run_without_a_grant(tmp_path: Path):
+    called = []
+
+    def transport(*_args):
+        called.append("called")
+        return {}
+
+    with pytest.raises(RecordError, match="--grant"):
+        _record(tmp_path, grant="", transport=transport, card_mib=lambda: 100)
+    stale = tmp_path / "stale"
+    stale.write_text("old", encoding="utf-8")
+    os.utime(stale, (time.time() - 120, time.time() - 120))
+    with pytest.raises(RecordError, match="heartbeat"):
+        _record(
+            tmp_path,
+            grant="grant-t",
+            heartbeat=stale,
+            now=time.time(),
             transport=transport,
             card_mib=lambda: 100,
         )
@@ -132,33 +191,19 @@ def test_the_recorder_refuses_a_cloud_model(tmp_path: Path):
 
 
 def test_the_recorder_refuses_a_card_that_is_not_at_baseline(tmp_path: Path):
+    calls = []
+
     def loaded(method, url, _body, _timeout):
+        calls.append(url)
         if url.endswith("/api/ps"):
             return {"models": [{"name": "qwen3:8b"}]}
         return {}
 
-    with pytest.raises(RecordError, match="not at baseline"):
-        record_fixtures(
-            model="qwen3:8b",
-            host="http://127.0.0.1:11434",
-            out_dir=tmp_path,
-            timeout=15,
-            ceiling=4096,
-            today="2026-10-12",
-            transport=loaded,
-            card_mib=lambda: 100,
-        )
+    with pytest.raises(RecordError, match="still on the card"):
+        _record(tmp_path, transport=loaded, card_mib=lambda: 100)
+    assert calls == ["http://127.0.0.1:11434/api/ps"]
     with pytest.raises(RecordError, match="above 4096"):
-        record_fixtures(
-            model="qwen3:8b",
-            host="http://127.0.0.1:11434",
-            out_dir=tmp_path,
-            timeout=15,
-            ceiling=4096,
-            today="2026-10-12",
-            transport=lambda *_args: {"models": []},
-            card_mib=lambda: 9000,
-        )
+        _record(tmp_path, transport=lambda *_args: {"models": []}, card_mib=lambda: 9000)
 
 
 def _recording_transport(timeouts: list):
@@ -174,7 +219,7 @@ def _recording_transport(timeouts: list):
             return {"model_info": {"qwen3.context_length": 4096}}
         options = body.get("options") if isinstance(body, dict) else None
         if isinstance(options, dict) and ("num_predict" not in options or options.get("num_predict") in (0, None)):
-            return None
+            return {"done": True, "eval_count": 64}
         if isinstance(options, dict) and options.get("num_ctx") == 8:
             return {"error": "the prompt exceeds the context length"}
         return {"done": True, "prompt_eval_count": 1}
@@ -184,13 +229,8 @@ def _recording_transport(timeouts: list):
 
 def test_num_predict_0_is_recorded_as_no_reply_within_the_timeout(tmp_path: Path):
     timeouts: list = []
-    written = record_fixtures(
-        model="qwen3:8b",
-        host="http://127.0.0.1:11434",
-        out_dir=tmp_path,
-        timeout=15,
-        ceiling=4096,
-        today="2026-10-12",
+    written = _record(
+        tmp_path,
         transport=_recording_transport(timeouts),
         card_mib=lambda: 100,
     )
@@ -198,15 +238,21 @@ def test_num_predict_0_is_recorded_as_no_reply_within_the_timeout(tmp_path: Path
     assert set(timeouts) == {15}
     saved = json.loads((tmp_path / "0.35.1" / "num_predict_0.json").read_text(encoding="utf-8"))
     assert saved["behaviour"] == "no_reply"
-    assert saved["response"] is None
+    assert saved["response"]["eval_count"] > 1
+    assert saved["request"]["body"]["options"]["num_ctx"] == 64
+    assert saved["request"]["body"]["shift"] is False
     assert saved["ollama_version"] == "0.35.1"
     assert saved["digest"] == "sha256:abc"
     assert saved["date"] == "2026-10-12"
     assert saved["request"]["body"]["options"]["num_predict"] == 0
+    cold = json.loads((tmp_path / "0.35.1" / "num_predict_1.json").read_text(encoding="utf-8"))
+    assert isinstance(cold["cold_load_s"], float) and cold["cold_load_s"] >= 0
     for name in ("num_predict_null", "num_predict_missing"):
         document = json.loads((tmp_path / "0.35.1" / f"{name}.json").read_text(encoding="utf-8"))
         assert document["behaviour"] == "no_reply"
-        assert document["response"] is None
+        assert document["response"]["eval_count"] > 1
+        assert document["request"]["body"]["options"]["num_ctx"] == 64
+        assert document["request"]["body"]["shift"] is False
     truncate = json.loads((tmp_path / "0.35.1" / "truncate_over_num_ctx.json").read_text(encoding="utf-8"))
     assert truncate["behaviour"] == "error"
     assert "exceeds" in truncate["response"]["error"]
@@ -268,3 +314,36 @@ def test_a_count_exchange_that_times_out_refuses_with_the_note():
     with pytest.raises(AdapterError, match="the token count timed out") as raised:
         adapter.count_tokens("qwen3:8b", "hi", settings={"num_ctx": 32}, timeout=2)
     assert str(raised.value) == COUNT_TIMEOUT_NOTE
+
+
+def test_a_no_limit_reply_stays_no_reply_and_keeps_eval_count():
+    behaviour, response = _observed(case_by_name("num_predict_0"), None)
+    assert behaviour == "no_reply" and response is None
+    behaviour, response = _observed(case_by_name("num_predict_0"), {"done": True, "eval_count": 64})
+    assert behaviour == "no_reply"
+    assert response["eval_count"] > 1
+
+
+def test_the_count_budget_names_a_prompt_length_term():
+    bare = count_timeout_s([1024**3])
+    long = count_timeout_s([1024**3], prompt_tokens=118_000)
+    assert long - bare == pytest.approx(118_000 / PREFILL_TOKENS_PER_S)
+    assert count_timeout_s([1024**3], prompt_tokens=True) == bare
+
+    class Adapter:
+        def tag_size(self, _model, _device):
+            return 1024**3
+
+    interleaved = {
+        "procedure": "interleaved",
+        "arms": [{"engine": "ollama", "model": "qwen3:8b", "device": "5090"}],
+        "dataset": {"target_tokens": 6000},
+    }
+    assert roster_timeout(Adapter(), interleaved) == pytest.approx(bare + 1.0)
+    fill = {
+        "procedure": "fill-card",
+        "models": [{"model": "qwen3:8b"}],
+        "confirm_prompt_fraction": 0.5,
+        "max_ctx": 12_000,
+    }
+    assert roster_timeout(Adapter(), fill) == pytest.approx(bare + 1.0)

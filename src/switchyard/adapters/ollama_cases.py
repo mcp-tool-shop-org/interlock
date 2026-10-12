@@ -55,25 +55,25 @@ CASES: tuple[Case, ...] = (
         "num_predict_0",
         "POST",
         "/api/generate",
-        _generate({"num_predict": 0, "temperature": 0}),
+        _generate({"num_predict": 0, "temperature": 0, "num_ctx": 64}, shift=False),
         "no_reply",
-        frozenset({"num_predict"}),
+        frozenset({"num_predict", "num_ctx", "shift"}),
     ),
     Case(
         "num_predict_null",
         "POST",
         "/api/generate",
-        _generate({"num_predict": None, "temperature": 0}),
+        _generate({"num_predict": None, "temperature": 0, "num_ctx": 64}, shift=False),
         "no_reply",
-        frozenset({"num_predict"}),
+        frozenset({"num_predict", "num_ctx", "shift"}),
     ),
     Case(
         "num_predict_missing",
         "POST",
         "/api/generate",
-        _generate({"temperature": 0}),
+        _generate({"temperature": 0, "num_ctx": 64}, shift=False),
         "no_reply",
-        frozenset({"num_predict"}),
+        frozenset({"num_predict", "num_ctx", "shift"}),
     ),
     Case(
         "raw_true",
@@ -164,29 +164,36 @@ def covered_parameters() -> frozenset[str]:
 
 
 def sent_parameters() -> frozenset[str]:
-    """Every option, body flag, and path the Ollama adapter can put on the wire."""
+    """Every option, body flag, and path the Ollama adapter can put on the wire.
 
-    request = StepRequest(
-        "s",
-        "generate",
-        MODEL,
-        "5090",
-        "ollama",
-        {
-            "num_predict": 1,
-            "temperature": 0,
-            "num_ctx": 2048,
-            "keep_alive": "5m",
-            "prompt": SHORT_PROMPT,
-            "shift": False,
-            "truncate": False,
-            "thinking_level": "off",
-        },
-    )
-    body = generate_body(request)
-    names = set(body["options"])
-    names.update(key for key in ("stream", "keep_alive", "shift", "truncate", "think") if key in body)
-    names.update({"raw", "truncate", "companion"})
+    One body per settings branch. An option that only one branch adds still
+    needs a fixture.
+    """
+
+    def names_of(settings: dict, **extra) -> set[str]:
+        request = StepRequest("s", "generate", MODEL, "5090", "ollama", settings)
+        body = generate_body(request)
+        body.update(extra)
+        found = set(body.get("options") or {})
+        found.update(key for key in body if key not in {"model", "prompt", "options"})
+        return found
+
+    base = {
+        "num_predict": 1,
+        "temperature": 0,
+        "num_ctx": 2048,
+        "keep_alive": "5m",
+        "prompt": SHORT_PROMPT,
+    }
+    names: set[str] = set()
+    names.update(names_of({**base, "thinking_level": "off"}))
+    names.update(names_of({**base, "thinking_level": "on"}))
+    names.update(names_of({**base, "shift": False}))
+    names.update(names_of({**base, "truncate": False}))
+    names.update(names_of(dict(base)))
+    names.update(names_of(dict(base), raw=True, truncate=False))
+    names.update(names_of(dict(base), companion="start"))
+    names.update({"stream", "companion"})
     names.update({"/api/ps", "/api/show", "/api/tags", "/api/version"})
     return frozenset(names)
 

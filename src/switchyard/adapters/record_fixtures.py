@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import http.client
 import json
+import time
 from pathlib import Path
 from urllib.parse import urlsplit
 
 from switchyard.adapters.base import AdapterError
 from switchyard.adapters.ollama import refuse_cloud
 from switchyard.adapters.ollama_cases import CASES, Case, fixture_document, request_body
+from switchyard.guards import GuardError, require_card_empty, require_grant, require_heartbeat
 from switchyard.harness.fill import MEMORY_ARGV, parse_mib
 
 RECORD_TIMEOUT_S = 15.0
@@ -103,20 +105,42 @@ def http_exchange(method: str, url: str, body: dict | None, timeout: float):
 
 
 def _observed(case: Case, payload) -> tuple[str, dict | None]:
-    """What this call did. A timeout is ``no_reply`` and is not relabelled."""
+    """What this call did.
+
+    A timeout is ``no_reply`` with no body. A catalogued no-limit generate that
+    answers inside the timeout stays ``no_reply``, so a fake still refuses it,
+    and the reply is kept so ``eval_count`` is on the fixture.
+    """
 
     if payload is None:
         return "no_reply", None
     if case.behaviour == "no_reply":
-        # The dangerous generate answered inside the timeout. Keep the answer.
-        return "reply", payload
-    if payload.get("error"):
+        return "no_reply", payload if isinstance(payload, dict) else None
+    if isinstance(payload, dict) and payload.get("error"):
         return "error", payload
-    return "reply", payload
+    return "reply", payload if isinstance(payload, dict) else None
 
 
 def _unload_body(model: str) -> dict:
     return {"model": model, "prompt": "", "stream": False, "keep_alive": 0}
+
+
+def _guards(grant: str | None, heartbeat: Path, now: float) -> None:
+    """Grant and a fresh heartbeat. Neither call touches Ollama."""
+
+    try:
+        require_grant(grant, uses_5090=True)
+        require_heartbeat(heartbeat, now)
+    except GuardError as exc:
+        raise RecordError(str(exc)) from exc
+
+
+def _require_empty(models) -> None:
+    loaded = models if isinstance(models, list) else ["unreadable"]
+    try:
+        require_card_empty(loaded)
+    except GuardError as exc:
+        raise RecordError(str(exc)) from exc
 
 
 def record_fixtures(
@@ -129,21 +153,27 @@ def record_fixtures(
     today: str,
     transport,
     card_mib,
+    grant: str | None,
+    heartbeat: Path,
+    now: float,
 ) -> list[Path]:
     """Write one JSON file per case under ``out_dir/<ollama-version>/``.
 
     ``transport(method, url, body, timeout)`` returns a dict, or None when the
-    call does not answer. ``card_mib()`` is the card reading in MiB.
+    call does not answer. ``card_mib()`` is the card reading in MiB. The grant
+    and the heartbeat are checked before any request. The first request is the
+    empty-card probe.
     """
 
-    refuse_model(model)
     if timeout <= 0:
         raise RecordError("timeout must be a positive number of seconds")
+    _guards(grant, heartbeat, now)
+    refuse_model(model)
     host = host.rstrip("/")
-    idle = card_mib()
+    refuse_unless_baseline([], card_mib(), ceiling=ceiling)
     ps = transport("GET", f"{host}/api/ps", None, timeout)
     models = ps.get("models") if isinstance(ps, dict) else None
-    refuse_unless_baseline(models if isinstance(models, list) else ["unreadable"], idle, ceiling=ceiling)
+    _require_empty(models)
 
     version_payload = transport("GET", f"{host}/api/version", None, timeout)
     version = version_payload.get("version") if isinstance(version_payload, dict) else None
@@ -158,12 +188,10 @@ def record_fixtures(
     written: dict[str, Path] = {}
 
     def capture(case: Case) -> None:
+        started = time.perf_counter()
         payload = transport(case.method, f"{host}{case.path}", request_body(case, model), timeout)
+        elapsed = time.perf_counter() - started
         behaviour, response = _observed(case, payload)
-        # A catalogued no_reply that timed out stays no_reply even if a later
-        # field would have called it an error.
-        if payload is None:
-            behaviour, response = "no_reply", None
         document = fixture_document(
             case,
             model=model,
@@ -173,14 +201,17 @@ def record_fixtures(
             behaviour=behaviour,
             response=response,
         )
+        if case.name == "num_predict_1":
+            document["cold_load_s"] = round(elapsed, 3)
         path = folder / f"{case.name}.json"
         path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8", newline="\n")
         written[case.name] = path
 
     def baseline_again() -> None:
+        refuse_unless_baseline([], card_mib(), ceiling=ceiling)
         again = transport("GET", f"{host}/api/ps", None, timeout)
         loaded = again.get("models") if isinstance(again, dict) else ["unreadable"]
-        refuse_unless_baseline(loaded if isinstance(loaded, list) else ["unreadable"], card_mib(), ceiling=ceiling)
+        _require_empty(loaded)
 
     def unload() -> None:
         payload = transport("POST", f"{host}/api/generate", _unload_body(model), timeout)
