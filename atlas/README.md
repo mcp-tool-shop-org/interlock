@@ -1,16 +1,16 @@
 # interlock: how it works
 
-Mapped at 2026-10-13 from commit 7c1508b by Atlas 1.24.0.
+Mapped at 2026-10-13 from commit d899ac0 by Atlas 1.24.0.
 
 ## What this is
 
 interlock routes each job to a model, engine and device from a receipt-backed table. (written by a person)
 
-7 parts, mostly Python (84 files). Work enters through 3 doors; the busiest is CI, which reaches 2 parts. It publishes to PyPI. People run interlock.
+7 parts, mostly Python (86 files). Work enters through 3 doors; the busiest is CI, which reaches 2 parts. It publishes to PyPI. People run interlock.
 
-## What changed since 2026-10-12 (3cdd4ca)
+## What changed since 2026-10-13 (7c1508b)
 
-Nothing structural changed since 2026-10-12; 1 file removed and 5 changed content.
+Nothing structural changed since 2026-10-13; 8 files added and 11 changed content.
 
 ## What comes in
 
@@ -41,10 +41,8 @@ CI writes nothing this map can see.
 ## What tends to change together
 
 - **src/switchyard/adapters/openvino.py** and **tests/test_openvino_adapter.py** changed together in 17 of 22 commits.
-- **src/switchyard/harness/fill.py** and **tests/test_fill_card_live.py** changed together in 5 of 7 commits.
 - **src/switchyard/harness/receipts.py** and **src/switchyard/receipt.py** changed together in 7 of 13 commits.
-- **src/switchyard/harness/runner.py** and **tests/test_harness.py** changed together in 14 of 27 commits.
-- **src/switchyard/adapters/ollama.py** and **tests/test_fill_card_live.py** changed together in 4 of 8 commits.
+- **src/switchyard/harness/fill.py** and **tests/test_fill_card_live.py** changed together in 5 of 10 commits.
 
 1 file changed together with its own test, as expected.
 
@@ -82,7 +80,7 @@ Read those in order to follow one run of interlock end to end. This path follows
 
 - 1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.
 - 3 writes and 4 reads use paths built at run time and are not named here.
-- 12 writes and 37 reads go to a path their caller passes, not to this repository.
+- 12 writes and 38 reads go to a path their caller passes, not to this repository.
 - 3 reads go to the directory the command is run in (receipts/), not to this repository.
 - 84 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 81 more.
 - Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window.

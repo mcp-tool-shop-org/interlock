@@ -20,22 +20,22 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 0,
-      "changed": 5,
+      "added": 8,
+      "changed": 11,
       "moved": 0,
       "parts": 4,
-      "removed": 1
+      "removed": 0
     },
     "items": [
       {
         "kind": "counts",
-        "sentence": "Nothing structural changed since 2026-10-12; 1 file removed and 5 changed content.",
+        "sentence": "Nothing structural changed since 2026-10-13; 8 files added and 11 changed content.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "3cdd4cae332185bbf7addf53a04ea72f3dcd72c5",
-      "generatedAt": "2026-10-12T23:17:58.951Z"
+      "commit": "7c1508b5474f1ed476bc97767c995a02cd4ddb90",
+      "generatedAt": "2026-10-13T00:20:55.054Z"
     },
     "unchanged": true
   },
@@ -56,21 +56,6 @@
       "shared": 17
     },
     {
-      "a": "src/switchyard/harness/fill.py",
-      "b": "tests/test_fill_card_live.py",
-      "either": 7,
-      "partLabels": [
-        null,
-        "tests"
-      ],
-      "parts": [
-        null,
-        "tests"
-      ],
-      "relation": "unassigned",
-      "shared": 5
-    },
-    {
       "a": "src/switchyard/harness/receipts.py",
       "b": "src/switchyard/receipt.py",
       "either": 13,
@@ -86,24 +71,9 @@
       "shared": 7
     },
     {
-      "a": "src/switchyard/harness/runner.py",
-      "b": "tests/test_harness.py",
-      "either": 27,
-      "partLabels": [
-        null,
-        "tests"
-      ],
-      "parts": [
-        null,
-        "tests"
-      ],
-      "relation": "unassigned",
-      "shared": 14
-    },
-    {
-      "a": "src/switchyard/adapters/ollama.py",
+      "a": "src/switchyard/harness/fill.py",
       "b": "tests/test_fill_card_live.py",
-      "either": 8,
+      "either": 10,
       "partLabels": [
         null,
         "tests"
@@ -113,7 +83,7 @@
         "tests"
       ],
       "relation": "unassigned",
-      "shared": 4
+      "shared": 5
     }
   ],
   "changesTogetherNote": [
@@ -122,9 +92,9 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 8 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 1,
-  "commit": "7c1508b5474f1ed476bc97767c995a02cd4ddb90",
+  "commit": "d899ac0a629d5ffae13f602eae3aef4138ba802f",
   "defaultBranch": "main",
-  "derived": "7 parts, mostly Python (84 files). Work enters through 3 doors; the busiest is CI, which reaches 2 parts. It publishes to PyPI. People run interlock.",
+  "derived": "7 parts, mostly Python (86 files). Work enters through 3 doors; the busiest is CI, which reaches 2 parts. It publishes to PyPI. People run interlock.",
   "doors": [
     {
       "checks": [],
@@ -139,7 +109,7 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 33
+          "files": 35
         },
         {
           "boundary": "src",
@@ -225,11 +195,11 @@
   "edges": [],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-13T00:20:55.054Z",
+  "generatedAt": "2026-10-13T08:48:24.770Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "3 writes and 4 reads use paths built at run time and are not named here.",
-    "12 writes and 37 reads go to a path their caller passes, not to this repository.",
+    "12 writes and 38 reads go to a path their caller passes, not to this repository.",
     "3 reads go to the directory the command is run in (receipts/), not to this repository.",
     "84 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 81 more.",
     "Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window."
@@ -257,9 +227,9 @@
   "startReason": "This path follows interlock (a command people run) from its entry, since CI runs only tests.",
   "summary": "interlock routes each job to a model, engine and device from a receipt-backed table.",
   "summaryFrom": "person",
-  "testFiles": 51,
+  "testFiles": 58,
   "testedBy": {
-    "src": 30
+    "src": 32
   },
   "unnamedWrites": 3,
   "unread": [],

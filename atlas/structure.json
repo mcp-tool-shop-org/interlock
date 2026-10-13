@@ -186,7 +186,11 @@
           "path": "experiments/e4b/spec.yaml"
         },
         {
-          "hash": "d86bc031bbbbe9e308277934653e3ccb0ceccfb6dcdf8a730731e7b9f6c00ec2",
+          "hash": "7db1f75310c55126c7be129012d582470f4280e59acd486ac9d300be96c09af8",
+          "path": "experiments/e5-smoke/spec.yaml"
+        },
+        {
+          "hash": "c7bb80815807b90b14d58e268cc9d22a198d3f9c22230578456329d76a9cf329",
           "path": "experiments/e5/spec.yaml"
         }
       ],
@@ -221,7 +225,7 @@
           "path": ".python-version"
         },
         {
-          "hash": "9fb05e247340bda4d5e9356b1bb056447daf660ff9aae9ffcff1a479c1692e0f",
+          "hash": "820e509b636caebd3c2dad27677ef2fff58a30ee21e2d62e14eb65b05a7cc26b",
           "path": "CHANGELOG.md"
         },
         {
@@ -229,7 +233,7 @@
           "path": "LICENSE"
         },
         {
-          "hash": "7677cb46a0971032e4e7c11f5b280334d0885097c3c0d351742be70f8e84ae5a",
+          "hash": "c37bbaaaa1e3f55b32f5b8dc27aab0db365cfeb4bffac81a0846b4faae3820f9",
           "path": "README.md"
         },
         {
@@ -3782,80 +3786,88 @@
         },
         {
           "exports": [
+            "baseline_is_spilling",
             "fit_prompt",
             "fit_prompt_words",
+            "floor_confirm_shared",
             "is_spill",
             "over_margin",
-            "search"
+            "search",
+            "shared_deltas"
           ],
           "failurePaths": [
             {
               "in": "fit_prompt",
               "kind": "raise",
-              "line": 104
+              "line": 107
             },
             {
               "in": "fit_prompt",
               "kind": "raise",
-              "line": 106
+              "line": 109
             },
             {
               "in": "fit_prompt",
               "kind": "raise",
-              "line": 111
+              "line": 114
             },
             {
               "in": "_as_count",
               "kind": "raise",
-              "line": 152
+              "line": 155
             },
             {
               "in": "fit_prompt_words",
               "kind": "raise",
-              "line": 176
+              "line": 179
             },
             {
               "in": "fit_prompt_words",
               "kind": "raise",
-              "line": 178
+              "line": 181
             },
             {
               "in": "fit_prompt_words",
               "kind": "raise",
-              "line": 182
+              "line": 185
             },
             {
               "in": "fit_prompt_words",
               "kind": "raise",
-              "line": 199
+              "line": 202
             },
             {
               "in": "search",
               "kind": "raise",
-              "line": 285
+              "line": 327
             },
             {
               "in": "search",
               "kind": "raise",
-              "line": 287
+              "line": 329
             },
             {
               "in": "search",
               "kind": "raise",
-              "line": 289
+              "line": 331
             },
             {
               "in": "search",
               "kind": "raise",
-              "line": 291
+              "line": 333
             },
             {
               "in": "measure",
               "kind": "raise",
-              "line": 298
+              "line": 340
+            },
+            {
+              "in": "search",
+              "kind": "raise",
+              "line": 349
             }
           ],
-          "hash": "220b68a71a2986218cf30db248fbdb20875f4edb1fd16a1b58b84797d260a0b6",
+          "hash": "dd361f1a295c99f80d8d0356cc95da519b73db1d920f649f166fb45897e172a8",
           "path": "src/interlock/harness/e5.py"
         },
         {
@@ -3905,272 +3917,393 @@
         {
           "exports": [
             "adapter_usage",
+            "config_facts",
             "driver_cuda",
             "facts_from_log",
             "first_line",
+            "format_preflight",
             "ggml_cuda_sha256",
+            "install_relative",
+            "judge_preflight",
+            "listener_exe",
+            "listener_log",
+            "live_run",
+            "load_line_facts",
+            "log_redirect",
             "match_adapter_instance",
             "parse_counter_text",
             "parse_mib",
+            "pin_failure",
             "quiet_fill_seams",
             "real_fill_seams",
+            "resolve_fill_paths",
             "run_fill_card",
             "runner_pid",
             "window_delta"
           ],
           "failurePaths": [
             {
-              "in": "sample",
+              "in": "preflight",
+              "kind": "raise",
+              "line": 286
+            },
+            {
+              "in": "preflight",
+              "kind": "raise",
+              "line": 289
+            },
+            {
+              "in": "preflight",
               "kind": "except",
-              "line": 249
+              "line": 298
+            },
+            {
+              "in": "preflight",
+              "kind": "raise",
+              "line": 299
             },
             {
               "in": "sample",
               "kind": "except",
-              "line": 265
+              "line": 362
+            },
+            {
+              "in": "sample",
+              "kind": "except",
+              "line": 378
             },
             {
               "in": "parse_mib",
               "kind": "except",
-              "line": 314
+              "line": 427
             },
             {
               "in": "parse_counter_text",
               "kind": "except",
-              "line": 341
+              "line": 454
+            },
+            {
+              "in": "listener_log",
+              "kind": "except",
+              "line": 793
             },
             {
               "in": "ggml_cuda_sha256",
               "kind": "except",
-              "line": 507
+              "line": 811
             },
             {
               "in": "_capture",
               "kind": "except",
-              "line": 515
+              "line": 819
             },
             {
               "in": "_read_configured_log",
               "kind": "except",
-              "line": 537
+              "line": 841
+            },
+            {
+              "in": "listener_exe",
+              "kind": "except",
+              "line": 874
+            },
+            {
+              "in": "listener_exe",
+              "kind": "except",
+              "line": 881
+            },
+            {
+              "in": "_read_text",
+              "kind": "except",
+              "line": 925
+            },
+            {
+              "in": "judge_preflight",
+              "kind": "raise",
+              "line": 946
+            },
+            {
+              "in": "judge_preflight",
+              "kind": "raise",
+              "line": 949
+            },
+            {
+              "in": "judge_preflight",
+              "kind": "raise",
+              "line": 954
+            },
+            {
+              "in": "judge_preflight",
+              "kind": "raise",
+              "line": 956
+            },
+            {
+              "in": "judge_preflight",
+              "kind": "raise",
+              "line": 959
+            },
+            {
+              "in": "judge_preflight",
+              "kind": "raise",
+              "line": 961
+            },
+            {
+              "in": "judge_preflight",
+              "kind": "raise",
+              "line": 963
+            },
+            {
+              "in": "judge_preflight",
+              "kind": "raise",
+              "line": 965
+            },
+            {
+              "in": "judge_preflight",
+              "kind": "raise",
+              "line": 969
+            },
+            {
+              "in": "judge_preflight",
+              "kind": "raise",
+              "line": 985
             },
             {
               "in": "_optional_reader",
               "kind": "except",
-              "line": 574
+              "line": 1028
             },
             {
               "in": "_window_readings",
               "kind": "except",
-              "line": 583
+              "line": 1037
             },
             {
               "in": "_ollama_version",
               "kind": "except",
-              "line": 595
+              "line": 1049
             },
             {
               "in": "_refuse_confirm_num_predict",
               "kind": "raise",
-              "line": 609
+              "line": 1063
             },
             {
               "in": "_ollama",
               "kind": "except",
-              "line": 642
+              "line": 1096
             },
             {
               "in": "_ollama",
               "kind": "raise",
-              "line": 643
+              "line": 1097
             },
             {
               "in": "_settled_card",
               "kind": "except",
-              "line": 730
+              "line": 1184
             },
             {
               "in": "_resume_fill",
               "kind": "except",
-              "line": 832
+              "line": 1286
             },
             {
               "in": "run_fill_card",
               "kind": "except",
-              "line": 938
+              "line": 1376
             },
             {
               "in": "run_fill_card",
               "kind": "raise",
-              "line": 967
+              "line": 1393
+            },
+            {
+              "in": "run_fill_card",
+              "kind": "except",
+              "line": 1441
+            },
+            {
+              "in": "run_fill_card",
+              "kind": "raise",
+              "line": 1470
             },
             {
               "in": "_unload",
               "kind": "except",
-              "line": 983
+              "line": 1486
             },
             {
               "in": "_unload",
               "kind": "raise",
-              "line": 988
+              "line": 1491
             },
             {
               "in": "_unload",
               "kind": "except",
-              "line": 989
+              "line": 1492
             },
             {
               "in": "_unload",
               "kind": "raise",
-              "line": 992
+              "line": 1495
             },
             {
               "in": "_remember",
               "kind": "except",
-              "line": 1063
+              "line": 1635
             },
             {
               "in": "_measure_model",
               "kind": "except",
-              "line": 1115
+              "line": 1687
             },
             {
               "in": "_measure_model",
               "kind": "except",
-              "line": 1163
+              "line": 1735
             },
             {
               "in": "stop_if_unload_timed_out",
               "kind": "raise",
-              "line": 1196
+              "line": 1768
             },
             {
               "in": "count",
               "kind": "except",
-              "line": 1212
+              "line": 1784
             },
             {
               "in": "count",
               "kind": "raise",
-              "line": 1214
+              "line": 1786
             },
             {
               "in": "count",
               "kind": "raise",
-              "line": 1216
+              "line": 1788
             },
             {
               "in": "count",
               "kind": "raise",
-              "line": 1219
+              "line": 1791
             },
             {
               "in": "count",
               "kind": "raise",
-              "line": 1220
+              "line": 1792
             },
             {
               "in": "count",
               "kind": "raise",
-              "line": 1222
+              "line": 1794
+            },
+            {
+              "in": "_gate_load_lines",
+              "kind": "raise",
+              "line": 1817
             },
             {
               "in": "observe",
               "kind": "except",
-              "line": 1232
+              "line": 1835
             },
             {
               "in": "observe",
               "kind": "except",
-              "line": 1235
+              "line": 1838
             },
             {
               "in": "observe",
               "kind": "raise",
-              "line": 1241
+              "line": 1844
             },
             {
               "in": "observe",
               "kind": "except",
-              "line": 1247
+              "line": 1850
             },
             {
               "in": "observe",
               "kind": "except",
-              "line": 1250
+              "line": 1853
             },
             {
               "in": "observe",
               "kind": "raise",
-              "line": 1256
+              "line": 1859
             },
             {
               "in": "observe",
               "kind": "raise",
-              "line": 1261
+              "line": 1864
             },
             {
               "in": "observe",
               "kind": "except",
-              "line": 1282
+              "line": 1889
             },
             {
               "in": "observe",
               "kind": "raise",
-              "line": 1288
+              "line": 1895
             },
             {
               "in": "observe",
               "kind": "raise",
-              "line": 1297
+              "line": 1905
             },
             {
               "in": "probe",
               "kind": "raise",
-              "line": 1325
+              "line": 1933
             },
             {
               "in": "probe",
               "kind": "raise",
-              "line": 1333
+              "line": 1941
             },
             {
               "in": "probe",
               "kind": "raise",
-              "line": 1336
+              "line": 1944
             },
             {
               "in": "probe",
               "kind": "except",
-              "line": 1344
+              "line": 1952
             },
             {
               "in": "probe",
               "kind": "raise",
-              "line": 1352
+              "line": 1960
             },
             {
               "in": "_measure_model",
               "kind": "except",
-              "line": 1369
+              "line": 1977
             },
             {
               "in": "_measure_model",
               "kind": "except",
-              "line": 1380
+              "line": 1988
             },
             {
               "in": "_measure_model",
               "kind": "except",
-              "line": 1402
+              "line": 2010
             },
             {
               "in": "_measure_model",
               "kind": "except",
-              "line": 1426
+              "line": 2034
+            },
+            {
+              "in": "_measure_model",
+              "kind": "except",
+              "line": 2053
             }
           ],
-          "hash": "91e862d238c540daa65ffa71a6cb4149f2c75231a13c7e208063c14aed39759d",
+          "hash": "02d88d13d64ec0d82cddec945b8210d9780aeb45ae1508d092f5bcbaaa0ef66a",
           "importOrder": [
             "src/interlock/adapters/base.py",
             "src/interlock/ollama_supervisor.py",
@@ -4182,6 +4315,8 @@
             "src/interlock/harness/e5.py",
             "src/interlock/harness/receipts.py",
             "src/interlock/receipt.py",
+            "src/interlock/harness/e4b.py",
+            "src/interlock/harness/ollama_serve.py",
             "src/interlock/harness/runner.py"
           ],
           "importsFiles": [
@@ -4191,7 +4326,9 @@
             "src/interlock/families.py",
             "src/interlock/guards.py",
             "src/interlock/harness/count_budget.py",
+            "src/interlock/harness/e4b.py",
             "src/interlock/harness/e5.py",
+            "src/interlock/harness/ollama_serve.py",
             "src/interlock/harness/receipts.py",
             "src/interlock/harness/runner.py",
             "src/interlock/ollama_supervisor.py",
@@ -4854,127 +4991,102 @@
             {
               "in": "run_interleaved",
               "kind": "raise",
-              "line": 303
+              "line": 324
             },
             {
               "in": "_halt",
               "kind": "except",
-              "line": 591
+              "line": 612
             },
             {
               "in": "_end_block",
               "kind": "raise",
-              "line": 677
+              "line": 698
             },
             {
               "in": "_resume_after_repair",
               "kind": "except",
-              "line": 700
+              "line": 721
             },
             {
               "in": "_resume_after_repair",
               "kind": "raise",
-              "line": 706
+              "line": 727
             },
             {
               "in": "_resume_after_repair",
               "kind": "raise",
-              "line": 713
+              "line": 734
             },
             {
               "in": "run_interleaved",
               "kind": "except",
-              "line": 787
+              "line": 808
             },
             {
               "in": "run_interleaved",
               "kind": "except",
-              "line": 828
+              "line": 849
             },
             {
               "in": "run_interleaved",
               "kind": "raise",
-              "line": 848
+              "line": 869
             },
             {
               "in": "run_interleaved",
               "kind": "raise",
-              "line": 878
+              "line": 899
             },
             {
               "in": "run_interleaved",
               "kind": "raise",
-              "line": 907
+              "line": 928
             },
             {
               "in": "run_interleaved",
               "kind": "except",
-              "line": 920
+              "line": 941
             },
             {
               "in": "run_interleaved",
               "kind": "raise",
-              "line": 924
+              "line": 945
             },
             {
               "in": "run_interleaved",
               "kind": "raise",
-              "line": 960
+              "line": 981
             },
             {
               "in": "run_interleaved",
               "kind": "except",
-              "line": 988
+              "line": 1009
             },
             {
               "in": "run_interleaved",
               "kind": "raise",
-              "line": 994
+              "line": 1015
             },
             {
               "in": "_cpu_sample",
               "kind": "except",
-              "line": 1103
+              "line": 1124
             },
             {
               "in": "_summary",
               "kind": "raise",
-              "line": 1383
+              "line": 1404
             },
             {
               "in": "_session",
               "kind": "raise",
-              "line": 1579
+              "line": 1600
             },
             {
               "in": "_dataset_prompt",
               "kind": "raise",
-              "line": 1660
-            },
-            {
-              "in": "_dataset_prompt",
-              "kind": "raise",
-              "line": 1683
-            },
-            {
-              "in": "_dataset_prompt",
-              "kind": "except",
-              "line": 1699
-            },
-            {
-              "in": "_dataset_prompt",
-              "kind": "raise",
-              "line": 1700
-            },
-            {
-              "in": "_dataset_prompt",
-              "kind": "except",
-              "line": 1701
-            },
-            {
-              "in": "_dataset_prompt",
-              "kind": "raise",
-              "line": 1703
+              "line": 1681
             },
             {
               "in": "_dataset_prompt",
@@ -4982,62 +5094,87 @@
               "line": 1704
             },
             {
+              "in": "_dataset_prompt",
+              "kind": "except",
+              "line": 1720
+            },
+            {
+              "in": "_dataset_prompt",
+              "kind": "raise",
+              "line": 1721
+            },
+            {
+              "in": "_dataset_prompt",
+              "kind": "except",
+              "line": 1722
+            },
+            {
+              "in": "_dataset_prompt",
+              "kind": "raise",
+              "line": 1724
+            },
+            {
+              "in": "_dataset_prompt",
+              "kind": "raise",
+              "line": 1725
+            },
+            {
               "in": "_cache_dirs",
               "kind": "raise",
-              "line": 1771
+              "line": 1792
             },
             {
               "in": "onexc",
               "kind": "except",
-              "line": 1796
+              "line": 1817
             },
             {
               "in": "onexc",
               "kind": "except",
-              "line": 1799
+              "line": 1820
             },
             {
               "in": "_check_run_id",
               "kind": "raise",
-              "line": 1828
+              "line": 1849
             },
             {
               "in": "_refuse_repo_interpreter",
               "kind": "except",
-              "line": 1907
+              "line": 1928
             },
             {
               "in": "_refuse_repo_interpreter",
               "kind": "raise",
-              "line": 1909
+              "line": 1930
             },
             {
               "in": "_card_probe",
               "kind": "raise",
-              "line": 1933
+              "line": 1954
             },
             {
               "in": "_start_state",
               "kind": "except",
-              "line": 1957
+              "line": 1978
             },
             {
               "in": "run_spec",
               "kind": "raise",
-              "line": 2037
+              "line": 2058
             },
             {
               "in": "run_spec",
               "kind": "raise",
-              "line": 2044
+              "line": 2065
             },
             {
               "in": "run_spec",
               "kind": "raise",
-              "line": 2089
+              "line": 2110
             }
           ],
-          "hash": "940e1933c6b8750142e2477b7ef43169dd0b463aae6aa13212206b80764f8aa4",
+          "hash": "fe8ddb89c294f48f04ef9f602d93ecd918e485b87e1b9f5414e0ed6fbab30d5a",
           "importsFiles": [
             "src/interlock/adapters/base.py",
             "src/interlock/adapters/offrig_calibrate.py",
@@ -5119,7 +5256,7 @@
                 },
                 {
                   "branch": "order == \"blocked\" and arm_ids is None",
-                  "line": 1299,
+                  "line": 1320,
                   "name": "schedule",
                   "target": {
                     "file": "src/interlock/harness/timing.py"
@@ -5128,7 +5265,7 @@
                 },
                 {
                   "branch": "order == \"aba\"",
-                  "line": 1264,
+                  "line": 1285,
                   "name": "schedule_aba",
                   "target": {
                     "file": "src/interlock/harness/timing.py"
@@ -5136,7 +5273,7 @@
                   "via": "_slots"
                 },
                 {
-                  "line": 1266,
+                  "line": 1287,
                   "name": "schedule",
                   "target": {
                     "file": "src/interlock/harness/timing.py"
@@ -5144,14 +5281,14 @@
                   "via": "_slots"
                 },
                 {
-                  "line": 224,
+                  "line": 245,
                   "name": "plan_argv",
                   "target": {
                     "file": "src/interlock/adapters/offrig_calibrate.py"
                   }
                 },
                 {
-                  "line": 240,
+                  "line": 261,
                   "name": "restart_policy_lines",
                   "target": {
                     "file": "src/interlock/ollama_supervisor.py"
@@ -5166,26 +5303,26 @@
             {
               "calls": [
                 {
-                  "line": 300,
+                  "line": 321,
                   "name": "require_unmodified",
                   "target": {
                     "file": "src/interlock/harness/lock.py"
                   }
                 },
                 {
-                  "line": 301,
+                  "line": 322,
                   "name": "load_spec",
                   "target": {
                     "file": "src/interlock/harness/spec.py"
                   }
                 },
                 {
-                  "line": 304,
+                  "line": 325,
                   "name": "resolve",
                   "target": null
                 },
                 {
-                  "line": 1849,
+                  "line": 1870,
                   "name": "assess_step",
                   "target": {
                     "file": "src/interlock/guards.py"
@@ -5193,7 +5330,7 @@
                   "via": "_guard_flags"
                 },
                 {
-                  "line": 308,
+                  "line": 329,
                   "name": "warmup_policy",
                   "target": {
                     "file": "src/interlock/harness/steady.py"
@@ -5201,7 +5338,7 @@
                 },
                 {
                   "branch": "order == \"aba\"",
-                  "line": 1264,
+                  "line": 1285,
                   "name": "schedule_aba",
                   "target": {
                     "file": "src/interlock/harness/timing.py"
@@ -5209,7 +5346,7 @@
                   "via": "_slots"
                 },
                 {
-                  "line": 1266,
+                  "line": 1287,
                   "name": "schedule",
                   "target": {
                     "file": "src/interlock/harness/timing.py"
@@ -5217,35 +5354,35 @@
                   "via": "_slots"
                 },
                 {
-                  "line": 317,
+                  "line": 338,
                   "name": "SlotStream",
                   "target": {
                     "file": "src/interlock/harness/steady.py"
                   }
                 },
                 {
-                  "line": 322,
+                  "line": 343,
                   "name": "BlockPlan",
                   "target": {
                     "file": "src/interlock/harness/steady.py"
                   }
                 },
                 {
-                  "line": 330,
+                  "line": 351,
                   "name": "UntilSteady",
                   "target": {
                     "file": "src/interlock/harness/steady.py"
                   }
                 },
                 {
-                  "line": 330,
+                  "line": 351,
                   "name": "SlotStream",
                   "target": {
                     "file": "src/interlock/harness/steady.py"
                   }
                 },
                 {
-                  "line": 353,
+                  "line": 374,
                   "name": "environment",
                   "target": {
                     "file": "src/interlock/harness/receipts.py"
@@ -5253,7 +5390,7 @@
                 },
                 {
                   "branch": "path.is_dir() and any(path.iterdir())",
-                  "line": 1771,
+                  "line": 1792,
                   "name": "GuardError",
                   "target": {
                     "file": "src/interlock/guards.py"
@@ -5261,60 +5398,60 @@
                   "via": "_cache_dirs"
                 },
                 {
-                  "line": 361,
+                  "line": 382,
                   "name": "WatchHooks",
                   "target": {
                     "file": "src/interlock/harness/watch.py"
                   }
                 },
                 {
-                  "line": 362,
+                  "line": 383,
                   "name": "CompileTracker",
                   "target": {
                     "file": "src/interlock/adapters/base.py"
                   }
                 },
                 {
-                  "line": 366,
+                  "line": 387,
                   "name": "RunMarker",
                   "target": {
                     "file": "src/interlock/harness/marker.py"
                   }
                 },
                 {
-                  "line": 370,
+                  "line": 391,
                   "name": "restart",
                   "target": null
                 },
                 {
-                  "line": 1955,
+                  "line": 1976,
                   "name": "state_sampler",
                   "target": null,
                   "via": "_start_state"
                 },
                 {
-                  "line": 373,
+                  "line": 394,
                   "name": "BuildGuard",
                   "target": {
                     "file": "src/interlock/harness/watch.py"
                   }
                 },
                 {
-                  "line": 375,
+                  "line": 396,
                   "name": "read_bytes",
                   "target": {
                     "file": "src/interlock/harness/watch.py"
                   }
                 },
                 {
-                  "line": 607,
+                  "line": 628,
                   "name": "RunWatch",
                   "target": {
                     "file": "src/interlock/harness/watch.py"
                   }
                 },
                 {
-                  "line": 613,
+                  "line": 634,
                   "name": "RAM_STOP_PCT",
                   "passed": true,
                   "target": {
@@ -5322,7 +5459,7 @@
                   }
                 },
                 {
-                  "line": 730,
+                  "line": 751,
                   "name": "start",
                   "receiver": "RunWatch",
                   "target": {
@@ -5330,7 +5467,7 @@
                   }
                 },
                 {
-                  "line": 741,
+                  "line": 762,
                   "name": "pop",
                   "receiver": "SlotStream",
                   "target": {
@@ -5347,7 +5484,7 @@
             {
               "calls": [
                 {
-                  "line": 1013,
+                  "line": 1034,
                   "name": "failure_kind",
                   "target": {
                     "file": "src/interlock/ollama_supervisor.py"
@@ -5362,7 +5499,7 @@
             {
               "calls": [
                 {
-                  "line": 1145,
+                  "line": 1166,
                   "name": "NativeBinaryRejected",
                   "passed": true,
                   "target": {
@@ -5378,7 +5515,7 @@
             {
               "calls": [
                 {
-                  "line": 1162,
+                  "line": 1183,
                   "name": "CompileRejected",
                   "passed": true,
                   "target": {
@@ -5386,7 +5523,7 @@
                   }
                 },
                 {
-                  "line": 1164,
+                  "line": 1185,
                   "name": "compile_rejected_error",
                   "target": {
                     "file": "src/interlock/adapters/base.py"
@@ -5401,12 +5538,12 @@
             {
               "calls": [
                 {
-                  "line": 1170,
+                  "line": 1191,
                   "name": "partition",
                   "target": null
                 },
                 {
-                  "line": 1170,
+                  "line": 1191,
                   "name": "COMPILER_MESSAGE_MARKER",
                   "passed": true,
                   "target": {
@@ -5422,13 +5559,13 @@
             {
               "calls": [
                 {
-                  "line": 1170,
+                  "line": 1191,
                   "name": "partition",
                   "target": null,
                   "via": "compiler_message"
                 },
                 {
-                  "line": 1170,
+                  "line": 1191,
                   "name": "COMPILER_MESSAGE_MARKER",
                   "passed": true,
                   "target": {
@@ -5446,7 +5583,7 @@
               "calls": [
                 {
                   "branch": "order == \"blocked\" and arm_ids is None",
-                  "line": 1299,
+                  "line": 1320,
                   "name": "schedule",
                   "target": {
                     "file": "src/interlock/harness/timing.py"
@@ -5455,14 +5592,14 @@
                 },
                 {
                   "branch": "order == \"aba\"",
-                  "line": 1264,
+                  "line": 1285,
                   "name": "schedule_aba",
                   "target": {
                     "file": "src/interlock/harness/timing.py"
                   }
                 },
                 {
-                  "line": 1266,
+                  "line": 1287,
                   "name": "schedule",
                   "target": {
                     "file": "src/interlock/harness/timing.py"
@@ -5478,7 +5615,7 @@
               "calls": [
                 {
                   "branch": "order == \"aba\"",
-                  "line": 1264,
+                  "line": 1285,
                   "name": "schedule_aba",
                   "target": {
                     "file": "src/interlock/harness/timing.py"
@@ -5486,7 +5623,7 @@
                   "via": "_slots"
                 },
                 {
-                  "line": 1266,
+                  "line": 1287,
                   "name": "schedule",
                   "target": {
                     "file": "src/interlock/harness/timing.py"
@@ -5502,7 +5639,7 @@
             {
               "calls": [
                 {
-                  "line": 1665,
+                  "line": 1686,
                   "name": "roster_timeout",
                   "target": {
                     "file": "src/interlock/harness/count_budget.py"
@@ -5510,7 +5647,7 @@
                   "via": "_dataset_prompt"
                 },
                 {
-                  "line": 1676,
+                  "line": 1697,
                   "name": "fit_prompt_words",
                   "target": {
                     "file": "src/interlock/harness/e5.py"
@@ -5518,26 +5655,26 @@
                   "via": "_dataset_prompt"
                 },
                 {
-                  "line": 1678,
+                  "line": 1699,
                   "name": "unload",
                   "target": null,
                   "via": "_dataset_prompt"
                 },
                 {
                   "branch": "cold_tokens != tokens",
-                  "line": 1682,
+                  "line": 1703,
                   "name": "unload",
                   "target": null,
                   "via": "_dataset_prompt"
                 },
                 {
-                  "line": 1690,
+                  "line": 1711,
                   "name": "unload",
                   "target": null,
                   "via": "_dataset_prompt"
                 },
                 {
-                  "line": 1696,
+                  "line": 1717,
                   "name": "fit_prompt",
                   "target": {
                     "file": "src/interlock/harness/e5.py"
@@ -5545,7 +5682,7 @@
                   "via": "_dataset_prompt"
                 },
                 {
-                  "line": 1325,
+                  "line": 1346,
                   "name": "StepRequest",
                   "target": {
                     "file": "src/interlock/adapters/base.py"
@@ -5561,14 +5698,14 @@
               "calls": [
                 {
                   "branch": "present and (len(set(present)) != 1 or len(present) != len(…",
-                  "line": 1383,
+                  "line": 1404,
                   "name": "TimingError",
                   "target": {
                     "file": "src/interlock/harness/timing.py"
                   }
                 },
                 {
-                  "line": 1385,
+                  "line": 1406,
                   "name": "summarize",
                   "target": {
                     "file": "src/interlock/harness/timing.py"
@@ -5583,14 +5720,14 @@
             {
               "calls": [
                 {
-                  "line": 1495,
+                  "line": 1516,
                   "name": "warmup_trace",
                   "target": {
                     "file": "src/interlock/harness/steady.py"
                   }
                 },
                 {
-                  "line": 1496,
+                  "line": 1517,
                   "name": "is_steady",
                   "target": null
                 }
@@ -5603,7 +5740,7 @@
             {
               "calls": [
                 {
-                  "line": 1525,
+                  "line": 1546,
                   "name": "aba_call",
                   "target": {
                     "file": "src/interlock/harness/timing.py"
@@ -5618,7 +5755,7 @@
             {
               "calls": [
                 {
-                  "line": 1665,
+                  "line": 1686,
                   "name": "roster_timeout",
                   "target": {
                     "file": "src/interlock/harness/count_budget.py"
@@ -5626,7 +5763,7 @@
                   "via": "_dataset_prompt"
                 },
                 {
-                  "line": 1676,
+                  "line": 1697,
                   "name": "fit_prompt_words",
                   "target": {
                     "file": "src/interlock/harness/e5.py"
@@ -5634,26 +5771,26 @@
                   "via": "_dataset_prompt"
                 },
                 {
-                  "line": 1678,
+                  "line": 1699,
                   "name": "unload",
                   "target": null,
                   "via": "_dataset_prompt"
                 },
                 {
                   "branch": "cold_tokens != tokens",
-                  "line": 1682,
+                  "line": 1703,
                   "name": "unload",
                   "target": null,
                   "via": "_dataset_prompt"
                 },
                 {
-                  "line": 1690,
+                  "line": 1711,
                   "name": "unload",
                   "target": null,
                   "via": "_dataset_prompt"
                 },
                 {
-                  "line": 1696,
+                  "line": 1717,
                   "name": "fit_prompt",
                   "target": {
                     "file": "src/interlock/harness/e5.py"
@@ -5661,7 +5798,7 @@
                   "via": "_dataset_prompt"
                 },
                 {
-                  "line": 1325,
+                  "line": 1346,
                   "name": "StepRequest",
                   "target": {
                     "file": "src/interlock/adapters/base.py"
@@ -5677,37 +5814,37 @@
             {
               "calls": [
                 {
-                  "line": 1665,
+                  "line": 1686,
                   "name": "roster_timeout",
                   "target": {
                     "file": "src/interlock/harness/count_budget.py"
                   }
                 },
                 {
-                  "line": 1676,
+                  "line": 1697,
                   "name": "fit_prompt_words",
                   "target": {
                     "file": "src/interlock/harness/e5.py"
                   }
                 },
                 {
-                  "line": 1678,
+                  "line": 1699,
                   "name": "unload",
                   "target": null
                 },
                 {
                   "branch": "cold_tokens != tokens",
-                  "line": 1682,
+                  "line": 1703,
                   "name": "unload",
                   "target": null
                 },
                 {
-                  "line": 1690,
+                  "line": 1711,
                   "name": "unload",
                   "target": null
                 },
                 {
-                  "line": 1696,
+                  "line": 1717,
                   "name": "fit_prompt",
                   "target": {
                     "file": "src/interlock/harness/e5.py"
@@ -5723,7 +5860,7 @@
               "calls": [
                 {
                   "branch": "path.is_dir() and any(path.iterdir())",
-                  "line": 1771,
+                  "line": 1792,
                   "name": "GuardError",
                   "target": {
                     "file": "src/interlock/guards.py"
@@ -5738,7 +5875,7 @@
             {
               "calls": [
                 {
-                  "line": 1849,
+                  "line": 1870,
                   "name": "assess_step",
                   "target": {
                     "file": "src/interlock/guards.py"
@@ -5754,7 +5891,7 @@
               "calls": [
                 {
                   "branch": "spec[\"procedure\"] == \"interleaved\"",
-                  "line": 1849,
+                  "line": 1870,
                   "name": "assess_step",
                   "target": {
                     "file": "src/interlock/guards.py"
@@ -5762,7 +5899,7 @@
                   "via": "_guard_flags"
                 },
                 {
-                  "line": 1872,
+                  "line": 1893,
                   "name": "assess_step",
                   "target": {
                     "file": "src/interlock/guards.py"
@@ -5777,7 +5914,7 @@
             {
               "calls": [
                 {
-                  "line": 1894,
+                  "line": 1915,
                   "name": "for_engine",
                   "target": {
                     "file": "src/interlock/adapters/registry.py"
@@ -5792,12 +5929,12 @@
             {
               "calls": [
                 {
-                  "line": 1906,
+                  "line": 1927,
                   "name": "resolve",
                   "target": null
                 },
                 {
-                  "line": 1909,
+                  "line": 1930,
                   "name": "GuardError",
                   "target": {
                     "file": "src/interlock/guards.py"
@@ -5813,7 +5950,7 @@
               "calls": [
                 {
                   "branch": "not callable(probe)",
-                  "line": 1933,
+                  "line": 1954,
                   "name": "GuardError",
                   "target": {
                     "file": "src/interlock/guards.py"
@@ -5828,14 +5965,14 @@
             {
               "calls": [
                 {
-                  "line": 1940,
+                  "line": 1961,
                   "name": "require_heartbeat",
                   "target": {
                     "file": "src/interlock/guards.py"
                   }
                 },
                 {
-                  "line": 1941,
+                  "line": 1962,
                   "name": "require_card_empty",
                   "target": {
                     "file": "src/interlock/guards.py"
@@ -5850,7 +5987,7 @@
             {
               "calls": [
                 {
-                  "line": 1955,
+                  "line": 1976,
                   "name": "state_sampler",
                   "target": null
                 }
@@ -5863,13 +6000,13 @@
             {
               "calls": [
                 {
-                  "line": 1906,
+                  "line": 1927,
                   "name": "resolve",
                   "target": null,
                   "via": "_refuse_repo_interpreter"
                 },
                 {
-                  "line": 1909,
+                  "line": 1930,
                   "name": "GuardError",
                   "target": {
                     "file": "src/interlock/guards.py"
@@ -5877,7 +6014,7 @@
                   "via": "_refuse_repo_interpreter"
                 },
                 {
-                  "line": 2016,
+                  "line": 2037,
                   "name": "load_spec",
                   "target": {
                     "file": "src/interlock/harness/spec.py"
@@ -5885,7 +6022,7 @@
                 },
                 {
                   "branch": "spec.get(\"id\") == \"E4b\"",
-                  "line": 2020,
+                  "line": 2041,
                   "name": "run_from_cli",
                   "target": {
                     "file": "src/interlock/harness/e4b.py"
@@ -5893,7 +6030,7 @@
                 },
                 {
                   "branch": "pilot",
-                  "line": 2037,
+                  "line": 2058,
                   "name": "E4bError",
                   "target": {
                     "file": "src/interlock/harness/e4b.py"
@@ -5901,7 +6038,7 @@
                 },
                 {
                   "branch": "spec[\"procedure\"] == \"interleaved\"",
-                  "line": 1849,
+                  "line": 1870,
                   "name": "assess_step",
                   "target": {
                     "file": "src/interlock/guards.py"
@@ -5909,7 +6046,7 @@
                   "via": "_guard_flags"
                 },
                 {
-                  "line": 1872,
+                  "line": 1893,
                   "name": "assess_step",
                   "target": {
                     "file": "src/interlock/guards.py"
@@ -5917,7 +6054,7 @@
                   "via": "check_flags"
                 },
                 {
-                  "line": 2039,
+                  "line": 2060,
                   "name": "require_unmodified",
                   "target": {
                     "file": "src/interlock/harness/lock.py"
@@ -5925,26 +6062,26 @@
                 },
                 {
                   "branch": "receipt.exists()",
-                  "line": 2044,
+                  "line": 2065,
                   "name": "GuardError",
                   "target": {
                     "file": "src/interlock/guards.py"
                   }
                 },
                 {
-                  "line": 2051,
+                  "line": 2072,
                   "name": "resolve",
                   "target": null
                 },
                 {
-                  "line": 2053,
+                  "line": 2074,
                   "name": "RunMarker",
                   "target": {
                     "file": "src/interlock/harness/marker.py"
                   }
                 },
                 {
-                  "line": 2061,
+                  "line": 2082,
                   "name": "write",
                   "receiver": "RunMarker",
                   "target": {
@@ -5953,7 +6090,7 @@
                 },
                 {
                   "branch": "spec[\"procedure\"] == \"fill-card\"",
-                  "line": 2066,
+                  "line": 2087,
                   "name": "for_engine",
                   "target": {
                     "file": "src/interlock/adapters/registry.py"
@@ -5961,7 +6098,7 @@
                 },
                 {
                   "branch": "spec[\"procedure\"] == \"fill-card\"",
-                  "line": 2070,
+                  "line": 2091,
                   "name": "quiet_fill_seams",
                   "target": {
                     "file": "src/interlock/harness/fill.py"
@@ -5969,7 +6106,7 @@
                 },
                 {
                   "branch": "spec[\"procedure\"] == \"fill-card\"",
-                  "line": 2072,
+                  "line": 2093,
                   "name": "real_fill_seams",
                   "target": {
                     "file": "src/interlock/harness/fill.py"
@@ -5977,7 +6114,7 @@
                 },
                 {
                   "branch": "spec[\"procedure\"] == \"fill-card\"",
-                  "line": 2073,
+                  "line": 2094,
                   "name": "run_fill_card",
                   "target": {
                     "file": "src/interlock/harness/fill.py"
@@ -5985,14 +6122,14 @@
                 },
                 {
                   "branch": "spec[\"procedure\"] != \"interleaved\"",
-                  "line": 2089,
+                  "line": 2110,
                   "name": "GuardError",
                   "target": {
                     "file": "src/interlock/guards.py"
                   }
                 },
                 {
-                  "line": 1894,
+                  "line": 1915,
                   "name": "for_engine",
                   "target": {
                     "file": "src/interlock/adapters/registry.py"
@@ -6001,7 +6138,7 @@
                 },
                 {
                   "branch": "not callable(probe)",
-                  "line": 1933,
+                  "line": 1954,
                   "name": "GuardError",
                   "target": {
                     "file": "src/interlock/guards.py"
@@ -6009,7 +6146,7 @@
                   "via": "_card_probe"
                 },
                 {
-                  "line": 1940,
+                  "line": 1961,
                   "name": "require_heartbeat",
                   "target": {
                     "file": "src/interlock/guards.py"
@@ -6017,7 +6154,7 @@
                   "via": "_card_guards"
                 },
                 {
-                  "line": 1941,
+                  "line": 1962,
                   "name": "require_card_empty",
                   "target": {
                     "file": "src/interlock/guards.py"
@@ -6025,7 +6162,7 @@
                   "via": "_card_guards"
                 },
                 {
-                  "line": 300,
+                  "line": 321,
                   "name": "require_unmodified",
                   "target": {
                     "file": "src/interlock/harness/lock.py"
@@ -6033,7 +6170,7 @@
                   "via": "run_interleaved"
                 },
                 {
-                  "line": 301,
+                  "line": 322,
                   "name": "load_spec",
                   "target": {
                     "file": "src/interlock/harness/spec.py"
@@ -6041,7 +6178,7 @@
                   "via": "run_interleaved"
                 },
                 {
-                  "line": 304,
+                  "line": 325,
                   "name": "resolve",
                   "target": null,
                   "via": "run_interleaved"
@@ -6366,7 +6503,7 @@
             {
               "in": "_fill_card",
               "kind": "raise",
-              "line": 295
+              "line": 296
             },
             {
               "in": "_fill_card",
@@ -6376,37 +6513,37 @@
             {
               "in": "_fill_card",
               "kind": "raise",
-              "line": 301
+              "line": 303
             },
             {
               "in": "_fill_card",
               "kind": "raise",
-              "line": 303
+              "line": 305
+            },
+            {
+              "in": "_fill_card",
+              "kind": "raise",
+              "line": 307
             },
             {
               "in": "_confirm_num_predict",
               "kind": "raise",
-              "line": 317
+              "line": 321
             },
             {
               "in": "_pairs",
               "kind": "raise",
-              "line": 323
+              "line": 327
             },
             {
               "in": "_pairs",
               "kind": "raise",
-              "line": 328
+              "line": 332
             },
             {
               "in": "_pairs",
               "kind": "raise",
-              "line": 330
-            },
-            {
-              "in": "_pairs",
-              "kind": "raise",
-              "line": 335
+              "line": 334
             },
             {
               "in": "_pairs",
@@ -6416,27 +6553,22 @@
             {
               "in": "_pairs",
               "kind": "raise",
-              "line": 342
+              "line": 343
             },
             {
               "in": "_pairs",
               "kind": "raise",
-              "line": 344
+              "line": 346
+            },
+            {
+              "in": "_pairs",
+              "kind": "raise",
+              "line": 348
             },
             {
               "in": "_close",
               "kind": "raise",
-              "line": 349
-            },
-            {
-              "in": "_e4b",
-              "kind": "raise",
-              "line": 360
-            },
-            {
-              "in": "_e4b",
-              "kind": "raise",
-              "line": 362
+              "line": 353
             },
             {
               "in": "_e4b",
@@ -6461,12 +6593,12 @@
             {
               "in": "_e4b",
               "kind": "raise",
-              "line": 373
+              "line": 372
             },
             {
               "in": "_e4b",
               "kind": "raise",
-              "line": 375
+              "line": 374
             },
             {
               "in": "_e4b",
@@ -6476,27 +6608,32 @@
             {
               "in": "_e4b",
               "kind": "raise",
+              "line": 379
+            },
+            {
+              "in": "_e4b",
+              "kind": "raise",
               "line": 381
             },
             {
               "in": "_e4b",
               "kind": "raise",
-              "line": 384
+              "line": 385
             },
             {
               "in": "_e4b",
               "kind": "raise",
-              "line": 402
+              "line": 388
             },
             {
               "in": "_e4b",
               "kind": "raise",
-              "line": 407
+              "line": 406
             },
             {
-              "in": "_choice_rule",
+              "in": "_e4b",
               "kind": "raise",
-              "line": 417
+              "line": 411
             },
             {
               "in": "_choice_rule",
@@ -6511,32 +6648,27 @@
             {
               "in": "_choice_rule",
               "kind": "raise",
-              "line": 428
+              "line": 429
             },
             {
               "in": "_choice_rule",
               "kind": "raise",
-              "line": 430
+              "line": 432
             },
             {
               "in": "_choice_rule",
               "kind": "raise",
-              "line": 433
+              "line": 434
             },
             {
               "in": "_choice_rule",
               "kind": "raise",
-              "line": 435
+              "line": 437
             },
             {
               "in": "_choice_rule",
               "kind": "raise",
-              "line": 438
-            },
-            {
-              "in": "_choice_rule",
-              "kind": "raise",
-              "line": 440
+              "line": 439
             },
             {
               "in": "_choice_rule",
@@ -6546,20 +6678,30 @@
             {
               "in": "_choice_rule",
               "kind": "raise",
-              "line": 445
+              "line": 444
+            },
+            {
+              "in": "_choice_rule",
+              "kind": "raise",
+              "line": 446
+            },
+            {
+              "in": "_choice_rule",
+              "kind": "raise",
+              "line": 449
             },
             {
               "in": "_offrig",
               "kind": "raise",
-              "line": 451
+              "line": 455
             },
             {
               "in": "_offrig",
               "kind": "raise",
-              "line": 453
+              "line": 457
             }
           ],
-          "hash": "8f1842db316327a2e88d7e3d7a934d49cca3da741dc2d2d63eaafde20b4cc454",
+          "hash": "20369565f3e8b670a25fbe7ce460ebca769ae50c747ff91e86d413fef4e39a6c",
           "importsFiles": [
             "src/interlock/harness/e5.py",
             "src/interlock/tasks.py"
@@ -8992,7 +9134,7 @@
           "path": "src/interlock/schema/route-decision.v1.json"
         },
         {
-          "hash": "493a11ebfe0ab32d8a23656e9a1fee11cc268de8ee3a66f082246e2d03972571",
+          "hash": "5a1a200f50894f5fe99226661757706271ca252ede54be74171691f0258fb8d0",
           "path": "src/interlock/schema/routing-row.schema.json"
         },
         {
@@ -9031,7 +9173,7 @@
       "origin": "authored",
       "outsidePlaces": [
         {
-          "reads": 37,
+          "reads": 38,
           "where": [
             "caller"
           ],
@@ -9045,13 +9187,13 @@
           "writes": 0
         }
       ],
-      "outsideReads": 40,
+      "outsideReads": 41,
       "outsideWrites": 12,
       "role": "code",
       "testRunners": [
         "pytest"
       ],
-      "testedBy": 30,
+      "testedBy": 32,
       "unresolvedSites": 0
     },
     {
@@ -9074,6 +9216,26 @@
         {
           "hash": "60ab4b4e76d75b65de76ffb35cb004748deb59d689037b53b593841bfff2115b",
           "path": "tests/fixtures/README.md"
+        },
+        {
+          "hash": "820e92464b9051b318b8915e9fe25d2a90f314d084a1dd4612aa060a84e60329",
+          "path": "tests/fixtures/e5/idle-card-pin.txt"
+        },
+        {
+          "hash": "58b66e9b5d4002ccf0d4cba7e0012ab492cec5f6e0548f5da8205ca5098c0397",
+          "path": "tests/fixtures/e5/load-lines-11434.txt"
+        },
+        {
+          "hash": "32639d53b8defbc77e61634438dd2429de247f6893cb42e9342c2ce47a068984",
+          "path": "tests/fixtures/e5/nvidia-smi-617.42.txt"
+        },
+        {
+          "hash": "8522d4c651711326976ca9ea2664ec61dab865596fbbe717587b322a51d89583",
+          "path": "tests/fixtures/e5/server-config-11434.txt"
+        },
+        {
+          "hash": "78bce43cfe59470bf352fd34c46cdd59c560426178da6952b6ecbc7d7479c7f1",
+          "path": "tests/fixtures/e5/two-adapters-within-tolerance.txt"
         },
         {
           "hash": "e188cc8c4c15916caa783d6417d64d2ff0b9d6d6155fafd468331667af80b40e",
@@ -9462,6 +9624,50 @@
         },
         {
           "exports": [
+            "test_a_home_path_in_the_server_facts_is_caught_by_the_guard",
+            "test_the_backend_library_is_recorded_inside_the_install"
+          ],
+          "hash": "a5dbda1453debde1fece4a1595317cbdde3c315e97074b42edcffbc7dfb7a795",
+          "importsFiles": [
+            "src/interlock/harness/fill.py",
+            "src/interlock/receipt.py"
+          ],
+          "path": "tests/test_e5_backend_path.py",
+          "testFramework": "pytest"
+        },
+        {
+          "exports": [
+            "test_a_baseline_past_the_cuda_host_sum_is_inconclusive",
+            "test_a_missing_shared_reading_is_still_a_spill",
+            "test_a_model_resident_at_its_first_load_is_judged_against_the_floor",
+            "test_a_parent_redirect_parses_and_the_runner_is_llama_server",
+            "test_a_pin_with_no_number_and_a_listener_miss_are_refusals",
+            "test_a_window_300_mib_over_the_baseline_spills",
+            "test_both_specs_load_and_carry_the_spill_baseline_amendment",
+            "test_driver_cuda_accepts_both_headers_and_the_check_refuses_a_miss",
+            "test_exact_match_fails_on_the_idle_card_and_the_512_pin_picks_the_5090",
+            "test_later_reads_follow_the_pinned_instance",
+            "test_load_lines_parse_the_recorded_segment_and_a_missing_line_refuses",
+            "test_the_baseline_helpers_skip_a_reading_that_is_not_the_floor_confirm",
+            "test_the_config_line_is_recorded_as_it_is_and_empty_is_unset",
+            "test_the_e5_spec_loads_and_rejects_a_wrong_tolerance",
+            "test_the_live_default_runner_returns_a_childs_stdout",
+            "test_the_log_path_comes_from_the_listener_parent_and_the_tray_is_never_used",
+            "test_the_recorded_smoke_deltas_confirm_against_the_floor",
+            "test_two_adapters_within_tolerance_refuse_and_never_pick",
+            "test_zero_adapters_within_tolerance_refuse"
+          ],
+          "hash": "9749aa6df809c8fcfb206013bf346b29817975593e840a70fe4316f3726ca7ff",
+          "importsFiles": [
+            "src/interlock/harness/e5.py",
+            "src/interlock/harness/fill.py",
+            "src/interlock/harness/spec.py"
+          ],
+          "path": "tests/test_e5_preflight.py",
+          "testFramework": "pytest"
+        },
+        {
+          "exports": [
             "test_an_old_environment_name_warns_and_is_read",
             "test_the_new_environment_name_wins_without_a_warning",
             "test_the_old_log_and_exe_names_still_resolve",
@@ -9478,28 +9684,34 @@
           "exports": [
             "test_a_bisect_predicted_over_is_skipped",
             "test_a_card_that_falls_while_the_unload_settles_is_not_noted",
+            "test_a_clean_preflight_records_the_sample_the_sources_and_git",
             "test_a_clean_search_records_the_confirmed_window",
             "test_a_cold_recount_mismatch_refuses_the_confirmation",
             "test_a_confirmation_with_no_completion_limit_is_refused",
+            "test_a_dirty_start_is_recorded_false_on_the_aborted_receipt",
             "test_a_failed_show_is_a_failed_step_and_unloads",
             "test_a_fake_adapter_without_seams_does_not_call_nvidia",
             "test_a_fallen_prompt_rate_steps_the_candidate_back",
             "test_a_hanging_unload_stops_before_the_next_load",
             "test_a_missing_baseline_stops_before_the_larger_window",
             "test_a_missing_grant_never_calls_the_adapter",
+            "test_a_missing_load_line_refuses_before_a_measured_window",
             "test_a_missing_reading_is_a_spill",
             "test_a_missing_weight_size_stops_before_the_larger_window",
             "test_a_non_positive_share_stops_before_the_larger_window",
+            "test_a_preflight_failure_refuses_before_any_load",
             "test_a_trained_window_that_is_not_resident_searches_down_to_the_grain",
             "test_a_window_that_is_not_fully_resident_searches_down",
             "test_a_window_whose_card_does_not_fall_after_unload_is_noted",
             "test_an_exception_still_unloads",
             "test_dry_run_names_the_confirmation_count",
             "test_guards_run_per_model_and_rest_is_not_taken",
+            "test_missing_cuda_host_lines_refuse_after_the_first_load",
             "test_one_measured_window_skips_a_bisect_with_less_than_one_cache_of_room",
+            "test_preflight_refuses_a_wrong_tolerance_before_any_sample",
             "test_readers_parse_fake_output_and_do_not_guess",
+            "test_shared_growth_is_measured_from_the_floor_confirm",
             "test_shared_growth_steps_the_candidate_back",
-            "test_shared_growth_uses_the_pre_window_baseline",
             "test_spec_validation_refuses_confirm_num_predict_0",
             "test_the_5090_is_the_dedicated_match_and_a_bad_match_is_a_spill",
             "test_the_next_load_waits_until_the_abort_has_settled",
@@ -9509,7 +9721,7 @@
             "test_the_search_does_not_load_above_the_trained_length",
             "test_the_server_log_fills_the_four_fields"
           ],
-          "hash": "4d1919063895399c3ee795c5dc0e6c70b16635002eaa757f921a38de329d0389",
+          "hash": "d89a33ec69f52d6b68988a68c4bc509da6302084a1053160b292126acdf464c1",
           "importOrder": [
             "src/interlock/adapters/base.py",
             "src/interlock/adapters/ollama.py",
@@ -9518,13 +9730,15 @@
             "src/interlock/guards.py",
             "src/interlock/harness/fill.py",
             "src/interlock/harness/runner.py",
-            "src/interlock/receipt.py"
+            "src/interlock/receipt.py",
+            "src/interlock/harness/e4b.py"
           ],
           "importsFiles": [
             "src/interlock/adapters/base.py",
             "src/interlock/adapters/ollama.py",
             "src/interlock/adapters/ollama_cases.py",
             "src/interlock/guards.py",
+            "src/interlock/harness/e4b.py",
             "src/interlock/harness/fill.py",
             "src/interlock/harness/runner.py",
             "src/interlock/harness/spec.py",
@@ -9618,7 +9832,7 @@
             "test_the_rejected_row_validates_and_the_table_sees_pending_replication",
             "test_the_run_path_refuses_an_edited_spec_before_any_adapter_call"
           ],
-          "hash": "1fb683c096a1f06d52e8496fe283cb0a919ce0eb3e06c3dc4484b65b2435863f",
+          "hash": "1b2574ec13eb6909161b87a4f8ff56c973259ac1b922955ba8c443f69940c9e8",
           "importOrder": [
             "src/interlock/adapters/base.py",
             "src/interlock/adapters/offrig_calibrate.py",
@@ -9809,7 +10023,7 @@
             "test_the_restart_cap_stops_the_run",
             "test_the_start_line_record_is_optional_and_filtered"
           ],
-          "hash": "96aa26c5b2ceb0daeac2f8d3c48c08124f24fcdb14ce5860cc258c73cb19f8a6",
+          "hash": "e5a4d65af898d9d7a6c11244845a9a06edfbe86aee57cd6a2628412df0559837",
           "importOrder": [
             "src/interlock/adapters/base.py",
             "src/interlock/adapters/ollama.py",
@@ -10415,7 +10629,7 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 33
+          "files": 35
         },
         {
           "boundary": "src",
@@ -10455,7 +10669,7 @@
         {
           "config": "pyproject.toml",
           "coverage": true,
-          "files": 33,
+          "files": 35,
           "job": "test",
           "runner": "pytest",
           "step": "Test"
@@ -10687,8 +10901,8 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "7c1508b5474f1ed476bc97767c995a02cd4ddb90",
-    "tracked": 228
+    "commit": "d899ac0a629d5ffae13f602eae3aef4138ba802f",
+    "tracked": 236
   },
   "landings": [
     {
@@ -10946,7 +11160,7 @@
   "overlaps": [],
   "submodules": [],
   "symlinks": [],
-  "testFiles": 51,
+  "testFiles": 58,
   "unassigned": [
     {
       "hash": "be418720d26ab2999db6b0a7e07f4f2d6532c8c35f3c2d5329f9ce506b82109f",
