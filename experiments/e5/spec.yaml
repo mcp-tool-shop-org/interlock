@@ -14,6 +14,7 @@
 # Amendment, 2026-10-11 (maintainer). Rest is the Publisher's scheduling decision between consecutive long runs, not a harness rule; rest_s below is no longer read.
 # Amended 2026-10-12 (Publisher): the tool is renamed interlock; commands updated.
 # Amendment, 2026-10-12. The spill counter is \GPU Adapter Memory(*)\Shared Usage on the 5090 adapter instance whose Dedicated Usage matches nvidia-smi memory.used, at the baseline taken immediately before the window and again after the load. No match, or more than one, is a missing reading, and a missing reading is a spill. The gate is that shared delta. The dedicated delta is recorded and is not a gate. The runner pid may be recorded and does not gate. The search cap is min(max_ctx, the trained context length). A window above the trained length is not loaded. A trained-length window that is not resident is halved to one grain, then bisected upward. The spill reference is the lowest resident window. Flash attention, the KV cache type, the server default context and the backend library are read from the server log named by SWITCHYARD_OLLAMA_LOG. A missing log leaves those four fields unrecorded with a reason. The ggml-cuda sha is the sha256 of ggml-cuda.dll under the exe's lib\ollama\cuda_v13, and the exe is SWITCHYARD_OLLAMA_EXE. Driver CUDA is the nvidia-smi header, not a cuda_version query.
+# Amendment, 2026-10-12, after e5-2026-10-12c. Adapter match: the 5090 adapter instance is pinned once, at run start, on the idle card. It is the only instance whose Dedicated Usage is within adapter_match_tolerance_mib of nvidia-smi memory.used. Shared and dedicated are then read for that pinned instance at each window's baseline and after its load. Zero or several instances within tolerance refuses the run before any load. adapter_match_tolerance_mib is 512. It is a matching allowance, unrelated to spill_shared_mib 256, and it is not a spill threshold. Server facts: the log is the one named by INTERLOCK_OLLAMA_LOG, else %LOCALAPPDATA%\Ollama\server.log. The exe is INTERLOCK_OLLAMA_EXE, else the 11434 listener's executable, as E4b finds it. A missing log or dll is a refusal at preflight, not an unrecorded field. The preflight, before the first load or pull, samples nvidia-smi memory, both counters on the pinned instance, the server-config line (flash attention and the KV cache type), the ggml-cuda dll sha256, git (a 40-hex sha and an empty porcelain), and driver CUDA. The nvidia-smi header may say CUDA Version or CUDA UMD Version. Any failure refuses and names what failed. The runner pid stays record-only.
 id: E5
 procedure: fill-card
 question: >
@@ -37,6 +38,8 @@ confirm_prompt_fraction: 0.9
 confirm_num_predict: 1
 sample_ms: 200
 spill_shared_mib: 256
+# Matching allowance for the idle-card pin. Not a spill threshold.
+adapter_match_tolerance_mib: 512
 spill_prompt_ratio: 0.5
 max_ctx: 1048576
 shift: false

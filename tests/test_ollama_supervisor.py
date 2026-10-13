@@ -1291,6 +1291,7 @@ def _fill_spec(models: list[dict], **extra) -> dict:
         "confirm_num_predict": 1,
         "sample_ms": 200,
         "spill_shared_mib": 256,
+        "adapter_match_tolerance_mib": 512,
         "spill_prompt_ratio": 0.5,
         "max_ctx": 8192,
         "shift": False,

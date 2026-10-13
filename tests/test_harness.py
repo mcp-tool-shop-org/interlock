@@ -1252,6 +1252,8 @@ def test_e4_and_e5_specs_pin_the_rules():
     assert e5["ceiling_mib"] == 31200
     assert e5["grain"] == 2048
     assert e5["spill_shared_mib"] == SHARED_GROWTH_MIB == 256
+    assert e5["adapter_match_tolerance_mib"] == 512
+    assert e5["adapter_match_tolerance_mib"] != e5["spill_shared_mib"]
     assert e5["spill_prompt_ratio"] == PROMPT_RATIO == 0.5
     assert "spill_tok_ratio" not in e5 and "spill_ttft_ratio" not in e5
     assert e5["rest_s"] == 900
@@ -1297,6 +1299,12 @@ def test_an_edited_spec_is_refused_and_dry_run_does_not_touch_devices(tmp_path: 
     assert "abort_mib: 30500" in e5_text
     assert "spill_shared_mib: 256" in e5_text
     assert "spill_prompt_ratio: 0.5" in e5_text
+    assert "adapter_match_tolerance_mib: 512" in e5_text
+    assert "the tolerance is a matching allowance and is not the spill threshold" in e5_text
+    assert "pinned once at run start" in e5_text
+    assert "zero or several instances within tolerance refuses before any load" in e5_text
+    assert "driver CUDA accepts CUDA Version and CUDA UMD Version" in e5_text
+    assert "a missing log or dll refuses at preflight" in e5_text
     assert "quant is read from /api/show at run time" in e5_text
     assert "not launched" not in e4_text
     spec = repo / "experiments" / "e4" / "spec.yaml"
@@ -1585,6 +1593,10 @@ def test_spec_rejects_a_contract_that_is_not_pre_registered(tmp_path: Path):
         validate_spec({**card, "confirm_prompt_fraction": 1})
     with pytest.raises(SpecError, match="spill_shared_mib"):
         validate_spec({**card, "spill_shared_mib": 512})
+    with pytest.raises(SpecError, match="adapter_match_tolerance_mib"):
+        validate_spec({**card, "adapter_match_tolerance_mib": 256})
+    with pytest.raises(SpecError, match="adapter_match_tolerance_mib"):
+        validate_spec({key: value for key, value in card.items() if key != "adapter_match_tolerance_mib"})
     with pytest.raises(SpecError, match="spill_prompt_ratio"):
         validate_spec({**card, "spill_prompt_ratio": 0.7})
     # rest_s is no longer read: any value, or none, is accepted

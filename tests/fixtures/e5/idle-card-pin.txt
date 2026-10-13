@@ -1,0 +1,22 @@
+# Idle card, 2026-10-12, run e5-2026-10-12c.
+# nvidia-smi memory.used was 2490 MiB.
+# Get-Counter CookedValue is bytes. The harness prints InstanceName=CookedValue.
+# Four adapters. The 5090 is the instance whose name ends 0x000140e1.
+# That LUID is the elided token from the brief, not a fresh Get-Counter dump.
+# Dedicated 2508 MiB is 2629828608 bytes. Shared 74 MiB is 77594624 bytes.
+# The other three adapters read 0.
+
+[nvidia-smi]
+2490
+
+[dedicated]
+luid_0x00000000_0x000140e1_phys_0=2629828608
+luid_0x00000000_0x00011111_phys_0=0
+luid_0x00000000_0x00012222_phys_0=0
+luid_0x00000000_0x00013333_phys_0=0
+
+[shared]
+luid_0x00000000_0x000140e1_phys_0=77594624
+luid_0x00000000_0x00011111_phys_0=0
+luid_0x00000000_0x00012222_phys_0=0
+luid_0x00000000_0x00013333_phys_0=0

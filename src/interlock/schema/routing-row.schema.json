@@ -173,7 +173,9 @@
           "required": ["experiment_spec", "run_id"],
           "properties": {
             "experiment_spec": {"type": "string", "minLength": 1},
-            "run_id": {"type": "string", "minLength": 1}
+            "run_id": {"type": "string", "minLength": 1},
+            "git_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+            "clean_tree": {"type": "boolean"}
           }
         }
       ]

@@ -39,6 +39,7 @@ caller builds :func:`real_fill_seams` and then calls them.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import subprocess
@@ -92,7 +93,7 @@ EXE_ENV = "INTERLOCK_OLLAMA_EXE"
 _MIB = 1024 * 1024
 _ENV_IN_LOG = re.compile(r"\b(OLLAMA_[A-Z0-9_]+)[=:]([^\s,\]]+)")
 _BACKEND_LINE = re.compile(r"load_backend: loaded \S+ backend from (\S+)")
-_CUDA_HEADER = re.compile(r"CUDA Version:\s*([0-9.]+)")
+_CUDA_HEADER = re.compile(r"CUDA(?: UMD)? Version:\s*([0-9.]+)")
 
 
 class _WindowOver(Exception):
@@ -118,6 +119,14 @@ class _Repairable(Exception):
         super().__init__(error)
         self.kind = kind
         self.error = error
+
+
+class FillPreflightError(Exception):
+    """A live sample failed before any load. ``record`` is what can still be written."""
+
+    def __init__(self, message: str, record: dict | None = None) -> None:
+        super().__init__(message)
+        self.record = record
 
 
 @dataclass
@@ -171,22 +180,30 @@ def real_fill_seams(adapter, *, run=None, read_counter=None) -> FillSeams:
 
     run = run or subprocess.run
     read_counter = read_counter or (lambda counter: _powershell_counter(counter, run))
+    pinned: dict[str, str | None] = {"instance": None}
+
+    def _counter_mib(counter: str) -> int | None:
+        instance = pinned["instance"]
+        if not isinstance(instance, str):
+            return None
+        samples = parse_counter_text(read_counter(counter) or "")
+        return _instance_mib(samples, instance)
 
     def read_adapter():
-        nvidia = parse_mib(_capture(run, MEMORY_ARGV))
-        if nvidia is None:
+        instance = pinned["instance"]
+        if not isinstance(instance, str):
             return None
-        dedicated = parse_counter_text(read_counter(ADAPTER_DEDICATED) or "")
-        shared = parse_counter_text(read_counter(ADAPTER_SHARED) or "")
-        return adapter_usage(dedicated, shared, nvidia)
+        shared = _counter_mib(ADAPTER_SHARED)
+        dedicated = _counter_mib(ADAPTER_DEDICATED)
+        if shared is None or dedicated is None:
+            return None
+        return instance, shared, dedicated
 
     def shared_mib() -> int | None:
-        found = read_adapter()
-        return None if found is None else found[1]
+        return _counter_mib(ADAPTER_SHARED)
 
     def dedicated_mib() -> int | None:
-        found = read_adapter()
-        return None if found is None else found[2]
+        return _counter_mib(ADAPTER_DEDICATED)
 
     def driver() -> str | None:
         return first_line(_capture(run, DRIVER_ARGV))
@@ -209,6 +226,52 @@ def real_fill_seams(adapter, *, run=None, read_counter=None) -> FillSeams:
     seams.server_log = lambda: _read_configured_log()
     seams.ggml_dll = lambda: _configured_dll()
     seams.runner_pid = lambda: _runner_pid(run)
+
+    def bind_pin(instance: str) -> None:
+        pinned["instance"] = instance
+
+    def preflight(spec: dict, repo: Path) -> dict:
+        from interlock.harness.e4b import E4bError, capture_run, read_git
+        from interlock.harness.e5 import ADAPTER_MATCH_TOLERANCE_MIB
+
+        tolerance = spec.get("adapter_match_tolerance_mib")
+        if tolerance != ADAPTER_MATCH_TOLERANCE_MIB:
+            raise FillPreflightError("adapter_match_tolerance_mib is 512, a matching allowance, not the spill threshold")
+        paths = resolve_fill_paths(run)
+        nvidia = parse_mib(_capture(run, MEMORY_ARGV))
+        dedicated = parse_counter_text(read_counter(ADAPTER_DEDICATED) or "")
+        shared = parse_counter_text(read_counter(ADAPTER_SHARED) or "")
+        log_text = _read_text(paths["log_path"])
+        ggml_sha, ggml_reason = ggml_cuda_sha256(paths["dll"])
+        cuda = driver_cuda(_capture(run, NVIDIA_SMI_ARGV))
+        try:
+            git = read_git(repo, capture_run)
+        except E4bError as exc:
+            raise FillPreflightError(str(exc)) from exc
+        record = judge_preflight(
+            nvidia_mib=nvidia,
+            dedicated=dedicated,
+            shared=shared,
+            tolerance_mib=tolerance,
+            log_text=log_text,
+            ggml_sha=ggml_sha,
+            ggml_reason=ggml_reason,
+            git=git,
+            driver_cuda_value=cuda,
+            log_source=paths["log_source"],
+            exe_source=paths["exe_source"],
+        )
+        pinned["instance"] = record["instance"]
+        # The measurement row reads these. The env-only helpers would miss a
+        # LOCALAPPDATA log or a listener exe that preflight already accepted.
+        log_path = paths["log_path"]
+        dll_path = paths["dll"]
+        seams.server_log = lambda path=log_path: _read_text(path)
+        seams.ggml_dll = lambda path=dll_path: path
+        return record
+
+    seams.bind_pin = bind_pin
+    seams.preflight = preflight
     return seams
 
 
@@ -349,24 +412,56 @@ def _cooked_mib(cooked: object) -> int | None:
     return int(cooked / _MIB)
 
 
-def match_adapter_instance(dedicated: list[tuple[str, float]], nvidia_mib: int) -> str | None:
-    """The one adapter whose dedicated MiB equals ``nvidia_mib``.
+def _adapters_within(dedicated: list[tuple[str, float]], nvidia_mib: int, tolerance_mib: int) -> list[str] | None:
+    """Instance names within ``tolerance_mib`` of ``nvidia_mib``. None when the inputs are unusable.
 
-    The iGPU is an adapter too. Zero matches or more than one is missing.
-    Order is not a match.
+    Tolerance 0 is exact equality. The iGPU is an adapter too. Order is not a match.
     """
 
     if isinstance(nvidia_mib, bool) or not isinstance(nvidia_mib, int):
+        return None
+    if isinstance(tolerance_mib, bool) or not isinstance(tolerance_mib, int) or tolerance_mib < 0:
         return None
     matches = []
     for name, cooked in dedicated:
         if not isinstance(name, str):
             continue
-        if _cooked_mib(cooked) == nvidia_mib:
+        mib = _cooked_mib(cooked)
+        if mib is None:
+            continue
+        if abs(mib - nvidia_mib) <= tolerance_mib:
             matches.append(name)
-    if len(matches) != 1:
+    return matches
+
+
+def match_adapter_instance(
+    dedicated: list[tuple[str, float]],
+    nvidia_mib: int,
+    tolerance_mib: int = 0,
+) -> str | None:
+    """The one adapter within ``tolerance_mib`` of ``nvidia_mib``.
+
+    The default is exact equality, which is what the older per-window match used.
+    The live pin passes the spec tolerance. Zero matches or more than one is missing.
+    """
+
+    matches = _adapters_within(dedicated, nvidia_mib, tolerance_mib)
+    if matches is None or len(matches) != 1:
         return None
     return matches[0]
+
+
+def pin_failure(dedicated: list[tuple[str, float]], nvidia_mib: int, tolerance_mib: int) -> str | None:
+    """Why the idle-card pin cannot choose one instance. None when it can."""
+
+    matches = _adapters_within(dedicated, nvidia_mib, tolerance_mib)
+    if matches is None:
+        return "nvidia-smi memory.used returned no number"
+    if len(matches) == 0:
+        return "zero instances within adapter_match_tolerance_mib"
+    if len(matches) > 1:
+        return "several instances within adapter_match_tolerance_mib"
+    return None
 
 
 def _instance_mib(samples: list[tuple[str, float]], instance: str) -> int | None:
@@ -412,7 +507,8 @@ def window_delta(before, after) -> tuple[int | None, int | None, int | None]:
 def driver_cuda(text: str | None) -> str | None:
     """CUDA from the nvidia-smi header, labelled as the driver's.
 
-    ``nvidia-smi --query-gpu=cuda_version`` is not a field on driver 617.14.
+    Older headers say ``CUDA Version:``. Driver 617.42 says ``CUDA UMD Version:``.
+    ``nvidia-smi --query-gpu=cuda_version`` is not a field on this driver.
     """
 
     if not isinstance(text, str):
@@ -545,6 +641,145 @@ def _configured_dll() -> str | None:
     if not isinstance(exe, str) or not exe.strip():
         return None
     return str(Path(exe).parent / "lib" / "ollama" / "cuda_v13" / "ggml-cuda.dll")
+
+
+def _command_stdout(completed) -> str:
+    if isinstance(completed, str):
+        return completed
+    stdout = getattr(completed, "stdout", "")
+    if isinstance(stdout, bytes):
+        return stdout.decode("utf-8", errors="replace")
+    return stdout or ""
+
+
+def listener_exe(run) -> str | None:
+    """The executable listening on 11434, from E4b's lookup. The port is not opened."""
+
+    from interlock.harness.ollama_serve import LISTENER_SCRIPT
+
+    try:
+        completed = run(["powershell", "-NoProfile", "-Command", LISTENER_SCRIPT])
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    text = _command_stdout(completed)
+    if getattr(completed, "returncode", 0) not in (0, None) and not isinstance(completed, str):
+        return None
+    try:
+        report = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    exe = report.get("exe") if isinstance(report, dict) else None
+    if not isinstance(exe, str) or not exe.strip():
+        return None
+    return exe.strip()
+
+
+def resolve_fill_paths(run, *, localappdata: str | None = None) -> dict:
+    """Log and exe paths. ``INTERLOCK_OLLAMA_*`` wins. The receipt stores the source, not the path."""
+
+    from interlock.harness.ollama_serve import cuda_dll
+
+    log_override = read_project_env(LOG_ENV)
+    if isinstance(log_override, str) and log_override.strip():
+        log_path, log_source = log_override.strip(), "INTERLOCK_OLLAMA_LOG"
+    else:
+        root = localappdata if localappdata is not None else os.environ.get("LOCALAPPDATA", "")
+        log_path, log_source = str(Path(root) / "Ollama" / "server.log"), "LOCALAPPDATA"
+    exe_override = read_project_env(EXE_ENV)
+    if isinstance(exe_override, str) and exe_override.strip():
+        exe, exe_source = exe_override.strip(), "INTERLOCK_OLLAMA_EXE"
+    else:
+        exe, exe_source = listener_exe(run), "listener"
+    dll = None if not exe else str(cuda_dll(Path(exe)))
+    return {
+        "log_path": log_path,
+        "log_source": log_source,
+        "exe": exe,
+        "exe_source": exe_source,
+        "dll": dll,
+    }
+
+
+def _read_text(path: str | None) -> str | None:
+    if not isinstance(path, str) or not path.strip():
+        return None
+    try:
+        return Path(path).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+
+
+def judge_preflight(
+    *,
+    nvidia_mib: int | None,
+    dedicated: list[tuple[str, float]],
+    shared: list[tuple[str, float]],
+    tolerance_mib: int,
+    log_text: str | None,
+    ggml_sha: str,
+    ggml_reason: str | None,
+    git: dict | None,
+    driver_cuda_value: str | None,
+    log_source: str,
+    exe_source: str,
+) -> dict:
+    """One sample of each live source. The first failure refuses, before any load."""
+
+    if nvidia_mib is None:
+        raise FillPreflightError("nvidia-smi memory.used returned no number")
+    failure = pin_failure(dedicated, nvidia_mib, tolerance_mib)
+    if failure is not None:
+        raise FillPreflightError(f"adapter pin refused: {failure}")
+    instance = match_adapter_instance(dedicated, nvidia_mib, tolerance_mib)
+    dedicated_mib = _instance_mib(dedicated, instance or "")
+    shared_mib = _instance_mib(shared, instance or "")
+    if dedicated_mib is None:
+        raise FillPreflightError("Dedicated Usage returned no number for the pinned instance")
+    if shared_mib is None:
+        raise FillPreflightError("Shared Usage returned no number for the pinned instance")
+    facts = facts_from_log(log_text)
+    if facts["flash_attention"] == UNRECORDED or facts["kv_cache_type"] == UNRECORDED:
+        raise FillPreflightError(str(facts["reason"] or "server log did not parse"))
+    if not isinstance(ggml_sha, str) or ggml_sha == UNRECORDED or not re.fullmatch(r"[0-9a-f]{64}", ggml_sha):
+        raise FillPreflightError(ggml_reason or "ggml-cuda.dll is missing")
+    if not isinstance(driver_cuda_value, str) or not driver_cuda_value.strip():
+        raise FillPreflightError("driver CUDA did not parse")
+    sha = git.get("git_sha") if isinstance(git, dict) else None
+    clean = git.get("clean_tree") if isinstance(git, dict) else None
+    if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha):
+        raise FillPreflightError("git did not return a 40-hex sha")
+    record = {
+        "instance": instance,
+        "dedicated_mib": dedicated_mib,
+        "nvidia_mib": nvidia_mib,
+        "shared_mib": shared_mib,
+        "flash_attention": facts["flash_attention"],
+        "kv_cache_type": facts["kv_cache_type"],
+        "ggml_sha": ggml_sha,
+        "driver_cuda": driver_cuda_value.strip(),
+        "git_sha": sha,
+        "clean_tree": clean is True,
+        "log_source": log_source,
+        "exe_source": exe_source,
+    }
+    if clean is not True:
+        raise FillPreflightError("git porcelain is not empty", record)
+    return record
+
+
+def format_preflight(record: dict) -> str:
+    """The sampled values. Paths stay off this line."""
+
+    return (
+        f"preflight nvidia_mib={record['nvidia_mib']} "
+        f"dedicated_mib={record['dedicated_mib']} shared_mib={record['shared_mib']} "
+        f"instance={record['instance']}\n"
+        f"preflight flash_attention={record['flash_attention']} "
+        f"kv_cache_type={record['kv_cache_type']} driver_cuda={record['driver_cuda']}\n"
+        f"preflight ggml_cuda_sha={record['ggml_sha']}\n"
+        f"preflight git_sha={record['git_sha']} clean_tree={str(record['clean_tree']).lower()}\n"
+        f"preflight log_source={record['log_source']} exe_source={record['exe_source']}\n"
+    )
 
 
 def _runner_pid(run) -> int | None:
@@ -851,6 +1086,29 @@ def _resume_fill(supervisor, marker, entry, repair, spec, retries, row) -> str |
     return "next"
 
 
+def _preflight_row(spec, entry, *, grant, spec_rel, run_id, date, notes, record) -> dict:
+    """An aborted row for a preflight refusal. Nothing was loaded."""
+
+    return _row(
+        spec,
+        entry,
+        grant=grant,
+        spec_rel=spec_rel,
+        run_id=run_id,
+        date=date,
+        notes=notes,
+        aborted=True,
+        version=UNRECORDED,
+        driver=UNRECORDED,
+        cuda=str(record.get("driver_cuda") or UNRECORDED),
+        baseline=record.get("nvidia_mib") if isinstance(record.get("nvidia_mib"), int) else None,
+        flash=str(record.get("flash_attention") or UNRECORDED),
+        kv=str(record.get("kv_cache_type") or UNRECORDED),
+        ggml=str(record.get("ggml_sha") or UNRECORDED),
+        preflight=record,
+    )
+
+
 def run_fill_card(
     spec: dict,
     *,
@@ -890,6 +1148,32 @@ def run_fill_card(
             require_heartbeat(heartbeat, wall())
             adapter = _ollama(adapters)
             require_card_empty(adapter.loaded_models())
+            if not getattr(seams, "preflight_done", False):
+                seams.preflight_done = True
+                reader = getattr(seams, "preflight", None)
+                if callable(reader):
+                    try:
+                        record = reader(spec, root)
+                    except FillPreflightError as exc:
+                        kept = exc.record if isinstance(exc.record, dict) else None
+                        if kept is not None:
+                            rows.append(
+                                _preflight_row(
+                                    spec,
+                                    entry,
+                                    grant=grant,
+                                    spec_rel=spec_rel,
+                                    run_id=run_id,
+                                    date=date,
+                                    notes=str(exc),
+                                    record=kept,
+                                )
+                            )
+                        from interlock.harness.runner import RunnerError
+
+                        raise RunnerError(str(exc)) from exc
+                    print(format_preflight(record), end="")
+                    seams.preflight_record = record
             marker.entered = True
             repair: list[tuple[str, str]] = []
             if supervisor is not None:
@@ -1031,6 +1315,7 @@ def _measure_model(
         kwargs.setdefault("server_reason", facts["reason"])
         kwargs.setdefault("ggml_reason", ggml_reason)
         kwargs.setdefault("runner_pid", runner)
+        kwargs.setdefault("preflight", getattr(seams, "preflight_record", None))
         return _row(spec, entry, **kwargs)
 
     baseline = _optional_int(seams.card_mib())
@@ -1528,6 +1813,7 @@ def _row(
     server_reason: str | None = None,
     ggml_reason: str | None = None,
     runner_pid: int | None = None,
+    preflight: dict | None = None,
 ) -> dict:
     num_predict = _refuse_confirm_num_predict(spec.get("confirm_num_predict", 1))
     settings = {
@@ -1588,6 +1874,17 @@ def _row(
         settings["prompt_token_cold"] = prompt_meta[3]
     if dedicated is not None:
         settings["dedicated_mib"] = dedicated
+    provenance = {"experiment_spec": spec_rel, "run_id": run_id}
+    if isinstance(preflight, dict):
+        settings["adapter_instance"] = preflight["instance"]
+        settings["adapter_match_dedicated_mib"] = preflight["dedicated_mib"]
+        settings["adapter_match_nvidia_mib"] = preflight["nvidia_mib"]
+        settings["preflight_shared_mib"] = preflight["shared_mib"]
+        settings["preflight_driver_cuda"] = preflight["driver_cuda"]
+        settings["log_source"] = preflight["log_source"]
+        settings["exe_source"] = preflight["exe_source"]
+        provenance["git_sha"] = preflight["git_sha"]
+        provenance["clean_tree"] = preflight["clean_tree"] is True
     model = {
         "repo_or_tag": entry["model"],
         "revision_or_digest": entry["revision_or_digest"],
@@ -1610,7 +1907,7 @@ def _row(
         "date": date,
         "repeats": 1,
         "provisional": True,
-        "provenance": {"experiment_spec": spec_rel, "run_id": run_id},
+        "provenance": provenance,
         "notes": notes,
     }
     if size_meta is not None:
