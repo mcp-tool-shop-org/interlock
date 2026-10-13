@@ -8,16 +8,16 @@
 
 | Category | Score | Notes |
 |----------|-------|-------|
-| A. Security | 7/10 | SECURITY.md and a threat model already existed. The advisory link still named switchyard. Telemetry was not stated. |
+| A. Security | 7/10 | SECURITY.md and a threat model already existed. The advisory link still named the previous repository. Telemetry was not stated. |
 | B. Error Handling | 4/10 | `route --json` is a structured refusal. Other commands print a line. Exits are 0, 1, 75, 76, 77. |
-| C. Operator Docs | 7/10 | README, CHANGELOG, and LICENSE were current. No handbook. The README wordmark still said switchyard. |
+| C. Operator Docs | 7/10 | README, CHANGELOG, and LICENSE were current. No handbook. The README wordmark still said the previous name. |
 | D. Shipping Hygiene | 5/10 | `uv.lock` and `requires-python` were set. No verify script, no dependency scanner in CI, no release tag. |
 | E. Identity (soft) | 2/10 | A local logo only. No landing page, no homepage, no translations. |
 | **Overall** | **25/50** | |
 
 ## Key Gaps
 
-1. No landing page or handbook, and the README logo was a local file whose wordmark still said switchyard.
+1. No landing page or handbook, and the README logo was a local file whose wordmark still said the previous name.
 2. CI had no dependency scanner.
 3. Error reporting is not the org's structured shape, and there is no logging-level switch. This treatment does not change that contract.
 4. Translations are not in the tree yet. The Publisher runs them.
