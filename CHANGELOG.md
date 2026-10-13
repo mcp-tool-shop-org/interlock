@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- E5 measures the floor window first, one grain, and loads and confirms it before any candidate. That confirm is the reference for the shared gate and the prompt-rate gate. A model that is resident at its first load is still judged against the floor, not against itself. The CUDA_Host check uses the floor confirm. The earlier "lowest resident window" sentence is superseded and left in place. (spec amendment 2026-10-13, after the live read on the e5 smoke)
+
 - E5's spill baseline is the model's own lowest resident window, the same window as the prompt-rate reference. A window spills when its shared reading exceeds that baseline by more than 256 MiB, or when its prompt rate falls under the existing rule. The idle shared reading and the CUDA_Host model, compute, and output sizes from the first load check that baseline. If the lowest window's shared reading minus idle exceeds that sum by more than 256 MiB, the row is inconclusive and is not confirmed. A missing CUDA_Host line refuses after the first load. A missing shared reading is still a spill. (spec amendment 2026-10-13, after the e5 smoke)
 
 - Fixed: E5 records the backend library as a path inside the Ollama install (`lib\ollama\...`), and every server fact passes the receipt's home-path guard before any model loads. Live 2026-10-13: E5 measured gemma4:31b for 70 minutes, then its row was refused at write time for the full load_backend path under the user's home, and the run ended with no receipt.

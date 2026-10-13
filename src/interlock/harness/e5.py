@@ -1,21 +1,22 @@
 """Fill-the-card search.
 
-The first window is the search cap: the trained context length, or the spec
-cap when that is lower. Nothing above that cap is loaded. When the first
-window fits, the search may still climb toward the cap and bisect on the
-grain. When it does not fit, the search halves until a window does (floor:
-one grain), then bisects upward between that window and the one that failed.
+The floor window is one grain. It is loaded and confirmed before any candidate,
+and that confirm is the reference for both spill gates. The candidate search
+then starts at the cap: the trained context length, or the spec cap when that
+is lower. Nothing above that cap is loaded. When the cap fits, the search may
+still climb toward the cap and bisect on the grain. When it does not fit, the
+search halves until a window does, then bisects upward.
 
 Confirmation is a separate probe. A window that exceeds ``abort_mib`` or
-fails residency steps back one grid notch. So does a spill.
+fails residency steps back one grid notch. So does a spill. The floor confirm
+is not probed again on the way down.
 
-The primary spill signal is growth in the 5090 adapter's shared GPU memory
-over the model's own lowest resident window, which is also the prompt-rate
-reference. A pre-window reading is the idle sample. It is not this
-comparison. The secondary signal is prompt-processing rate
-(``prompt_eval_count / prompt_eval_duration``). Either one trips the spill.
-A missing shared reading or a missing prompt rate is a spill. Decode tokens
-per second and raw time-to-first-token are recorded and are not gates.
+The shared gate compares a confirm's shared reading with the floor confirm.
+The prompt-rate gate compares a confirm's prompt rate with that same confirm.
+A pre-window reading is the idle sample. It is not this comparison. Either
+gate trips the spill. A missing shared reading or a missing prompt rate is a
+spill. Decode tokens per second and raw time-to-first-token are recorded and
+are not gates.
 
 ``limit`` is ``margin`` when residency or ``abort_mib`` stopped the search,
 and ``max_ctx`` when the cap stopped it.
@@ -81,10 +82,10 @@ def is_spill(
 ) -> bool:
     """True when shared memory grew past the threshold, or the prompt rate fell.
 
-    The baseline is ``reference``, the lowest resident window. A pre-window
-    reading stored on the observation is the idle sample and is not this
-    comparison. Missing shared usage or ``prompt_tok_s`` on either side is a
-    spill. Decode ``tok_s`` and ``ttft_ms`` are ignored here.
+    ``reference`` is the floor confirm. A pre-window reading stored on the
+    observation is the idle sample and is not this comparison. Missing shared
+    usage or ``prompt_tok_s`` on either side is a spill. Decode ``tok_s`` and
+    ``ttft_ms`` are ignored here.
     """
 
     baseline = reference.shared_mib
@@ -267,7 +268,7 @@ def _bisect(low: int, high: int, grain: int, measure, abort_mib: int) -> int:
 
 
 def baseline_is_spilling(idle_mib: int, baseline_mib: int, host_sum_mib: float, *, allowance_mib: int = SHARED_GROWTH_MIB) -> bool:
-    """The lowest window, minus idle, is more than the CUDA_Host sum plus the allowance.
+    """The floor confirm, minus idle, is more than the CUDA_Host sum plus the allowance.
 
     Equality at the allowance is not spilling. The caller has the three readings.
     """
@@ -275,20 +276,27 @@ def baseline_is_spilling(idle_mib: int, baseline_mib: int, host_sum_mib: float, 
     return (baseline_mib - idle_mib) - host_sum_mib > allowance_mib
 
 
-def lowest_resident_shared(calls: list[tuple]) -> tuple[int, int] | None:
-    """``(ctx, shared_mib)`` of the lowest resident load. That window is the baseline."""
+def floor_confirm_shared(calls: list[tuple]) -> tuple[int, int, float | None] | None:
+    """``(ctx, shared_mib, prompt_tok_s)`` of the floor confirm.
 
-    chosen: tuple[int, int] | None = None
+    The floor is confirmed before any candidate, so the reference is the
+    lowest confirm that has a shared reading. The first one at that window
+    wins. A load is not the reference: the gates compare confirm with confirm.
+    """
+
+    chosen: tuple[int, int, float | None] | None = None
     for call in calls:
-        if len(call) < 6 or call[0] != "load" or call[5] != "resident":
+        if len(call) < 6 or call[0] != "confirm":
             continue
-        ctx, shared = call[1], call[3]
+        ctx, shared, prompt = call[1], call[3], call[4]
         if isinstance(ctx, bool) or isinstance(shared, bool):
             continue
         if not isinstance(ctx, int) or not isinstance(shared, int):
             continue
-        if chosen is None or ctx < chosen[0]:
-            chosen = (ctx, shared)
+        if chosen is not None and ctx >= chosen[0]:
+            continue
+        rate = prompt if isinstance(prompt, (int, float)) and not isinstance(prompt, bool) else None
+        chosen = (ctx, shared, None if rate is None else float(rate))
     return chosen
 
 
@@ -303,13 +311,6 @@ def shared_deltas(calls: list[tuple], baseline_mib: int) -> list[dict]:
             delta = shared - baseline_mib
         rows.append({"kind": call[0], "ctx": call[1], "delta_mib": delta})
     return rows
-
-
-def _lowest_resident(loaded: dict[int, Observation], abort_mib: int) -> Observation | None:
-    fitting = [ctx for ctx, obs in loaded.items() if not over_margin(obs, abort_mib)]
-    if not fitting:
-        return None
-    return loaded[min(fitting)]
 
 
 def search(
@@ -344,32 +345,35 @@ def search(
             loaded[ctx] = obs
         return obs
 
-    first = measure(default_ctx, "load")
-    last_pass: int | None = None
-    if over_margin(first, abort_mib):
-        # The cap does not fit. Halve to a resident window, then bisect upward.
-        high = default_ctx
-        low: int | None = None
-        ctx = default_ctx
-        while True:
-            nxt = _halve(ctx, grain)
-            if nxt is None:
-                break
-            ctx = nxt
-            obs = measure(ctx, "load")
-            if not over_margin(obs, abort_mib):
-                low = ctx
-                break
-            high = ctx
-        if low is None:
-            return SearchResult(None, "no resident window", calls, limit="margin")
-        last_pass = _bisect(low, high, grain, measure, abort_mib)
-        limit = "margin"
-    else:
-        ctx = default_ctx
-        last_pass = default_ctx
+    if grain > max_ctx:
+        raise SearchError("the floor window is above the search cap")
+
+    # The floor is one grain, loaded and confirmed before any candidate.
+    # That confirm is the reference for both gates. A cap that fits is still
+    # judged against this confirm, not against itself.
+    floor_load = measure(grain, "load")
+    if over_margin(floor_load, abort_mib):
+        return SearchResult(None, "no resident window", calls, limit="margin")
+    floor_obs = measure(grain, "confirm")
+    if over_margin(floor_obs, abort_mib) or is_spill(
+        floor_obs,
+        floor_obs,
+        shared_growth_mib=shared_growth_mib,
+        prompt_ratio=prompt_ratio,
+    ):
+        reason = "spill" if not over_margin(floor_obs, abort_mib) else _load_reason(floor_obs, abort_mib)
+        calls[-1] = _reading("confirm", grain, floor_obs, reason)
+        return SearchResult(None, "no confirmed window", calls, limit="margin")
+    calls[-1] = _reading("confirm", grain, floor_obs, "confirmed")
+
+    def climb(start: int) -> int:
+        """The largest load that fits at or above ``start``. ``start`` already fits."""
+
+        nonlocal limit
+        ctx = start
+        passed = start
         first_fail: int | None = None
-        seen = {default_ctx}
+        seen = {start}
         while True:
             doubled = ctx * 2
             if doubled <= ctx or doubled > max_ctx:
@@ -384,20 +388,47 @@ def search(
                 first_fail = ctx
                 limit = "margin"
                 break
-            last_pass = ctx
+            passed = ctx
         if first_fail is not None:
-            last_pass = _bisect(last_pass, first_fail, grain, measure, abort_mib)
+            passed = _bisect(passed, first_fail, grain, measure, abort_mib)
+        return passed
 
-    reference = _lowest_resident(loaded, abort_mib)
-    if reference is None or last_pass is None:
-        return SearchResult(None, "no resident window", calls, limit=limit or "margin")
+    last_pass: int | None
+    if default_ctx <= grain:
+        last_pass = climb(grain)
+    else:
+        first = measure(default_ctx, "load")
+        if over_margin(first, abort_mib):
+            # The cap does not fit. Halve toward the floor, then bisect upward.
+            high = default_ctx
+            low: int | None = None
+            ctx = default_ctx
+            while True:
+                nxt = _halve(ctx, grain)
+                if nxt is None:
+                    break
+                ctx = nxt
+                if ctx == grain:
+                    low = ctx
+                    break
+                obs = measure(ctx, "load")
+                if not over_margin(obs, abort_mib):
+                    low = ctx
+                    break
+                high = ctx
+            if low is None:
+                return SearchResult(None, "no resident window", calls, limit="margin")
+            last_pass = _bisect(low, high, grain, measure, abort_mib)
+            limit = "margin"
+        else:
+            last_pass = climb(default_ctx)
 
     candidate = last_pass
-    while candidate >= grain:
+    while candidate > grain:
         obs = measure(candidate, "confirm")
         spilled = is_spill(
             obs,
-            reference,
+            floor_obs,
             shared_growth_mib=shared_growth_mib,
             prompt_ratio=prompt_ratio,
         )
@@ -419,4 +450,15 @@ def search(
             shared_mib=obs.shared_mib,
             dedicated_delta=obs.dedicated_delta,
         )
-    return SearchResult(None, "no confirmed window", calls, limit=limit)
+    return SearchResult(
+        grain,
+        "confirmed",
+        calls,
+        peak_mib=floor_obs.peak_mib,
+        tok_s=floor_obs.tok_s,
+        ttft_ms=floor_obs.ttft_ms,
+        limit=limit,
+        prompt_tok_s=floor_obs.prompt_tok_s,
+        shared_mib=floor_obs.shared_mib,
+        dedicated_delta=floor_obs.dedicated_delta,
+    )

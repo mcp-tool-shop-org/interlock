@@ -20,7 +20,7 @@ from interlock.harness.e5 import (
     SearchResult,
     baseline_is_spilling,
     is_spill,
-    lowest_resident_shared,
+    floor_confirm_shared,
     search,
     shared_deltas,
 )
@@ -489,34 +489,38 @@ def _window(shared: int, *, prompt: float = _SMOKE_PROMPT) -> Observation:
 
 
 def _smoke_calls() -> list[tuple]:
-    calls = [
-        ("load", ctx, 1000, shared, _SMOKE_PROMPT, "resident")
-        for ctx, shared in _SMOKE_SHARED.items()
+    """The recorded e5-smoke calls: one load at 8192, then confirms down to 2048."""
+
+    recorded = (
+        ("load", 8192, "resident"),
+        ("confirm", 8192, "confirmed"),
+        ("confirm", 6144, "confirmed"),
+        ("confirm", 4096, "confirmed"),
+        ("confirm", 2048, "confirmed"),
+    )
+    return [
+        (kind, ctx, 1000, _SMOKE_SHARED[ctx], _SMOKE_PROMPT, reason)
+        for kind, ctx, reason in recorded
     ]
-    calls.append(("confirm", 8192, 1000, _SMOKE_SHARED[8192], _SMOKE_PROMPT, "confirmed"))
-    return calls
 
 
-def test_the_smoke_windows_confirm_against_the_lowest_resident_window():
+def test_the_recorded_smoke_deltas_confirm_against_the_floor():
     host = _smoke_host()
     assert host == {"model": 333.84, "compute": 18.01, "output": 0.58, "sum": 352.43}
+    over = (_SMOKE_SHARED[2048] - _SMOKE_IDLE) - host["sum"]
+    assert round(over, 1) == 80.6
     assert baseline_is_spilling(_SMOKE_IDLE, _SMOKE_SHARED[2048], host["sum"]) is False
+    calls = _smoke_calls()
+    assert floor_confirm_shared(calls) == (2048, 505, _SMOKE_PROMPT)
+    assert [item["delta_mib"] for item in shared_deltas(calls, 505)] == [29, 29, 26, 2, 0]
     reference = _window(_SMOKE_SHARED[2048])
     for shared in _SMOKE_SHARED.values():
         assert is_spill(_window(shared), reference, shared_growth_mib=256, prompt_ratio=0.5) is False
 
-    def probe(ctx, _kind):
-        return _window(_SMOKE_SHARED[ctx])
-
-    climbed = search(default_ctx=2048, probe=probe, abort_mib=30500, grain=2048, max_ctx=8192)
-    assert climbed.max_ctx == 8192
-    assert climbed.reason == "confirmed"
-    assert [call[1] for call in climbed.calls if call[0] == "load"] == [2048, 4096, 8192]
-
     found = SearchResult(
         8192,
         "confirmed",
-        _smoke_calls(),
+        calls,
         peak_mib=1000,
         tok_s=10,
         ttft_ms=1,
@@ -528,18 +532,54 @@ def test_the_smoke_windows_confirm_against_the_lowest_resident_window():
     assert fields["idle_shared_mib"] == _SMOKE_IDLE
     assert fields["baseline_ctx"] == 2048
     assert fields["baseline_shared_mib"] == 505
+    assert fields["baseline_prompt_tok_s"] == _SMOKE_PROMPT
     assert fields["cuda_host_model_mib"] == 333.84
     assert fields["cuda_host_compute_mib"] == 18.01
     assert fields["cuda_host_output_mib"] == 0.58
     assert fields["cuda_host_sum_mib"] == 352.43
+    assert [item["delta_mib"] for item in fields["shared_delta_mib"]] == [29, 29, 26, 2, 0]
     assert found.max_ctx == 8192
     assert found.reason == "confirmed"
-    loads = {
-        item["ctx"]: item["delta_mib"]
-        for item in fields["shared_delta_mib"]
-        if item["kind"] == "load"
-    }
-    assert loads == {2048: 0, 4096: 2, 6144: 26, 8192: 29}
+
+
+def test_a_model_resident_at_its_first_load_is_judged_against_the_floor():
+    """The search starts at the cap. The cap's own load is not the reference.
+
+    Load and confirm at 8192 read the same shared value, so a comparison with
+    that load is a delta of 0. Three hundred MiB over the floor confirm still
+    spills. A cap within 256 of the floor confirms, and baseline_ctx stays 2048.
+    """
+
+    def spilling(ctx, _kind):
+        return _window(805 if ctx == 8192 else 505)
+
+    found = search(default_ctx=8192, probe=spilling, abort_mib=30500, grain=2048, max_ctx=8192)
+    assert found.calls[0] == ("load", 2048, 1000, 505, _SMOKE_PROMPT, "resident")
+    assert found.calls[1] == ("confirm", 2048, 1000, 505, _SMOKE_PROMPT, "confirmed")
+    assert ("load", 8192, 1000, 805, _SMOKE_PROMPT, "resident") in found.calls
+    assert ("confirm", 8192, 1000, 805, _SMOKE_PROMPT, "spill") in found.calls
+    assert found.max_ctx == 6144
+    assert found.reason == "confirmed"
+    host = _smoke_host()
+    fields = _apply_spill_baseline(found, host, _SMOKE_IDLE)
+    assert fields["baseline_ctx"] == 2048
+    assert fields["baseline_shared_mib"] == 505
+    cap = next(
+        item for item in fields["shared_delta_mib"] if item["kind"] == "confirm" and item["ctx"] == 8192
+    )
+    assert cap["delta_mib"] == 300
+
+    def within(ctx, _kind):
+        return _window(505 + 256 if ctx == 8192 else 505)
+
+    held = search(default_ctx=8192, probe=within, abort_mib=30500, grain=2048, max_ctx=8192)
+    assert held.calls[0][1] == 2048
+    assert held.max_ctx == 8192
+    assert held.reason == "confirmed"
+    assert floor_confirm_shared(held.calls) == (2048, 505, _SMOKE_PROMPT)
+    held_fields = _apply_spill_baseline(held, host, _SMOKE_IDLE)
+    assert held_fields["baseline_check"] == "ok"
+    assert held_fields["baseline_ctx"] == 2048
 
 
 def test_a_window_300_mib_over_the_baseline_spills():
@@ -569,15 +609,20 @@ def test_a_baseline_past_the_cuda_host_sum_is_inconclusive():
     assert baseline_is_spilling(_SMOKE_IDLE, 680, host["sum"]) is False
     assert baseline_is_spilling(_SMOKE_IDLE, 681, host["sum"]) is True
 
-    calls = _smoke_calls()
-    calls[0] = ("load", 2048, 1000, 681, _SMOKE_PROMPT, "resident")
+    calls = [
+        ("confirm", 2048, 1000, 681, _SMOKE_PROMPT, "confirmed") if call[0] == "confirm" and call[1] == 2048 else call
+        for call in _smoke_calls()
+    ]
     found = SearchResult(8192, "confirmed", calls, peak_mib=1000, tok_s=10, prompt_tok_s=_SMOKE_PROMPT, shared_mib=534)
     fields = _apply_spill_baseline(found, host, _SMOKE_IDLE)
     assert fields["baseline_check"] == "spilling"
     assert fields["baseline_ctx"] == 2048
     assert fields["baseline_shared_mib"] == 681
     assert fields["idle_shared_mib"] == _SMOKE_IDLE
-    assert fields["shared_delta_mib"][0]["delta_mib"] == 0
+    floor_row = next(
+        item for item in fields["shared_delta_mib"] if item["kind"] == "confirm" and item["ctx"] == 2048
+    )
+    assert floor_row["delta_mib"] == 0
     assert found.max_ctx is None
     assert found.reason == f"{INCONCLUSIVE}: the baseline may be spilling"
     assert found.peak_mib is None
@@ -600,19 +645,26 @@ def test_a_baseline_past_the_cuda_host_sum_is_inconclusive():
     assert empty.max_ctx is None
 
 
-def test_the_baseline_helpers_skip_a_reading_that_is_not_a_resident_window():
+def test_the_baseline_helpers_skip_a_reading_that_is_not_the_floor_confirm():
     calls = [
         ("load",),
+        ("load", 1024, 1, 100, _SMOKE_PROMPT, "resident"),
+        ("confirm", 8192, 1, 534, _SMOKE_PROMPT, "confirmed"),
+        ("confirm", True, 1, 505, _SMOKE_PROMPT, "confirmed"),
+        ("confirm", 4096, 1, True, _SMOKE_PROMPT, "confirmed"),
+        ("confirm", "3000", 1, 505, _SMOKE_PROMPT, "confirmed"),
         ("confirm", 2048, 1, 505, _SMOKE_PROMPT, "confirmed"),
-        ("load", 8192, 1, 534, _SMOKE_PROMPT, "over abort_mib"),
-        ("load", True, 1, 505, _SMOKE_PROMPT, "resident"),
-        ("load", 4096, 1, True, _SMOKE_PROMPT, "resident"),
-        ("load", "8192", 1, 505, _SMOKE_PROMPT, "resident"),
-        ("load", 6144, 1, 531, _SMOKE_PROMPT, "resident"),
-        ("load", 2048, 1, 505, _SMOKE_PROMPT, "resident"),
+        ("confirm", 2048, 1, 400, True, "confirmed"),
+        ("confirm", 1024, 1, 10, "nope", "confirmed"),
     ]
-    assert lowest_resident_shared(calls) == (2048, 505)
-    assert lowest_resident_shared([]) is None
+    assert floor_confirm_shared(calls) == (1024, 10, None)
+    assert floor_confirm_shared([]) is None
+    assert floor_confirm_shared([("load", 2048, 1, 505, 1.0, "resident")]) is None
+    numbered = [
+        ("confirm", 2048, 1, 505, 40, "confirmed"),
+        ("confirm", 6144, 1, 531, 40.0, "confirmed"),
+    ]
+    assert floor_confirm_shared(numbered) == (2048, 505, 40.0)
     deltas = shared_deltas([("confirm", 4096), ("load", 2048, 1, True, 1, "resident"), ("load", 2048, 1, 507, 1, "resident")], 505)
     assert deltas[0]["delta_mib"] is None
     assert deltas[1]["delta_mib"] is None
@@ -640,12 +692,17 @@ def test_both_specs_load_and_carry_the_spill_baseline_amendment():
         loaded = load_spec(path)
         validate_spec(loaded)
         text = path.read_text(encoding="utf-8")
-        assert text.count("Amendment, 2026-10-13") == 1
-        amendment = next(line for line in text.splitlines() if "Amendment, 2026-10-13" in line)
-        assert "lowest resident window" in amendment
-        assert "spill_shared_mib (256)" in amendment
-        assert "CUDA_Host" in amendment
-        assert "inconclusive, never confirmed" in amendment
+        assert text.count("Amendment, 2026-10-13") == 2
+        amendments = [line for line in text.splitlines() if "Amendment, 2026-10-13" in line]
+        earlier = amendments[0]
+        assert "lowest resident window" in earlier
+        assert "spill_shared_mib (256)" in earlier
+        assert "CUDA_Host" in earlier
+        assert "inconclusive, never confirmed" in earlier
+        later = amendments[1]
+        assert "superseded" in later
+        assert "floor window" in later
+        assert "loaded and confirmed first" in later
         assert loaded["spill_shared_mib"] == 256
         assert loaded["spill_prompt_ratio"] == 0.5
         assert loaded["abort_mib"] == 30500

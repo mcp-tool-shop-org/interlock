@@ -75,7 +75,7 @@ from interlock.harness.e5 import (
     Observation,
     baseline_is_spilling,
     fit_prompt_words,
-    lowest_resident_shared,
+    floor_confirm_shared,
     search,
     shared_deltas,
 )
@@ -1522,29 +1522,30 @@ def _demote_unchecked_baseline(found) -> None:
 
 
 def _apply_spill_baseline(found, host: dict, idle) -> dict:
-    """Receipt fields for the lowest-window baseline, and a demotion when it may be spilling.
+    """Receipt fields for the floor-confirm baseline, and a demotion when it may be spilling.
 
-    The baseline is checked, not assumed. A missing idle reading or a missing
-    lowest window cannot confirm.
+    The baseline is the floor confirm, checked against idle and the CUDA_Host
+    sum. A missing idle reading or a missing floor confirm cannot confirm.
     """
 
-    lowest = lowest_resident_shared(found.calls)
+    floor = floor_confirm_shared(found.calls)
     idle_mib = idle if isinstance(idle, int) and not isinstance(idle, bool) else None
     fields = {
         "idle_shared_mib": idle_mib,
-        "baseline_ctx": None if lowest is None else lowest[0],
-        "baseline_shared_mib": None if lowest is None else lowest[1],
+        "baseline_ctx": None if floor is None else floor[0],
+        "baseline_shared_mib": None if floor is None else floor[1],
+        "baseline_prompt_tok_s": None if floor is None else floor[2],
         "cuda_host_model_mib": host.get("model"),
         "cuda_host_compute_mib": host.get("compute"),
         "cuda_host_output_mib": host.get("output"),
         "cuda_host_sum_mib": host.get("sum"),
-        "shared_delta_mib": [] if lowest is None else shared_deltas(found.calls, lowest[1]),
+        "shared_delta_mib": [] if floor is None else shared_deltas(found.calls, floor[1]),
     }
-    if lowest is None or idle_mib is None or host.get("sum") is None:
+    if floor is None or idle_mib is None or host.get("sum") is None:
         fields["baseline_check"] = "spilling"
         _demote_unchecked_baseline(found)
         return fields
-    spilling = baseline_is_spilling(idle_mib, lowest[1], host["sum"])
+    spilling = baseline_is_spilling(idle_mib, floor[1], host["sum"])
     fields["baseline_check"] = "spilling" if spilling else "ok"
     if spilling:
         _demote_unchecked_baseline(found)
