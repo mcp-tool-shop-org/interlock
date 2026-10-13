@@ -1,4 +1,6 @@
-<img src="assets/logo.png" width="200" alt="interlock">
+<p align="center">
+  <img src="assets/logo.png" width="480" alt="interlock">
+</p>
 
 # interlock: local AI device router
 
