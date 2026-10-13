@@ -22,7 +22,9 @@ are not gates.
 
 ``limit`` is ``predicted`` when ``predicted_over`` stopped the search,
 ``margin`` when residency or ``abort_mib`` stopped it, and ``max_ctx`` when
-the cap stopped it.
+the cap stopped it. A measured abort on the confirm walk is ``margin``,
+including when the search had already stopped on ``predicted_over``. A spill
+keeps the label the search had set. The cap keeps ``max_ctx``.
 
 The watchdog is not this search. ``abort_mib`` is the sampler's own stop.
 """
@@ -535,6 +537,9 @@ def search(
         if over_margin(obs, abort_mib) or spilled:
             reason = "spill" if spilled and not over_margin(obs, abort_mib) else _load_reason(obs, abort_mib)
             calls[-1] = _reading("confirm", ctx, obs, reason)
+            # A spill is not a measured abort, so it keeps predicted or max_ctx.
+            if over_margin(obs, abort_mib):
+                limit = "margin"
             break
         calls[-1] = _reading("confirm", ctx, obs, "confirmed")
         best_ctx = ctx

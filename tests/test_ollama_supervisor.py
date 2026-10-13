@@ -1294,6 +1294,8 @@ def _fill_spec(models: list[dict], **extra) -> dict:
         "adapter_match_tolerance_mib": 512,
         "spill_prompt_ratio": 0.5,
         "shared_gate_from_mib": 28452,
+        "settle_tolerance_mib": 512,
+        "settle_timeout_s": 30,
         "max_ctx": 8192,
         "shift": False,
         "truncate": False,
