@@ -190,16 +190,36 @@ def quiet_fill_seams() -> FillSeams:
     )
 
 
+def live_run(args, **kwargs):
+    """The live default. A bare ``subprocess.run`` returns no stdout.
+
+    No extra flags takes :func:`interlock.harness.e4b.capture_run`, which is
+    how E4b's pin and git reads capture. A lookup that passes only the argv
+    still gets the child's text. Flags a caller already set, such as a
+    timeout, are kept, and capture stays on.
+    """
+
+    from interlock.harness.e4b import capture_run
+
+    if not kwargs:
+        return capture_run(args)
+    kwargs.setdefault("capture_output", True)
+    kwargs.setdefault("text", True)
+    kwargs.setdefault("check", False)
+    return subprocess.run(args, **kwargs)
+
+
 def real_fill_seams(adapter, *, run=None, read_counter=None) -> FillSeams:
     """The command's seams. ``run`` and ``read_counter`` are test fakes.
 
-    Shared and dedicated usage come from the pinned adapter instance. The
-    runner pid is ``llama-server.exe`` when one can be named. It is not a
-    gate. The server log is the 11434 listener's parent redirect, unless
-    ``INTERLOCK_OLLAMA_LOG`` names one. The tray app log is not a source.
+    The live ``run`` is :func:`live_run`. Shared and dedicated usage come
+    from the pinned adapter instance. The runner pid is ``llama-server.exe``
+    when one can be named. It is not a gate. The server log is the 11434
+    listener's parent redirect, unless ``INTERLOCK_OLLAMA_LOG`` names one.
+    The tray app log is not a source.
     """
 
-    run = run or subprocess.run
+    run = run or live_run
     read_counter = read_counter or (lambda counter: _powershell_counter(counter, run))
     pinned: dict[str, str | None] = {"instance": None}
 
@@ -725,7 +745,8 @@ def log_redirect(command: str | None) -> str | None:
 def listener_log(run) -> str | None:
     """The 11434 listener's parent redirect. The port is not opened.
 
-    The tray app log is a different server and is not a fallback. A string
+    The call passes only the argv. The live default captures stdout. The
+    tray app log is a different server and is not a fallback. A string
     stdout is a successful lookup, matching :func:`listener_exe`.
     """
 
@@ -802,7 +823,11 @@ def _command_stdout(completed) -> str:
 
 
 def listener_exe(run) -> str | None:
-    """The executable listening on 11434, from E4b's lookup. The port is not opened."""
+    """The executable listening on 11434, from E4b's lookup. The port is not opened.
+
+    The call passes only the argv. The live default captures stdout, so the
+    program path is read from the child's text.
+    """
 
     from interlock.harness.ollama_serve import LISTENER_SCRIPT
 

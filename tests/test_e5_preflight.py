@@ -7,7 +7,10 @@ brief. Nothing here opens a socket, runs nvidia-smi, or reads a GPU counter.
 
 from __future__ import annotations
 
+import inspect
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -16,11 +19,13 @@ from interlock.harness.fill import (
     ADAPTER_DEDICATED,
     ADAPTER_SHARED,
     FillPreflightError,
+    _runner_pid,
     config_facts,
     driver_cuda,
     judge_preflight,
     listener_exe,
     listener_log,
+    live_run,
     load_line_facts,
     log_redirect,
     match_adapter_instance,
@@ -403,3 +408,30 @@ def test_a_parent_redirect_parses_and_the_runner_is_llama_server():
     assert runner_pid(["42 7 ollama.exe"]) is None
     assert runner_pid(["42 7 llama-server.exe", "43 7 llama-server.exe"]) is None
     assert runner_pid([]) is None
+
+
+def test_the_live_default_runner_returns_a_childs_stdout(monkeypatch):
+    # A string-returning fake hides this. The live default used to be a bare
+    # subprocess.run, so stdout was None and both lookups resolved nothing.
+    completed = live_run([sys.executable, "-c", "print('captured')"])
+    assert completed.stdout.strip() == "captured"
+    seams = real_fill_seams(object())
+    assert inspect.getclosurevars(seams.runner_pid).nonlocals["run"] is live_run
+
+    def captured(args, **kwargs):
+        assert kwargs.get("capture_output") is True
+        assert kwargs.get("text") is True
+        script = args[-1]
+        if "CommandLine" in script:
+            text = r"cmd.exe /c ollama serve >> E:\AI\ollama-cu134\system-11434.log 2>&1"
+        elif "ConvertTo-Json" in script:
+            text = '{"exe": "D:\\\\ollama\\\\ollama.exe"}'
+        else:
+            text = "42 5 llama-server.exe"
+        return subprocess.CompletedProcess(args, 0, stdout=text, stderr="")
+
+    monkeypatch.setattr("interlock.harness.e4b.subprocess.run", captured)
+    monkeypatch.setattr("interlock.harness.fill.subprocess.run", captured)
+    assert listener_log(live_run) == r"E:\AI\ollama-cu134\system-11434.log"
+    assert listener_exe(live_run) == r"D:\ollama\ollama.exe"
+    assert _runner_pid(live_run) == 42
