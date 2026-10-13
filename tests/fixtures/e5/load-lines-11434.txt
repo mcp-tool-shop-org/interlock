@@ -1,0 +1,8 @@
+# Recorded 2026-10-12 from the 11434 server log, the latest model load.
+# The llama-server executable path on that line named a per-user install and
+# is replaced here with D:\ollama\llama-server.exe. The flags, the
+# llama_kv_cache line, and the Flash Attention line are the recorded text.
+# File order: the start line, then the KV size line, then Flash Attention enabled.
+time=2026-10-12T23:06:54.383-04:00 level=INFO source=llama_server.go:436 msg="starting llama-server" cmd="D:\\ollama\\llama-server.exe --model E:\\AI-Models\\Ollama\\blobs\\sha256-a3de86cd1c132c822487ededd47a324c50491393e6565cd14bafa40d0b8e686f --port 62133 --host 127.0.0.1 --no-webui --offline -c 2048 -np 1 --log-verbosity 4 --no-log-prefix --no-log-timestamps --no-jinja --chat-template chatml --load-mode none --flash-attn auto -b 512 -ub 512"
+llama_kv_cache: size =  288.00 MiB (  2048 cells,  36 layers,  1/1 seqs), K (f16):  144.00 MiB, V (f16):  144.00 MiB
+resolve_fused_ops: Flash Attention enabled

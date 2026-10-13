@@ -157,6 +157,7 @@ class _Transport:
         self._release = threading.Event()
         self.shown = None
         self.calls = []
+        self.before_generate = None
         self.unloads = []
         self.abort_unloads = []
         self.order = []
@@ -246,6 +247,8 @@ class _Transport:
         self.state["confirm"] = (not body.get("raw")) and body.get("prompt") != SEED
         self.state["busy"] = True
         self.events.append(("load", self.state["ctx"]))
+        if callable(self.before_generate) and not body.get("raw") and body.get("prompt") != "":
+            self.before_generate()
         if self.explode and not body.get("raw"):
             raise RuntimeError("generate exploded")
         holding = (
@@ -721,7 +724,14 @@ def test_dry_run_names_the_confirmation_count(monkeypatch):
     assert "preflight samples nvidia-smi, both counters, the server log, the ggml-cuda sha, git, and driver CUDA before any load" in text
     assert "driver CUDA accepts CUDA Version and CUDA UMD Version" in text
     assert "a missing log or dll refuses at preflight" in text
-    assert "the log is INTERLOCK_OLLAMA_LOG, else the per-user Ollama server log" in text
+    assert "the log is INTERLOCK_OLLAMA_LOG, else the 11434 listener parent's redirect" in text
+    assert "the tray app log is never a fallback" in text
+    assert "an unresolved log refuses at preflight" in text
+    assert "OLLAMA_HOST 127.0.0.1:11434" in text
+    assert "an empty KV cache type is unset" in text
+    assert "gated on the first-load lines" in text
+    assert "a missing load line refuses before any measured window" in text
+    assert "the runner pid is llama-server.exe and stays record-only" in text
     assert "the exe is INTERLOCK_OLLAMA_EXE, else the 11434 listener" in text
     assert "quant is read from /api/show at run time" in text
     assert "closing the request does not return the memory a load already allocated" in text
@@ -890,7 +900,9 @@ def test_readers_parse_fake_output_and_do_not_guess(tmp_path: Path):
     assert driver_cuda(header) == "driver 13.2"
     assert driver_cuda("no cuda header\n") is None
     assert runner_pid(["42 7 ollama.exe", "9 7 ollama.exe"]) is None
-    assert runner_pid(["42 7 OLLAMA.EXE"]) == 42
+    assert runner_pid(["42 7 ollama.exe"]) is None
+    assert runner_pid(["42 7 llama-server.exe"]) == 42
+    assert runner_pid(["42 7 LLAMA-SERVER.EXE"]) == 42
     assert runner_pid([]) is None
     missing = facts_from_log(None)
     assert missing["flash_attention"] == "unrecorded"
@@ -932,7 +944,8 @@ def test_readers_parse_fake_output_and_do_not_guess(tmp_path: Path):
         if "cuda_version" in script or "cuda_version" in " ".join(argv):
             raise AssertionError(argv)
         if "11434" in script:
-            return Completed("42 100 ollama.exe\n")
+            assert "llama-server.exe" in script
+            return Completed("42 100 llama-server.exe\n")
         raise AssertionError(argv)
 
     seen = []
@@ -1035,7 +1048,7 @@ def test_the_runtime_check_refuses_confirm_num_predict_before_the_card(tmp_path:
 
 _SERVER_LOG = (
     'msg="server config" env="map[OLLAMA_FLASH_ATTENTION:true OLLAMA_KV_CACHE_TYPE:q8_0 '
-    'OLLAMA_CONTEXT_LENGTH:8192]"\n'
+    'OLLAMA_HOST:http://127.0.0.1:11434 OLLAMA_CONTEXT_LENGTH:8192]"\n'
     "load_backend: loaded CUDA backend from C:/ollama/lib/ollama/cuda_v13/ggml-cuda.dll\n"
 )
 _DLL_BYTES = b"cuda-bytes"
@@ -1126,8 +1139,10 @@ def _live_commands(install: dict, fault: str):
             return _Completed("617.42\n")
         if argv and argv[0] == "powershell":
             script = argv[-1]
-            if "ParentProcessId" in script:
-                return _Completed("")
+            if "llama-server.exe" in script:
+                return _Completed("77 5 llama-server.exe\n")
+            if "CommandLine" in script:
+                return _Completed(f'cmd.exe /c ollama serve >> "{install["log"]}" 2>&1')
             if "ConvertTo-Json" in script:
                 return _Completed(json.dumps({"exe": str(install["exe"])}))
         raise AssertionError(argv)
@@ -1292,13 +1307,36 @@ def test_a_dirty_start_is_recorded_false_on_the_aborted_receipt(tmp_path: Path, 
     assert str(install["exe"]) not in text
 
 
+def _recorded_log(name: str) -> str:
+    return (ROOT / "tests" / "fixtures" / "e5" / name).read_text(encoding="utf-8")
+
+
+def _decoy_tray(tmp_path: Path, monkeypatch) -> None:
+    tray = tmp_path / "tray"
+    (tray / "Ollama").mkdir(parents=True)
+    (tray / "Ollama" / "server.log").write_text(
+        'msg="server config" env="map[OLLAMA_HOST:http://127.0.0.1:11490 OLLAMA_FLASH_ATTENTION:true]"\n',
+        encoding="utf-8",
+        newline="\n",
+    )
+    monkeypatch.setenv("LOCALAPPDATA", str(tray))
+
+
 def test_a_clean_preflight_records_the_sample_the_sources_and_git(tmp_path: Path, monkeypatch, capsys):
     _clear_fill_env(monkeypatch)
     install = _install_tree(tmp_path)
-    monkeypatch.setenv("LOCALAPPDATA", str(install["app"]))
+    _decoy_tray(tmp_path, monkeypatch)
+    install["log"].write_text(_recorded_log("server-config-11434.txt"), encoding="utf-8", newline="\n")
+    load_lines = _recorded_log("load-lines-11434.txt")
+
+    def append() -> None:
+        with install["log"].open("a", encoding="utf-8", newline="") as handle:
+            handle.write(load_lines if load_lines.endswith("\n") else load_lines + "\n")
+
     repo, spec_path = _committed_repo(tmp_path, _spec([_model()]), folder="clean")
     run, read_counter, seen = _live_commands(install, "ok")
     transport = _Transport(None)
+    transport.before_generate = append
     adapter = OllamaAdapter(transport=transport)
     seams = real_fill_seams(adapter, run=run, read_counter=read_counter)
     seams.threaded = False
@@ -1316,9 +1354,13 @@ def test_a_clean_preflight_records_the_sample_the_sources_and_git(tmp_path: Path
     )
     printed = capsys.readouterr().out
     assert "driver_cuda=driver 13.4" in printed
-    assert "log_source=LOCALAPPDATA" in printed
+    assert "config_flash_attention=false" in printed
+    assert "config_kv_cache_type=unset" in printed
+    assert "log_source=listener-parent" in printed
+    assert "LOCALAPPDATA" not in printed
     assert "exe_source=listener" in printed
     assert _GPU_LUID in printed
+    assert any("CommandLine" in (argv[-1] if argv else "") for argv in seen)
     assert any("ConvertTo-Json" in (argv[-1] if argv else "") for argv in seen)
     row = rows[0]
     sha = subprocess.run(
@@ -1338,13 +1380,16 @@ def test_a_clean_preflight_records_the_sample_the_sources_and_git(tmp_path: Path
     assert settings["dedicated_mib"] == 2508
     assert settings["preflight_driver_cuda"] == "driver 13.4"
     assert settings["cuda_backend"] == "driver 13.4"
-    assert settings["flash_attention"] == "true"
-    assert settings["kv_cache_type"] == "q8_0"
+    assert settings["config_flash_attention"] == "false"
+    assert settings["config_kv_cache_type"] == "unset"
+    assert settings["flash_attention"] == "enabled"
+    assert settings["flash_attn"] == "auto"
+    assert settings["kv_cache_type"] == "f16"
     assert settings["ggml_cuda_sha"] == hashlib.sha256(_DLL_BYTES).hexdigest()
-    assert settings["log_source"] == "LOCALAPPDATA"
+    assert settings["log_source"] == "listener-parent"
     assert settings["exe_source"] == "listener"
+    assert settings["runner_pid"] == 77
     assert settings["max_resident_ctx"] == 4096
-    assert "runner_pid" not in settings
     urls = [url for _method, url, _body in transport.calls]
     assert urls[0].endswith("/api/ps")
     assert any(url.endswith("/api/show") for url in urls)
@@ -1353,3 +1398,53 @@ def test_a_clean_preflight_records_the_sample_the_sources_and_git(tmp_path: Path
     assert "Users" not in text
     assert str(install["log"]) not in text
     assert str(install["exe"]) not in text
+
+
+def test_a_missing_load_line_refuses_before_a_measured_window(tmp_path: Path, monkeypatch):
+    _clear_fill_env(monkeypatch)
+    install = _install_tree(tmp_path)
+    _decoy_tray(tmp_path, monkeypatch)
+    # The lines are already in the file, from an earlier model. This load writes nothing.
+    install["log"].write_text(
+        _recorded_log("server-config-11434.txt") + _recorded_log("load-lines-11434.txt"),
+        encoding="utf-8",
+        newline="\n",
+    )
+    repo, spec_path = _committed_repo(tmp_path, _spec([_model()]), folder="stale-load")
+    run, read_counter, _seen = _live_commands(install, "ok")
+    transport = _Transport(None)
+    adapter = OllamaAdapter(transport=transport)
+    seams = real_fill_seams(adapter, run=run, read_counter=read_counter)
+    seams.threaded = False
+    seams.sleep = lambda _seconds: None
+    transport.seams = seams
+    with pytest.raises(RunnerError, match="first load"):
+        run_spec(
+            spec_path,
+            root=repo,
+            grant="g",
+            adapters={"ollama": adapter},
+            heartbeat=_fresh(tmp_path),
+            date="2026-10-12",
+            run_id="fill-stale",
+            seams=seams,
+        )
+    row = load_jsonl(repo / "receipts" / "fill-stale.jsonl")[0]
+    assert row["aborted"] is True
+    assert row["settings"]["max_resident_ctx"] is None
+    assert "search_calls" not in row["settings"]
+    assert row["settings"]["flash_attention"] == "unrecorded"
+    assert row["settings"]["kv_cache_type"] == "unrecorded"
+    assert "flash_attn" not in row["settings"]
+    assert row["settings"]["config_flash_attention"] == "false"
+    assert row["settings"]["config_kv_cache_type"] == "unset"
+    assert row["settings"]["runner_pid"] == 77
+    assert row["settings"]["log_source"] == "listener-parent"
+    prompts = [
+        body.get("prompt")
+        for _method, url, body in transport.calls
+        if str(url).endswith("/api/generate") and isinstance(body, dict) and body.get("prompt")
+    ]
+    assert len(prompts) == 1
+    text = (repo / "receipts" / "fill-stale.jsonl").read_text(encoding="utf-8")
+    assert "Users" not in text

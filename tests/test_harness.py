@@ -1305,6 +1305,8 @@ def test_an_edited_spec_is_refused_and_dry_run_does_not_touch_devices(tmp_path: 
     assert "zero or several instances within tolerance refuses before any load" in e5_text
     assert "driver CUDA accepts CUDA Version and CUDA UMD Version" in e5_text
     assert "a missing log or dll refuses at preflight" in e5_text
+    assert "the tray app log is never a fallback" in e5_text
+    assert "llama-server.exe" in e5_text
     assert "quant is read from /api/show at run time" in e5_text
     assert "not launched" not in e4_text
     spec = repo / "experiments" / "e4" / "spec.yaml"
