@@ -18,13 +18,14 @@ must sit within ``settle_tolerance_mib`` of the expected pre-call level.
 Between models, and when nothing is resident, that level is the idle baseline
 taken before the model loads. A ``num_ctx`` change unloads first
 (``keep_alive`` 0) and settles to that idle reading, and only then does the
-call load at the new context. A confirm whose count unloads waits again for
-that same idle reading immediately before the measured request. That reading
-is the pre-call reading. The reading taken before the count is the pre-count
-reading. The resident floor applies only where no count unload comes before
-the call. A card that does not settle within ``settle_timeout_s`` makes the
-model inconclusive. That window is not a margin ceiling, and the measurement
-is not kept.
+call load at the new context. A confirm counts, then waits again for that
+same idle reading immediately before the measured request, whoever unloads
+the runner (``keep_alive`` 0 included). That reading is the pre-call reading
+and it carries ``count_ran``. The reading taken before the count is the
+pre-count reading. ``unloaded`` still means the harness unloaded. The
+resident floor applies only where no count comes before the call. A card
+that does not settle within ``settle_timeout_s`` makes the model inconclusive.
+That window is not a margin ceiling, and the measurement is not kept.
 ``num_predict`` of 1 is not a decode rate: the row stores null and a reason.
 
 Before a load, two resident loads predict the next card reading from their
@@ -1275,10 +1276,11 @@ def _attach_pre_calls(row: dict, pre_calls: list, *, key: str = "pre_call_dedica
     ``predicted_over`` is not a measured call, so it has no pre-call reading.
     A later load of the same context is a different call and keeps its own.
     ``resident_ctx`` is the runner this wait found, or null when nothing was
-    resident. ``unloaded`` is true when that runner was unloaded before the wait.
-    A confirm whose count unloads keeps the earlier reading under
-    ``pre_count_dedicated_mib``. ``pre_call_dedicated_mib`` is the reading
-    taken immediately before the measured request.
+    resident. ``unloaded`` is true when the harness unloaded before the wait.
+    ``count_ran`` is true when this observe counted before the measured request.
+    A confirm keeps the earlier reading under ``pre_count_dedicated_mib``.
+    ``pre_call_dedicated_mib`` is the reading taken immediately before the
+    measured request.
     """
 
     calls = row.get("settings", {}).get("search_calls")
@@ -1295,15 +1297,16 @@ def _attach_pre_calls(row: dict, pre_calls: list, *, key: str = "pre_call_dedica
         if item["kind"] != call[0] or item["ctx"] != call[1]:
             continue
         queue.pop(0)
-        paired.append(
-            {
-                "kind": item["kind"],
-                "ctx": item["ctx"],
-                "mib": item["mib"],
-                "resident_ctx": item["resident_ctx"],
-                "unloaded": item["unloaded"],
-            }
-        )
+        recorded = {
+            "kind": item["kind"],
+            "ctx": item["ctx"],
+            "mib": item["mib"],
+            "resident_ctx": item["resident_ctx"],
+            "unloaded": item["unloaded"],
+        }
+        if "count_ran" in item:
+            recorded["count_ran"] = bool(item["count_ran"])
+        paired.append(recorded)
     if paired:
         row["settings"][key] = paired
 
@@ -1908,9 +1911,10 @@ def _measure_model(
             raise _UnloadTimeout(note)
 
     # Idle is taken before the model's first load. A num_ctx change unloads
-    # first and settles to it before the count. A confirm whose count unloads
-    # waits for it again immediately before the measured request. The resident
-    # floor applies only where no count unload comes before the call.
+    # first and settles to it before the count. A confirm counts, then waits
+    # for idle again immediately before the measured request, whoever unloads
+    # the runner. The resident floor applies only where no count comes before
+    # the call.
     idle_dedicated = _read_dedicated(seams.dedicated_mib)
     model_resident = False
     resident_floor: int | None = None
@@ -1928,6 +1932,10 @@ def _measure_model(
             settings["shift"] = False
         if truncate:
             settings["truncate"] = False
+        # An entry at keep_alive 0 has Ollama drop the runner when the count
+        # returns. The harness does not send a second unload for that.
+        if entry.get("keep_alive") is not None:
+            settings["keep_alive"] = entry["keep_alive"]
         try:
             counted = adapter.count_tokens(
                 model, text, settings=settings, device="5090", timeout=count_timeout
@@ -1976,11 +1984,16 @@ def _measure_model(
             "sum": parsed["cuda_host_sum_mib"],
         }
 
-    def _note_measured_pre_call(kind: str, ctx: int, reading: int | None) -> None:
+    def _mark_count_ran(kind: str, ctx: int, ran: bool) -> None:
+        if pre_calls and pre_calls[-1]["kind"] == kind and pre_calls[-1]["ctx"] == ctx:
+            pre_calls[-1]["count_ran"] = ran
+
+    def _note_measured_pre_call(kind: str, ctx: int, reading: int | None, *, harness_unloaded: bool) -> None:
         """Keep the probe reading as the pre-count reading.
 
-        The count loaded this context and then unloaded it. The reading passed
-        here was taken after that unload, immediately before the measured request.
+        The reading passed here was taken after the count, immediately before
+        the measured request. ``unloaded`` stays true only when the harness
+        unloaded. ``count_ran`` is not copied onto the pre-count reading.
         """
 
         earlier = None
@@ -1994,7 +2007,9 @@ def _measure_model(
             }
             pre_calls[-1]["mib"] = reading
             pre_calls[-1]["resident_ctx"] = ctx
-            pre_calls[-1]["unloaded"] = True
+            if harness_unloaded:
+                pre_calls[-1]["unloaded"] = True
+            pre_calls[-1]["count_ran"] = True
         else:
             pre_calls.append(
                 {
@@ -2002,7 +2017,8 @@ def _measure_model(
                     "ctx": ctx,
                     "mib": reading,
                     "resident_ctx": ctx,
-                    "unloaded": True,
+                    "unloaded": harness_unloaded,
+                    "count_ran": True,
                 }
             )
         if earlier is not None:
@@ -2011,7 +2027,8 @@ def _measure_model(
     def observe(ctx: int, kind: str) -> Observation:
         current["ctx"] = ctx
         prompt = seed
-        count_unloaded = False
+        harness_unloaded_count = False
+        _mark_count_ran(kind, ctx, kind == "confirm")
         if kind == "confirm":
             target = max(1, int(ctx * fraction))
             try:
@@ -2029,7 +2046,7 @@ def _measure_model(
                 return Observation(False, sampler.peak, error=str(exc))
             if _count_leaves_loaded(entry.get("keep_alive")):
                 stop_if_unload_timed_out()
-                count_unloaded = True
+                harness_unloaded_count = True
             try:
                 cold_tokens = count(text, ctx)
             except _WindowOver:
@@ -2052,7 +2069,7 @@ def _measure_model(
             prompts[ctx] = (cold_tokens, _prompt_method(fit), tokens, cold_tokens)
             if _count_leaves_loaded(entry.get("keep_alive")):
                 stop_if_unload_timed_out()
-                count_unloaded = True
+                harness_unloaded_count = True
             prompt = text
         settings = {
             "prompt": prompt,
@@ -2069,7 +2086,7 @@ def _measure_model(
             if isinstance(path, str) and path.strip():
                 load_state["offset"] = log_byte_size(path)
         request = StepRequest(f"{kind}-{ctx}", "generate", model, "5090", "ollama", settings)
-        if count_unloaded and idle_dedicated is not None:
+        if kind == "confirm" and idle_dedicated is not None:
             reading, reason = wait_for_dedicated(
                 seams.dedicated_mib,
                 seams.sleep,
@@ -2080,7 +2097,9 @@ def _measure_model(
             )
             if reason:
                 raise _Unsettled(reason)
-            _note_measured_pre_call(kind, ctx, reading)
+            _note_measured_pre_call(
+                kind, ctx, reading, harness_unloaded=harness_unloaded_count
+            )
         before = _window_readings(seams)
         try:
             result = adapter.run(request)
