@@ -627,7 +627,7 @@ def facts_from_log(text: str | None) -> dict[str, str | None]:
         "flash_attention": take("OLLAMA_FLASH_ATTENTION"),
         "kv_cache_type": take("OLLAMA_KV_CACHE_TYPE"),
         "default_context": take("OLLAMA_CONTEXT_LENGTH"),
-        "backend_library": libraries[-1] if libraries else UNRECORDED,
+        "backend_library": install_relative(libraries[-1]) if libraries else UNRECORDED,
     }
     missing = [name for name, value in facts.items() if value == UNRECORDED]
     facts["reason"] = None if not missing else "server log did not record " + ", ".join(missing)
@@ -726,6 +726,21 @@ def load_line_facts(text: str | None) -> dict:
         "kv_cache_type": kv,
         "reason": None if not missing else "the first load did not record " + ", ".join(missing),
     }
+
+
+def install_relative(path: str) -> str:
+    r"""The backend library as a path inside the Ollama install (``lib\ollama\...``).
+
+    The load line names the full path, which sits under the user's home on a
+    per-user install, and receipts refuse home paths. Live 2026-10-13: E5 measured
+    gemma4 for 70 minutes, then the row was refused at write time.
+    """
+
+    text = path.replace("/", "\\")
+    marker = text.lower().find("\\lib\\ollama\\")
+    if marker >= 0:
+        return text[marker + 1 :]
+    return text.rsplit("\\", 1)[-1]
 
 
 def log_redirect(command: str | None) -> str | None:
@@ -1484,6 +1499,11 @@ def _measure_model(
     cuda = _text(seams.cuda_backend())
     facts = facts_from_log(_optional_reader(seams, "server_log"))
     ggml, ggml_reason = ggml_cuda_sha256(_optional_reader(seams, "ggml_dll"))
+    # Every recorded fact must pass the receipt's guard before any model loads, not
+    # when the first row is written an hour later (live 2026-10-13).
+    from interlock.receipt import _reject_home_paths
+
+    _reject_home_paths({key: value for key, value in facts.items() if key != "reason"}, "$.settings")
     pid_value = _optional_reader(seams, "runner_pid")
     runner = pid_value if isinstance(pid_value, int) and not isinstance(pid_value, bool) else None
     # Quiet tests keep the config-line reading. A live preflight replaces these

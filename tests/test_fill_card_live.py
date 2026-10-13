@@ -22,6 +22,7 @@ from interlock.adapters.ollama_cases import require_recorded_behaviour
 from interlock.harness.spec import SpecError, validate_spec
 from interlock.guards import GuardError, require_card_empty, require_grant, require_heartbeat
 from interlock.harness.fill import (
+    install_relative,
     ADAPTER_DEDICATED,
     ADAPTER_SHARED,
     DRIVER_ARGV,
@@ -885,7 +886,7 @@ def test_the_server_log_fills_the_four_fields(tmp_path: Path):
     assert settings["flash_attention"] == "true"
     assert settings["kv_cache_type"] == "q8_0"
     assert settings["default_context"] == "8192"
-    assert settings["backend_library"] == library
+    assert settings["backend_library"] == install_relative(library)
     assert "server_facts_reason" not in settings
     assert settings["ggml_cuda_sha"] == hashlib.sha256(b"cuda-bytes").hexdigest()
     assert "ggml_cuda_reason" not in settings

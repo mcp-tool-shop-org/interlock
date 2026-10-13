@@ -1,0 +1,90 @@
+# E5 SMOKE (Publisher, 2026-10-13). Not an experiment and never a result: it proves the
+# whole fill-card path end to end (preflight, a load, a confirm, the row, the receipt write)
+# in minutes, before a long E5 run. Same rules as experiments/e5/spec.yaml, one small
+# model, the search capped at 8192. Run it with --root outside receipts/ (a scratch root).
+# Standards compliance
+#
+# PIN_PER_STEP: 2. The roster digests, the 2048 grid, 30500 MiB and 31200 MiB,
+#   the 256 MiB shared-memory spill threshold, and the 0.5 prompt-rate
+#   ratio are in this file.
+# ANDON_AUTHORITY: 2. The sampler aborts at 30500 MiB and unloads. It does not
+#   wait for the watchdog, and it never loads up to 31200 MiB.
+# NAMED_COMPENSATORS: 2. Unload is keep_alive 0. No publish and no rental.
+# DECOMPOSE_BY_SECRETS: 2. This file is the pre-registration. The search is code.
+# UNCERTAINTY_GATED_HUMANS: 2. One grant per model, from the Publisher, with the
+#   900 second rest between models. This spec does not start a device.
+# EXTERNAL_VERIFIER: n/a. R&D reviews this spec before any device time.
+
+# Amendment, 2026-10-11 (maintainer). Rest is the Publisher's scheduling decision between consecutive long runs, not a harness rule; rest_s below is no longer read.
+# Amended 2026-10-12 (Publisher): the tool is renamed interlock; commands updated.
+# Amendment, 2026-10-12. The spill counter is \GPU Adapter Memory(*)\Shared Usage on the 5090 adapter instance whose Dedicated Usage matches nvidia-smi memory.used, at the baseline taken immediately before the window and again after the load. No match, or more than one, is a missing reading, and a missing reading is a spill. The gate is that shared delta. The dedicated delta is recorded and is not a gate. The runner pid may be recorded and does not gate. The search cap is min(max_ctx, the trained context length). A window above the trained length is not loaded. A trained-length window that is not resident is halved to one grain, then bisected upward. The spill reference is the lowest resident window. Flash attention, the KV cache type, the server default context and the backend library are read from the server log named by SWITCHYARD_OLLAMA_LOG. A missing log leaves those four fields unrecorded with a reason. The ggml-cuda sha is the sha256 of ggml-cuda.dll under the exe's lib\ollama\cuda_v13, and the exe is SWITCHYARD_OLLAMA_EXE. Driver CUDA is the nvidia-smi header, not a cuda_version query.
+# Amendment, 2026-10-12, after e5-2026-10-12c. Adapter match: the 5090 adapter instance is pinned once, at run start, on the idle card. It is the only instance whose Dedicated Usage is within adapter_match_tolerance_mib of nvidia-smi memory.used. Shared and dedicated are then read for that pinned instance at each window's baseline and after its load. Zero or several instances within tolerance refuses the run before any load. adapter_match_tolerance_mib is 512. It is a matching allowance, unrelated to spill_shared_mib 256, and it is not a spill threshold. Server facts: the log is the one named by INTERLOCK_OLLAMA_LOG, else the >> redirect on the 11434 listener's parent command line. The tray app's %LOCALAPPDATA%\Ollama\server.log is a different server and is never a fallback. If nothing resolves, preflight refuses. The latest server-config line must show OLLAMA_HOST 127.0.0.1:11434, with or without an http scheme. The exe is INTERLOCK_OLLAMA_EXE, else the 11434 listener's executable, as E4b finds it. A missing log or dll is a refusal at preflight, not an unrecorded field. The preflight, before the first load or pull, samples nvidia-smi memory, both counters on the pinned instance, that server-config line, the ggml-cuda dll sha256, git (a 40-hex sha and an empty porcelain), and driver CUDA. The server-config values are recorded as they are. An empty KV cache type is unset, and that line is not the gated fact. The gated flash attention and KV cache type come from that model's first-load lines: the llama-server --flash-attn value, the Flash Attention enabled or disabled line, and the llama_kv_cache K and V types. A missing load line refuses after that first load and before any measured window. The nvidia-smi header may say CUDA Version or CUDA UMD Version. Any failure refuses and names what failed. The runner pid stays record-only and is llama-server.exe.
+id: E5-smoke
+procedure: fill-card
+question: >
+  For each named local 5090 model, what is the largest num_ctx that stays fully
+  resident and at or under 30500 MiB, including the peak while a long prompt
+  is processed?
+decision: >
+  The row is that num_ctx and the VRAM at the confirmed peak. offrig may later
+  read it as the ceiling for num_ctx auto. A window that fails residency or
+  exceeds 30500 MiB steps back one 2048 notch. So does a spill. Spill means the
+  5090 adapter's shared GPU memory grew by more than 256 MiB over the baseline
+  taken immediately before that window, or the prompt-processing rate fell
+  below half the lowest resident window's rate. Growth of exactly 256 MiB is
+  not a spill. Time to first
+  token and decode tokens per second are recorded and are not gates. No
+  confirmed window means the model has no fill-the-card row. Do not invent one.
+abort_mib: 30500
+ceiling_mib: 31200
+grain: 2048
+confirm_prompt_fraction: 0.9
+confirm_num_predict: 1
+sample_ms: 200
+spill_shared_mib: 256
+# Matching allowance for the idle-card pin. Not a spill threshold.
+adapter_match_tolerance_mib: 512
+spill_prompt_ratio: 0.5
+max_ctx: 8192
+shift: false
+truncate: false
+rest_s: 0
+needs:
+  grant: true
+  npu_session: false
+  cpu_window: false
+dataset:
+  name: e5-confirm-prompt
+  seed: "The switchyard fills the card with the same sentence. "
+  rule: >
+    The load uses num_predict 1. Confirmation uses a prompt of about 90 percent
+    of the candidate window, built by repeating the seed until the tokenizer
+    reaches that count, then keeping the shortest such prefix. shift and
+    truncate are both false, so a full window is an error and not a silent shift.
+metrics:
+  - max_resident_ctx
+  - peak_mib
+  - ttft_ms
+  - decode_tok_s
+  - prompt_tok_s
+  - shared_mib
+  - idle_baseline_mib
+stop_rules:
+  - Abort and unload the moment card VRAM reaches 30500 MiB. Do not test 31200 MiB. Do not rely on the watchdog. Ollama's runner is not on the watchdog's kill list.
+  - Fully resident means the loaded model reports size_vram equal to size, and the server log for that load shows every layer on the GPU.
+  - The search cap is the smaller of max_ctx and the model's trained context length from /api/show. Do not load a window above that length. The trained length is written on the receipt. Do not invent it in this file. When that window is not fully resident, halve until one is, down to one grain, then bisect upward on the 2048-token grid.
+  - Confirmation samples nvidia-smi about every 200 ms through the long prompt. The reported VRAM is that peak.
+  - "Spill is shared GPU memory growth, then prompt-processing rate. The counter is \\GPU Adapter Memory(*)\\Shared Usage on the 5090 adapter instance whose Dedicated Usage matches nvidia-smi memory.used at the pre-window baseline and after the load. No match, or more than one, is a missing reading. The threshold is 256 MiB over the shared usage read immediately before that window. The secondary gate is prompt_eval_count / prompt_eval_duration below 0.5 times the lowest resident window. Both numbers are pre-registered. Growth of exactly 256 MiB is not a spill. A missing shared-usage reading or a missing prompt rate is a spill, not a pass. Decode tokens per second and raw time to first token are recorded and do not step the search back. The dedicated delta is recorded and is not a gate. The runner pid is not a gate."
+  - Read quantization_level and the single model_info context length from Ollama /api/show when the run starts. num_ctx on the receipt is that context length. Flash attention, the KV cache type, the server default context and the backend library come from the server log, not from /api/show. A missing log leaves them unrecorded with a reason. A missing quantization level is written unrecorded. A failed show is a failed step. Do not invent either value in this file.
+  - The 700 MiB between 30500 and 31200 is the margin that is never tested. The first run logs desktop VRAM variance. Amend it only in a committed spec change before a later run.
+  - One grant per model. Rest 900 seconds between models, with the card empty.
+  - A row is stale when the Ollama version, the CUDA backend, the ggml-cuda sha, the digest, the quantization, flash attention, the KV cache type, the idle baseline, or the NVIDIA driver version changes.
+  - Continue-at-a-bigger-window stays escalate-only and is not part of this experiment. Paged KV is not measured. 8-bit KV is not a silent setting.
+models:
+- model: qwen3:8b
+  revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+  quant: unrecorded
+  licence: unrecorded
+  engine: ollama
+  engine_version: 0.35.1
+  device: '5090'
