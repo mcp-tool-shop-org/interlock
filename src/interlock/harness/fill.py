@@ -16,11 +16,15 @@ already allocated.
 Before each measured load or confirm, the pinned adapter's dedicated reading
 must sit within ``settle_tolerance_mib`` of the expected pre-call level.
 Between models, and when nothing is resident, that level is the idle baseline
-taken before the model loads. A call at the same ``num_ctx`` as the resident
-runner keeps the resident floor. A ``num_ctx`` change unloads first
+taken before the model loads. A ``num_ctx`` change unloads first
 (``keep_alive`` 0) and settles to that idle reading, and only then does the
-call load at the new context. A card that does not settle within
-``settle_timeout_s`` refuses that call. The measurement is not kept.
+call load at the new context. A confirm whose count unloads waits again for
+that same idle reading immediately before the measured request. That reading
+is the pre-call reading. The reading taken before the count is the pre-count
+reading. The resident floor applies only where no count unload comes before
+the call. A card that does not settle within ``settle_timeout_s`` makes the
+model inconclusive. That window is not a margin ceiling, and the measurement
+is not kept.
 ``num_predict`` of 1 is not a decode rate: the row stores null and a reason.
 
 Before a load, two resident loads predict the next card reading from their
@@ -154,6 +158,17 @@ class _Repairable(Exception):
     def __init__(self, kind: str, error: str) -> None:
         super().__init__(error)
         self.kind = kind
+        self.error = error
+
+
+class _Unsettled(Exception):
+    """The card did not settle. The model is inconclusive, not a margin ceiling.
+
+    This is not a supervisor restart. ``_Repairable`` would schedule one.
+    """
+
+    def __init__(self, error: str) -> None:
+        super().__init__(error)
         self.error = error
 
 
@@ -1254,14 +1269,16 @@ def wait_until_stable(read, sleep, clock, *, tolerance_mib: int, timeout_s: floa
         sleep(_PRE_CALL_POLL_S)
 
 
-def _attach_pre_calls(row: dict, pre_calls: list) -> None:
+def _attach_pre_calls(row: dict, pre_calls: list, *, key: str = "pre_call_dedicated_mib") -> None:
     """Record each measured call's settled dedicated reading beside ``search_calls``.
 
     ``predicted_over`` is not a measured call, so it has no pre-call reading.
     A later load of the same context is a different call and keeps its own.
-    ``resident_ctx`` is the runner before this call, or null when nothing is
-    resident. ``unloaded`` is true when a num_ctx change unloaded that runner
-    before the wait.
+    ``resident_ctx`` is the runner this wait found, or null when nothing was
+    resident. ``unloaded`` is true when that runner was unloaded before the wait.
+    A confirm whose count unloads keeps the earlier reading under
+    ``pre_count_dedicated_mib``. ``pre_call_dedicated_mib`` is the reading
+    taken immediately before the measured request.
     """
 
     calls = row.get("settings", {}).get("search_calls")
@@ -1288,7 +1305,7 @@ def _attach_pre_calls(row: dict, pre_calls: list) -> None:
             }
         )
     if paired:
-        row["settings"]["pre_call_dedicated_mib"] = paired
+        row["settings"][key] = paired
 
 
 def _predict_mib(measured: list[tuple[int, int]], ctx: int) -> int | None:
@@ -1359,6 +1376,7 @@ def _strip_measurement(row: dict) -> None:
         "slope_predictions",
         "window_gates",
         "pre_call_dedicated_mib",
+        "pre_count_dedicated_mib",
         "decode_reason",
     ):
         settings.pop(key, None)
@@ -1722,10 +1740,12 @@ def _measure_model(
         if spill_fields:
             built["settings"].update(spill_fields)
         _attach_pre_calls(built, pre_calls)
+        _attach_pre_calls(built, pre_count_calls, key="pre_count_dedicated_mib")
         return built
 
     baseline = _optional_int(seams.card_mib())
     pre_calls: list = []
+    pre_count_calls: list = []
 
     def _kind(error: str) -> str | None:
         if supervisor is None:
@@ -1887,10 +1907,10 @@ def _measure_model(
             hung["note"] = note
             raise _UnloadTimeout(note)
 
-    # A call at the same num_ctx as the resident runner keeps the resident floor.
-    # A num_ctx change unloads first and settles to this idle dedicated reading,
-    # taken before the model's first load. Between models, and when nothing is
-    # resident, that idle reading is the expected level.
+    # Idle is taken before the model's first load. A num_ctx change unloads
+    # first and settles to it before the count. A confirm whose count unloads
+    # waits for it again immediately before the measured request. The resident
+    # floor applies only where no count unload comes before the call.
     idle_dedicated = _read_dedicated(seams.dedicated_mib)
     model_resident = False
     resident_floor: int | None = None
@@ -1956,9 +1976,42 @@ def _measure_model(
             "sum": parsed["cuda_host_sum_mib"],
         }
 
+    def _note_measured_pre_call(kind: str, ctx: int, reading: int | None) -> None:
+        """Keep the probe reading as the pre-count reading.
+
+        The count loaded this context and then unloaded it. The reading passed
+        here was taken after that unload, immediately before the measured request.
+        """
+
+        earlier = None
+        if pre_calls and pre_calls[-1]["kind"] == kind and pre_calls[-1]["ctx"] == ctx:
+            earlier = {
+                "kind": pre_calls[-1]["kind"],
+                "ctx": pre_calls[-1]["ctx"],
+                "mib": pre_calls[-1]["mib"],
+                "resident_ctx": pre_calls[-1]["resident_ctx"],
+                "unloaded": pre_calls[-1]["unloaded"],
+            }
+            pre_calls[-1]["mib"] = reading
+            pre_calls[-1]["resident_ctx"] = ctx
+            pre_calls[-1]["unloaded"] = True
+        else:
+            pre_calls.append(
+                {
+                    "kind": kind,
+                    "ctx": ctx,
+                    "mib": reading,
+                    "resident_ctx": ctx,
+                    "unloaded": True,
+                }
+            )
+        if earlier is not None:
+            pre_count_calls.append(earlier)
+
     def observe(ctx: int, kind: str) -> Observation:
         current["ctx"] = ctx
         prompt = seed
+        count_unloaded = False
         if kind == "confirm":
             target = max(1, int(ctx * fraction))
             try:
@@ -1976,6 +2029,7 @@ def _measure_model(
                 return Observation(False, sampler.peak, error=str(exc))
             if _count_leaves_loaded(entry.get("keep_alive")):
                 stop_if_unload_timed_out()
+                count_unloaded = True
             try:
                 cold_tokens = count(text, ctx)
             except _WindowOver:
@@ -1998,6 +2052,7 @@ def _measure_model(
             prompts[ctx] = (cold_tokens, _prompt_method(fit), tokens, cold_tokens)
             if _count_leaves_loaded(entry.get("keep_alive")):
                 stop_if_unload_timed_out()
+                count_unloaded = True
             prompt = text
         settings = {
             "prompt": prompt,
@@ -2014,6 +2069,18 @@ def _measure_model(
             if isinstance(path, str) and path.strip():
                 load_state["offset"] = log_byte_size(path)
         request = StepRequest(f"{kind}-{ctx}", "generate", model, "5090", "ollama", settings)
+        if count_unloaded and idle_dedicated is not None:
+            reading, reason = wait_for_dedicated(
+                seams.dedicated_mib,
+                seams.sleep,
+                seams.clock,
+                expected=idle_dedicated,
+                tolerance_mib=tolerance,
+                timeout_s=timeout_s,
+            )
+            if reason:
+                raise _Unsettled(reason)
+            _note_measured_pre_call(kind, ctx, reading)
         before = _window_readings(seams)
         try:
             result = adapter.run(request)
@@ -2158,7 +2225,7 @@ def _measure_model(
                 }
             )
             if reason:
-                return Observation(False, None, error=reason)
+                raise _Unsettled(reason)
         sampler.reset()
         try:
             obs = sampler.cover(lambda: observe(ctx, kind))
@@ -2194,6 +2261,15 @@ def _measure_model(
     except _Repairable as exc:
         if repair is not None:
             repair.append((exc.kind, exc.error))
+        return _inconclusive(
+            exc.error,
+            quant=quant,
+            default_ctx=default_ctx,
+            flash=flash,
+            kv=kv,
+            ggml=ggml,
+        )
+    except _Unsettled as exc:
         return _inconclusive(
             exc.error,
             quant=quant,

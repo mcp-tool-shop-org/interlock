@@ -299,12 +299,18 @@ def dry_run(
             "settles within settle_tolerance_mib of the expected pre-call level"
         )
         lines.append("between models and after an unload that level is the idle baseline")
-        lines.append("a call at the same num_ctx as the resident runner keeps the resident floor")
+        lines.append("the resident floor applies only where no count unload comes before the call")
+        lines.append(
+            "a confirm whose count unloads waits for the idle baseline immediately before the measured request"
+        )
+        lines.append(
+            "that settled reading is the pre-call reading, and the reading before the count is the pre-count reading"
+        )
         lines.append(
             "a num_ctx change unloads first and settles to the idle baseline, then the call loads at the new num_ctx"
         )
         lines.append(
-            "a card that does not settle within settle_timeout_s refuses that call and the measurement is not kept"
+            "a card that does not settle makes the model inconclusive and is not a margin ceiling"
         )
         lines.append("a second window with no bound stops the row")
         lines.append("one model at a time; unloaded between models; rest is not taken here")

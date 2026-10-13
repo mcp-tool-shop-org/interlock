@@ -133,7 +133,7 @@ def _fresh(tmp_path: Path) -> Path:
 
 
 class _Transport:
-    def __init__(self, seams, *, show_error=None, explode=False, spill_shared=False, spill_prompt=False, missing_shared=False, missing_prompt=False, abort_at=None, stick=False, linear=None, cold_disagrees=False, omit_tags=False, tag_bytes=None, busy_mib=20000, hide_baseline=False, settle_high=0, self_sample=True, split_vram=False, hold_abort=False, slow_unload=0, hang_unload=False, trained=4096, unresident_at=None, idle_mib=1500, peaks=None, fallback_peak=None, gate_peak_at=None, dedicated_script=None, dedicated_tracks_resident=False, resident_level=28000, idle_level=100, stuck_after_unload=False):
+    def __init__(self, seams, *, show_error=None, explode=False, spill_shared=False, spill_prompt=False, missing_shared=False, missing_prompt=False, abort_at=None, stick=False, linear=None, cold_disagrees=False, omit_tags=False, tag_bytes=None, busy_mib=20000, hide_baseline=False, settle_high=0, self_sample=True, split_vram=False, hold_abort=False, slow_unload=0, hang_unload=False, trained=4096, unresident_at=None, idle_mib=1500, peaks=None, fallback_peak=None, gate_peak_at=None, dedicated_script=None, dedicated_tracks_resident=False, resident_level=28000, idle_level=100, stuck_after_unload=False, dedicated_lag=2):
         self.seams = seams
         self.show_error = show_error
         self.explode = explode
@@ -166,7 +166,9 @@ class _Transport:
         self.resident_level = resident_level
         self.idle_level = idle_level
         self.stuck_after_unload = stuck_after_unload
+        self.dedicated_lag = dedicated_lag
         self._stuck = False
+        self._lag_left = 0
         self.timeline = []
         self._dedicated_index = 0
         self.block_count = False
@@ -229,9 +231,13 @@ class _Transport:
 
     def dedicated_mib(self):
         if self.dedicated_tracks_resident:
-            # High while a model is resident. Idle only after unload clears it,
-            # unless the card is stuck and the unload does not free the reading.
+            # High while a model is resident. After an unload the card stays at
+            # that level for dedicated_lag readings, then falls. A stuck card
+            # never falls. Falling on the unload's own return hid the missing wait.
             if self._stuck or self.loaded is not None:
+                value = self.resident_level
+            elif self._lag_left > 0:
+                self._lag_left -= 1
                 value = self.resident_level
             else:
                 value = self.idle_level
@@ -289,6 +295,8 @@ class _Transport:
             self.state["busy"] = False
             if self.stuck_after_unload:
                 self._stuck = True
+            elif self.dedicated_tracks_resident and self.dedicated_lag > 0:
+                self._lag_left = self.dedicated_lag
             if self.dedicated_tracks_resident:
                 self.timeline.append(("unload",))
             return {}
@@ -498,16 +506,17 @@ def test_a_card_that_never_settles_refuses_the_call(tmp_path: Path):
     transport = _Transport(None, dedicated_script=[100, 9000])
     seams = _seams(transport)
     _advance(seams)
-    _repo, rows = _run(tmp_path, transport, seams=seams)
-    row = rows[0]
+    with pytest.raises(RunnerError, match="the step is inconclusive") as caught:
+        _run(tmp_path, transport, seams=seams)
+    assert UNSETTLED in str(caught.value)
+    row = load_jsonl(tmp_path / "repo" / "receipts" / "fill-1.jsonl")[0]
+    assert row["aborted"] is True
+    assert "the step is inconclusive" in row["notes"]
+    assert UNSETTLED in row["notes"]
     assert row["settings"]["max_resident_ctx"] is None
     assert row["settings"]["peak_mib"] is None
-    assert row["settings"]["search_calls"] == [
-        ["load", 2048, None, None, None, UNSETTLED],
-    ]
-    assert row["settings"]["pre_call_dedicated_mib"] == [
-        {"kind": "load", "ctx": 2048, "mib": 9000, "resident_ctx": None, "unloaded": False},
-    ]
+    assert row["settings"].get("limit") != "margin"
+    assert "search_calls" not in row["settings"]
     assert _ctxs(transport) == []
     assert seams.slept
     # Resident floor: a card that keeps moving is the same refusal, and the reading is not kept.
@@ -549,9 +558,13 @@ def test_the_pre_call_reading_is_on_the_receipt(tmp_path: Path):
     ]
     assert [(item["resident_ctx"], item["unloaded"]) for item in pre] == [
         (None, False),
-        (2048, False),
         (2048, True),
-        (4096, False),
+        (2048, True),
+        (4096, True),
+    ]
+    assert row["settings"]["pre_count_dedicated_mib"] == [
+        {"kind": "confirm", "ctx": 2048, "mib": 250, "resident_ctx": 2048, "unloaded": False},
+        {"kind": "confirm", "ctx": 4096, "mib": 250, "resident_ctx": 4096, "unloaded": False},
     ]
     assert len(pre) == len(measured)
     stored = load_jsonl(repo / "receipts" / "fill-1.jsonl")[0]
@@ -611,7 +624,14 @@ def test_a_context_change_unloads_and_settles_to_idle_before_the_call(tmp_path: 
     pre = row["settings"]["pre_call_dedicated_mib"]
     assert all("resident_ctx" in item and "unloaded" in item for item in pre)
     confirm = next(item for item in pre if item["kind"] == "confirm" and item["ctx"] == 4096)
-    assert confirm == {
+    assert confirm["mib"] == 100
+    assert confirm["unloaded"] is True
+    counted = next(
+        item
+        for item in row["settings"]["pre_count_dedicated_mib"]
+        if item["kind"] == "confirm" and item["ctx"] == 4096
+    )
+    assert counted == {
         "kind": "confirm",
         "ctx": 4096,
         "mib": 100,
@@ -628,7 +648,7 @@ def test_a_context_change_unloads_and_settles_to_idle_before_the_call(tmp_path: 
     assert transport.timeline[confirm_at] == ("request", 4096, True)
 
 
-def test_the_same_context_keeps_the_resident_floor_wait(tmp_path: Path):
+def test_the_same_context_counts_on_the_resident_floor_then_the_measured_request_waits_for_idle(tmp_path: Path):
     transport = _Transport(
         None,
         trained=4096,
@@ -643,11 +663,26 @@ def test_the_same_context_keeps_the_resident_floor_wait(tmp_path: Path):
     assert pre[1] == {
         "kind": "confirm",
         "ctx": 2048,
+        "mib": 100,
+        "resident_ctx": 2048,
+        "unloaded": True,
+    }
+    assert pre[3] == {
+        "kind": "confirm",
+        "ctx": 4096,
+        "mib": 100,
+        "resident_ctx": 4096,
+        "unloaded": True,
+    }
+    counted = rows[0]["settings"]["pre_count_dedicated_mib"]
+    assert counted[0] == {
+        "kind": "confirm",
+        "ctx": 2048,
         "mib": 28000,
         "resident_ctx": 2048,
         "unloaded": False,
     }
-    assert pre[3] == {
+    assert counted[1] == {
         "kind": "confirm",
         "ctx": 4096,
         "mib": 28000,
@@ -664,6 +699,56 @@ def test_the_same_context_keeps_the_resident_floor_wait(tmp_path: Path):
     assert ("unload",) not in transport.timeline[later + 1:again]
 
 
+def _last(timeline, event):
+    found = None
+    for index, item in enumerate(timeline):
+        if item == event:
+            found = index
+    if found is None:
+        raise AssertionError(event)
+    return found
+
+
+def test_the_measured_confirm_waits_until_dedicated_reads_idle_after_the_count_unload(tmp_path: Path):
+    """The count unloads, and dedicated stays at the resident level for several readings.
+
+    The measured confirm is the non-raw request. It must not go out until a
+    dedicated reading has fallen to the idle level taken before the first load.
+    """
+
+    transport = _Transport(
+        None,
+        trained=4096,
+        dedicated_tracks_resident=True,
+        resident_level=28000,
+        idle_level=100,
+        dedicated_lag=3,
+    )
+    seams = _seams(transport)
+    _repo, rows = _run(tmp_path, transport, seams=seams, max_ctx=4096)
+    assert rows[0]["settings"]["max_resident_ctx"] == 4096
+    measured = _last(transport.timeline, ("request", 4096, False))
+    prior = transport.timeline[:measured]
+    unload_at = max(index for index, event in enumerate(prior) if event == ("unload",))
+    between = transport.timeline[unload_at + 1:measured]
+    assert ("dedicated", 100) in between
+    assert ("request", 4096, False) not in between
+    confirm = next(
+        item
+        for item in rows[0]["settings"]["pre_call_dedicated_mib"]
+        if item["kind"] == "confirm" and item["ctx"] == 4096
+    )
+    assert confirm["mib"] == 100
+    assert confirm["unloaded"] is True
+    counted = next(
+        item
+        for item in rows[0]["settings"]["pre_count_dedicated_mib"]
+        if item["kind"] == "confirm" and item["ctx"] == 4096
+    )
+    assert counted["mib"] == 28000
+    assert counted["unloaded"] is False
+
+
 def test_a_card_that_never_returns_to_idle_after_unload_refuses_the_call(tmp_path: Path):
     transport = _Transport(
         None,
@@ -676,24 +761,18 @@ def test_a_card_that_never_returns_to_idle_after_unload_refuses_the_call(tmp_pat
     assert transport.dedicated_script is None
     seams = _seams(transport)
     _advance(seams)
-    _repo, rows = _run(tmp_path, transport, seams=seams, max_ctx=4096)
-    row = rows[0]
-    assert ["load", 4096, None, None, None, UNSETTLED] in row["settings"]["search_calls"]
-    refused = next(
-        item
-        for item in row["settings"]["pre_call_dedicated_mib"]
-        if item["kind"] == "load" and item["ctx"] == 4096
-    )
-    assert refused == {
-        "kind": "load",
-        "ctx": 4096,
-        "mib": 28000,
-        "resident_ctx": 2048,
-        "unloaded": True,
-    }
+    with pytest.raises(RunnerError, match="the step is inconclusive") as caught:
+        _run(tmp_path, transport, seams=seams, max_ctx=4096)
+    assert UNSETTLED in str(caught.value)
+    row = load_jsonl(tmp_path / "repo" / "receipts" / "fill-1.jsonl")[0]
+    assert row["aborted"] is True
+    assert "the step is inconclusive" in row["notes"]
+    assert UNSETTLED in row["notes"]
+    assert row["settings"]["max_resident_ctx"] is None
+    assert row["settings"]["peak_mib"] is None
+    assert row["settings"].get("limit") != "margin"
     assert 4096 not in _ctxs(transport)
     assert seams.slept
-    assert row["settings"]["max_resident_ctx"] == 2048
 
 
 def test_num_predict_1_does_not_publish_a_decode_rate(tmp_path: Path):
@@ -1104,14 +1183,19 @@ def test_dry_run_names_the_confirmation_count(monkeypatch):
     assert "a measured abort on the confirm walk is margin" in text
     assert "settle_tolerance_mib: 512" in text
     assert "settle_timeout_s: 30" in text
-    assert "a call at the same num_ctx as the resident runner keeps the resident floor" in text
+    assert "the resident floor applies only where no count unload comes before the call" in text
+    assert "a confirm whose count unloads waits for the idle baseline immediately before the measured request" in text
+    assert "that settled reading is the pre-call reading, and the reading before the count is the pre-count reading" in text
+    assert "a call at the same num_ctx as the resident runner keeps the resident floor" not in text
     assert "a num_ctx change unloads first and settles to the idle baseline, then the call loads at the new num_ctx" in text
     assert "between models and after an unload that level is the idle baseline" in text
-    assert "a card that does not settle within settle_timeout_s refuses that call and the measurement is not kept" in text
+    assert "a card that does not settle makes the model inconclusive and is not a margin ceiling" in text
     smoke = dry_run(ROOT / "experiments" / "e5-smoke" / "spec.yaml", ROOT)
     assert "settle_tolerance_mib: 512" in smoke
     assert "settle_timeout_s: 30" in smoke
-    assert "a call at the same num_ctx as the resident runner keeps the resident floor" in smoke
+    assert "the resident floor applies only where no count unload comes before the call" in smoke
+    assert "a confirm whose count unloads waits for the idle baseline immediately before the measured request" in smoke
+    assert "a call at the same num_ctx as the resident runner keeps the resident floor" not in smoke
     assert "a num_ctx change unloads first and settles to the idle baseline, then the call loads at the new num_ctx" in smoke
     assert "a measured abort on the confirm walk is margin" in smoke
     assert "a second window with no bound stops the row" in text

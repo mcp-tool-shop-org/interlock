@@ -697,7 +697,7 @@ def test_both_specs_load_and_carry_the_spill_baseline_amendment():
         loaded = load_spec(path)
         validate_spec(loaded)
         text = path.read_text(encoding="utf-8")
-        assert text.count("Amendment, 2026-10-13") == 5
+        assert text.count("Amendment, 2026-10-13") == 6
         amendments = [line for line in text.splitlines() if "Amendment, 2026-10-13" in line]
         earlier = amendments[0]
         assert "lowest resident window" in earlier
@@ -725,6 +725,13 @@ def test_both_specs_load_and_carry_the_spill_baseline_amendment():
         assert "num_ctx change unloads first" in changed
         assert "idle reading taken before the model's first load" in changed
         assert "same num_ctx keeps the resident floor" in changed
+        reviewed = amendments[5]
+        assert "review of ce7b31e" in reviewed
+        assert "superseded" in reviewed
+        assert "immediately before the measured request" in reviewed
+        assert "pre-count reading" in reviewed
+        assert "resident floor applies only where no count unload" in reviewed
+        assert "not a margin ceiling" in reviewed
         assert loaded["settle_tolerance_mib"] == 512
         assert loaded["settle_timeout_s"] == 30
         assert loaded["spill_shared_mib"] == 256
