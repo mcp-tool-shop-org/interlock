@@ -1171,7 +1171,7 @@ def _call_bound(slot: Slot, cold_call_s: float | None, ceiling: float) -> float:
 
 
 def _finish_slot_probe(probe, adapter) -> dict | None:
-    """The slot's min/max/mean, after the final reading. A second call does not sample again."""
+    """The slot's min/max/mean, after the final reading. A second call does not sample or rank again."""
 
     if probe is None:
         return None
