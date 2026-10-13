@@ -299,7 +299,10 @@ def dry_run(
             "settles within settle_tolerance_mib of the expected pre-call level"
         )
         lines.append("between models and after an unload that level is the idle baseline")
-        lines.append("within a model the model stays resident, so that level is the resident floor")
+        lines.append("a call at the same num_ctx as the resident runner keeps the resident floor")
+        lines.append(
+            "a num_ctx change unloads first and settles to the idle baseline, then the call loads at the new num_ctx"
+        )
         lines.append(
             "a card that does not settle within settle_timeout_s refuses that call and the measurement is not kept"
         )

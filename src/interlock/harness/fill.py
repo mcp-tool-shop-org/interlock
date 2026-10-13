@@ -15,12 +15,13 @@ already allocated.
 
 Before each measured load or confirm, the pinned adapter's dedicated reading
 must sit within ``settle_tolerance_mib`` of the expected pre-call level.
-Between models, and after an unload, that level is the idle baseline taken
-before the model loads. The search keeps the model resident between windows,
-so within a model the level is the resident floor. A card that does not
-settle within ``settle_timeout_s`` refuses that call. The measurement is not
-kept. ``num_predict`` of 1 is not a decode rate: the row stores null and a
-reason.
+Between models, and when nothing is resident, that level is the idle baseline
+taken before the model loads. A call at the same ``num_ctx`` as the resident
+runner keeps the resident floor. A ``num_ctx`` change unloads first
+(``keep_alive`` 0) and settles to that idle reading, and only then does the
+call load at the new context. A card that does not settle within
+``settle_timeout_s`` refuses that call. The measurement is not kept.
+``num_predict`` of 1 is not a decode rate: the row stores null and a reason.
 
 Before a load, two resident loads predict the next card reading from their
 measured peak-per-token slope. ``predicted_over`` applies when that prediction
@@ -1258,6 +1259,9 @@ def _attach_pre_calls(row: dict, pre_calls: list) -> None:
 
     ``predicted_over`` is not a measured call, so it has no pre-call reading.
     A later load of the same context is a different call and keeps its own.
+    ``resident_ctx`` is the runner before this call, or null when nothing is
+    resident. ``unloaded`` is true when a num_ctx change unloaded that runner
+    before the wait.
     """
 
     calls = row.get("settings", {}).get("search_calls")
@@ -1270,10 +1274,19 @@ def _attach_pre_calls(row: dict, pre_calls: list) -> None:
             continue
         if not queue:
             break
-        if queue[0][0] != call[0] or queue[0][1] != call[1]:
+        item = queue[0]
+        if item["kind"] != call[0] or item["ctx"] != call[1]:
             continue
-        kind, ctx, mib = queue.pop(0)
-        paired.append({"kind": kind, "ctx": ctx, "mib": mib})
+        queue.pop(0)
+        paired.append(
+            {
+                "kind": item["kind"],
+                "ctx": item["ctx"],
+                "mib": item["mib"],
+                "resident_ctx": item["resident_ctx"],
+                "unloaded": item["unloaded"],
+            }
+        )
     if paired:
         row["settings"]["pre_call_dedicated_mib"] = paired
 
@@ -1874,13 +1887,14 @@ def _measure_model(
             hung["note"] = note
             raise _UnloadTimeout(note)
 
-    # The search does not unload between windows (generate keep_alive stays at
-    # 5m). Unload runs on abort and at the end of the model. Within a model the
-    # expected pre-call level is therefore the resident floor. Between models,
-    # and after an unload, it is this idle dedicated reading.
+    # A call at the same num_ctx as the resident runner keeps the resident floor.
+    # A num_ctx change unloads first and settles to this idle dedicated reading,
+    # taken before the model's first load. Between models, and when nothing is
+    # resident, that idle reading is the expected level.
     idle_dedicated = _read_dedicated(seams.dedicated_mib)
     model_resident = False
     resident_floor: int | None = None
+    resident_ctx: int | None = None
     tolerance = spec.get("settle_tolerance_mib", 512)
     timeout_s = float(spec.get("settle_timeout_s", 30))
 
@@ -2074,15 +2088,18 @@ def _measure_model(
             resident_floor = found
         return found, reason
 
-    def _note_resident(obs: Observation) -> None:
-        nonlocal model_resident, resident_floor
+    def _note_resident(obs: Observation, ctx: int) -> None:
+        nonlocal model_resident, resident_floor, resident_ctx
         if obs.error or not obs.resident:
             model_resident = False
             resident_floor = None
+            resident_ctx = None
             return
         model_resident = True
+        resident_ctx = ctx
 
     def probe(ctx: int, kind: str) -> Observation:
+        nonlocal model_resident, resident_floor, resident_ctx
         sampler.wait_for_abort()
         if hung["note"]:
             raise _UnloadTimeout(hung["note"])
@@ -2119,9 +2136,27 @@ def _measure_model(
             if ctx not in predicted_over:
                 predicted_over.append(ctx)
             return Observation(False, predicted, error=PREDICTED_OVER)
+        before = resident_ctx
+        unloaded = before is not None and before != ctx
+        if unloaded:
+            note = _unload(adapter, model, quiet=False)
+            if note:
+                hung["note"] = note
+                raise _UnloadTimeout(note)
+            model_resident = False
+            resident_floor = None
+            resident_ctx = None
         if idle_dedicated is not None:
             reading, reason = _settle_before_call()
-            pre_calls.append((kind, ctx, reading))
+            pre_calls.append(
+                {
+                    "kind": kind,
+                    "ctx": ctx,
+                    "mib": reading,
+                    "resident_ctx": before,
+                    "unloaded": unloaded,
+                }
+            )
             if reason:
                 return Observation(False, None, error=reason)
         sampler.reset()
@@ -2130,7 +2165,7 @@ def _measure_model(
         except _WindowOver:
             aborted.append(ctx)
             obs = _over(sampler.peak)
-        _note_resident(obs)
+        _note_resident(obs, ctx)
         if kind == "load" and isinstance(obs.peak_mib, int) and obs.error != ABORT_ERROR:
             measured.append((ctx, obs.peak_mib))
             resident_at[ctx] = bool(obs.resident)

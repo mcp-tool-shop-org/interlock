@@ -13,7 +13,7 @@ import pytest
 from interlock.adapters.ollama import OllamaAdapter
 from interlock.cli import main
 from interlock.harness.e5 import PREDICTED_OVER, SHARED_GATE_FROM_MIB, Observation, is_spill, search
-from interlock.harness.fill import _predict_mib, wait_until_stable
+from interlock.harness.fill import _predict_mib
 from interlock.harness.runner import RunnerError, dry_run, parse_models, resolve_models, run_spec
 from interlock.harness.spec import load_spec
 from tests.test_fill_card_live import _Transport, _ctxs, _fresh, _model, _run, _seams, _spec, _bind
@@ -324,44 +324,3 @@ def test_a_measured_confirm_abort_is_margin_and_a_predicted_stop_stays_predicted
     granite = _replay(rows["granite4.1:30b"])
     assert granite.limit == "predicted"
     assert granite.max_ctx == 43008
-
-
-def test_granite_4096_confirm_would_have_waited():
-    calls = {
-        (call[0], call[1]): call[2]
-        for call in _receipt_c()["granite4.1:30b"]["settings"]["search_calls"]
-    }
-    assert calls[("confirm", 4096)] == 27329
-    assert calls[("confirm", 2048)] == 20366
-    assert calls[("confirm", 6144)] == 21655
-    assert calls[("load", 43008)] == 30233
-    assert calls[("confirm", 4096)] - calls[("confirm", 6144)] > 512
-    # Within a model the search keeps the model resident, so the waiter is the resident floor.
-    # 27329 is still moving; the settled reading is the later neighbour, not that peak.
-    script = [26000, 24000, 22000, 21655]
-    index = {"i": 0}
-
-    def read():
-        i = index["i"]
-        index["i"] += 1
-        return script[min(i, len(script) - 1)]
-
-    clock = {"t": 0.0}
-    slept = []
-
-    def sleep(seconds):
-        slept.append(seconds)
-        clock["t"] += float(seconds)
-
-    found, reason = wait_until_stable(
-        read,
-        sleep,
-        lambda: clock["t"],
-        tolerance_mib=512,
-        timeout_s=30,
-        first=27329,
-    )
-    assert reason is None
-    assert slept
-    assert found == 21655
-    assert found != 27329
