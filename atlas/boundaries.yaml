@@ -16,10 +16,22 @@ boundaries:
     globs:
       - experiments/**
     role: data
+  - name: receipts
+    globs:
+      - receipts/**
+    role: data
+  - name: scripts
+    globs:
+      - scripts/**
+    role: code
   - name: src
     globs:
       - src/**
     role: code
+  - name: table
+    globs:
+      - table/**
+    role: data
   - name: tests
     globs:
       - tests/**

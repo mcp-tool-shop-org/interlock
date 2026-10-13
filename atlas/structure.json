@@ -213,6 +213,349 @@
       "externals": 0,
       "files": [
         {
+          "hash": "be418720d26ab2999db6b0a7e07f4f2d6532c8c35f3c2d5329f9ce506b82109f",
+          "path": "receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl"
+        },
+        {
+          "hash": "ab6c7eb6f0751d31ffc02b66f9e8827778ca5f6415d8bb23c9c6f80ddc95a20e",
+          "path": "receipts/e1-intel-2026-10-09-rerun.jsonl"
+        },
+        {
+          "hash": "60d51fc770a8e357bb92d5ba7ea6c315cc5380e9f666d79123f6713a1d210dbc",
+          "path": "receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl"
+        },
+        {
+          "hash": "f3c915c9f7cdfde9cd04c1e379b2a59185a5dab4a5692de1caef3d4af9ab1490",
+          "path": "receipts/e1-intel-2026-10-09-rerun2-nomic-diag.jsonl"
+        },
+        {
+          "hash": "bb25ef40dc0f112d68b897aead4d6f3bb637543245ace38d36435e3413ac1217",
+          "path": "receipts/e1-intel-2026-10-09-rerun2.jsonl"
+        },
+        {
+          "hash": "0c806f214f1a0fb89996683a22b8a3e4f4c337751529873b1aa0fa7b7e4add6e",
+          "path": "receipts/e2-2026-10-10b.jsonl"
+        },
+        {
+          "hash": "a3d3edd20f7d8a858b9c69ed886cc6ae24a6fb5ad12ac831e938b563281d7bb1",
+          "path": "receipts/e2-2026-10-10c.jsonl"
+        },
+        {
+          "hash": "ff43d47b396c7137582c8310053a69b3bae93320316eac4fc7850d4d192011c5",
+          "path": "receipts/e2-b8tail-2026-10-10c.jsonl"
+        },
+        {
+          "hash": "c7e3cfea7d9a3be4e71ebcbe42bacf852dac741211f34820d48454f2c9f6c5b3",
+          "path": "receipts/e2-b8tail-2026-10-11.jsonl"
+        },
+        {
+          "hash": "d6436479628480a9d430c9205d690c3a5fe1acb26bc3b0b53aee39df1a9e17bc",
+          "path": "receipts/e3-2026-10-10b.jsonl"
+        },
+        {
+          "hash": "36121c55605224b4d5b34540416bf7384c958d17b157bd18aee39591704973ac",
+          "path": "receipts/e3-2026-10-11.jsonl"
+        },
+        {
+          "hash": "64c6cdec574b3298c13a1dab8cad7047fc6eb1866aaaa67820f11d842fd68645",
+          "path": "receipts/e3-2026-10-11b.jsonl"
+        },
+        {
+          "hash": "aa76234923364b35444b342c76a506cd4c7ce4c94898bcc01c9ab780a5a78af6",
+          "path": "receipts/e3-ref-2026-10-11b.jsonl"
+        },
+        {
+          "hash": "20d0089f23b2675caa710c18e4f47515ad7b48cf51db5151579dfde5973504a5",
+          "path": "receipts/e4-2026-10-12.jsonl"
+        },
+        {
+          "hash": "d0b6ae2a0eead6ef37d348cc94f435af5d28b41a4a9854d2f912e32546d18367",
+          "path": "receipts/e4b-block-2-series/5090-igpu-0-alone-after-5090-alone.jsonl"
+        },
+        {
+          "hash": "e09e2ca9005274f9864dcb7f78d840fd68ca244acd5d3f81aac453a2218f243e",
+          "path": "receipts/e4b-block-2-series/5090-igpu-0-alone-before-5090-alone.jsonl"
+        },
+        {
+          "hash": "39b7f95c2fd3f54817048f83304993596b8fcb0ef77ee40b266de19da515d846",
+          "path": "receipts/e4b-block-2-series/5090-igpu-0-paired-5090-with-igpu.jsonl"
+        },
+        {
+          "hash": "ec327dac61af254b1a3c2d3c16e27657f8f2daca3774d0bc8dc49d2b75a085f5",
+          "path": "receipts/e4b-block-2-series/5090-igpu-1-alone-after-5090-alone.jsonl"
+        },
+        {
+          "hash": "4089a800187fb910b9ff93c547e22d36cc246a9f1740fca2614917a1de9f913d",
+          "path": "receipts/e4b-block-2-series/5090-igpu-1-alone-before-5090-alone.jsonl"
+        },
+        {
+          "hash": "d836750aab3b9b3c2d899de42913345cc89a1266f947d7110febbc6d9fd1c008",
+          "path": "receipts/e4b-block-2-series/5090-igpu-1-paired-5090-with-igpu.jsonl"
+        },
+        {
+          "hash": "55674f3c635c70d104390aa9781b9a67244fa51de5a4088e247cb68df4344e56",
+          "path": "receipts/e4b-block-2-series/5090-igpu-2-alone-after-5090-alone.jsonl"
+        },
+        {
+          "hash": "5aee490468423394b178d5fba34531336927efa3e3cc73014df3224a9aff303c",
+          "path": "receipts/e4b-block-2-series/5090-igpu-2-alone-before-5090-alone.jsonl"
+        },
+        {
+          "hash": "b4a1c3c88737f18f8e6f6c94b6702b92fe67700629bd2f2c932373080f3d9343",
+          "path": "receipts/e4b-block-2-series/5090-igpu-2-paired-5090-with-igpu.jsonl"
+        },
+        {
+          "hash": "94e2f1ff56e8fd3907a0050088c172856dc1ad3db11fafdf8727d31912465251",
+          "path": "receipts/e4b-block-2-series/5090-igpu-3-alone-after-5090-alone.jsonl"
+        },
+        {
+          "hash": "f4258b09b5720bca43edc149523e3413da951a9d8a6511ccdf86a4b88bfca32b",
+          "path": "receipts/e4b-block-2-series/5090-igpu-3-alone-before-5090-alone.jsonl"
+        },
+        {
+          "hash": "6142f9374cd3ee2ac3cf3bbb380b3e981d26382bf7fda075d3a1dbd017652645",
+          "path": "receipts/e4b-block-2-series/5090-igpu-3-paired-5090-with-igpu.jsonl"
+        },
+        {
+          "hash": "f93f497a72a66a63290cd66d53b7cb8372cf453d69f0906e0b7168fad12a822b",
+          "path": "receipts/e4b-block-2-series/5090-igpu-4-alone-after-5090-alone.jsonl"
+        },
+        {
+          "hash": "6f2b64eaf5bf4859c8ef1d48569227dd38d81f4c9193b58fcdce30b1a0b88134",
+          "path": "receipts/e4b-block-2-series/5090-igpu-4-alone-before-5090-alone.jsonl"
+        },
+        {
+          "hash": "623b3344931aaa7ea599323fd927e8d1fcc61e47e08d2f0f2ec733bc41f95cbc",
+          "path": "receipts/e4b-block-2-series/5090-igpu-4-paired-5090-with-igpu.jsonl"
+        },
+        {
+          "hash": "f05c8ea5d0ce87e8bfac977f7a3d4ff153f44340510f04c06db8a24e5a8f4e73",
+          "path": "receipts/e4b-block-2-series/5090-igpu-5-alone-after-5090-alone.jsonl"
+        },
+        {
+          "hash": "f84c5ba9c54e00e3bdb3c7a771facc0f8f0fca665b94655f83cbbddc0f3f74cb",
+          "path": "receipts/e4b-block-2-series/5090-igpu-5-alone-before-5090-alone.jsonl"
+        },
+        {
+          "hash": "fc5dbeade545fb92a7374276c6a20cd9e76e59343cd223451f6beb242c4f82bd",
+          "path": "receipts/e4b-block-2-series/5090-igpu-5-paired-5090-with-igpu.jsonl"
+        },
+        {
+          "hash": "b1664f89af5a58a96aa6015f8e755729be1ccc2bcac1214de321ed40b5dc0b8d",
+          "path": "receipts/e4b-block-2-series/5090-igpu-6-alone-after-5090-alone.jsonl"
+        },
+        {
+          "hash": "46a87924f3c59792c02cae694529f27938a2967fe5dc7d6b476c82bd2cae0419",
+          "path": "receipts/e4b-block-2-series/5090-igpu-6-alone-before-5090-alone.jsonl"
+        },
+        {
+          "hash": "4b8859176b33379d7816b7149981045821bd422f45e8cfdcd160475e169fd5e0",
+          "path": "receipts/e4b-block-2-series/5090-igpu-6-paired-5090-with-igpu.jsonl"
+        },
+        {
+          "hash": "7968846ff6c25e67ae782cf14694a43817a9afb983adf174b97f0a10b71a15bf",
+          "path": "receipts/e4b-block-2-series/5090-igpu-7-alone-after-5090-alone.jsonl"
+        },
+        {
+          "hash": "39ca160f8280645c69eb67d6d70ed9398851c0e62160a881d86bd153ef2b7c0d",
+          "path": "receipts/e4b-block-2-series/5090-igpu-7-alone-before-5090-alone.jsonl"
+        },
+        {
+          "hash": "98c6cf7d1a8e6c58169afd076c162d1fc006435d299345b2f20ec4d05b36fd5f",
+          "path": "receipts/e4b-block-2-series/5090-igpu-7-paired-5090-with-igpu.jsonl"
+        },
+        {
+          "hash": "0aba002d7cd22b8abc2464b5cd1c17deff8d85e6dc2e624995c70a8af2c86051",
+          "path": "receipts/e4b-block-2-series/5090-igpu-8-alone-after-5090-alone.jsonl"
+        },
+        {
+          "hash": "6b06c0485bf9d632be5ffb2db450852619445a12423a227437ce5f4152419684",
+          "path": "receipts/e4b-block-2-series/5090-igpu-8-alone-before-5090-alone.jsonl"
+        },
+        {
+          "hash": "a155c3e0e1bd95d47b83285bcd244c34143cbbb2e0b7c2f8ff9b8d3879641382",
+          "path": "receipts/e4b-block-2-series/5090-igpu-8-paired-5090-with-igpu.jsonl"
+        },
+        {
+          "hash": "afbd1c4a912d18a7d1c1bd9d82fc54e7ba907f5f0ac2df9d6c3fcea6fbcc9c74",
+          "path": "receipts/e4b-block-2-series/5090-igpu-9-alone-after-5090-alone.jsonl"
+        },
+        {
+          "hash": "43e726704aec26af7b2279d0c41dfe72dd6d6462ae2430f7b08a8eda97f9cc8e",
+          "path": "receipts/e4b-block-2-series/5090-igpu-9-alone-before-5090-alone.jsonl"
+        },
+        {
+          "hash": "aedd7e026b64d44182ab8b155592c1fb63c2635cd146da3167ea5aa669df4986",
+          "path": "receipts/e4b-block-2-series/5090-igpu-9-paired-5090-with-igpu.jsonl"
+        },
+        {
+          "hash": "ca33dfa00f0b19bf56f78d6ace89efa199c303ef6fa6b77f5e587efd6482feab",
+          "path": "receipts/e4b-block-2-series/5090-npu-0-alone-after-5090-alone.jsonl"
+        },
+        {
+          "hash": "c2525e07bb43badfcca3200866b66648da0e92c44d0f016e9ffcf4dbe08c85bf",
+          "path": "receipts/e4b-block-2-series/5090-npu-0-alone-before-5090-alone.jsonl"
+        },
+        {
+          "hash": "a502a7c40c40ee19270e7876e5d6eaf009dfa5707e28e946c7ca3c779781077a",
+          "path": "receipts/e4b-block-2-series/5090-npu-0-paired-5090-with-npu.jsonl"
+        },
+        {
+          "hash": "e58e726f355f8fbe823fd79e11ccbce973513b5816929d89845c0143f9c5e240",
+          "path": "receipts/e4b-block-2-series/5090-npu-1-alone-after-5090-alone.jsonl"
+        },
+        {
+          "hash": "c8e024149cd7958371313cf9470953d25425c52db61b5c73cddfa71dc6403425",
+          "path": "receipts/e4b-block-2-series/5090-npu-1-alone-before-5090-alone.jsonl"
+        },
+        {
+          "hash": "7d38e67929084bdbd0c90b71f9c99360c3667e42fcc74e8595f7f3be092a5748",
+          "path": "receipts/e4b-block-2-series/5090-npu-1-paired-5090-with-npu.jsonl"
+        },
+        {
+          "hash": "82fec167b9bd65ea067e3f81520b8025af215bf8c61add44d66346034a1ecac8",
+          "path": "receipts/e4b-block-2-series/5090-npu-2-alone-after-5090-alone.jsonl"
+        },
+        {
+          "hash": "de8d9e8bd8c4dba91da76e1046dc7054ccb344b7c43d3a676ba4fa24d16f46bc",
+          "path": "receipts/e4b-block-2-series/5090-npu-2-alone-before-5090-alone.jsonl"
+        },
+        {
+          "hash": "ad074ecb32a06102d0f29c73a204357c4c3625b3229046f79e35be76b7233dfd",
+          "path": "receipts/e4b-block-2-series/5090-npu-2-paired-5090-with-npu.jsonl"
+        },
+        {
+          "hash": "231cce1bad2ad948c4068a4488bb6163a98b0f89f04d6f8c6d3ce469da6189fa",
+          "path": "receipts/e4b-block-2-series/5090-npu-3-alone-after-5090-alone.jsonl"
+        },
+        {
+          "hash": "55acad3bc72dabf43642b37030636ff916afbaf5357846bef7c666f7ae3ed14a",
+          "path": "receipts/e4b-block-2-series/5090-npu-3-alone-before-5090-alone.jsonl"
+        },
+        {
+          "hash": "58444d3ad6ab4cd7f0c3f7f3ba928a6d4b974b9e068293a3be9eabbe4464186b",
+          "path": "receipts/e4b-block-2-series/5090-npu-3-paired-5090-with-npu.jsonl"
+        },
+        {
+          "hash": "df855cfbf8dc322d2c43a613aff1129db30a9f9691ec92a2de5d1d9b055654f2",
+          "path": "receipts/e4b-block-2-series/5090-npu-4-alone-after-5090-alone.jsonl"
+        },
+        {
+          "hash": "5bbc2b9f5e151cc9d457697538c24d752e4a5631cec88c790bb1b091026eec38",
+          "path": "receipts/e4b-block-2-series/5090-npu-4-alone-before-5090-alone.jsonl"
+        },
+        {
+          "hash": "d3ba1a667207453bc37752d49340db153a3bfc457a67fec82b8fb907d631fcb5",
+          "path": "receipts/e4b-block-2-series/5090-npu-4-paired-5090-with-npu.jsonl"
+        },
+        {
+          "hash": "df3c1ff4bc22bacf35e633ce1e5a5ff7b6b0091d51c40e6b1817bf06d32d6cb3",
+          "path": "receipts/e4b-block-2-series/5090-npu-5-alone-after-5090-alone.jsonl"
+        },
+        {
+          "hash": "1407686bf761031e55353b21bca8a0b88f88e1bd97b274061e32ff80b97dc686",
+          "path": "receipts/e4b-block-2-series/5090-npu-5-alone-before-5090-alone.jsonl"
+        },
+        {
+          "hash": "8a3a7151024e237f56534cbb049aa1ca4345b6650c7681649e44d39fa5acdb84",
+          "path": "receipts/e4b-block-2-series/5090-npu-5-paired-5090-with-npu.jsonl"
+        },
+        {
+          "hash": "3e75e6800d711c50a5fcf9648065c95447bef7286a830604b086dc09c4357153",
+          "path": "receipts/e4b-block-2-series/5090-npu-6-alone-after-5090-alone.jsonl"
+        },
+        {
+          "hash": "d3727bf4112cd1f523edbf874a7f994f055f46608e47a137d87473a2218ab203",
+          "path": "receipts/e4b-block-2-series/5090-npu-6-alone-before-5090-alone.jsonl"
+        },
+        {
+          "hash": "b42b577e6cc77fdf297ad3d0c859cb00b1279029a1da8bea1efd9ce21b12f0ed",
+          "path": "receipts/e4b-block-2-series/5090-npu-6-paired-5090-with-npu.jsonl"
+        },
+        {
+          "hash": "a7cb8465e99e3f460fc59981c2249123cb57e626f15e7641777a7b748bdaa19f",
+          "path": "receipts/e4b-block-2-series/5090-npu-7-alone-after-5090-alone.jsonl"
+        },
+        {
+          "hash": "fe48c4d616b6f9fe6d1bf994d9ddb5fb60f76145ecac7fb1c98fe69f8db54e12",
+          "path": "receipts/e4b-block-2-series/5090-npu-7-alone-before-5090-alone.jsonl"
+        },
+        {
+          "hash": "c2ac50a5c120255adec873e6b3add0f1e7431f915e685c36cc91e23d1bc59704",
+          "path": "receipts/e4b-block-2-series/5090-npu-7-paired-5090-with-npu.jsonl"
+        },
+        {
+          "hash": "303befbcdf6e5ba8eb8ea0e5296b6e1e6b6df90ffd6b2de36c259ec9baa50eec",
+          "path": "receipts/e4b-block-2-series/5090-npu-8-alone-after-5090-alone.jsonl"
+        },
+        {
+          "hash": "629de16f40f05b514da1ded27ff25bfd9b3ac49a18086c84dc937842e235b567",
+          "path": "receipts/e4b-block-2-series/5090-npu-8-alone-before-5090-alone.jsonl"
+        },
+        {
+          "hash": "91241bbf0f5f67347493a05de573ba8b2f9d25815b46814ffd1a26ee04850800",
+          "path": "receipts/e4b-block-2-series/5090-npu-8-paired-5090-with-npu.jsonl"
+        },
+        {
+          "hash": "bcb25175833e6861160d68516afd86d9a4648a5c8a2b40006c853c682dd7e36b",
+          "path": "receipts/e4b-block-2-series/5090-npu-9-alone-after-5090-alone.jsonl"
+        },
+        {
+          "hash": "0f768b67feeef1c6737f469b7e528d44056ccc7b3a8b6f2eed76ff32f2523dca",
+          "path": "receipts/e4b-block-2-series/5090-npu-9-alone-before-5090-alone.jsonl"
+        },
+        {
+          "hash": "b039c92ba308a17d552371cbd9f0e89527be1135e2152265751f069c1f94019f",
+          "path": "receipts/e4b-block-2-series/5090-npu-9-paired-5090-with-npu.jsonl"
+        },
+        {
+          "hash": "44685ea877a06bc92d9a910d4aa6c1bfc678f9edb3af0c3271577796cdfd2da5",
+          "path": "receipts/e4b-block-2-series/cold-0-cold-5090-alone.jsonl"
+        },
+        {
+          "hash": "4b479eb35c30b42fdb1e5262685c5c5915970453ced8bd8d408c2993085b1e9d",
+          "path": "receipts/e4b-block-2-series/cold-0-cold-5090-with-igpu.jsonl"
+        },
+        {
+          "hash": "29632df141b47cbb00eeb146fc024c3f0a8f55ba9b0c68c2f2ec5f57c4ae308f",
+          "path": "receipts/e4b-block-2-series/cold-0-cold-5090-with-npu.jsonl"
+        },
+        {
+          "hash": "71a574ae4775e0b6975d343c3c63d12f2b6e2da3a5d716fed382782523335338",
+          "path": "receipts/e4b-block-2.jsonl"
+        },
+        {
+          "hash": "73465ce2679d69300dd3f6ce8869b985a043c446706bf40128164f6fce7b16f7",
+          "path": "receipts/e4b-block-3.jsonl"
+        },
+        {
+          "hash": "1a2147ad1bf667165c25906dd2dca8ae43625ba97e57d3a8cbf0138303984d3a",
+          "path": "receipts/e5-2026-10-13b.jsonl"
+        },
+        {
+          "hash": "454d901a8423fed7b2ebab188ce3a044429372172b3c0acb74680548ea13e9d0",
+          "path": "receipts/e5-2026-10-13c.jsonl"
+        }
+      ],
+      "globs": [
+        "receipts/**"
+      ],
+      "importConfidence": "full",
+      "name": "receipts",
+      "origin": "authored",
+      "role": "data",
+      "testedBy": 0,
+      "unresolvedSites": 0
+    },
+    {
+      "dynamicReads": 0,
+      "dynamicSpawns": 0,
+      "dynamicSpawnsInTests": 0,
+      "dynamicWrites": 0,
+      "entryPoints": [],
+      "externals": 0,
+      "files": [
+        {
           "hash": "93699a1108fd9da226b06f84ee12e317f4ea4d2f18a8fd05260443fd1bf2faef",
           "path": ".gitattributes"
         },
@@ -261,6 +604,56 @@
       "origin": "authored",
       "role": "config",
       "testedBy": 0,
+      "unresolvedSites": 0
+    },
+    {
+      "dynamicReads": 0,
+      "dynamicSpawns": 0,
+      "dynamicSpawnsInTests": 0,
+      "dynamicWrites": 0,
+      "entryPoints": [],
+      "externals": 0,
+      "files": [
+        {
+          "exports": [
+            "main"
+          ],
+          "failurePaths": [
+            {
+              "in": "main",
+              "kind": "except",
+              "line": 58
+            },
+            {
+              "in": "main",
+              "kind": "except",
+              "line": 84
+            },
+            {
+              "kind": "raise",
+              "line": 93
+            }
+          ],
+          "hash": "d513eac659768cee7c42206cb717fe250eddce80678fb10aca454d083d2ac19d",
+          "importsFiles": [
+            "src/interlock/adapters/ollama_cases.py",
+            "src/interlock/adapters/record_fixtures.py",
+            "src/interlock/harness/runner.py"
+          ],
+          "path": "scripts/record_ollama_fixtures.py"
+        }
+      ],
+      "globs": [
+        "scripts/**"
+      ],
+      "importConfidence": "full",
+      "name": "scripts",
+      "origin": "authored",
+      "role": "code",
+      "testRunners": [
+        "pytest"
+      ],
+      "testedBy": 1,
       "unresolvedSites": 0
     },
     {
@@ -9255,6 +9648,41 @@
       "externals": 0,
       "files": [
         {
+          "hash": "ec72d834ffb89f9e672da48ac0e21d48c1854a5764cca1975a04b856ab2e65a6",
+          "path": "table/candidates.json"
+        },
+        {
+          "hash": "048b08ea66561b1786bc63372c7df71aaad52ad6d4aafd29e05ab9c0eed67394",
+          "path": "table/gaps.md"
+        },
+        {
+          "hash": "29cb17e2397eacbd977ccb212e2bee1e09d36fe2c5c8b8da8c64b5c82430464f",
+          "path": "table/model-families.json"
+        },
+        {
+          "hash": "59441c8afea7c2a68894e8b222cba361d8657cee7def3f0bfcef84e47facf373",
+          "path": "table/routing.jsonl"
+        }
+      ],
+      "globs": [
+        "table/**"
+      ],
+      "importConfidence": "full",
+      "name": "table",
+      "origin": "authored",
+      "role": "data",
+      "testedBy": 0,
+      "unresolvedSites": 0
+    },
+    {
+      "dynamicReads": 0,
+      "dynamicSpawns": 0,
+      "dynamicSpawnsInTests": 0,
+      "dynamicWrites": 0,
+      "entryPoints": [],
+      "externals": 0,
+      "files": [
+        {
           "hash": "9149c78d8e99a2722a908ff62cdc9e63f5a9e21ff159e27d8eaa1c447b2f3660",
           "importsFiles": [
             "src/interlock/harness/runner.py",
@@ -10709,6 +11137,15 @@
           "files": 36
         },
         {
+          "boundary": "scripts",
+          "depth": 1,
+          "enters": {
+            "file": "scripts/record_ollama_fixtures.py",
+            "from": "tests/test_ollama_fixtures.py"
+          },
+          "files": 1
+        },
+        {
           "boundary": "src",
           "depth": 1,
           "enters": {
@@ -10970,6 +11407,17 @@
   ],
   "edges": [
     {
+      "from": "scripts",
+      "kind": "file",
+      "to": "src"
+    },
+    {
+      "from": "tests",
+      "fromTests": true,
+      "kind": "file",
+      "to": "scripts"
+    },
+    {
       "from": "tests",
       "fromTests": true,
       "kind": "file",
@@ -10978,7 +11426,7 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "0db35c8299b647b7a65db85a8e37d44e919edd71",
+    "commit": "cc91aedf0475ce6a5621cce98c53b2c000f9d930",
     "tracked": 239
   },
   "landings": [
@@ -11238,374 +11686,5 @@
   "submodules": [],
   "symlinks": [],
   "testFiles": 59,
-  "unassigned": [
-    {
-      "hash": "be418720d26ab2999db6b0a7e07f4f2d6532c8c35f3c2d5329f9ce506b82109f",
-      "path": "receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl"
-    },
-    {
-      "hash": "ab6c7eb6f0751d31ffc02b66f9e8827778ca5f6415d8bb23c9c6f80ddc95a20e",
-      "path": "receipts/e1-intel-2026-10-09-rerun.jsonl"
-    },
-    {
-      "hash": "60d51fc770a8e357bb92d5ba7ea6c315cc5380e9f666d79123f6713a1d210dbc",
-      "path": "receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl"
-    },
-    {
-      "hash": "f3c915c9f7cdfde9cd04c1e379b2a59185a5dab4a5692de1caef3d4af9ab1490",
-      "path": "receipts/e1-intel-2026-10-09-rerun2-nomic-diag.jsonl"
-    },
-    {
-      "hash": "bb25ef40dc0f112d68b897aead4d6f3bb637543245ace38d36435e3413ac1217",
-      "path": "receipts/e1-intel-2026-10-09-rerun2.jsonl"
-    },
-    {
-      "hash": "0c806f214f1a0fb89996683a22b8a3e4f4c337751529873b1aa0fa7b7e4add6e",
-      "path": "receipts/e2-2026-10-10b.jsonl"
-    },
-    {
-      "hash": "a3d3edd20f7d8a858b9c69ed886cc6ae24a6fb5ad12ac831e938b563281d7bb1",
-      "path": "receipts/e2-2026-10-10c.jsonl"
-    },
-    {
-      "hash": "ff43d47b396c7137582c8310053a69b3bae93320316eac4fc7850d4d192011c5",
-      "path": "receipts/e2-b8tail-2026-10-10c.jsonl"
-    },
-    {
-      "hash": "c7e3cfea7d9a3be4e71ebcbe42bacf852dac741211f34820d48454f2c9f6c5b3",
-      "path": "receipts/e2-b8tail-2026-10-11.jsonl"
-    },
-    {
-      "hash": "d6436479628480a9d430c9205d690c3a5fe1acb26bc3b0b53aee39df1a9e17bc",
-      "path": "receipts/e3-2026-10-10b.jsonl"
-    },
-    {
-      "hash": "36121c55605224b4d5b34540416bf7384c958d17b157bd18aee39591704973ac",
-      "path": "receipts/e3-2026-10-11.jsonl"
-    },
-    {
-      "hash": "64c6cdec574b3298c13a1dab8cad7047fc6eb1866aaaa67820f11d842fd68645",
-      "path": "receipts/e3-2026-10-11b.jsonl"
-    },
-    {
-      "hash": "aa76234923364b35444b342c76a506cd4c7ce4c94898bcc01c9ab780a5a78af6",
-      "path": "receipts/e3-ref-2026-10-11b.jsonl"
-    },
-    {
-      "hash": "20d0089f23b2675caa710c18e4f47515ad7b48cf51db5151579dfde5973504a5",
-      "path": "receipts/e4-2026-10-12.jsonl"
-    },
-    {
-      "hash": "d0b6ae2a0eead6ef37d348cc94f435af5d28b41a4a9854d2f912e32546d18367",
-      "path": "receipts/e4b-block-2-series/5090-igpu-0-alone-after-5090-alone.jsonl"
-    },
-    {
-      "hash": "e09e2ca9005274f9864dcb7f78d840fd68ca244acd5d3f81aac453a2218f243e",
-      "path": "receipts/e4b-block-2-series/5090-igpu-0-alone-before-5090-alone.jsonl"
-    },
-    {
-      "hash": "39b7f95c2fd3f54817048f83304993596b8fcb0ef77ee40b266de19da515d846",
-      "path": "receipts/e4b-block-2-series/5090-igpu-0-paired-5090-with-igpu.jsonl"
-    },
-    {
-      "hash": "ec327dac61af254b1a3c2d3c16e27657f8f2daca3774d0bc8dc49d2b75a085f5",
-      "path": "receipts/e4b-block-2-series/5090-igpu-1-alone-after-5090-alone.jsonl"
-    },
-    {
-      "hash": "4089a800187fb910b9ff93c547e22d36cc246a9f1740fca2614917a1de9f913d",
-      "path": "receipts/e4b-block-2-series/5090-igpu-1-alone-before-5090-alone.jsonl"
-    },
-    {
-      "hash": "d836750aab3b9b3c2d899de42913345cc89a1266f947d7110febbc6d9fd1c008",
-      "path": "receipts/e4b-block-2-series/5090-igpu-1-paired-5090-with-igpu.jsonl"
-    },
-    {
-      "hash": "55674f3c635c70d104390aa9781b9a67244fa51de5a4088e247cb68df4344e56",
-      "path": "receipts/e4b-block-2-series/5090-igpu-2-alone-after-5090-alone.jsonl"
-    },
-    {
-      "hash": "5aee490468423394b178d5fba34531336927efa3e3cc73014df3224a9aff303c",
-      "path": "receipts/e4b-block-2-series/5090-igpu-2-alone-before-5090-alone.jsonl"
-    },
-    {
-      "hash": "b4a1c3c88737f18f8e6f6c94b6702b92fe67700629bd2f2c932373080f3d9343",
-      "path": "receipts/e4b-block-2-series/5090-igpu-2-paired-5090-with-igpu.jsonl"
-    },
-    {
-      "hash": "94e2f1ff56e8fd3907a0050088c172856dc1ad3db11fafdf8727d31912465251",
-      "path": "receipts/e4b-block-2-series/5090-igpu-3-alone-after-5090-alone.jsonl"
-    },
-    {
-      "hash": "f4258b09b5720bca43edc149523e3413da951a9d8a6511ccdf86a4b88bfca32b",
-      "path": "receipts/e4b-block-2-series/5090-igpu-3-alone-before-5090-alone.jsonl"
-    },
-    {
-      "hash": "6142f9374cd3ee2ac3cf3bbb380b3e981d26382bf7fda075d3a1dbd017652645",
-      "path": "receipts/e4b-block-2-series/5090-igpu-3-paired-5090-with-igpu.jsonl"
-    },
-    {
-      "hash": "f93f497a72a66a63290cd66d53b7cb8372cf453d69f0906e0b7168fad12a822b",
-      "path": "receipts/e4b-block-2-series/5090-igpu-4-alone-after-5090-alone.jsonl"
-    },
-    {
-      "hash": "6f2b64eaf5bf4859c8ef1d48569227dd38d81f4c9193b58fcdce30b1a0b88134",
-      "path": "receipts/e4b-block-2-series/5090-igpu-4-alone-before-5090-alone.jsonl"
-    },
-    {
-      "hash": "623b3344931aaa7ea599323fd927e8d1fcc61e47e08d2f0f2ec733bc41f95cbc",
-      "path": "receipts/e4b-block-2-series/5090-igpu-4-paired-5090-with-igpu.jsonl"
-    },
-    {
-      "hash": "f05c8ea5d0ce87e8bfac977f7a3d4ff153f44340510f04c06db8a24e5a8f4e73",
-      "path": "receipts/e4b-block-2-series/5090-igpu-5-alone-after-5090-alone.jsonl"
-    },
-    {
-      "hash": "f84c5ba9c54e00e3bdb3c7a771facc0f8f0fca665b94655f83cbbddc0f3f74cb",
-      "path": "receipts/e4b-block-2-series/5090-igpu-5-alone-before-5090-alone.jsonl"
-    },
-    {
-      "hash": "fc5dbeade545fb92a7374276c6a20cd9e76e59343cd223451f6beb242c4f82bd",
-      "path": "receipts/e4b-block-2-series/5090-igpu-5-paired-5090-with-igpu.jsonl"
-    },
-    {
-      "hash": "b1664f89af5a58a96aa6015f8e755729be1ccc2bcac1214de321ed40b5dc0b8d",
-      "path": "receipts/e4b-block-2-series/5090-igpu-6-alone-after-5090-alone.jsonl"
-    },
-    {
-      "hash": "46a87924f3c59792c02cae694529f27938a2967fe5dc7d6b476c82bd2cae0419",
-      "path": "receipts/e4b-block-2-series/5090-igpu-6-alone-before-5090-alone.jsonl"
-    },
-    {
-      "hash": "4b8859176b33379d7816b7149981045821bd422f45e8cfdcd160475e169fd5e0",
-      "path": "receipts/e4b-block-2-series/5090-igpu-6-paired-5090-with-igpu.jsonl"
-    },
-    {
-      "hash": "7968846ff6c25e67ae782cf14694a43817a9afb983adf174b97f0a10b71a15bf",
-      "path": "receipts/e4b-block-2-series/5090-igpu-7-alone-after-5090-alone.jsonl"
-    },
-    {
-      "hash": "39ca160f8280645c69eb67d6d70ed9398851c0e62160a881d86bd153ef2b7c0d",
-      "path": "receipts/e4b-block-2-series/5090-igpu-7-alone-before-5090-alone.jsonl"
-    },
-    {
-      "hash": "98c6cf7d1a8e6c58169afd076c162d1fc006435d299345b2f20ec4d05b36fd5f",
-      "path": "receipts/e4b-block-2-series/5090-igpu-7-paired-5090-with-igpu.jsonl"
-    },
-    {
-      "hash": "0aba002d7cd22b8abc2464b5cd1c17deff8d85e6dc2e624995c70a8af2c86051",
-      "path": "receipts/e4b-block-2-series/5090-igpu-8-alone-after-5090-alone.jsonl"
-    },
-    {
-      "hash": "6b06c0485bf9d632be5ffb2db450852619445a12423a227437ce5f4152419684",
-      "path": "receipts/e4b-block-2-series/5090-igpu-8-alone-before-5090-alone.jsonl"
-    },
-    {
-      "hash": "a155c3e0e1bd95d47b83285bcd244c34143cbbb2e0b7c2f8ff9b8d3879641382",
-      "path": "receipts/e4b-block-2-series/5090-igpu-8-paired-5090-with-igpu.jsonl"
-    },
-    {
-      "hash": "afbd1c4a912d18a7d1c1bd9d82fc54e7ba907f5f0ac2df9d6c3fcea6fbcc9c74",
-      "path": "receipts/e4b-block-2-series/5090-igpu-9-alone-after-5090-alone.jsonl"
-    },
-    {
-      "hash": "43e726704aec26af7b2279d0c41dfe72dd6d6462ae2430f7b08a8eda97f9cc8e",
-      "path": "receipts/e4b-block-2-series/5090-igpu-9-alone-before-5090-alone.jsonl"
-    },
-    {
-      "hash": "aedd7e026b64d44182ab8b155592c1fb63c2635cd146da3167ea5aa669df4986",
-      "path": "receipts/e4b-block-2-series/5090-igpu-9-paired-5090-with-igpu.jsonl"
-    },
-    {
-      "hash": "ca33dfa00f0b19bf56f78d6ace89efa199c303ef6fa6b77f5e587efd6482feab",
-      "path": "receipts/e4b-block-2-series/5090-npu-0-alone-after-5090-alone.jsonl"
-    },
-    {
-      "hash": "c2525e07bb43badfcca3200866b66648da0e92c44d0f016e9ffcf4dbe08c85bf",
-      "path": "receipts/e4b-block-2-series/5090-npu-0-alone-before-5090-alone.jsonl"
-    },
-    {
-      "hash": "a502a7c40c40ee19270e7876e5d6eaf009dfa5707e28e946c7ca3c779781077a",
-      "path": "receipts/e4b-block-2-series/5090-npu-0-paired-5090-with-npu.jsonl"
-    },
-    {
-      "hash": "e58e726f355f8fbe823fd79e11ccbce973513b5816929d89845c0143f9c5e240",
-      "path": "receipts/e4b-block-2-series/5090-npu-1-alone-after-5090-alone.jsonl"
-    },
-    {
-      "hash": "c8e024149cd7958371313cf9470953d25425c52db61b5c73cddfa71dc6403425",
-      "path": "receipts/e4b-block-2-series/5090-npu-1-alone-before-5090-alone.jsonl"
-    },
-    {
-      "hash": "7d38e67929084bdbd0c90b71f9c99360c3667e42fcc74e8595f7f3be092a5748",
-      "path": "receipts/e4b-block-2-series/5090-npu-1-paired-5090-with-npu.jsonl"
-    },
-    {
-      "hash": "82fec167b9bd65ea067e3f81520b8025af215bf8c61add44d66346034a1ecac8",
-      "path": "receipts/e4b-block-2-series/5090-npu-2-alone-after-5090-alone.jsonl"
-    },
-    {
-      "hash": "de8d9e8bd8c4dba91da76e1046dc7054ccb344b7c43d3a676ba4fa24d16f46bc",
-      "path": "receipts/e4b-block-2-series/5090-npu-2-alone-before-5090-alone.jsonl"
-    },
-    {
-      "hash": "ad074ecb32a06102d0f29c73a204357c4c3625b3229046f79e35be76b7233dfd",
-      "path": "receipts/e4b-block-2-series/5090-npu-2-paired-5090-with-npu.jsonl"
-    },
-    {
-      "hash": "231cce1bad2ad948c4068a4488bb6163a98b0f89f04d6f8c6d3ce469da6189fa",
-      "path": "receipts/e4b-block-2-series/5090-npu-3-alone-after-5090-alone.jsonl"
-    },
-    {
-      "hash": "55acad3bc72dabf43642b37030636ff916afbaf5357846bef7c666f7ae3ed14a",
-      "path": "receipts/e4b-block-2-series/5090-npu-3-alone-before-5090-alone.jsonl"
-    },
-    {
-      "hash": "58444d3ad6ab4cd7f0c3f7f3ba928a6d4b974b9e068293a3be9eabbe4464186b",
-      "path": "receipts/e4b-block-2-series/5090-npu-3-paired-5090-with-npu.jsonl"
-    },
-    {
-      "hash": "df855cfbf8dc322d2c43a613aff1129db30a9f9691ec92a2de5d1d9b055654f2",
-      "path": "receipts/e4b-block-2-series/5090-npu-4-alone-after-5090-alone.jsonl"
-    },
-    {
-      "hash": "5bbc2b9f5e151cc9d457697538c24d752e4a5631cec88c790bb1b091026eec38",
-      "path": "receipts/e4b-block-2-series/5090-npu-4-alone-before-5090-alone.jsonl"
-    },
-    {
-      "hash": "d3ba1a667207453bc37752d49340db153a3bfc457a67fec82b8fb907d631fcb5",
-      "path": "receipts/e4b-block-2-series/5090-npu-4-paired-5090-with-npu.jsonl"
-    },
-    {
-      "hash": "df3c1ff4bc22bacf35e633ce1e5a5ff7b6b0091d51c40e6b1817bf06d32d6cb3",
-      "path": "receipts/e4b-block-2-series/5090-npu-5-alone-after-5090-alone.jsonl"
-    },
-    {
-      "hash": "1407686bf761031e55353b21bca8a0b88f88e1bd97b274061e32ff80b97dc686",
-      "path": "receipts/e4b-block-2-series/5090-npu-5-alone-before-5090-alone.jsonl"
-    },
-    {
-      "hash": "8a3a7151024e237f56534cbb049aa1ca4345b6650c7681649e44d39fa5acdb84",
-      "path": "receipts/e4b-block-2-series/5090-npu-5-paired-5090-with-npu.jsonl"
-    },
-    {
-      "hash": "3e75e6800d711c50a5fcf9648065c95447bef7286a830604b086dc09c4357153",
-      "path": "receipts/e4b-block-2-series/5090-npu-6-alone-after-5090-alone.jsonl"
-    },
-    {
-      "hash": "d3727bf4112cd1f523edbf874a7f994f055f46608e47a137d87473a2218ab203",
-      "path": "receipts/e4b-block-2-series/5090-npu-6-alone-before-5090-alone.jsonl"
-    },
-    {
-      "hash": "b42b577e6cc77fdf297ad3d0c859cb00b1279029a1da8bea1efd9ce21b12f0ed",
-      "path": "receipts/e4b-block-2-series/5090-npu-6-paired-5090-with-npu.jsonl"
-    },
-    {
-      "hash": "a7cb8465e99e3f460fc59981c2249123cb57e626f15e7641777a7b748bdaa19f",
-      "path": "receipts/e4b-block-2-series/5090-npu-7-alone-after-5090-alone.jsonl"
-    },
-    {
-      "hash": "fe48c4d616b6f9fe6d1bf994d9ddb5fb60f76145ecac7fb1c98fe69f8db54e12",
-      "path": "receipts/e4b-block-2-series/5090-npu-7-alone-before-5090-alone.jsonl"
-    },
-    {
-      "hash": "c2ac50a5c120255adec873e6b3add0f1e7431f915e685c36cc91e23d1bc59704",
-      "path": "receipts/e4b-block-2-series/5090-npu-7-paired-5090-with-npu.jsonl"
-    },
-    {
-      "hash": "303befbcdf6e5ba8eb8ea0e5296b6e1e6b6df90ffd6b2de36c259ec9baa50eec",
-      "path": "receipts/e4b-block-2-series/5090-npu-8-alone-after-5090-alone.jsonl"
-    },
-    {
-      "hash": "629de16f40f05b514da1ded27ff25bfd9b3ac49a18086c84dc937842e235b567",
-      "path": "receipts/e4b-block-2-series/5090-npu-8-alone-before-5090-alone.jsonl"
-    },
-    {
-      "hash": "91241bbf0f5f67347493a05de573ba8b2f9d25815b46814ffd1a26ee04850800",
-      "path": "receipts/e4b-block-2-series/5090-npu-8-paired-5090-with-npu.jsonl"
-    },
-    {
-      "hash": "bcb25175833e6861160d68516afd86d9a4648a5c8a2b40006c853c682dd7e36b",
-      "path": "receipts/e4b-block-2-series/5090-npu-9-alone-after-5090-alone.jsonl"
-    },
-    {
-      "hash": "0f768b67feeef1c6737f469b7e528d44056ccc7b3a8b6f2eed76ff32f2523dca",
-      "path": "receipts/e4b-block-2-series/5090-npu-9-alone-before-5090-alone.jsonl"
-    },
-    {
-      "hash": "b039c92ba308a17d552371cbd9f0e89527be1135e2152265751f069c1f94019f",
-      "path": "receipts/e4b-block-2-series/5090-npu-9-paired-5090-with-npu.jsonl"
-    },
-    {
-      "hash": "44685ea877a06bc92d9a910d4aa6c1bfc678f9edb3af0c3271577796cdfd2da5",
-      "path": "receipts/e4b-block-2-series/cold-0-cold-5090-alone.jsonl"
-    },
-    {
-      "hash": "4b479eb35c30b42fdb1e5262685c5c5915970453ced8bd8d408c2993085b1e9d",
-      "path": "receipts/e4b-block-2-series/cold-0-cold-5090-with-igpu.jsonl"
-    },
-    {
-      "hash": "29632df141b47cbb00eeb146fc024c3f0a8f55ba9b0c68c2f2ec5f57c4ae308f",
-      "path": "receipts/e4b-block-2-series/cold-0-cold-5090-with-npu.jsonl"
-    },
-    {
-      "hash": "71a574ae4775e0b6975d343c3c63d12f2b6e2da3a5d716fed382782523335338",
-      "path": "receipts/e4b-block-2.jsonl"
-    },
-    {
-      "hash": "73465ce2679d69300dd3f6ce8869b985a043c446706bf40128164f6fce7b16f7",
-      "path": "receipts/e4b-block-3.jsonl"
-    },
-    {
-      "hash": "1a2147ad1bf667165c25906dd2dca8ae43625ba97e57d3a8cbf0138303984d3a",
-      "path": "receipts/e5-2026-10-13b.jsonl"
-    },
-    {
-      "hash": "454d901a8423fed7b2ebab188ce3a044429372172b3c0acb74680548ea13e9d0",
-      "path": "receipts/e5-2026-10-13c.jsonl"
-    },
-    {
-      "exports": [
-        "main"
-      ],
-      "failurePaths": [
-        {
-          "in": "main",
-          "kind": "except",
-          "line": 58
-        },
-        {
-          "in": "main",
-          "kind": "except",
-          "line": 84
-        },
-        {
-          "kind": "raise",
-          "line": 93
-        }
-      ],
-      "hash": "d513eac659768cee7c42206cb717fe250eddce80678fb10aca454d083d2ac19d",
-      "importsFiles": [
-        "src/interlock/adapters/ollama_cases.py",
-        "src/interlock/adapters/record_fixtures.py",
-        "src/interlock/harness/runner.py"
-      ],
-      "path": "scripts/record_ollama_fixtures.py"
-    },
-    {
-      "hash": "ec72d834ffb89f9e672da48ac0e21d48c1854a5764cca1975a04b856ab2e65a6",
-      "path": "table/candidates.json"
-    },
-    {
-      "hash": "048b08ea66561b1786bc63372c7df71aaad52ad6d4aafd29e05ab9c0eed67394",
-      "path": "table/gaps.md"
-    },
-    {
-      "hash": "29cb17e2397eacbd977ccb212e2bee1e09d36fe2c5c8b8da8c64b5c82430464f",
-      "path": "table/model-families.json"
-    },
-    {
-      "hash": "59441c8afea7c2a68894e8b222cba361d8657cee7def3f0bfcef84e47facf373",
-      "path": "table/routing.jsonl"
-    }
-  ]
+  "unassigned": []
 }
