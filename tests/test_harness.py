@@ -1307,6 +1307,9 @@ def test_an_edited_spec_is_refused_and_dry_run_does_not_touch_devices(tmp_path: 
     assert "a missing log or dll refuses at preflight" in e5_text
     assert "the tray app log is never a fallback" in e5_text
     assert "llama-server.exe" in e5_text
+    assert "the spill baseline is the model's lowest resident window" in e5_text
+    assert "a missing CUDA_Host line refuses after the first load" in e5_text
+    assert "the shared gate is the delta from the baseline taken before the window" not in e5_text
     assert "quant is read from /api/show at run time" in e5_text
     assert "not launched" not in e4_text
     spec = repo / "experiments" / "e4" / "spec.yaml"
@@ -1482,13 +1485,14 @@ def test_search_spill_and_schedule_refuse_bad_inputs():
     assert is_spill(_resident(1, shared=1257, prompt=20), reference, shared_growth_mib=256, prompt_ratio=0.5) is True
     assert is_spill(_resident(1, shared=1000, prompt=10), reference, shared_growth_mib=256, prompt_ratio=0.5) is False
     assert is_spill(_resident(1, shared=1000, prompt=9), reference, shared_growth_mib=256, prompt_ratio=0.5) is True
-    # The pre-window baseline, not the reference window's shared usage.
+    # The pre-window reading is the idle sample. The baseline is the reference window.
     under = Observation(True, 1, shared_mib=1200, prompt_tok_s=20, shared_baseline=1000, baseline_taken=True)
     assert is_spill(under, reference, shared_growth_mib=256, prompt_ratio=0.5) is False
     over = Observation(True, 1, shared_mib=1257, prompt_tok_s=20, shared_baseline=1000, baseline_taken=True)
     assert is_spill(over, reference, shared_growth_mib=256, prompt_ratio=0.5) is True
-    missing_base = Observation(True, 1, shared_mib=1100, prompt_tok_s=20, shared_baseline=None, baseline_taken=True)
-    assert is_spill(missing_base, reference, shared_growth_mib=256, prompt_ratio=0.5) is True
+    idle_missing = Observation(True, 1, shared_mib=1100, prompt_tok_s=20, shared_baseline=None, baseline_taken=True)
+    assert is_spill(idle_missing, reference, shared_growth_mib=256, prompt_ratio=0.5) is False
+    assert is_spill(_resident(1, shared=1100, prompt=20), _resident(1, shared=None, prompt=20), shared_growth_mib=256, prompt_ratio=0.5) is True
     assert over_margin(Observation(True, None, error="lost"), 30500) is True
     assert over_margin(Observation(True, None), 30500) is True
 

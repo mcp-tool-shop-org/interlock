@@ -721,7 +721,15 @@ def test_dry_run_names_the_confirmation_count(monkeypatch):
     assert "pinned once at run start" in text
     assert "zero or several instances within tolerance refuses before any load" in text
     assert "later shared and dedicated reads use the pinned instance" in text
+    assert "the spill baseline is the model's lowest resident window" in text
+    assert "a window spills when its shared reading exceeds that baseline by more than spill_shared_mib" in text
+    assert "the prompt-rate rule is unchanged" in text
     assert "a missing shared reading during a window is still a spill" in text
+    assert "the baseline is checked against the idle shared reading and the CUDA_Host buffer sum" in text
+    assert "a baseline that exceeds that sum by more than 256 MiB is inconclusive and is not confirmed" in text
+    assert "CUDA_Host model, compute, and output sizes come from the first-load lines" in text
+    assert "a missing CUDA_Host line refuses after the first load" in text
+    assert "the shared gate is the delta from the baseline taken before the window" not in text
     assert "preflight samples nvidia-smi, both counters, the server log, the ggml-cuda sha, git, and driver CUDA before any load" in text
     assert "driver CUDA accepts CUDA Version and CUDA UMD Version" in text
     assert "a missing log or dll refuses at preflight" in text
@@ -784,12 +792,12 @@ def test_a_trained_window_that_is_not_resident_searches_down_to_the_grain(tmp_pa
     assert calls[-1] == ["confirm", 6144, 20000, 1000, 100, "confirmed"]
 
 
-def test_shared_growth_uses_the_pre_window_baseline(tmp_path: Path):
-    """A high absolute shared reading is not a spill when this window barely grew.
+def test_shared_growth_is_measured_from_the_lowest_resident_window(tmp_path: Path):
+    """The confirm spills against the load, even when the pre-window rise is small.
 
-    The load's shared reading stays at 100. The confirmation sits near 2200.
-    Gating on the load would call that a spill. The baseline taken just before
-    the confirmation is 2000, so 200 MiB of growth is under the 256 MiB line.
+    The load sits at 100. The 8192 confirm reads 2200: 200 over the reading
+    taken just before that confirm, and 2100 over the load. The spill baseline
+    is the load. The search steps back and confirms 6144 at 200.
     """
 
     transport = _Transport(None, trained=8192)
@@ -799,6 +807,8 @@ def test_shared_growth_uses_the_pre_window_baseline(tmp_path: Path):
         (_GPU, 100, 12),
         (_GPU, 2000, 12),
         (_GPU, 2200, 20),
+        (_GPU, 150, 12),
+        (_GPU, 200, 14),
     ]
 
     def adapter_reading():
@@ -809,11 +819,11 @@ def test_shared_growth_uses_the_pre_window_baseline(tmp_path: Path):
     seams.adapter_reading = adapter_reading
     _repo, rows = _run(tmp_path, transport, seams=seams, max_ctx=8192)
     assert script == []
-    assert rows[0]["settings"]["max_resident_ctx"] == 8192
-    assert rows[0]["settings"]["shared_mib"] == 2200
-    assert rows[0]["settings"]["dedicated_delta_mib"] == 8
-    assert rows[0]["settings"]["dedicated_mib"] == 20
-    assert rows[0]["settings"]["search_calls"][-1] == ["confirm", 8192, 20000, 2200, 100, "confirmed"]
+    calls = rows[0]["settings"]["search_calls"]
+    assert rows[0]["settings"]["max_resident_ctx"] == 6144
+    assert rows[0]["settings"]["shared_mib"] == 200
+    assert ["confirm", 8192, 20000, 2200, 100, "spill"] in calls
+    assert calls[-1] == ["confirm", 6144, 20000, 200, 100, "confirmed"]
 
 
 def test_the_5090_is_the_dedicated_match_and_a_bad_match_is_a_spill(tmp_path: Path):
@@ -1391,6 +1401,15 @@ def test_a_clean_preflight_records_the_sample_the_sources_and_git(tmp_path: Path
     assert settings["exe_source"] == "listener"
     assert settings["runner_pid"] == 77
     assert settings["max_resident_ctx"] == 4096
+    assert settings["idle_shared_mib"] == 74
+    assert settings["baseline_check"] == "ok"
+    assert settings["cuda_host_model_mib"] == 333.84
+    assert settings["cuda_host_compute_mib"] == 18.01
+    assert settings["cuda_host_output_mib"] == 0.58
+    assert settings["cuda_host_sum_mib"] == 352.43
+    assert isinstance(settings["baseline_ctx"], int)
+    assert isinstance(settings["baseline_shared_mib"], int)
+    assert all(isinstance(item["delta_mib"], int) for item in settings["shared_delta_mib"])
     urls = [url for _method, url, _body in transport.calls]
     assert urls[0].endswith("/api/ps")
     assert any(url.endswith("/api/show") for url in urls)
@@ -1449,3 +1468,47 @@ def test_a_missing_load_line_refuses_before_a_measured_window(tmp_path: Path, mo
     assert len(prompts) == 1
     text = (repo / "receipts" / "fill-stale.jsonl").read_text(encoding="utf-8")
     assert "Users" not in text
+
+
+def test_missing_cuda_host_lines_refuse_after_the_first_load(tmp_path: Path, monkeypatch):
+    _clear_fill_env(monkeypatch)
+    install = _install_tree(tmp_path)
+    _decoy_tray(tmp_path, monkeypatch)
+    install["log"].write_text(_recorded_log("server-config-11434.txt"), encoding="utf-8", newline="\n")
+    full = _recorded_log("load-lines-11434.txt")
+    kept = "\n".join(line for line in full.splitlines() if "CUDA_Host" not in line) + "\n"
+    assert "flash-attn" in kept and "llama_kv_cache" in kept
+    assert "CUDA_Host" not in kept
+
+    def append() -> None:
+        with install["log"].open("a", encoding="utf-8", newline="") as handle:
+            handle.write(kept)
+
+    repo, spec_path = _committed_repo(tmp_path, _spec([_model()]), folder="missing-host")
+    run, read_counter, _seen = _live_commands(install, "ok")
+    transport = _Transport(None)
+    transport.before_generate = append
+    adapter = OllamaAdapter(transport=transport)
+    seams = real_fill_seams(adapter, run=run, read_counter=read_counter)
+    seams.threaded = False
+    seams.sleep = lambda _seconds: None
+    transport.seams = seams
+    with pytest.raises(RunnerError, match="CUDA_Host"):
+        run_spec(
+            spec_path,
+            root=repo,
+            grant="g",
+            adapters={"ollama": adapter},
+            heartbeat=_fresh(tmp_path),
+            date="2026-10-13",
+            run_id="fill-missing-host",
+            seams=seams,
+        )
+    row = load_jsonl(repo / "receipts" / "fill-missing-host.jsonl")[0]
+    assert row["aborted"] is True
+    assert row["settings"]["max_resident_ctx"] is None
+    assert "search_calls" not in row["settings"]
+    assert "CUDA_Host model" in row["notes"]
+    assert "CUDA_Host compute" in row["notes"]
+    assert "CUDA_Host output" in row["notes"]
+    assert "Users" not in (repo / "receipts" / "fill-missing-host.jsonl").read_text(encoding="utf-8")

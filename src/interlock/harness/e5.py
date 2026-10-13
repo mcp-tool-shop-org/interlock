@@ -10,13 +10,12 @@ Confirmation is a separate probe. A window that exceeds ``abort_mib`` or
 fails residency steps back one grid notch. So does a spill.
 
 The primary spill signal is growth in the 5090 adapter's shared GPU memory
-over a baseline taken immediately before that window. When the observation
-carries no baseline, the growth is measured from the lowest resident
-window, which is also the prompt-rate reference. The secondary signal is
-prompt-processing rate (``prompt_eval_count / prompt_eval_duration``).
-Either one trips the spill. A missing shared reading or a missing prompt
-rate is a spill. Decode tokens per second and raw time-to-first-token are
-recorded and are not gates.
+over the model's own lowest resident window, which is also the prompt-rate
+reference. A pre-window reading is the idle sample. It is not this
+comparison. The secondary signal is prompt-processing rate
+(``prompt_eval_count / prompt_eval_duration``). Either one trips the spill.
+A missing shared reading or a missing prompt rate is a spill. Decode tokens
+per second and raw time-to-first-token are recorded and are not gates.
 
 ``limit`` is ``margin`` when residency or ``abort_mib`` stopped the search,
 and ``max_ctx`` when the cap stopped it.
@@ -82,12 +81,13 @@ def is_spill(
 ) -> bool:
     """True when shared memory grew past the threshold, or the prompt rate fell.
 
-    Missing shared usage or ``prompt_tok_s`` on either side is a spill.
-    A baseline taken before this window replaces the reference window's
-    shared usage. Decode ``tok_s`` and ``ttft_ms`` are ignored here.
+    The baseline is ``reference``, the lowest resident window. A pre-window
+    reading stored on the observation is the idle sample and is not this
+    comparison. Missing shared usage or ``prompt_tok_s`` on either side is a
+    spill. Decode ``tok_s`` and ``ttft_ms`` are ignored here.
     """
 
-    baseline = obs.shared_baseline if obs.baseline_taken else reference.shared_mib
+    baseline = reference.shared_mib
     if baseline is None or obs.shared_mib is None:
         return True
     if obs.shared_mib - baseline > shared_growth_mib:
@@ -264,6 +264,45 @@ def _bisect(low: int, high: int, grain: int, measure, abort_mib: int) -> int:
         else:
             low = snapped
     return low
+
+
+def baseline_is_spilling(idle_mib: int, baseline_mib: int, host_sum_mib: float, *, allowance_mib: int = SHARED_GROWTH_MIB) -> bool:
+    """The lowest window, minus idle, is more than the CUDA_Host sum plus the allowance.
+
+    Equality at the allowance is not spilling. The caller has the three readings.
+    """
+
+    return (baseline_mib - idle_mib) - host_sum_mib > allowance_mib
+
+
+def lowest_resident_shared(calls: list[tuple]) -> tuple[int, int] | None:
+    """``(ctx, shared_mib)`` of the lowest resident load. That window is the baseline."""
+
+    chosen: tuple[int, int] | None = None
+    for call in calls:
+        if len(call) < 6 or call[0] != "load" or call[5] != "resident":
+            continue
+        ctx, shared = call[1], call[3]
+        if isinstance(ctx, bool) or isinstance(shared, bool):
+            continue
+        if not isinstance(ctx, int) or not isinstance(shared, int):
+            continue
+        if chosen is None or ctx < chosen[0]:
+            chosen = (ctx, shared)
+    return chosen
+
+
+def shared_deltas(calls: list[tuple], baseline_mib: int) -> list[dict]:
+    """Each window's shared reading minus the baseline. A missing reading stays None."""
+
+    rows = []
+    for call in calls:
+        shared = call[3] if len(call) > 3 else None
+        delta = None
+        if isinstance(shared, int) and not isinstance(shared, bool):
+            delta = shared - baseline_mib
+        rows.append({"kind": call[0], "ctx": call[1], "delta_mib": delta})
+    return rows
 
 
 def _lowest_resident(loaded: dict[int, Observation], abort_mib: int) -> Observation | None:

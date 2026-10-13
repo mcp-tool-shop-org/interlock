@@ -15,10 +15,21 @@ from pathlib import Path
 
 import pytest
 
+from interlock.harness.e5 import (
+    Observation,
+    SearchResult,
+    baseline_is_spilling,
+    is_spill,
+    lowest_resident_shared,
+    search,
+    shared_deltas,
+)
 from interlock.harness.fill import (
     ADAPTER_DEDICATED,
     ADAPTER_SHARED,
+    INCONCLUSIVE,
     FillPreflightError,
+    _apply_spill_baseline,
     _runner_pid,
     config_facts,
     driver_cuda,
@@ -40,6 +51,7 @@ from interlock.harness.spec import SpecError, load_spec, validate_spec
 
 ROOT = Path(__file__).resolve().parents[1]
 E5 = ROOT / "experiments" / "e5" / "spec.yaml"
+E5_SMOKE = ROOT / "experiments" / "e5-smoke" / "spec.yaml"
 FIXTURES = ROOT / "tests" / "fixtures" / "e5"
 _GPU = "luid_0x00000000_0x000140e1_phys_0"
 _SHA = "a" * 40
@@ -373,6 +385,16 @@ def test_load_lines_parse_the_recorded_segment_and_a_missing_line_refuses():
     assert parsed["flash_attn"] == "auto"
     assert parsed["flash_attention"] == "enabled"
     assert parsed["kv_cache_type"] == "f16"
+    assert parsed["cuda_host_model_mib"] == 333.84
+    assert parsed["cuda_host_compute_mib"] == 18.01
+    assert parsed["cuda_host_output_mib"] == 0.58
+    assert parsed["cuda_host_sum_mib"] == 352.43
+    without_host = "\n".join(line for line in segment.splitlines() if "CUDA_Host" not in line)
+    refused = load_line_facts(without_host)
+    assert refused["reason"] is not None
+    assert "CUDA_Host model" in refused["reason"]
+    assert "CUDA_Host compute" in refused["reason"]
+    assert "CUDA_Host output" in refused["reason"]
     disabled = segment.replace("Flash Attention enabled", "Flash Attention disabled")
     assert load_line_facts(disabled)["flash_attention"] == "disabled"
     split = segment.replace("V (f16)", "V (q8_0)")
@@ -435,3 +457,199 @@ def test_the_live_default_runner_returns_a_childs_stdout(monkeypatch):
     assert listener_log(live_run) == r"E:\AI\ollama-cu134\system-11434.log"
     assert listener_exe(live_run) == r"D:\ollama\ollama.exe"
     assert _runner_pid(live_run) == 42
+
+
+# Recorded on the e5 smoke, qwen3:8b, windows 2048 through 8192.
+_SMOKE_SHARED = {2048: 505, 4096: 507, 6144: 531, 8192: 534}
+_SMOKE_IDLE = 72
+_SMOKE_PROMPT = 40.0
+
+
+def _smoke_host() -> dict:
+    parsed = load_line_facts((FIXTURES / "load-lines-11434.txt").read_text(encoding="utf-8"))
+    return {
+        "model": parsed["cuda_host_model_mib"],
+        "compute": parsed["cuda_host_compute_mib"],
+        "output": parsed["cuda_host_output_mib"],
+        "sum": parsed["cuda_host_sum_mib"],
+    }
+
+
+def _window(shared: int, *, prompt: float = _SMOKE_PROMPT) -> Observation:
+    return Observation(
+        True,
+        1000,
+        shared_mib=shared,
+        prompt_tok_s=prompt,
+        tok_s=10,
+        ttft_ms=1,
+        shared_baseline=_SMOKE_IDLE,
+        baseline_taken=True,
+    )
+
+
+def _smoke_calls() -> list[tuple]:
+    calls = [
+        ("load", ctx, 1000, shared, _SMOKE_PROMPT, "resident")
+        for ctx, shared in _SMOKE_SHARED.items()
+    ]
+    calls.append(("confirm", 8192, 1000, _SMOKE_SHARED[8192], _SMOKE_PROMPT, "confirmed"))
+    return calls
+
+
+def test_the_smoke_windows_confirm_against_the_lowest_resident_window():
+    host = _smoke_host()
+    assert host == {"model": 333.84, "compute": 18.01, "output": 0.58, "sum": 352.43}
+    assert baseline_is_spilling(_SMOKE_IDLE, _SMOKE_SHARED[2048], host["sum"]) is False
+    reference = _window(_SMOKE_SHARED[2048])
+    for shared in _SMOKE_SHARED.values():
+        assert is_spill(_window(shared), reference, shared_growth_mib=256, prompt_ratio=0.5) is False
+
+    def probe(ctx, _kind):
+        return _window(_SMOKE_SHARED[ctx])
+
+    climbed = search(default_ctx=2048, probe=probe, abort_mib=30500, grain=2048, max_ctx=8192)
+    assert climbed.max_ctx == 8192
+    assert climbed.reason == "confirmed"
+    assert [call[1] for call in climbed.calls if call[0] == "load"] == [2048, 4096, 8192]
+
+    found = SearchResult(
+        8192,
+        "confirmed",
+        _smoke_calls(),
+        peak_mib=1000,
+        tok_s=10,
+        ttft_ms=1,
+        prompt_tok_s=_SMOKE_PROMPT,
+        shared_mib=_SMOKE_SHARED[8192],
+    )
+    fields = _apply_spill_baseline(found, host, _SMOKE_IDLE)
+    assert fields["baseline_check"] == "ok"
+    assert fields["idle_shared_mib"] == _SMOKE_IDLE
+    assert fields["baseline_ctx"] == 2048
+    assert fields["baseline_shared_mib"] == 505
+    assert fields["cuda_host_model_mib"] == 333.84
+    assert fields["cuda_host_compute_mib"] == 18.01
+    assert fields["cuda_host_output_mib"] == 0.58
+    assert fields["cuda_host_sum_mib"] == 352.43
+    assert found.max_ctx == 8192
+    assert found.reason == "confirmed"
+    loads = {
+        item["ctx"]: item["delta_mib"]
+        for item in fields["shared_delta_mib"]
+        if item["kind"] == "load"
+    }
+    assert loads == {2048: 0, 4096: 2, 6144: 26, 8192: 29}
+
+
+def test_a_window_300_mib_over_the_baseline_spills():
+    reference = _window(505)
+    assert is_spill(_window(505 + 256), reference, shared_growth_mib=256, prompt_ratio=0.5) is False
+    assert is_spill(_window(505 + 300), reference, shared_growth_mib=256, prompt_ratio=0.5) is True
+
+    def probe(ctx, kind):
+        shared = _SMOKE_SHARED[ctx]
+        if kind == "confirm" and ctx == 8192:
+            shared = 505 + 300
+        return _window(shared)
+
+    found = search(default_ctx=2048, probe=probe, abort_mib=30500, grain=2048, max_ctx=8192)
+    spilled = [call for call in found.calls if call[0] == "confirm" and call[1] == 8192]
+    assert spilled == [("confirm", 8192, 1000, 805, _SMOKE_PROMPT, "spill")]
+    assert found.max_ctx == 6144
+    assert found.reason == "confirmed"
+    assert found.calls[-1][5] == "confirmed"
+
+
+def test_a_baseline_past_the_cuda_host_sum_is_inconclusive():
+    host = _smoke_host()
+    assert baseline_is_spilling(0, 356, 100.0) is False
+    assert baseline_is_spilling(0, 357, 100.0) is True
+    # 681 is the first integer shared reading on the smoke buffers that clears the allowance.
+    assert baseline_is_spilling(_SMOKE_IDLE, 680, host["sum"]) is False
+    assert baseline_is_spilling(_SMOKE_IDLE, 681, host["sum"]) is True
+
+    calls = _smoke_calls()
+    calls[0] = ("load", 2048, 1000, 681, _SMOKE_PROMPT, "resident")
+    found = SearchResult(8192, "confirmed", calls, peak_mib=1000, tok_s=10, prompt_tok_s=_SMOKE_PROMPT, shared_mib=534)
+    fields = _apply_spill_baseline(found, host, _SMOKE_IDLE)
+    assert fields["baseline_check"] == "spilling"
+    assert fields["baseline_ctx"] == 2048
+    assert fields["baseline_shared_mib"] == 681
+    assert fields["idle_shared_mib"] == _SMOKE_IDLE
+    assert fields["shared_delta_mib"][0]["delta_mib"] == 0
+    assert found.max_ctx is None
+    assert found.reason == f"{INCONCLUSIVE}: the baseline may be spilling"
+    assert found.peak_mib is None
+    assert found.shared_mib is None
+    assert all(call[5] != "confirmed" for call in found.calls)
+    assert found.calls[-1][5] == "baseline spilling"
+
+    unchecked = SearchResult(2048, "confirmed", [("load", 2048, 1000, 505, _SMOKE_PROMPT, "resident")], peak_mib=9)
+    missing_idle = _apply_spill_baseline(unchecked, host, None)
+    assert missing_idle["baseline_check"] == "spilling"
+    assert unchecked.max_ctx is None
+    idle_bool = SearchResult(2048, "confirmed", [("load", 2048, 1000, 505, _SMOKE_PROMPT, "resident")])
+    assert _apply_spill_baseline(idle_bool, host, True)["baseline_check"] == "spilling"
+    assert idle_bool.max_ctx is None
+    no_sum = SearchResult(2048, "confirmed", [("load", 2048, 1000, 505, _SMOKE_PROMPT, "resident")])
+    assert _apply_spill_baseline(no_sum, {**host, "sum": None}, _SMOKE_IDLE)["baseline_check"] == "spilling"
+    assert no_sum.max_ctx is None
+    empty = SearchResult(None, "no resident window", [])
+    assert _apply_spill_baseline(empty, host, _SMOKE_IDLE)["baseline_check"] == "spilling"
+    assert empty.max_ctx is None
+
+
+def test_the_baseline_helpers_skip_a_reading_that_is_not_a_resident_window():
+    calls = [
+        ("load",),
+        ("confirm", 2048, 1, 505, _SMOKE_PROMPT, "confirmed"),
+        ("load", 8192, 1, 534, _SMOKE_PROMPT, "over abort_mib"),
+        ("load", True, 1, 505, _SMOKE_PROMPT, "resident"),
+        ("load", 4096, 1, True, _SMOKE_PROMPT, "resident"),
+        ("load", "8192", 1, 505, _SMOKE_PROMPT, "resident"),
+        ("load", 6144, 1, 531, _SMOKE_PROMPT, "resident"),
+        ("load", 2048, 1, 505, _SMOKE_PROMPT, "resident"),
+    ]
+    assert lowest_resident_shared(calls) == (2048, 505)
+    assert lowest_resident_shared([]) is None
+    deltas = shared_deltas([("confirm", 4096), ("load", 2048, 1, True, 1, "resident"), ("load", 2048, 1, 507, 1, "resident")], 505)
+    assert deltas[0]["delta_mib"] is None
+    assert deltas[1]["delta_mib"] is None
+    assert deltas[2]["delta_mib"] == 2
+
+
+def test_a_missing_shared_reading_is_still_a_spill():
+    reference = _window(505)
+    missing = Observation(True, 1000, shared_mib=None, prompt_tok_s=_SMOKE_PROMPT)
+    assert is_spill(missing, reference, shared_growth_mib=256, prompt_ratio=0.5) is True
+
+    def probe(ctx, kind):
+        if kind == "confirm":
+            return missing
+        return _window(_SMOKE_SHARED[ctx])
+
+    found = search(default_ctx=8192, probe=probe, abort_mib=30500, grain=2048, max_ctx=8192)
+    assert found.max_ctx is None
+    assert found.reason == "no confirmed window"
+    assert any(call[0] == "confirm" and call[3] is None and call[5] == "spill" for call in found.calls)
+
+
+def test_both_specs_load_and_carry_the_spill_baseline_amendment():
+    for path in (E5, E5_SMOKE):
+        loaded = load_spec(path)
+        validate_spec(loaded)
+        text = path.read_text(encoding="utf-8")
+        assert text.count("Amendment, 2026-10-13") == 1
+        amendment = next(line for line in text.splitlines() if "Amendment, 2026-10-13" in line)
+        assert "lowest resident window" in amendment
+        assert "spill_shared_mib (256)" in amendment
+        assert "CUDA_Host" in amendment
+        assert "inconclusive, never confirmed" in amendment
+        assert loaded["spill_shared_mib"] == 256
+        assert loaded["spill_prompt_ratio"] == 0.5
+        assert loaded["abort_mib"] == 30500
+        assert loaded["ceiling_mib"] == 31200
+    assert load_spec(E5)["id"] == "E5"
+    assert load_spec(E5_SMOKE)["id"] == "E5-smoke"
+    assert E5.read_text(encoding="utf-8").count("Amendment, 2026-10-12") == 2

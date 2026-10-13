@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- E5's spill baseline is the model's own lowest resident window, the same window as the prompt-rate reference. A window spills when its shared reading exceeds that baseline by more than 256 MiB, or when its prompt rate falls under the existing rule. The idle shared reading and the CUDA_Host model, compute, and output sizes from the first load check that baseline. If the lowest window's shared reading minus idle exceeds that sum by more than 256 MiB, the row is inconclusive and is not confirmed. A missing CUDA_Host line refuses after the first load. A missing shared reading is still a spill. (spec amendment 2026-10-13, after the e5 smoke)
+
 - Fixed: E5 records the backend library as a path inside the Ollama install (`lib\ollama\...`), and every server fact passes the receipt's home-path guard before any model loads. Live 2026-10-13: E5 measured gemma4:31b for 70 minutes, then its row was refused at write time for the full load_backend path under the user's home, and the run ended with no receipt.
 
 - Fixed: E5's live runner was a bare `subprocess.run`, which captures no output, so the 11434 listener's parent command line and the listener's program path both came back empty. Preflight refused with "server log did not resolve", and the program-path lookup would have failed the same way on the next line. The default now captures the child's text (`capture_run` when the call passes only the argv). The log lookup, the program-path lookup, and the other `run` calls in the fill harness use it. Found live by the Publisher, 2026-10-13.
