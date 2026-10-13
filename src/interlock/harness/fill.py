@@ -2232,15 +2232,21 @@ def _measure_model(
         except _WindowOver:
             aborted.append(ctx)
             obs = _over(sampler.peak)
+        sampler.wait_for_abort()
+        if hung["note"]:
+            raise _UnloadTimeout(hung["note"])
+        # cover has joined the sampler, so over is final. observe can pass
+        # its own check and still return the window as resident while the
+        # card crosses abort_mib. on_abort already unloaded it.
+        if sampler.over and obs.error != ABORT_ERROR:
+            aborted.append(ctx)
+            obs = _over(sampler.peak)
         _note_resident(obs, ctx)
         if kind == "load" and isinstance(obs.peak_mib, int) and obs.error != ABORT_ERROR:
             measured.append((ctx, obs.peak_mib))
             resident_at[ctx] = bool(obs.resident)
             if obs.resident and obs.error != PREDICTED_OVER:
                 predicted_over[:] = [item for item in predicted_over if item != ctx]
-        sampler.wait_for_abort()
-        if hung["note"]:
-            raise _UnloadTimeout(hung["note"])
         return obs
 
     spec_cap = spec.get("max_ctx", 1_048_576)
