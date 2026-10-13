@@ -20,7 +20,11 @@ never end the test process.
 
 A slot probe is separate from that thread. The runner opens one around each
 measured call: a reading before, one a second while the call runs, and one
-after. Tests pass a ``slot_reader`` and leave the thread off.
+after. Those readings are system-wide counters only (total CPU, RAM, the
+disk counter). The process walk runs in ``close``, after the measured call
+has returned, and only when that slot's CPU max is over 30%. The receipt
+records it as ``top_after_call``. Tests pass a ``slot_reader`` and leave the
+thread off.
 """
 
 from __future__ import annotations
@@ -174,21 +178,15 @@ def _span(readings: list[dict], key: str) -> dict | None:
 
 
 def summarize_slot(readings: list[dict]) -> dict:
-    """Min, max and mean for one slot. Top-process names only when CPU passes 30%.
+    """Min, max and mean for one slot.
 
     A disk counter that cannot be mapped is ``unrecorded`` with a reason.
-    It is not a quiet zero and it is not a bare null.
+    It is not a quiet zero and it is not a bare null. Process names are not
+    taken here. ``SlotProbe.close`` adds ``top_after_call`` after the call,
+    and only when this slot's CPU max is over 30%.
     """
 
     cpu = _span(readings, "cpu_pct")
-    names: list[str] = []
-    if cpu is not None and cpu["max"] > 30:
-        for row in readings:
-            if row.get("cpu_pct") is None or row["cpu_pct"] <= 30:
-                continue
-            for name in row.get("top") or []:
-                if name not in names:
-                    names.append(name)
     drives = [row["drive"] for row in readings if row.get("drive")]
     disk = _span(readings, "disk_read_mb_s")
     reasons = [row["disk_reason"] for row in readings if row.get("disk_reason")]
@@ -197,7 +195,6 @@ def summarize_slot(readings: list[dict]) -> dict:
         "cpu_pct": cpu,
         "ram_pct": _span(readings, "ram_pct"),
         "disk_read_mb_s": disk if disk is not None or not reasons else UNRECORDED,
-        "top_processes": names,
         "load_drive": drives[-1] if drives else None,
     }
     if disk is None and reasons:
@@ -324,42 +321,100 @@ def _disk_key(counters: dict, number: int) -> str | None:
 _DISK = _DiskRate()
 
 
-def _top_other(limit: int = 3) -> list[str]:
-    """The busiest other processes. This process and its children are left out."""
+# How long the after-call rank waits between its two process snapshots.
+TOP_AFTER_GAP_S = 1.0
 
-    if psutil is None:
-        return []
+
+def _own_pids() -> set[int] | None:
+    """This process and its children. None when that tree cannot be read."""
+
     try:
         me = psutil.Process()
         excluded = {int(me.pid)}
         for child in me.children(recursive=True):
             excluded.add(int(child.pid))
     except Exception:
-        return []
-    ranked: list[tuple[float, str]] = []
+        return None
+    return excluded
+
+
+def _cpu_seconds(proc) -> float | None:
+    """User plus system CPU time, in seconds. None when the counter is missing."""
+
+    times = proc.cpu_times()
+    user = _number(getattr(times, "user", None))
+    system = _number(getattr(times, "system", None))
+    if user is None or system is None:
+        return None
+    return user + system
+
+
+def _snapshot_cpu() -> dict[int, tuple[float, str]]:
+    """One look at every process: pid to (user + system seconds, name)."""
+
+    found: dict[int, tuple[float, str]] = {}
     try:
         processes = psutil.process_iter()
     except Exception:
-        return []
+        return found
     for proc in processes:
         try:
-            if int(proc.pid) in excluded:
+            seconds = _cpu_seconds(proc)
+            if seconds is None:
                 continue
-            cpu = _number(proc.cpu_percent(interval=None))
-            if cpu is None:
-                continue
-            ranked.append((cpu, str(proc.name())))
+            found[int(proc.pid)] = (seconds, str(proc.name()))
         except Exception:
             continue
+    return found
+
+
+def _top_other(
+    limit: int = 3,
+    *,
+    sleep: Callable[[float], None] | None = None,
+    gap_s: float = TOP_AFTER_GAP_S,
+) -> list[str]:
+    """Other processes ranked by CPU time gained between two snapshots.
+
+    The rank is the user-plus-system time gained across about a second.
+    pid 0 is always left out. This process and its children are left out.
+    pid 4 (System) stays, so it ranks only when the kernel was busy.
+    ``SlotProbe.close`` calls this after the measured call, and only when
+    that slot's CPU max is over 30%.
+    """
+
+    if psutil is None:
+        return []
+    own = _own_pids()
+    if own is None:
+        return []
+    excluded = set(own)
+    excluded.add(0)
+    pause = time.sleep if sleep is None else sleep
+    first = _snapshot_cpu()
+    pause(gap_s)
+    second = _snapshot_cpu()
+    ranked: list[tuple[float, str]] = []
+    for pid, (later, name) in second.items():
+        if pid in excluded:
+            continue
+        earlier = first.get(pid)
+        if earlier is None:
+            continue
+        delta = later - earlier[0]
+        if delta <= 0:
+            continue
+        ranked.append((delta, name))
     ranked.sort(key=lambda item: item[0], reverse=True)
-    return [name for _cpu, name in ranked[:limit]]
+    return [name for _delta, name in ranked[:limit]]
 
 
 def read_slot(drive: str | None) -> dict:
-    """One sample of total CPU, used RAM, disk read MB/s and the top other processes.
+    """One sample of total CPU, used RAM and disk read MB/s.
 
-    ``drive`` is the letter the weights are loaded from. Disk stays None until
-    that letter is known and the counter can be read.
+    System-wide counters only. ``drive`` is the letter the weights are loaded
+    from. Disk stays None until that letter is known and the counter can be
+    read. The process walk is ``_top_other``, and it does not run from here.
     """
 
     cpu = None
@@ -379,7 +434,6 @@ def read_slot(drive: str | None) -> dict:
         "ram_pct": ram,
         "disk_read_mb_s": rate,
         "disk_reason": reason,
-        "top": _top_other(3),
     }
 
 
@@ -396,6 +450,7 @@ class SlotProbe:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._closed = False
+        self._summary: dict | None = None
 
     def set_drive(self, drive: str | None) -> None:
         with self._lock:
@@ -414,7 +469,6 @@ class SlotProbe:
             "ram_pct": _number(raw.get("ram_pct")),
             "disk_read_mb_s": _number(raw.get("disk_read_mb_s")),
             "disk_reason": None if not reason else str(reason).strip().splitlines()[0][:200],
-            "top": [str(name) for name in list(raw.get("top") or [])[:3]],
             "drive": drive,
         }
         with self._lock:
@@ -431,15 +485,27 @@ class SlotProbe:
             self.sample()
 
     def close(self) -> dict:
+        """The slot summary. A second call does not sample or rank again.
+
+        When the slot's CPU max is over 30%, rank other processes from two
+        snapshots taken after the measured call. An idle slot does not walk.
+        """
+
         if self._closed:
-            return self.summary()
+            return self._summary or {}
         self._stop.set()
         thread = self._thread
         if thread is not None and thread is not threading.current_thread():
             thread.join(timeout=2)
         self.sample()
+        summary = self.summary()
+        cpu = summary.get("cpu_pct")
+        maximum = _number(cpu.get("max")) if isinstance(cpu, dict) else None
+        if maximum is not None and maximum > 30:
+            summary["top_after_call"] = _top_other(3)
+        self._summary = summary
         self._closed = True
-        return self.summary()
+        return summary
 
     def summary(self) -> dict:
         with self._lock:

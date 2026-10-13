@@ -546,15 +546,23 @@ def _samples(row: dict) -> list[dict]:
     return [slot["sample"] for slot in row["artifacts"]["slots"]]
 
 
-def test_a_busy_process_during_a_call_is_in_the_top_three(tmp_path: Path):
+def test_a_contended_slot_records_top_after_call(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    walks = {"n": 0}
+
     def reader(_drive):
         return {
             "cpu_pct": 72.0,
             "ram_pct": 40.0,
             "disk_read_mb_s": None,
-            "top": ["busy-neighbor", "second", "third", "fourth"],
+            "top": ["in-window", "should-not-appear"],
         }
 
+    def rank(limit=3, **_kwargs):
+        walks["n"] += 1
+        assert limit == 3
+        return ["busy-neighbor", "second", "third"]
+
+    monkeypatch.setattr(watch_mod, "_top_other", rank)
     adapter = Scripted({"phi": [_result(1.0, 10.0), _result(1.0, 10.0)]})
     rows = _run(
         tmp_path / "repo",
@@ -566,11 +574,20 @@ def test_a_busy_process_during_a_call_is_in_the_top_three(tmp_path: Path):
     )
     samples = _samples(rows[0])
     assert len(samples) == 2
-    assert all(sample["top_processes"][:3] == ["busy-neighbor", "second", "third"] for sample in samples)
     assert all(sample["cpu_pct"]["max"] > 30 for sample in samples)
+    assert all(sample["top_after_call"] == ["busy-neighbor", "second", "third"] for sample in samples)
+    assert all("top_processes" not in sample for sample in samples)
+    assert all("in-window" not in json.dumps(sample) for sample in samples)
+    # One rank per slot. The runner's second close must not walk again.
+    assert walks["n"] == 2
 
 
-def test_a_short_call_still_has_two_readings(tmp_path: Path):
+def test_a_short_call_still_has_two_readings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    def rank(limit=3, **_kwargs):
+        raise AssertionError("an idle slot walked processes")
+
+    monkeypatch.setattr(watch_mod, "_top_other", rank)
+
     def reader(_drive):
         return {"cpu_pct": 5.0, "ram_pct": 11.0, "disk_read_mb_s": None, "top": ["quiet"]}
 
@@ -586,7 +603,9 @@ def test_a_short_call_still_has_two_readings(tmp_path: Path):
     samples = _samples(rows[0])
     assert [sample["samples"] for sample in samples] == [2, 2]
     assert all(sample["cpu_pct"] == {"min": 5.0, "max": 5.0, "mean": 5.0} for sample in samples)
-    assert all(sample["top_processes"] == [] for sample in samples)
+    assert all("top_after_call" not in sample for sample in samples)
+    assert all("top_processes" not in sample for sample in samples)
+    assert all("quiet" not in json.dumps(sample) for sample in samples)
 
 
 def test_the_disk_counter_follows_the_load_drive(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -741,25 +760,7 @@ def test_a_directory_tokenizer_refuses_a_hub_fetch(tmp_path: Path, monkeypatch: 
     assert "snap" not in "tokenizer is missing under the resolved directory; refusing instead of fetching it"
 
 
-def test_the_slot_reader_skips_this_process_and_a_missing_disk(monkeypatch: pytest.MonkeyPatch):
-    class Proc:
-        def __init__(self, pid, name, cpu):
-            self.pid = pid
-            self._name = name
-            self._cpu = cpu
-
-        def cpu_percent(self, interval=None):
-            return self._cpu
-
-        def name(self):
-            return self._name
-
-    class Me:
-        pid = 10
-
-        def children(self, recursive=False):
-            return [Proc(11, "child", 99.0)]
-
+def test_the_slot_reader_records_cpu_ram_and_a_missing_disk(monkeypatch: pytest.MonkeyPatch):
     class Counter:
         def __init__(self, read_bytes):
             self.read_bytes = read_bytes
@@ -767,6 +768,7 @@ def test_the_slot_reader_skips_this_process_and_a_missing_disk(monkeypatch: pyte
     class FakePsutil:
         def __init__(self):
             self.bytes = 0
+            self.walks = 0
 
         def cpu_percent(self, interval=None):
             return 15.0
@@ -777,16 +779,9 @@ def test_the_slot_reader_skips_this_process_and_a_missing_disk(monkeypatch: pyte
         def disk_io_counters(self, perdisk=True):
             return {"PhysicalDrive2": Counter(self.bytes)}
 
-        def Process(self):
-            return Me()
-
         def process_iter(self):
-            return [
-                Proc(10, "interlock", 50.0),
-                Proc(11, "child", 99.0),
-                Proc(12, "busy-neighbor", 80.0),
-                Proc(13, "second", 10.0),
-            ]
+            self.walks += 1
+            raise AssertionError("read_slot walked processes")
 
     fake = FakePsutil()
     ticks = iter([0.0, 1.0])
@@ -801,14 +796,16 @@ def test_the_slot_reader_skips_this_process_and_a_missing_disk(monkeypatch: pyte
     first = watch_mod.read_slot("C")
     assert first["cpu_pct"] == 15.0 and first["ram_pct"] == 22.0
     assert first["disk_read_mb_s"] is None and first["disk_reason"] is None
-    assert first["top"] == ["busy-neighbor", "second"]
-    assert "interlock" not in first["top"] and "child" not in first["top"]
+    assert "top" not in first
+    assert fake.walks == 0
     fake.bytes = 2 * 1024 * 1024
     second = watch_mod.read_slot("C")
     assert second["disk_read_mb_s"] == pytest.approx(2.0)
+    assert "top" not in second
     missing = watch_mod.read_slot("Z")
     assert missing["disk_read_mb_s"] is None
     assert missing["disk_reason"] == "no partition for Z"
+    assert fake.walks == 0
 
     class Boom:
         def cpu_percent(self, interval=None):
@@ -820,13 +817,11 @@ def test_the_slot_reader_skips_this_process_and_a_missing_disk(monkeypatch: pyte
         def disk_io_counters(self, perdisk=True):
             raise RuntimeError("disk")
 
-        def Process(self):
-            raise RuntimeError("proc")
-
     monkeypatch.setattr(watch_mod, "psutil", Boom())
     blank = watch_mod.read_slot("C")
     assert blank["cpu_pct"] is None and blank["ram_pct"] is None
-    assert blank["disk_read_mb_s"] is None and blank["top"] == []
+    assert blank["disk_read_mb_s"] is None
+    assert "top" not in blank
     probe = watch_mod.slot_probe(WatchHooks(start_thread=True, slot_reader=None))
     assert probe is not None and probe._reader is watch_mod.read_slot
     quiet = watch_mod.SlotProbe(lambda _drive: (_ for _ in ()).throw(RuntimeError("counter")), start_thread=False)
@@ -916,3 +911,220 @@ def test_a_slot_probe_samples_during_a_call():
     summary = probe.close()
     assert summary["samples"] >= 3
     assert seen["n"] == summary["samples"]
+
+
+def test_in_window_samples_do_not_walk_processes(monkeypatch: pytest.MonkeyPatch):
+    """open() and the loop read system counters. They do not walk processes."""
+
+    class Counting:
+        def __init__(self):
+            self.walks = 0
+
+        def cpu_percent(self, interval=None):
+            return 12.0
+
+        def virtual_memory(self):
+            return type("Mem", (), {"percent": 20.0})()
+
+        def disk_io_counters(self, perdisk=True):
+            return {}
+
+        def Process(self):
+            return type("Me", (), {"pid": 10, "children": lambda self, recursive=False: []})()
+
+        def process_iter(self):
+            self.walks += 1
+            return []
+
+    fake = Counting()
+    monkeypatch.setattr(watch_mod, "psutil", fake)
+    probe = watch_mod.SlotProbe(watch_mod.read_slot, start_thread=False)
+    probe.open()
+    assert fake.walks == 0
+    probe.sample()
+    assert fake.walks == 0
+    assert all("top" not in row for row in probe._readings)
+
+    threaded = watch_mod.SlotProbe(watch_mod.read_slot, start_thread=True, interval_s=0.02)
+    threaded.open()
+    time.sleep(0.08)
+    threaded._stop.set()
+    assert threaded._thread is not None
+    threaded._thread.join(timeout=2)
+    assert fake.walks == 0
+    assert all("top" not in row for row in threaded._readings)
+
+
+def test_top_after_call_appears_only_when_cpu_max_is_over_30(monkeypatch: pytest.MonkeyPatch):
+    walks = {"n": 0}
+
+    def rank(limit=3, **_kwargs):
+        walks["n"] += 1
+        return ["busy-neighbor"]
+
+    monkeypatch.setattr(watch_mod, "_top_other", rank)
+
+    def finish(cpu):
+        probe = watch_mod.SlotProbe(
+            lambda _drive: {"cpu_pct": cpu, "ram_pct": 1.0, "disk_read_mb_s": None, "top": ["in-window"]},
+            start_thread=False,
+        )
+        probe.open()
+        summary = probe.close()
+        assert probe.close() is summary
+        assert all("top" not in row for row in probe._readings)
+        return summary
+
+    hot = finish(30.1)
+    assert hot["top_after_call"] == ["busy-neighbor"]
+    assert "top_processes" not in hot
+    assert "top_after_call" not in finish(30)
+    assert "top_after_call" not in finish(4.0)
+    missing = watch_mod.SlotProbe(lambda _drive: {}, start_thread=False)
+    missing.open()
+    assert "top_after_call" not in missing.close()
+    assert walks["n"] == 1
+
+
+class _Times:
+    def __init__(self, user, system):
+        self.user = user
+        self.system = system
+
+
+class _Proc:
+    def __init__(self, pid, name, samples, percent=0.0, boom=False):
+        self.pid = pid
+        self._name = name
+        self._samples = list(samples)
+        self._i = 0
+        self._percent = percent
+        self._boom = boom
+
+    def name(self):
+        return self._name
+
+    def cpu_percent(self, interval=None):
+        return self._percent
+
+    def cpu_times(self):
+        if self._boom:
+            raise RuntimeError("cpu_times")
+        user, system = self._samples[min(self._i, len(self._samples) - 1)]
+        self._i += 1
+        return _Times(user, system)
+
+
+def _ranked(monkeypatch: pytest.MonkeyPatch) -> tuple[list[str], list[float]]:
+    """A world whose instant percents and CPU-time deltas disagree."""
+
+    procs = [
+        _Proc(0, "System Idle Process", [(100, 0), (400, 0)], percent=99),
+        _Proc(4, "System", [(1, 1), (2, 1)], percent=5),
+        _Proc(10, "interlock", [(0, 0), (50, 50)], percent=90),
+        _Proc(11, "child", [(0, 0), (40, 40)], percent=80),
+        _Proc(12, "percent-decoy", [(10, 0), (10.125, 0)], percent=95),
+        _Proc(13, "delta-worker", [(1, 1), (4, 1)], percent=1),
+        _Proc(14, "middle", [(2, 0), (2.5, 0.25)], percent=40),
+        _Proc(16, "went-backwards", [(8, 0), (4, 0)], percent=70),
+        _Proc(17, "unreadable", [], boom=True),
+        _Proc(18, "no-user", [(None, 1), (None, 1)]),
+    ]
+    late = _Proc(15, "late", [(80, 80)], percent=90)
+    calls = {"n": 0}
+
+    class Psutil:
+        def Process(self):
+            class Me:
+                pid = 10
+
+                def children(self, recursive=False):
+                    return [type("Child", (), {"pid": 11})()]
+
+            return Me()
+
+        def process_iter(self):
+            calls["n"] += 1
+            rows = list(procs)
+            if calls["n"] > 1:
+                rows.append(late)
+            return rows
+
+    monkeypatch.setattr(watch_mod, "psutil", Psutil())
+    slept: list[float] = []
+    names = watch_mod._top_other(3, sleep=lambda seconds: slept.append(seconds))
+    return names, slept
+
+
+def test_the_after_call_rank_skips_pid_0_and_this_tree_and_keeps_system(monkeypatch: pytest.MonkeyPatch):
+    names, _slept = _ranked(monkeypatch)
+    assert "System Idle Process" not in names
+    assert "interlock" not in names
+    assert "child" not in names
+    assert "System" in names
+
+
+def test_the_after_call_rank_uses_cpu_time_between_snapshots(monkeypatch: pytest.MonkeyPatch):
+    names, slept = _ranked(monkeypatch)
+    # delta-worker gained 3 s, System 1 s, middle 0.75 s. percent-decoy gained
+    # 0.125 s. late is absent from the first snapshot, so it has no delta.
+    assert names == ["delta-worker", "System", "middle"]
+    assert "percent-decoy" not in names
+    assert "late" not in names
+    assert "went-backwards" not in names
+    assert "unreadable" not in names
+    assert "no-user" not in names
+    assert slept == [1.0]
+
+
+def test_the_after_call_rank_returns_nothing_when_the_tree_cannot_be_read(monkeypatch: pytest.MonkeyPatch):
+    walks = {"n": 0}
+
+    class NoTree:
+        def Process(self):
+            raise RuntimeError("proc")
+
+        def process_iter(self):
+            walks["n"] += 1
+            return []
+
+    monkeypatch.setattr(watch_mod, "psutil", NoTree())
+    assert watch_mod._top_other(sleep=lambda _seconds: None) == []
+    assert walks["n"] == 0
+
+    class NoChildren:
+        def Process(self):
+            class Me:
+                pid = 10
+
+                def children(self, recursive=False):
+                    raise RuntimeError("children")
+
+            return Me()
+
+        def process_iter(self):
+            walks["n"] += 1
+            return []
+
+    monkeypatch.setattr(watch_mod, "psutil", NoChildren())
+    assert watch_mod._top_other(sleep=lambda _seconds: None) == []
+    assert walks["n"] == 0
+
+    class NoIter:
+        def Process(self):
+            class Me:
+                pid = 10
+
+                def children(self, recursive=False):
+                    return []
+
+            return Me()
+
+        def process_iter(self):
+            raise RuntimeError("iter")
+
+    monkeypatch.setattr(watch_mod, "psutil", NoIter())
+    assert watch_mod._top_other(sleep=lambda _seconds: None) == []
+
+    monkeypatch.setattr(watch_mod, "psutil", None)
+    assert watch_mod._top_other() == []
