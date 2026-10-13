@@ -218,8 +218,8 @@
         "path": "assets/logo/switchyard_64.png"
       },
       {
-        "commits": 29,
-        "lines": 668,
+        "commits": 30,
+        "lines": 682,
         "path": "atlas/README.md"
       },
       {
@@ -228,18 +228,18 @@
         "path": "atlas/boundaries.yaml"
       },
       {
-        "commits": 29,
-        "lines": 2018,
+        "commits": 30,
+        "lines": 2080,
         "path": "atlas/page.json"
       },
       {
-        "commits": 29,
-        "lines": 5395,
+        "commits": 30,
+        "lines": 5562,
         "path": "atlas/statistics.json"
       },
       {
-        "commits": 29,
-        "lines": 30010,
+        "commits": 30,
+        "lines": 30748,
         "path": "atlas/structure.json"
       },
       {
@@ -1053,6 +1053,11 @@
         "path": "receipts/e4b-block-3.jsonl"
       },
       {
+        "commits": 1,
+        "lines": 6,
+        "path": "receipts/e5-2026-10-13b.jsonl"
+      },
+      {
         "commits": 3,
         "lines": 101,
         "path": "scripts/record_ollama_fixtures.py"
@@ -1683,51 +1688,51 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-10-13T08:48:24.770Z",
+  "generatedAt": "2026-10-13T14:17:52.194Z",
   "generatedFrom": {
-    "commit": "d899ac0a629d5ffae13f602eae3aef4138ba802f"
+    "commit": "6e8cab6f20c647eff0847912364ba2695f6f1757"
   },
   "pairs": [
     {
       "a": "atlas/README.md",
       "b": "atlas/page.json",
-      "either": 26,
-      "shared": 26,
+      "either": 27,
+      "shared": 27,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/statistics.json",
-      "either": 26,
-      "shared": 26,
+      "either": 27,
+      "shared": 27,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/structure.json",
-      "either": 26,
-      "shared": 26,
+      "either": 27,
+      "shared": 27,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/statistics.json",
-      "either": 26,
-      "shared": 26,
+      "either": 27,
+      "shared": 27,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/structure.json",
-      "either": 26,
-      "shared": 26,
+      "either": 27,
+      "shared": 27,
       "strength": 1
     },
     {
       "a": "atlas/statistics.json",
       "b": "atlas/structure.json",
-      "either": 26,
-      "shared": 26,
+      "either": 27,
+      "shared": 27,
       "strength": 1
     },
     {
@@ -1825,16 +1830,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-10-13T00:54:14-07:00",
-    "inScopeFiles": 241,
+    "headDate": "2026-10-13T01:49:01-07:00",
+    "inScopeFiles": 242,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 95,
+    "qualifyingCommits": 96,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-04-16T07:54:14.000Z",
+    "since": "2026-04-16T08:49:01.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",
