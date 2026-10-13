@@ -1,27 +1,30 @@
 # interlock: how it works
 
-Mapped at 2026-10-13 from commit cc91aed by Atlas 1.24.0.
+Mapped at 2026-10-13 from commit e8628ca by Atlas 1.24.0.
 
 ## What this is
 
 interlock routes each job to a model, engine and device from a receipt-backed table. (written by a person)
 
-10 parts, mostly Python (87 files). Work enters through 3 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. People run interlock.
+10 parts, mostly Python (87 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 4 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.
 
-## What changed since 2026-10-13 (0db35c8)
+## What changed since 2026-10-13 (cc91aed)
 
-- scripts now imports src.
-- tests now imports scripts.
-- receipts is a new part, drawn from `receipts/**`.
-- scripts is a new part, drawn from `scripts/**`.
-- table is a new part, drawn from `table/**`.
-- 86 files moved, across 3 parts.
+- Deploy site to GitHub Pages (.github/workflows/pages.yml) is a new door. It starts on a push to main touching 2 paths; or by hand. It runs site/astro.config.mjs and site/src/.
+- site/src/content/docs/ is now read by site/astro.config.mjs.
+- site/src/content/docs/handbook/ is now read by site/astro.config.mjs.
+- site/astro.config.mjs is new and belongs to no part, so atlas check fails on it against the previous map.
+- site/package-lock.json is new and belongs to no part, so atlas check fails on it against the previous map.
+- site/package.json is new and belongs to no part, so atlas check fails on it against the previous map.
+- And 15 more new files that belong to no part.
+- 29 files added, 7 removed and 6 changed content, across 4 parts.
 
 ## What comes in
 
 1. **CI.** On a pull request to main; on a push to main touching 11 paths; or by hand. Runs tests/.
 2. **Release.** When a release is published; or by hand. Checks src/interlock/.
-3. **interlock** (a command people run). Runs src/interlock/cli.py.
+3. **Deploy site to GitHub Pages.** On a push to main touching 2 paths; or by hand. Runs site/astro.config.mjs and site/src/.
+4. **interlock** (a command people run). Runs src/interlock/cli.py.
 
 ## What happens through CI
 
@@ -36,6 +39,8 @@ CI writes nothing this map can see.
 ## The other doors
 
 **Release** checks src/interlock/ and publishes to PyPI.
+
+**Deploy site to GitHub Pages** runs site/astro.config.mjs and site/src/, and deploys the site.
 
 **interlock** (a command people run) runs src/interlock/cli.py.
 
@@ -58,6 +63,8 @@ Window: 180 days; a pair counts from 3 shared commits, since 8 source files reac
 ## What no test touches
 
 Every code part is imported by at least one test.
+
+verify.sh runs in no workflow.
 
 ## Written but never read
 
@@ -87,6 +94,7 @@ Read those in order to follow one run of interlock end to end. This path follows
 - 3 writes and 4 reads use paths built at run time and are not named here.
 - 12 writes and 39 reads go to a path their caller passes, not to this repository.
 - 3 reads go to the directory the command is run in (receipts/), not to this repository.
+- 18 files belong to no part: site/astro.config.mjs, site/package-lock.json, site/package.json and 15 more.
 - Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window.
 
 Regenerate with `npx --yes @dogfood-lab/atlas map`.
