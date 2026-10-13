@@ -1307,6 +1307,12 @@ def test_an_edited_spec_is_refused_and_dry_run_does_not_touch_devices(tmp_path: 
     assert "a missing log or dll refuses at preflight" in e5_text
     assert "the tray app log is never a fallback" in e5_text
     assert "llama-server.exe" in e5_text
+    assert "the reference is the floor window, one grain, loaded and confirmed first for every model" in e5_text
+    assert "the lowest resident window is superseded" in e5_text
+    assert "that floor confirm is the reference for the shared gate and the prompt-rate gate" in e5_text
+    assert "the spill baseline is the model's lowest resident window" not in e5_text
+    assert "a missing CUDA_Host line refuses after the first load" in e5_text
+    assert "the shared gate is the delta from the baseline taken before the window" not in e5_text
     assert "quant is read from /api/show at run time" in e5_text
     assert "not launched" not in e4_text
     spec = repo / "experiments" / "e4" / "spec.yaml"
@@ -1449,18 +1455,19 @@ def test_fill_card_doubles_bisects_and_steps_back():
     assert nowhere.max_ctx is None
     assert nowhere.reason == "no resident window"
     assert nowhere.limit == "margin"
-    assert [call[1] for call in nowhere.calls] == [4096, 2048]
+    assert [call[1] for call in nowhere.calls] == [2048]
     assert all(call[5] == "not resident" for call in nowhere.calls)
 
     def resident_below(limit):
         def probe(ctx, kind):
-            return _resident(20000, failed=ctx >= limit, prompt=100 if ctx == 4096 else 40)
+            return _resident(20000, failed=ctx >= limit, prompt=100 if ctx <= 4096 else 40)
 
         return probe
 
     downward = search(default_ctx=16384, probe=resident_below(8192), abort_mib=30500, max_ctx=16384)
     assert downward.max_ctx == 4096
-    assert downward.calls[0][:2] == ("load", 16384)
+    assert downward.calls[0][:2] == ("load", 2048)
+    assert any(call[0] == "load" and call[1] == 16384 for call in downward.calls)
     assert any(call[0] == "load" and call[1] == 4096 for call in downward.calls)
     assert any(call[0] == "confirm" and call[1] == 6144 and call[5] == "spill" for call in downward.calls)
     assert any(call[0] == "confirm" and call[1] == 4096 and call[5] == "confirmed" for call in downward.calls)
@@ -1482,24 +1489,28 @@ def test_search_spill_and_schedule_refuse_bad_inputs():
     assert is_spill(_resident(1, shared=1257, prompt=20), reference, shared_growth_mib=256, prompt_ratio=0.5) is True
     assert is_spill(_resident(1, shared=1000, prompt=10), reference, shared_growth_mib=256, prompt_ratio=0.5) is False
     assert is_spill(_resident(1, shared=1000, prompt=9), reference, shared_growth_mib=256, prompt_ratio=0.5) is True
-    # The pre-window baseline, not the reference window's shared usage.
+    # The pre-window reading is the idle sample. The baseline is the reference window.
     under = Observation(True, 1, shared_mib=1200, prompt_tok_s=20, shared_baseline=1000, baseline_taken=True)
     assert is_spill(under, reference, shared_growth_mib=256, prompt_ratio=0.5) is False
     over = Observation(True, 1, shared_mib=1257, prompt_tok_s=20, shared_baseline=1000, baseline_taken=True)
     assert is_spill(over, reference, shared_growth_mib=256, prompt_ratio=0.5) is True
-    missing_base = Observation(True, 1, shared_mib=1100, prompt_tok_s=20, shared_baseline=None, baseline_taken=True)
-    assert is_spill(missing_base, reference, shared_growth_mib=256, prompt_ratio=0.5) is True
+    idle_missing = Observation(True, 1, shared_mib=1100, prompt_tok_s=20, shared_baseline=None, baseline_taken=True)
+    assert is_spill(idle_missing, reference, shared_growth_mib=256, prompt_ratio=0.5) is False
+    assert is_spill(_resident(1, shared=1100, prompt=20), _resident(1, shared=None, prompt=20), shared_growth_mib=256, prompt_ratio=0.5) is True
     assert over_margin(Observation(True, None, error="lost"), 30500) is True
     assert over_margin(Observation(True, None), 30500) is True
 
     def confirm_fails(ctx, kind):
         if kind == "confirm":
-            return _resident(20000, shared=2000, prompt=1)
+            return Observation(True, 20000, shared_mib=None, prompt_tok_s=1)
         return _resident(20000)
 
     refused = search(default_ctx=4096, probe=confirm_fails, abort_mib=30500, max_ctx=4096)
     assert refused.max_ctx is None
     assert refused.reason == "no confirmed window"
+    assert refused.calls[0][:2] == ("load", 2048)
+    with pytest.raises(SearchError, match="the floor window is above the search cap"):
+        search(default_ctx=4096, probe=confirm_fails, abort_mib=30500, grain=8192, max_ctx=4096)
     with pytest.raises(SearchError):
         search(default_ctx=0, probe=confirm_fails, abort_mib=30500)
     with pytest.raises(SearchError):

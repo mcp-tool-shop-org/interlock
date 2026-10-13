@@ -73,8 +73,11 @@ from interlock.guards import GuardError, require_card_empty, require_grant, requ
 from interlock.harness.e5 import (
     SearchError,
     Observation,
+    baseline_is_spilling,
     fit_prompt_words,
+    floor_confirm_shared,
     search,
+    shared_deltas,
 )
 from interlock.harness.receipts import write_receipt
 from interlock.receipt import validate_row
@@ -99,6 +102,9 @@ _CUDA_HEADER = re.compile(r"CUDA(?: UMD)? Version:\s*([0-9.]+)")
 _FLASH_ARG = re.compile(r"--flash-attn(?:\s+|=)(\S+)")
 _FLASH_STATE = re.compile(r"Flash Attention (enabled|disabled)")
 _KV_TYPES = re.compile(r"llama_kv_cache:.*\bK \(([A-Za-z0-9_]+)\).*\bV \(([A-Za-z0-9_]+)\)")
+_CUDA_HOST = re.compile(
+    r"CUDA_Host\s+(model|compute|output)\s+buffer size\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*MiB"
+)
 _REDIRECT = re.compile(r">>\s*(?:\"([^\"]+)\"|'([^']+)'|(\S+))")
 _HOST_11434 = "127.0.0.1:11434"
 _LISTENER_PARENT_SCRIPT = """
@@ -688,17 +694,19 @@ def config_facts(text: str | None) -> dict:
 
 
 def load_line_facts(text: str | None) -> dict:
-    """Flash attention and the KV type from one model's first-load segment.
+    """Flash attention, the KV type, and the CUDA_Host buffers from one first-load segment.
 
     The segment is the log written by that load. A ``--flash-attn`` value, the
-    enabled or disabled line, and the ``llama_kv_cache`` K and V types all
-    have to be there. ``reason`` names what is missing.
+    enabled or disabled line, the ``llama_kv_cache`` K and V types, and the
+    CUDA_Host model, compute, and output buffer sizes all have to be there.
+    The first match of each buffer wins. ``reason`` names what is missing.
     """
 
     segment = text if isinstance(text, str) else ""
     arg = None
     state = None
     kv = None
+    buffers: dict[str, float] = {}
     for line in segment.splitlines():
         if arg is None:
             match = _FLASH_ARG.search(line)
@@ -713,6 +721,9 @@ def load_line_facts(text: str | None) -> dict:
             if match is not None:
                 key, value = match.group(1), match.group(2)
                 kv = key if key == value else f"K {key}, V {value}"
+        host = _CUDA_HOST.search(line)
+        if host is not None:
+            buffers.setdefault(host.group(1).lower(), round(float(host.group(2)), 2))
     missing = []
     if not arg:
         missing.append("flash-attn")
@@ -720,10 +731,22 @@ def load_line_facts(text: str | None) -> dict:
         missing.append("flash attention")
     if not kv:
         missing.append("kv cache")
+    for kind, label in (
+        ("model", "CUDA_Host model"),
+        ("compute", "CUDA_Host compute"),
+        ("output", "CUDA_Host output"),
+    ):
+        if kind not in buffers:
+            missing.append(label)
+    present = all(kind in buffers for kind in ("model", "compute", "output"))
     return {
         "flash_attn": arg,
         "flash_attention": state,
         "kv_cache_type": kv,
+        "cuda_host_model_mib": buffers.get("model"),
+        "cuda_host_compute_mib": buffers.get("compute"),
+        "cuda_host_output_mib": buffers.get("output"),
+        "cuda_host_sum_mib": round(sum(buffers[kind] for kind in ("model", "compute", "output")), 2) if present else None,
         "reason": None if not missing else "the first load did not record " + ", ".join(missing),
     }
 
@@ -1479,6 +1502,56 @@ def _iso(epoch: float) -> str:
     return datetime.datetime.fromtimestamp(epoch, tz=datetime.timezone.utc).isoformat(timespec="seconds")
 
 
+def _demote_unchecked_baseline(found) -> None:
+    """The row is not a confirmation. The search itself is left as it ran."""
+
+    found.max_ctx = None
+    found.reason = f"{INCONCLUSIVE}: the baseline may be spilling"
+    found.peak_mib = None
+    found.tok_s = None
+    found.ttft_ms = None
+    found.prompt_tok_s = None
+    found.shared_mib = None
+    found.dedicated_delta = None
+    found.calls = [
+        (call[0], call[1], call[2], call[3], call[4], "baseline spilling")
+        if len(call) > 5 and call[5] == "confirmed"
+        else call
+        for call in found.calls
+    ]
+
+
+def _apply_spill_baseline(found, host: dict, idle) -> dict:
+    """Receipt fields for the floor-confirm baseline, and a demotion when it may be spilling.
+
+    The baseline is the floor confirm, checked against idle and the CUDA_Host
+    sum. A missing idle reading or a missing floor confirm cannot confirm.
+    """
+
+    floor = floor_confirm_shared(found.calls)
+    idle_mib = idle if isinstance(idle, int) and not isinstance(idle, bool) else None
+    fields = {
+        "idle_shared_mib": idle_mib,
+        "baseline_ctx": None if floor is None else floor[0],
+        "baseline_shared_mib": None if floor is None else floor[1],
+        "baseline_prompt_tok_s": None if floor is None else floor[2],
+        "cuda_host_model_mib": host.get("model"),
+        "cuda_host_compute_mib": host.get("compute"),
+        "cuda_host_output_mib": host.get("output"),
+        "cuda_host_sum_mib": host.get("sum"),
+        "shared_delta_mib": [] if floor is None else shared_deltas(found.calls, floor[1]),
+    }
+    if floor is None or idle_mib is None or host.get("sum") is None:
+        fields["baseline_check"] = "spilling"
+        _demote_unchecked_baseline(found)
+        return fields
+    spilling = baseline_is_spilling(idle_mib, floor[1], host["sum"])
+    fields["baseline_check"] = "spilling" if spilling else "ok"
+    if spilling:
+        _demote_unchecked_baseline(found)
+    return fields
+
+
 def _measure_model(
     spec: dict,
     entry: dict,
@@ -1513,6 +1586,7 @@ def _measure_model(
         "kv": str(facts["kv_cache_type"]),
         "flash_attn": None,
     }
+    spill_fields: dict = {}
     load_state = {"done": False, "offset": 0}
 
     def row(**kwargs):
@@ -1526,7 +1600,10 @@ def _measure_model(
         kwargs.setdefault("ggml_reason", ggml_reason)
         kwargs.setdefault("runner_pid", runner)
         kwargs.setdefault("preflight", getattr(seams, "preflight_record", None))
-        return _row(spec, entry, **kwargs)
+        built = _row(spec, entry, **kwargs)
+        if spill_fields:
+            built["settings"].update(spill_fields)
+        return built
 
     baseline = _optional_int(seams.card_mib())
 
@@ -1741,6 +1818,12 @@ def _measure_model(
         chosen["flash"] = str(parsed["flash_attention"])
         chosen["kv"] = str(parsed["kv_cache_type"])
         chosen["flash_attn"] = parsed["flash_attn"]
+        chosen["host"] = {
+            "model": parsed["cuda_host_model_mib"],
+            "compute": parsed["cuda_host_compute_mib"],
+            "output": parsed["cuda_host_output_mib"],
+            "sum": parsed["cuda_host_sum_mib"],
+        }
 
     def observe(ctx: int, kind: str) -> Observation:
         current["ctx"] = ctx
@@ -1991,6 +2074,12 @@ def _measure_model(
             weights_mib=weights_mib,
             one_window_bound=one_window_bound,
         )
+
+    host = chosen.get("host")
+    if isinstance(host, dict):
+        record = getattr(seams, "preflight_record", None)
+        idle = record.get("shared_mib") if isinstance(record, dict) else None
+        spill_fields.update(_apply_spill_baseline(found, host, idle))
 
     prompt_meta = prompts.get(found.max_ctx) if found.max_ctx is not None else None
     size_meta = sizes.get(found.max_ctx) if found.max_ctx is not None else None

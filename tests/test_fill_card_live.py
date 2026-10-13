@@ -365,6 +365,8 @@ def test_a_clean_search_records_the_confirmed_window(tmp_path: Path):
     assert row["settings"]["ggml_cuda_sha"] == "unrecorded"
     assert "ggml-cuda.dll" in row["settings"]["ggml_cuda_reason"]
     assert row["settings"]["search_calls"] == [
+        ["load", 2048, 20000, 1000, 100, "resident"],
+        ["confirm", 2048, 20000, 1000, 100, "confirmed"],
         ["load", 4096, 20000, 1000, 100, "resident"],
         ["confirm", 4096, 20000, 1000, 100, "confirmed"],
     ]
@@ -375,7 +377,7 @@ def test_a_clean_search_records_the_confirmed_window(tmp_path: Path):
     assert row["settings"]["prompt_token_search"] == 100000
     assert row["settings"]["prompt_token_cold"] == 100000
     assert row["settings"]["weights_mib"] == 16000
-    assert "one_window_bound" not in row["settings"]
+    assert {"ctx": 4096, "mib": 22500} in row["settings"]["one_window_bound"]
     assert row["gpu_resident"] is True
     assert row["model"]["size"] == row["model"]["size_vram"] == 1000
     assert row["model_family"] == "qwen"
@@ -408,7 +410,8 @@ def test_the_sampler_unloads_when_the_window_reaches_abort_mib(tmp_path: Path):
     assert 31200 not in _ctxs(transport)
     assert 31200 not in row["settings"]["aborted_windows"]
     assert transport.abort_unloads == [8192]
-    assert transport.order[:2] == ["cancel", "unload"]
+    cancel_at = transport.order.index("cancel")
+    assert transport.order[cancel_at:cancel_at + 2] == ["cancel", "unload"]
     assert row["settings"]["after_unload_mib"] == [{"ctx": 8192, "mib": 1500}]
     assert "after the unload" not in row["notes"]
     assert "predicted_over" not in row["settings"]
@@ -420,29 +423,34 @@ def test_a_window_whose_card_does_not_fall_after_unload_is_noted(tmp_path: Path)
     seams = _seams(transport)
     _repo, rows = _run(tmp_path, transport, seams=seams)
     row = rows[0]
-    assert transport.order[:2] == ["cancel", "unload"]
+    cancel_at = transport.order.index("cancel")
+    assert transport.order[cancel_at:cancel_at + 2] == ["cancel", "unload"]
     assert {"ctx": 8192, "mib": 30500} in row["settings"]["after_unload_mib"]
     assert "8192 stayed at 30500 MiB after the unload" in row["notes"]
     assert row["settings"]["max_resident_ctx"] != 8192
 
 
 def test_a_bisect_predicted_over_is_skipped(tmp_path: Path):
-    transport = _Transport(None, linear=(10000, 2), trained=32768)
+    # The floor is measured first. This weight keeps that floor's share positive
+    # and lets 8192 load, while the slope from the floor still predicts 12288 over.
+    weights = 8596 * 1024 * 1024
+    transport = _Transport(None, linear=(10000, 2), trained=32768, tag_bytes=weights)
     seams = _seams(transport)
     _repo, rows = _run(tmp_path, transport, seams=seams, max_ctx=32768)
     row = rows[0]
     ctxs = _ctxs(transport)
-    assert ctxs[0] == 32768
+    assert ctxs[0] == 2048
     assert 8192 in ctxs
     assert 12288 in row["settings"]["predicted_over"]
     assert 12288 not in ctxs
     assert 31200 not in ctxs
+    assert row["settings"]["weights_mib"] == 8596
     assert row["settings"]["max_resident_ctx"] not in row["settings"]["predicted_over"]
     assert row["settings"]["max_resident_ctx"] == 10240
 
 
 def test_one_measured_window_skips_a_bisect_with_less_than_one_cache_of_room(tmp_path: Path):
-    """The resident window leaves less than one cache of room, so the bisect is predicted_over."""
+    """The floor is the one measured window. Its share leaves no room for the next grain."""
 
     weights = 1000 * 1024 * 1024
     transport = _Transport(None, busy_mib=28000, tag_bytes=weights, trained=16384, abort_at=16384)
@@ -450,7 +458,7 @@ def test_one_measured_window_skips_a_bisect_with_less_than_one_cache_of_room(tmp
     _repo, rows = _run(tmp_path, transport, seams=seams, max_ctx=16384)
     row = rows[0]
     ctxs = _ctxs(transport)
-    reading, baseline, ctx_1 = 28000, 1500, 8192
+    reading, baseline, ctx_1 = 28000, 1500, 2048
     share = reading - baseline - 1000
 
     def bound(ctx: int) -> int:
@@ -458,13 +466,15 @@ def test_one_measured_window_skips_a_bisect_with_less_than_one_cache_of_room(tmp
         return reading + (extra + ctx_1 - 1) // ctx_1
 
     assert row["settings"]["weights_mib"] == 1000
-    assert row["settings"]["max_resident_ctx"] == 8192
-    assert {"ctx": 12288, "mib": bound(12288)} in row["settings"]["one_window_bound"]
-    assert bound(12288) >= 30500
-    assert 12288 in row["settings"]["predicted_over"]
-    assert 10240 in row["settings"]["predicted_over"]
-    assert 12288 not in ctxs
-    assert 10240 not in ctxs
+    assert row["settings"]["max_resident_ctx"] == 2048
+    assert {"ctx": 4096, "mib": bound(4096)} in row["settings"]["one_window_bound"]
+    assert bound(4096) >= 30500
+    assert 4096 in row["settings"]["predicted_over"]
+    assert 8192 in row["settings"]["predicted_over"]
+    assert 16384 in row["settings"]["predicted_over"]
+    assert 4096 not in ctxs
+    assert 8192 not in ctxs
+    assert 16384 not in ctxs
     assert 31200 not in ctxs
 
 
@@ -474,9 +484,9 @@ def test_a_missing_weight_size_stops_before_the_larger_window(tmp_path: Path):
     with pytest.raises(RunnerError, match="the second window had no bound"):
         _run(tmp_path, transport, seams=seams, max_ctx=16384)
     ctxs = _ctxs(transport)
-    assert 16384 in ctxs
-    assert 8192 in ctxs
-    assert 12288 not in ctxs
+    assert 2048 in ctxs
+    assert 16384 not in ctxs
+    assert 8192 not in ctxs
 
 
 def test_a_missing_baseline_stops_before_the_larger_window(tmp_path: Path):
@@ -485,9 +495,9 @@ def test_a_missing_baseline_stops_before_the_larger_window(tmp_path: Path):
     with pytest.raises(RunnerError, match="the second window had no bound"):
         _run(tmp_path, transport, seams=seams, max_ctx=16384)
     ctxs = _ctxs(transport)
-    assert 16384 in ctxs
-    assert 8192 in ctxs
-    assert 12288 not in ctxs
+    assert 2048 in ctxs
+    assert 16384 not in ctxs
+    assert 8192 not in ctxs
 
 
 def test_a_non_positive_share_stops_before_the_larger_window(tmp_path: Path):
@@ -499,21 +509,22 @@ def test_a_non_positive_share_stops_before_the_larger_window(tmp_path: Path):
     with pytest.raises(RunnerError, match="the second window had no bound"):
         _run(tmp_path, transport, seams=seams, max_ctx=16384)
     ctxs = _ctxs(transport)
-    assert 16384 in ctxs
-    assert 8192 in ctxs
-    assert 12288 not in ctxs
+    assert 2048 in ctxs
+    assert 16384 not in ctxs
+    assert 8192 not in ctxs
 
 
 def test_a_window_that_is_not_fully_resident_searches_down(tmp_path: Path):
-    """A non-resident trained window is not a reason to load a larger one."""
+    """A floor that is not resident is not a reason to load the cap."""
 
     transport = _Transport(None, split_vram=True, trained=8192)
     seams = _seams(transport)
     _repo, rows = _run(tmp_path, transport, seams=seams, max_ctx=8192)
     ctxs = _ctxs(transport)
-    assert ctxs[0] == 8192
-    assert 4096 in ctxs
-    assert all(ctx <= 8192 for ctx in ctxs)
+    assert ctxs[0] == 2048
+    assert 8192 not in ctxs
+    assert 4096 not in ctxs
+    assert all(ctx <= 2048 for ctx in ctxs)
     assert rows[0]["settings"]["max_resident_ctx"] is None
     assert rows[0]["notes"] == "no resident window"
 
@@ -525,9 +536,11 @@ def test_the_next_load_waits_until_the_abort_has_settled(tmp_path: Path):
     seams = _seams(transport)
     seams.threaded = True
     _repo, rows = _run(tmp_path, transport, seams=seams)
-    settle_at = transport.events.index("settle")
-    next_load = transport.events.index(("load", 6144))
-    assert transport.events.index(("load", 8192)) < settle_at < next_load
+    abort_load = transport.events.index(("load", 8192))
+    next_load = next(
+        index for index, event in enumerate(transport.events) if event == ("load", 6144) and index > abort_load
+    )
+    assert any(event == "settle" for event in transport.events[abort_load + 1:next_load])
     assert rows[0]["settings"]["max_resident_ctx"] == 6144
     assert {"ctx": 8192, "mib": 1500} in rows[0]["settings"]["after_unload_mib"]
 
@@ -721,7 +734,19 @@ def test_dry_run_names_the_confirmation_count(monkeypatch):
     assert "pinned once at run start" in text
     assert "zero or several instances within tolerance refuses before any load" in text
     assert "later shared and dedicated reads use the pinned instance" in text
+    assert "the reference is the floor window, one grain, loaded and confirmed first for every model" in text
+    assert "the lowest resident window is superseded" in text
+    assert "that floor confirm is the reference for the shared gate and the prompt-rate gate" in text
+    assert "a window spills when its shared reading exceeds that floor confirm by more than spill_shared_mib" in text
     assert "a missing shared reading during a window is still a spill" in text
+    assert "the floor confirm is checked against the idle shared reading and the CUDA_Host buffer sum" in text
+    assert "the spill baseline is the model's lowest resident window" not in text
+    assert "the prompt-rate rule is unchanged" not in text
+    assert "a window spills when its shared reading exceeds that baseline by more than spill_shared_mib" not in text
+    assert "a baseline that exceeds that sum by more than 256 MiB is inconclusive and is not confirmed" in text
+    assert "CUDA_Host model, compute, and output sizes come from the first-load lines" in text
+    assert "a missing CUDA_Host line refuses after the first load" in text
+    assert "the shared gate is the delta from the baseline taken before the window" not in text
     assert "preflight samples nvidia-smi, both counters, the server log, the ggml-cuda sha, git, and driver CUDA before any load" in text
     assert "driver CUDA accepts CUDA Version and CUDA UMD Version" in text
     assert "a missing log or dll refuses at preflight" in text
@@ -761,35 +786,41 @@ def test_the_search_does_not_load_above_the_trained_length(tmp_path: Path):
     seams = _seams(transport)
     _repo, rows = _run(tmp_path, transport, seams=seams, max_ctx=1_048_576)
     ctxs = _ctxs(transport)
-    assert ctxs[0] == 4096
+    assert ctxs[0] == 2048
+    assert 4096 in ctxs
     assert all(ctx <= 4096 for ctx in ctxs)
     assert rows[0]["settings"]["max_resident_ctx"] == 4096
     assert rows[0]["settings"]["num_ctx"] == 4096
 
 
 def test_a_trained_window_that_is_not_resident_searches_down_to_the_grain(tmp_path: Path):
-    transport = _Transport(None, trained=16384, unresident_at=8192)
+    # 17200 MiB of weights leaves a share the floor can bound under abort, so the
+    # cap is loaded and found not resident instead of being predicted over.
+    weights = 17200 * 1024 * 1024
+    transport = _Transport(None, trained=16384, unresident_at=8192, tag_bytes=weights)
     seams = _seams(transport)
     _repo, rows = _run(tmp_path, transport, seams=seams, max_ctx=16384)
     ctxs = _ctxs(transport)
     row = rows[0]
-    assert ctxs[0] == 16384
+    assert ctxs[0] == 2048
     assert all(ctx <= 16384 for ctx in ctxs)
     assert 8192 in ctxs
+    assert 16384 in ctxs
     assert row["settings"]["max_resident_ctx"] == 6144
     assert 6144 % 2048 == 0
     calls = row["settings"]["search_calls"]
-    assert calls[0] == ["load", 16384, 20000, 1000, 100, "not resident"]
+    assert calls[0] == ["load", 2048, 20000, 1000, 100, "resident"]
+    assert ["load", 16384, 20000, 1000, 100, "not resident"] in calls
     assert ["load", 6144, 20000, 1000, 100, "resident"] in calls
     assert calls[-1] == ["confirm", 6144, 20000, 1000, 100, "confirmed"]
 
 
-def test_shared_growth_uses_the_pre_window_baseline(tmp_path: Path):
-    """A high absolute shared reading is not a spill when this window barely grew.
+def test_shared_growth_is_measured_from_the_floor_confirm(tmp_path: Path):
+    """The 8192 confirm spills against the floor confirm, not against its own load.
 
-    The load's shared reading stays at 100. The confirmation sits near 2200.
-    Gating on the load would call that a spill. The baseline taken just before
-    the confirmation is 2000, so 200 MiB of growth is under the 256 MiB line.
+    The floor confirm sits at 100. The cap's load also sits at 100, so a
+    comparison with that load would be 0. The 8192 confirm reads 2200, which
+    is 2100 over the floor. The search steps back and confirms 6144 at 200.
     """
 
     transport = _Transport(None, trained=8192)
@@ -797,8 +828,14 @@ def test_shared_growth_uses_the_pre_window_baseline(tmp_path: Path):
     script = [
         (_GPU, 100, 12),
         (_GPU, 100, 12),
+        (_GPU, 100, 12),
+        (_GPU, 100, 12),
+        (_GPU, 100, 12),
+        (_GPU, 100, 12),
         (_GPU, 2000, 12),
         (_GPU, 2200, 20),
+        (_GPU, 150, 12),
+        (_GPU, 200, 14),
     ]
 
     def adapter_reading():
@@ -809,11 +846,11 @@ def test_shared_growth_uses_the_pre_window_baseline(tmp_path: Path):
     seams.adapter_reading = adapter_reading
     _repo, rows = _run(tmp_path, transport, seams=seams, max_ctx=8192)
     assert script == []
-    assert rows[0]["settings"]["max_resident_ctx"] == 8192
-    assert rows[0]["settings"]["shared_mib"] == 2200
-    assert rows[0]["settings"]["dedicated_delta_mib"] == 8
-    assert rows[0]["settings"]["dedicated_mib"] == 20
-    assert rows[0]["settings"]["search_calls"][-1] == ["confirm", 8192, 20000, 2200, 100, "confirmed"]
+    calls = rows[0]["settings"]["search_calls"]
+    assert rows[0]["settings"]["max_resident_ctx"] == 6144
+    assert rows[0]["settings"]["shared_mib"] == 200
+    assert ["confirm", 8192, 20000, 2200, 100, "spill"] in calls
+    assert calls[-1] == ["confirm", 6144, 20000, 200, 100, "confirmed"]
 
 
 def test_the_5090_is_the_dedicated_match_and_a_bad_match_is_a_spill(tmp_path: Path):
@@ -1338,8 +1375,16 @@ def test_a_clean_preflight_records_the_sample_the_sources_and_git(tmp_path: Path
     run, read_counter, seen = _live_commands(install, "ok")
     transport = _Transport(None)
     transport.before_generate = append
+
+    def rising(argv, **kwargs):
+        # The idle pin stays 2490. While a generate is in flight the card rises,
+        # so the floor has a positive share and can bound the cap.
+        if tuple(argv) == MEMORY_ARGV and transport.state["busy"]:
+            return _Completed("20000\n")
+        return run(argv, **kwargs)
+
     adapter = OllamaAdapter(transport=transport)
-    seams = real_fill_seams(adapter, run=run, read_counter=read_counter)
+    seams = real_fill_seams(adapter, run=rising, read_counter=read_counter)
     seams.threaded = False
     seams.sleep = lambda _seconds: None
     transport.seams = seams
@@ -1391,6 +1436,17 @@ def test_a_clean_preflight_records_the_sample_the_sources_and_git(tmp_path: Path
     assert settings["exe_source"] == "listener"
     assert settings["runner_pid"] == 77
     assert settings["max_resident_ctx"] == 4096
+    assert settings["baseline_ctx"] == 2048
+    assert settings["baseline_shared_mib"] == 74
+    assert settings["idle_shared_mib"] == 74
+    assert settings["baseline_check"] == "ok"
+    assert settings["cuda_host_model_mib"] == 333.84
+    assert settings["cuda_host_compute_mib"] == 18.01
+    assert settings["cuda_host_output_mib"] == 0.58
+    assert settings["cuda_host_sum_mib"] == 352.43
+    assert isinstance(settings["baseline_ctx"], int)
+    assert isinstance(settings["baseline_shared_mib"], int)
+    assert all(isinstance(item["delta_mib"], int) for item in settings["shared_delta_mib"])
     urls = [url for _method, url, _body in transport.calls]
     assert urls[0].endswith("/api/ps")
     assert any(url.endswith("/api/show") for url in urls)
@@ -1449,3 +1505,47 @@ def test_a_missing_load_line_refuses_before_a_measured_window(tmp_path: Path, mo
     assert len(prompts) == 1
     text = (repo / "receipts" / "fill-stale.jsonl").read_text(encoding="utf-8")
     assert "Users" not in text
+
+
+def test_missing_cuda_host_lines_refuse_after_the_first_load(tmp_path: Path, monkeypatch):
+    _clear_fill_env(monkeypatch)
+    install = _install_tree(tmp_path)
+    _decoy_tray(tmp_path, monkeypatch)
+    install["log"].write_text(_recorded_log("server-config-11434.txt"), encoding="utf-8", newline="\n")
+    full = _recorded_log("load-lines-11434.txt")
+    kept = "\n".join(line for line in full.splitlines() if "CUDA_Host" not in line) + "\n"
+    assert "flash-attn" in kept and "llama_kv_cache" in kept
+    assert "CUDA_Host" not in kept
+
+    def append() -> None:
+        with install["log"].open("a", encoding="utf-8", newline="") as handle:
+            handle.write(kept)
+
+    repo, spec_path = _committed_repo(tmp_path, _spec([_model()]), folder="missing-host")
+    run, read_counter, _seen = _live_commands(install, "ok")
+    transport = _Transport(None)
+    transport.before_generate = append
+    adapter = OllamaAdapter(transport=transport)
+    seams = real_fill_seams(adapter, run=run, read_counter=read_counter)
+    seams.threaded = False
+    seams.sleep = lambda _seconds: None
+    transport.seams = seams
+    with pytest.raises(RunnerError, match="CUDA_Host"):
+        run_spec(
+            spec_path,
+            root=repo,
+            grant="g",
+            adapters={"ollama": adapter},
+            heartbeat=_fresh(tmp_path),
+            date="2026-10-13",
+            run_id="fill-missing-host",
+            seams=seams,
+        )
+    row = load_jsonl(repo / "receipts" / "fill-missing-host.jsonl")[0]
+    assert row["aborted"] is True
+    assert row["settings"]["max_resident_ctx"] is None
+    assert "search_calls" not in row["settings"]
+    assert "CUDA_Host model" in row["notes"]
+    assert "CUDA_Host compute" in row["notes"]
+    assert "CUDA_Host output" in row["notes"]
+    assert "Users" not in (repo / "receipts" / "fill-missing-host.jsonl").read_text(encoding="utf-8")
