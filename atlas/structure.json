@@ -44,10 +44,6 @@
           "path": "assets/logo/interlock-master.png"
         },
         {
-          "hash": "d03c4c2af8653c219ab4a77017a9fa4a38a37ec8d5d0b1f0f7609d49fc5f040b",
-          "path": "assets/logo/interlock-wordmark.png"
-        },
-        {
           "hash": "d3c590594b41d72ee23570402f81311696fa9bfd0633400bceddca2a07b14276",
           "path": "assets/logo/interlock_128.png"
         },
@@ -225,7 +221,7 @@
           "path": ".python-version"
         },
         {
-          "hash": "8edcffd9b969cf1096254a4b05b53ee96934a834ce8d466de2d21ffda2a21047",
+          "hash": "9fb05e247340bda4d5e9356b1bb056447daf660ff9aae9ffcff1a479c1692e0f",
           "path": "CHANGELOG.md"
         },
         {
@@ -233,7 +229,7 @@
           "path": "LICENSE"
         },
         {
-          "hash": "8564d32f76f97723127929d2af012a9e88fe8801e13e91c4371b467dae44baeb",
+          "hash": "7677cb46a0971032e4e7c11f5b280334d0885097c3c0d351742be70f8e84ae5a",
           "path": "README.md"
         },
         {
@@ -576,12 +572,7 @@
             {
               "in": "_no_reply",
               "kind": "raise",
-              "line": 226
-            },
-            {
-              "in": "require_recorded_behaviour",
-              "kind": "raise",
-              "line": 239
+              "line": 229
             },
             {
               "in": "require_recorded_behaviour",
@@ -591,7 +582,7 @@
             {
               "in": "require_recorded_behaviour",
               "kind": "raise",
-              "line": 244
+              "line": 245
             },
             {
               "in": "require_recorded_behaviour",
@@ -601,20 +592,25 @@
             {
               "in": "require_recorded_behaviour",
               "kind": "raise",
-              "line": 256
+              "line": 250
             },
             {
               "in": "require_recorded_behaviour",
               "kind": "raise",
-              "line": 266
+              "line": 259
             },
             {
               "in": "require_recorded_behaviour",
               "kind": "raise",
               "line": 269
+            },
+            {
+              "in": "require_recorded_behaviour",
+              "kind": "raise",
+              "line": 272
             }
           ],
-          "hash": "472d8a69d66ce89baf2bda3a0a7633e06744d7e9a724301c839f40077c039223",
+          "hash": "0d04d70b7f38afd85ecf8f88e4f3c60709302ab207d8b827ca73d137b7a86f02",
           "importsFiles": [
             "src/interlock/adapters/base.py",
             "src/interlock/adapters/ollama.py"
@@ -9140,7 +9136,7 @@
           "path": "tests/fixtures/ollama/0.35.1/think_off.json"
         },
         {
-          "hash": "7ddbb15b40c08e2ae5decda34007d036ff8d76f564c38dd412754fa3f8d87291",
+          "hash": "6f2bbf0175efb2ab084b544186d1e01ca179a4aee763e227991448fc9f303e45",
           "path": "tests/fixtures/ollama/0.35.1/truncate_over_num_ctx.json"
         },
         {
@@ -9755,7 +9751,7 @@
             "test_the_recorder_refuses_a_cloud_model",
             "test_the_recorder_refuses_to_run_without_a_grant"
           ],
-          "hash": "e8c344d449c8471d7e4d206a995dfc2b14afced10bfd25a50acf8955b7f004e8",
+          "hash": "5a71c07c3c8eaf3294a1fa89969f5db76fecfde95109bbf67c063998050173a2",
           "importOrder": [
             "src/interlock/adapters/base.py",
             "src/interlock/adapters/ollama.py",
@@ -10691,8 +10687,8 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "3cdd4cae332185bbf7addf53a04ea72f3dcd72c5",
-    "tracked": 229
+    "commit": "7c1508b5474f1ed476bc97767c995a02cd4ddb90",
+    "tracked": 228
   },
   "landings": [
     {
