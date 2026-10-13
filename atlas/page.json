@@ -34,73 +34,29 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 29,
-      "changed": 6,
+      "added": 1,
+      "changed": 27,
       "moved": 0,
-      "parts": 4,
-      "removed": 7
+      "parts": 6,
+      "removed": 0
     },
     "items": [
       {
         "kind": "door",
-        "sentence": "Deploy site to GitHub Pages (.github/workflows/pages.yml) is a new door. It starts on a push to main touching 2 paths; or by hand. It runs site/astro.config.mjs and site/src/.",
+        "sentence": "OpenSSF Scorecard (.github/workflows/scorecard.yml) is a new door. It starts on a `branch_protection_rule` event; on a schedule (`43 15 * * 1`), Monday at 15:43 UTC; or by hand. It runs no file this map can see.",
         "subjects": [
-          ".github/workflows/pages.yml",
-          "site/astro.config.mjs",
-          "site/src/"
+          ".github/workflows/scorecard.yml"
         ]
-      },
-      {
-        "kind": "landing",
-        "sentence": "site/src/content/docs/ is now read by site/astro.config.mjs.",
-        "subjects": [
-          "site/src/content/docs/",
-          "site/astro.config.mjs"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": "site/src/content/docs/handbook/ is now read by site/astro.config.mjs.",
-        "subjects": [
-          "site/src/content/docs/handbook/",
-          "site/astro.config.mjs"
-        ]
-      },
-      {
-        "kind": "unassigned",
-        "sentence": "site/astro.config.mjs is new and belongs to no part, so atlas check fails on it against the previous map.",
-        "subjects": [
-          "site/astro.config.mjs"
-        ]
-      },
-      {
-        "kind": "unassigned",
-        "sentence": "site/package-lock.json is new and belongs to no part, so atlas check fails on it against the previous map.",
-        "subjects": [
-          "site/package-lock.json"
-        ]
-      },
-      {
-        "kind": "unassigned",
-        "sentence": "site/package.json is new and belongs to no part, so atlas check fails on it against the previous map.",
-        "subjects": [
-          "site/package.json"
-        ]
-      },
-      {
-        "kind": "unassigned",
-        "sentence": "And 15 more new files that belong to no part.",
-        "subjects": []
       },
       {
         "kind": "counts",
-        "sentence": "29 files added, 7 removed and 6 changed content, across 4 parts.",
+        "sentence": "1 file added and 27 changed content, across 6 parts.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "cc91aedf0475ce6a5621cce98c53b2c000f9d930",
-      "generatedAt": "2026-10-13T17:54:00.739Z"
+      "commit": "e8628cab287088a160660d64d63444c98908f96d",
+      "generatedAt": "2026-10-13T18:18:15.631Z"
     },
     "unchanged": false
   },
@@ -121,30 +77,75 @@
       "shared": 17
     },
     {
-      "a": "src/switchyard/harness/receipts.py",
-      "b": "src/switchyard/receipt.py",
-      "either": 13,
+      "a": "src/interlock/harness/fill.py",
+      "b": "tests/test_e5_preflight.py",
+      "either": 7,
       "partLabels": [
-        null,
-        null
+        "src",
+        "tests"
       ],
       "parts": [
-        null,
-        null
+        "src",
+        "tests"
       ],
-      "relation": "unassigned",
+      "relation": "b-imports-a",
+      "shared": 5
+    },
+    {
+      "a": "src/interlock/harness/runner.py",
+      "b": "tests/test_e5_preflight.py",
+      "either": 7,
+      "partLabels": [
+        "src",
+        "tests"
+      ],
+      "parts": [
+        "src",
+        "tests"
+      ],
+      "relation": "b-imports-a",
+      "shared": 5
+    },
+    {
+      "a": "src/interlock/harness/fill.py",
+      "b": "tests/test_fill_card_live.py",
+      "either": 12,
+      "partLabels": [
+        "src",
+        "tests"
+      ],
+      "parts": [
+        "src",
+        "tests"
+      ],
+      "relation": "b-imports-a",
       "shared": 7
+    },
+    {
+      "a": "src/interlock/harness/fill.py",
+      "b": "src/interlock/harness/runner.py",
+      "either": 9,
+      "partLabels": [
+        "src",
+        "src"
+      ],
+      "parts": [
+        "src",
+        "src"
+      ],
+      "relation": "inside",
+      "shared": 5
     }
   ],
   "changesTogetherNote": [
     "1 file changed together with its own test, as expected.",
     "Confidence is low: fewer than 25 source files reach 10 revisions in the window.",
-    "Window: 180 days; a pair counts from 3 shared commits, since 8 source files reach 10 revisions; the floor rises to 10 when 25 do."
+    "Window: 180 days; a pair counts from 3 shared commits, since 9 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 1,
-  "commit": "e8628cab287088a160660d64d63444c98908f96d",
+  "commit": "2e4b1b53e46246469a46f10136ce19570307f932",
   "defaultBranch": "main",
-  "derived": "10 parts, mostly Python (87 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 4 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
+  "derived": "10 parts, mostly Python (87 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
   "doors": [
     {
       "checks": [],
@@ -246,6 +247,29 @@
       "checks": [],
       "checksCount": 0,
       "checksMore": 0,
+      "file": ".github/workflows/scorecard.yml",
+      "id": ".github/workflows/scorecard.yml",
+      "landings": [],
+      "name": "OpenSSF Scorecard",
+      "pushes": false,
+      "reach": [],
+      "runs": [],
+      "runsCount": 0,
+      "runsMore": 0,
+      "sends": [
+        "scans code with CodeQL"
+      ],
+      "stages": [],
+      "triggers": [
+        "on a `branch_protection_rule` event",
+        "on a schedule (`43 15 * * 1`), Monday at 15:43 UTC",
+        "or by hand"
+      ]
+    },
+    {
+      "checks": [],
+      "checksCount": 0,
+      "checksMore": 0,
       "file": "pyproject.toml",
       "id": "pyproject.toml#interlock",
       "kind": "command",
@@ -281,7 +305,7 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-13T18:18:15.631Z",
+  "generatedAt": "2026-10-13T22:47:49.564Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "3 writes and 4 reads use paths built at run time and are not named here.",

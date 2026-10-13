@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- OpenSSF Scorecard. `.github/workflows/scorecard.yml` runs weekly, on demand, and when branch protection changes. It publishes the result and uploads the SARIF file. The README and its translations show the Scorecard badge. CI and the release workflow now set a top-level read-only token permission. The workflow does not run on push.
+
 - E5 waits until the pinned adapter's dedicated reading is back within `settle_tolerance_mib` (512) of the idle reading taken before the model's first load after any confirm count, whoever unloads the runner (`keep_alive` 0 included), and only then sends the measured request. That reading is the call's pre-call reading and it carries `count_ran`. `unloaded` still means the harness unloaded. The reading taken before the count is the pre-count reading. The resident floor applies only where no count comes before the call. A card that does not settle makes the model inconclusive. A load, which does not count, keeps the resident-floor wait. (spec amendment 2026-10-13, after #110)
 
 - Fixed: an E5 window whose card crosses `abort_mib` after `observe` has checked the sampler, and before that call's `cover` returns, is an abort (`card memory reached abort_mib`). It is not kept: no measured point, no resident mark, and the model stays unloaded. The stop label is `margin`, for a load and for a confirm. Found live 2026-10-13 on the granite check. The spec already says abort and unload at 30500. No spec amendment.
