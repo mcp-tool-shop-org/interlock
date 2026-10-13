@@ -417,17 +417,17 @@ before.
   duplicate GPU chip). When the new files land, replace `assets/logo/`, and open the brand-repo PR **with the
   new version**, not the first draft. The Downloads folder isn't
   durable.
-  - Master: the Downloads master PNG (1328×1328, on a white margin) →
+  - Master: the Downloads master PNG (1328×1328, on a white margin) was filed as
     `assets/logo/interlock-master.png`.
-  - The icon set `switchyard_{16,32,64,128,256,512}.png` (cropped to the dark tile) →
-    `assets/logo/interlock_<n>.png`.
+  - The icon set (cropped to the dark tile) was filed as
+    `assets/logo/interlock_{16,32,64,128,256,512}.png`.
   - **Also the brand repo (org convention), approved by the Director:** switchyard goes public soon. Open a
     PR to `mcp-tool-shop-org/brand` adding `logos/switchyard/readme.png` (the 512 icon). Its pre-commit hook
     regenerates `manifest.json`; commit both together, per brand's README "Adding a Logo Manually". The
     Publisher merges.
   - The switchyard README header uses
     `https://raw.githubusercontent.com/mcp-tool-shop-org/brand/main/logos/switchyard/readme.png` at width 256,
-    as rnd does. Until the brand PR merges, it uses the in-repo `assets/logo/interlock_512.png`.
+    as rnd does. Those in-repo master and size files were the previous rail-crossing icon. Removed 2026-10-12. The mark is `assets/logo.png`.
 - **A snapshot of this brief:** add `docs/handoff/` with this brief and the four feedback files from "Read
   first". Rewrite absolute home-directory paths as plain references, so no home-directory path is
   committed. Note the date and the memory path they came from. The brief stays authoritative in memory, and
