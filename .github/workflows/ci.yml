@@ -3,6 +3,7 @@
 # PIN_PER_STEP: 2. uv.lock pins the packages. Actions are pinned by commit sha.
 #   Atlas is pinned to 1.24.0. The coverage floor in pyproject.toml is 90.
 #   Codecov project and patch targets are 90% with a 1% threshold.
+#   pip-audit 2.10.1 audits the project environment (the local package is not on PyPI).
 # ANDON_AUTHORITY: 2. pytest --cov-fail-under and atlas check are required steps.
 #   A red step fails the job. The Codecov upload uses fail_ci_if_error: false
 #   so a non-public repo's upload cannot block the gate. The floor is the gate.
@@ -58,6 +59,9 @@ jobs:
 
       - name: Install
         run: uv sync --frozen
+
+      - name: Dependency audit
+        run: uv run --with pip-audit==2.10.1 pip-audit
 
       - name: Test
         run: uv run pytest --cov-report=xml

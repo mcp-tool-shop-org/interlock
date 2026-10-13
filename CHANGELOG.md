@@ -16,6 +16,7 @@
 
 - Fixtures: `truncate_over_num_ctx` re-recorded on the rig at `num_ctx` 2048 with a 2,500-word prompt (qwen3:8b, Ollama 0.35.1). `truncate: false` refuses it ("request (2511 tokens) exceeds the available context size (2048 tokens)"), which is the behaviour E5's fill-card confirmation relies on. The catalogue case now requests what was recorded and expects `error`.
 
+- Full treatment at 0.1.0. Still a prototype, still not on PyPI, and the version is not bumped. Landing page, Starlight handbook, shipcheck scorecard, `pip-audit` in CI, and a Codecov badge. The README header uses the brand mark. The old wordmark image, which still says switchyard, is no longer shown.
 - README: labelled a prototype research instrument ahead of making the repository public; install from a clone until the first release.
 
 - E4b: a paired Intel slot with no 5090 companion call spanning the measurement is refused as `companion_not_covering` instead of falling back to the latest companion call (R&D on #92).

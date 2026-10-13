@@ -34,4 +34,4 @@ A bare single-label host and port, such as `myrig:11434`, is a known limit of th
 
 ## Reporting a vulnerability
 
-Use a GitHub private advisory on [mcp-tool-shop-org/switchyard](https://github.com/mcp-tool-shop-org/switchyard/security/advisories/new). Do not open a public issue for a vulnerability.
+Use a GitHub private advisory on [mcp-tool-shop-org/interlock](https://github.com/mcp-tool-shop-org/interlock/security/advisories/new). Do not open a public issue for a vulnerability. The maintainers read those advisories. This 0.1.x prototype does not publish a response-time promise.
