@@ -135,7 +135,7 @@ A remote suggestion includes an `offrig_plan` object. interlock does not call `o
 
 ## Run an experiment
 
-Every experiment is pre-registered: its spec under `experiments/<id>/spec.yaml` is committed, with the question, the decision it feeds, the arms, the dataset, the metrics and the stop rules, before any device time. `interlock run` refuses a spec that was edited after its commit, and records the spec's blob in the receipt. By practice, a rule is not changed after results are seen; a dated amendment comes before the run whose results count, and a run set aside as void is recorded as such.
+Every experiment is pre-registered: its spec under `experiments/<id>/spec.yaml` is committed, with the question, the decision it feeds, the arms, the dataset, the metrics and the stop rules, before any device time. `interlock run` refuses a spec that was edited after its commit. The spec's blob is checked against that commit before the run (`require_unmodified`) and printed by `--dry-run`. It is not written into the receipt. An E4b receipt records the harness `git_sha` and `clean_tree`. A fill-card receipt records `experiment_spec` and `run_id`, and when preflight ran it also records `git_sha` and `clean_tree`. Any other shared-runner receipt records `experiment_spec` and `run_id` only. By practice, a rule is not changed after results are seen; a dated amendment comes before the run whose results count, and a run set aside as void is recorded as such.
 
 ```
 interlock run experiments/e4/spec.yaml --dry-run

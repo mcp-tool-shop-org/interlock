@@ -5,7 +5,7 @@ sidebar:
   order: 4
 ---
 
-Every experiment is pre-registered. Its spec under `experiments/<id>/spec.yaml` is committed, with the question, the decision it feeds, the arms, the dataset, the metrics, and the stop rules, before any device time. `interlock run` refuses a spec that was edited after its commit, and records the spec's blob in the receipt. By practice, a rule is not changed after results are seen. A dated amendment comes before the run whose results count. A run set aside as void is recorded as such.
+Every experiment is pre-registered. Its spec under `experiments/<id>/spec.yaml` is committed, with the question, the decision it feeds, the arms, the dataset, the metrics, and the stop rules, before any device time. `interlock run` refuses a spec that was edited after its commit. The spec's blob is checked against that commit before the run (`require_unmodified`) and printed by `--dry-run`. It is not written into the receipt. An E4b receipt records the harness `git_sha` and `clean_tree`. A fill-card receipt records `experiment_spec` and `run_id`, and when preflight ran it also records `git_sha` and `clean_tree`. Any other shared-runner receipt records `experiment_spec` and `run_id` only. By practice, a rule is not changed after results are seen. A dated amendment comes before the run whose results count. A run set aside as void is recorded as such.
 
 ## What a receipt holds
 
@@ -70,7 +70,7 @@ Two committed receipts hold the result. Percent below is 100 times the log ratio
 | npu-5090 | none | none | inconclusive |
 | igpu-5090 | none | none | inconclusive |
 
-`receipts/e4b-block-3.jsonl` re-ran the two inconclusive pairs. Both intervals sit inside the band.
+`receipts/e4b-block-3.jsonl` re-ran the two inconclusive pairs. Block 2's Intel-side pairs were refused because the harness started the Intel calls before the 5090 companion was steadily decoding, which the spec already required. The dated amendment, written after block 2 and before block 3, made the harness wait for one steady warm decode. The band, the 22.5 MHz tolerance and the estimator did not change. Both intervals sit inside the band.
 
 | Pair | Estimate | Interval | Verdict |
 | --- | --- | --- | --- |
