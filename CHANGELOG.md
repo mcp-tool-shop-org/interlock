@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed: an E5 window whose card crosses `abort_mib` after `observe` has checked the sampler, and before that call's `cover` returns, is an abort (`card memory reached abort_mib`). It is not kept: no measured point, no resident mark, and the model stays unloaded. The stop label is `margin`, for a load and for a confirm. Found live 2026-10-13 on the granite check. The spec already says abort and unload at 30500. No spec amendment.
+
 - Slot probe (`instrument_perturbs_measurement`): during a measured call, `open()` and the 1 s loop read only total CPU, RAM and the disk counter. After the call, and only when that slot's CPU max is over 30%, two snapshots a second apart rank other processes by the user-plus-system CPU time they used between the snapshots. The receipt records that list as `top_after_call`. pid 0 is left out. The run's own process tree is left out. pid 4 stays. An idle slot does not take the snapshots.
 
 - E5 waits until the pinned adapter's dedicated reading is back within `settle_tolerance_mib` (512) of the idle reading taken before the model's first load after a confirm's count unloads, and only then sends the measured request. That reading is the call's pre-call reading. The reading taken before the count is the pre-count reading. The resident floor applies only where no count unload comes before the call. A card that does not settle makes the model inconclusive: `max_resident_ctx` stays null, and that window is not a margin ceiling. (spec amendment 2026-10-13, after the review of ce7b31e on #107)

@@ -22,6 +22,7 @@ from interlock.adapters.ollama_cases import require_recorded_behaviour
 from interlock.harness.spec import SpecError, validate_spec
 from interlock.guards import GuardError, require_card_empty, require_grant, require_heartbeat
 from interlock.harness.fill import (
+    ABORT_ERROR,
     install_relative,
     ADAPTER_DEDICATED,
     ADAPTER_SHARED,
@@ -133,7 +134,7 @@ def _fresh(tmp_path: Path) -> Path:
 
 
 class _Transport:
-    def __init__(self, seams, *, show_error=None, explode=False, spill_shared=False, spill_prompt=False, missing_shared=False, missing_prompt=False, abort_at=None, stick=False, linear=None, cold_disagrees=False, omit_tags=False, tag_bytes=None, busy_mib=20000, hide_baseline=False, settle_high=0, self_sample=True, split_vram=False, hold_abort=False, slow_unload=0, hang_unload=False, trained=4096, unresident_at=None, idle_mib=1500, peaks=None, fallback_peak=None, gate_peak_at=None, dedicated_script=None, dedicated_tracks_resident=False, resident_level=28000, idle_level=100, stuck_after_unload=False, dedicated_lag=2):
+    def __init__(self, seams, *, show_error=None, explode=False, spill_shared=False, spill_prompt=False, missing_shared=False, missing_prompt=False, abort_at=None, stick=False, linear=None, cold_disagrees=False, omit_tags=False, tag_bytes=None, busy_mib=20000, hide_baseline=False, settle_high=0, self_sample=True, split_vram=False, hold_abort=False, slow_unload=0, hang_unload=False, trained=4096, unresident_at=None, idle_mib=1500, peaks=None, fallback_peak=None, gate_peak_at=None, dedicated_script=None, dedicated_tracks_resident=False, resident_level=28000, idle_level=100, stuck_after_unload=False, dedicated_lag=2, late_cross=None, late_cross_ctx=None):
         self.seams = seams
         self.show_error = show_error
         self.explode = explode
@@ -167,6 +168,10 @@ class _Transport:
         self.idle_level = idle_level
         self.stuck_after_unload = stuck_after_unload
         self.dedicated_lag = dedicated_lag
+        self.late_cross = late_cross
+        self.late_cross_ctx = late_cross_ctx
+        self._late_load_returned = False
+        self._late_armed = False
         self._stuck = False
         self._lag_left = 0
         self.timeline = []
@@ -203,6 +208,8 @@ class _Transport:
             if self.unloads:
                 self.events.append("settle")
             return self.idle_mib
+        if self._late_armed and self.late_cross is not None and self.state["ctx"] == self.late_cross_ctx:
+            return self.late_cross
         ctx = self.state["ctx"]
         if self.abort_at is not None and isinstance(ctx, int) and ctx >= self.abort_at:
             return 30500
@@ -221,7 +228,26 @@ class _Transport:
                 return self.fallback_peak
         return self.busy_mib
 
+    def _arm_late_cross(self) -> None:
+        """After the measured load has returned, the next shared read is past observe's check.
+
+        Arming there lets the sampler thread take ``late_cross`` while cover is
+        still open. The reading is the sampler's. Nothing here tells probe the peak.
+        """
+
+        if self.late_cross is None or self._late_armed or not self._late_load_returned:
+            return
+        if not self.state["busy"] or self.state["confirm"] or self.state["ctx"] != self.late_cross_ctx:
+            return
+        self._late_armed = True
+        deadline = time.monotonic() + 2
+        while not (self.seams is not None and self.seams.over):
+            if time.monotonic() >= deadline:
+                raise RuntimeError("the sampler did not cross abort_mib after observe had checked")
+            time.sleep(0.001)
+
     def shared_mib(self):
+        self._arm_late_cross()
         if self.missing_shared and self.state["confirm"]:
             return None
         ctx = self.state["ctx"]
@@ -341,6 +367,13 @@ class _Transport:
         if rate is not None:
             payload["prompt_eval_count"] = 10
             payload["prompt_eval_duration"] = int(10 / rate * 1_000_000_000)
+        if (
+            self.late_cross is not None
+            and not body.get("raw")
+            and body.get("prompt") == SEED
+            and self.state["ctx"] == self.late_cross_ctx
+        ):
+            self._late_load_returned = True
         return payload
 
     def _rate(self):
@@ -828,6 +861,66 @@ def test_the_sampler_unloads_when_the_window_reaches_abort_mib(tmp_path: Path):
     assert "after the unload" not in row["notes"]
     assert "predicted_over" not in row["settings"]
     assert transport.unloads
+
+
+def _unloads_after_measured_load(transport: _Transport, ctx: int) -> int:
+    """Unloads after the measured load of ``ctx`` returns, and before the next request."""
+
+    seen = False
+    count = 0
+    for _method, _url, body in transport.calls:
+        if not isinstance(body, dict):
+            continue
+        if body.get("keep_alive") == 0 and body.get("prompt") == "":
+            if seen:
+                count += 1
+            continue
+        options = body.get("options")
+        if not isinstance(options, dict):
+            continue
+        this = options.get("num_ctx")
+        if not seen:
+            if this == ctx and body.get("prompt") == SEED and not body.get("raw"):
+                seen = True
+            continue
+        if this != ctx:
+            return count
+    return count
+
+
+def test_an_abort_that_crosses_after_observe_checked_is_still_an_abort(tmp_path: Path):
+    """40960 returns OK. The sampler then reads 30572, over abort_mib 30500.
+
+    The load's generate has returned and observe has checked sampler.over.
+    The crossing is the sampler thread's own card reading, while cover is
+    still open. A share of 1 MiB keeps the one-window prediction of 40960
+    under abort_mib, so the search does load it.
+    """
+
+    weights = 18499 * 1024 * 1024
+    transport = _Transport(
+        None,
+        trained=40960,
+        tag_bytes=weights,
+        late_cross=30572,
+        late_cross_ctx=40960,
+    )
+    seams = _seams(transport)
+    seams.threaded = True
+    _repo, rows = _run(tmp_path, transport, seams=seams, max_ctx=40960)
+    row = rows[0]
+    load = next(call for call in row["settings"]["search_calls"] if call[0] == "load" and call[1] == 40960)
+    assert load[5] == ABORT_ERROR
+    assert load[2] == 30572
+    assert 40960 in row["settings"]["aborted_windows"]
+    assert row["settings"]["limit"] == "margin"
+    assert row["settings"]["max_resident_ctx"] != 40960
+    slopes = row["settings"].get("slope_predictions", [])
+    assert all(item["left_ctx"] != 40960 and item["right_ctx"] != 40960 for item in slopes)
+    pre = row["settings"]["pre_call_dedicated_mib"]
+    crossed = next(index for index, item in enumerate(pre) if item["kind"] == "load" and item["ctx"] == 40960)
+    assert all(item["resident_ctx"] != 40960 for item in pre[crossed + 1 :])
+    assert _unloads_after_measured_load(transport, 40960) == 1
 
 
 def test_a_window_whose_card_does_not_fall_after_unload_is_noted(tmp_path: Path):
