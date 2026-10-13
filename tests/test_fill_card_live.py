@@ -317,14 +317,7 @@ class _Transport:
                 self.abort_unloads.append(self.state["ctx"])
             self.order.append("unload")
             self.unloads.append(body["model"])
-            self.loaded = None
-            self.state["busy"] = False
-            if self.stuck_after_unload:
-                self._stuck = True
-            elif self.dedicated_tracks_resident and self.dedicated_lag > 0:
-                self._lag_left = self.dedicated_lag
-            if self.dedicated_tracks_resident:
-                self.timeline.append(("unload",))
+            self._note_runner_unloaded()
             return {}
         options = body.get("options") or {}
         self.state["ctx"] = options.get("num_ctx")
@@ -354,6 +347,12 @@ class _Transport:
             count = 100000
             if self.cold_disagrees and self.loaded is None:
                 count = 100001
+            # keep_alive 0 drops the runner when the count returns. Dedicated
+            # stays at the resident level for dedicated_lag readings after that,
+            # the same lag the harness unload uses. Memory does not fall on a
+            # number this test hands in.
+            if body.get("keep_alive") == 0:
+                self._note_runner_unloaded()
             return {"prompt_eval_count": count}
         above = (
             self.unresident_at is not None
@@ -375,6 +374,18 @@ class _Transport:
         ):
             self._late_load_returned = True
         return payload
+
+    def _note_runner_unloaded(self) -> None:
+        """The runner is gone. Dedicated falls only on the readings after this."""
+
+        self.loaded = None
+        self.state["busy"] = False
+        if self.stuck_after_unload:
+            self._stuck = True
+        elif self.dedicated_tracks_resident and self.dedicated_lag > 0:
+            self._lag_left = self.dedicated_lag
+        if self.dedicated_tracks_resident:
+            self.timeline.append(("unload",))
 
     def _rate(self):
         if self.missing_prompt and self.state["confirm"]:
@@ -529,6 +540,7 @@ def test_a_card_still_freeing_memory_waits_then_measures(tmp_path: Path):
         "mib": 100,
         "resident_ctx": None,
         "unloaded": False,
+        "count_ran": False,
     }
     assert all(item["mib"] == 100 for item in pre)
     assert all("resident_ctx" in item and "unloaded" in item for item in pre)
@@ -699,6 +711,7 @@ def test_the_same_context_counts_on_the_resident_floor_then_the_measured_request
         "mib": 100,
         "resident_ctx": 2048,
         "unloaded": True,
+        "count_ran": True,
     }
     assert pre[3] == {
         "kind": "confirm",
@@ -706,6 +719,7 @@ def test_the_same_context_counts_on_the_resident_floor_then_the_measured_request
         "mib": 100,
         "resident_ctx": 4096,
         "unloaded": True,
+        "count_ran": True,
     }
     counted = rows[0]["settings"]["pre_count_dedicated_mib"]
     assert counted[0] == {
@@ -780,6 +794,160 @@ def test_the_measured_confirm_waits_until_dedicated_reads_idle_after_the_count_u
     )
     assert counted["mib"] == 28000
     assert counted["unloaded"] is False
+
+
+def test_keep_alive_zero_unloads_the_count_and_the_measured_confirm_waits_for_idle(tmp_path: Path):
+    """keep_alive 0: Ollama unloads the count's runner. The harness does not.
+
+    Dedicated stays at the resident level for several readings after that
+    unload. The measured confirm is the non-raw request. It must not go out
+    until a dedicated reading has fallen to the idle level taken before the
+    first load.
+    """
+
+    entry = _model()
+    entry["keep_alive"] = 0
+    transport = _Transport(
+        None,
+        trained=4096,
+        dedicated_tracks_resident=True,
+        resident_level=28000,
+        idle_level=100,
+        dedicated_lag=3,
+    )
+    assert transport.dedicated_script is None
+    seams = _seams(transport)
+    _repo, rows = _run(tmp_path, transport, seams=seams, max_ctx=4096, models=[entry])
+    assert rows[0]["settings"]["max_resident_ctx"] == 4096
+    count_at = _last(transport.timeline, ("request", 4096, True))
+    measured = _last(transport.timeline, ("request", 4096, False))
+    between = transport.timeline[count_at + 1:measured]
+    assert ("dedicated", 100) in between
+    assert ("unload",) in between
+    assert ("dedicated", 28000) in between
+    assert ("dedicated", 100) not in between[: between.index(("unload",))]
+    counts = [
+        body
+        for _method, _url, body in transport.calls
+        if isinstance(body, dict) and body.get("raw") is True
+    ]
+    assert counts and all(body["keep_alive"] == 0 for body in counts)
+    confirm = next(
+        item
+        for item in rows[0]["settings"]["pre_call_dedicated_mib"]
+        if item["kind"] == "confirm" and item["ctx"] == 4096
+    )
+    assert confirm["mib"] == 100
+    assert confirm["unloaded"] is False
+    assert confirm["count_ran"] is True
+    counted = next(
+        item
+        for item in rows[0]["settings"]["pre_count_dedicated_mib"]
+        if item["kind"] == "confirm" and item["ctx"] == 4096
+    )
+    assert counted == {
+        "kind": "confirm",
+        "ctx": 4096,
+        "mib": 28000,
+        "resident_ctx": 4096,
+        "unloaded": False,
+    }
+
+
+def test_a_default_entry_records_count_ran_and_still_waits_after_the_harness_unload(tmp_path: Path):
+    """No keep_alive. The harness still unloads the count, then the confirm waits.
+
+    Pre-call entries gain count_ran. unloaded still means the harness unloaded.
+    The pre-count reading stays the one taken before that unload.
+    """
+
+    transport = _Transport(
+        None,
+        trained=4096,
+        dedicated_tracks_resident=True,
+        resident_level=28000,
+        idle_level=100,
+        dedicated_lag=3,
+    )
+    assert transport.dedicated_script is None
+    seams = _seams(transport)
+    _repo, rows = _run(tmp_path, transport, seams=seams, max_ctx=4096)
+    assert rows[0]["settings"]["max_resident_ctx"] == 4096
+    pre = rows[0]["settings"]["pre_call_dedicated_mib"]
+    assert [(item["kind"], item["ctx"], item["count_ran"]) for item in pre] == [
+        ("load", 2048, False),
+        ("confirm", 2048, True),
+        ("load", 4096, False),
+        ("confirm", 4096, True),
+    ]
+    assert pre[3]["mib"] == 100
+    assert pre[3]["unloaded"] is True
+    counted = rows[0]["settings"]["pre_count_dedicated_mib"]
+    assert "count_ran" not in counted[1]
+    assert counted[1] == {
+        "kind": "confirm",
+        "ctx": 4096,
+        "mib": 28000,
+        "resident_ctx": 4096,
+        "unloaded": False,
+    }
+    count_at = _last(transport.timeline, ("request", 4096, True))
+    measured = _last(transport.timeline, ("request", 4096, False))
+    between = transport.timeline[count_at + 1:measured]
+    assert ("dedicated", 100) in between
+    counts = [
+        body
+        for _method, _url, body in transport.calls
+        if isinstance(body, dict) and body.get("raw") is True
+    ]
+    assert counts and all(body.get("keep_alive") == "5m" for body in counts)
+
+
+def test_a_card_that_never_returns_to_idle_after_a_keep_alive_zero_count_refuses_the_call(tmp_path: Path):
+    entry = _model()
+    entry["keep_alive"] = 0
+    transport = _Transport(
+        None,
+        trained=4096,
+        dedicated_tracks_resident=True,
+        resident_level=28000,
+        idle_level=100,
+        stuck_after_unload=True,
+    )
+    assert transport.dedicated_script is None
+    seams = _seams(transport)
+    _advance(seams)
+    with pytest.raises(RunnerError, match="the step is inconclusive") as caught:
+        _run(tmp_path, transport, seams=seams, max_ctx=4096, models=[entry])
+    assert UNSETTLED in str(caught.value)
+    row = load_jsonl(tmp_path / "repo" / "receipts" / "fill-1.jsonl")[0]
+    assert row["aborted"] is True
+    assert "the step is inconclusive" in row["notes"]
+    assert UNSETTLED in row["notes"]
+    assert row["settings"]["max_resident_ctx"] is None
+    assert row["settings"]["peak_mib"] is None
+    assert row["settings"].get("limit") != "margin"
+    # The count dropped its own runner. The only empty-prompt unload is the
+    # end-of-model cleanup, and it comes after those counts.
+    raw_at = [
+        index
+        for index, (_method, _url, body) in enumerate(transport.calls)
+        if isinstance(body, dict) and body.get("raw") is True
+    ]
+    harness_at = [
+        index
+        for index, (_method, _url, body) in enumerate(transport.calls)
+        if isinstance(body, dict) and body.get("prompt") == "" and body.get("keep_alive") == 0
+    ]
+    assert raw_at and harness_at
+    assert harness_at[0] > raw_at[-1]
+    assert ("unload",) in transport.timeline
+    unload_at = transport.timeline.index(("unload",))
+    assert not any(
+        event[0] == "request" and event[2] is False for event in transport.timeline[unload_at:]
+    )
+    assert 4096 not in _ctxs(transport)
+    assert seams.slept
 
 
 def test_a_card_that_never_returns_to_idle_after_unload_refuses_the_call(tmp_path: Path):
@@ -1276,8 +1444,10 @@ def test_dry_run_names_the_confirmation_count(monkeypatch):
     assert "a measured abort on the confirm walk is margin" in text
     assert "settle_tolerance_mib: 512" in text
     assert "settle_timeout_s: 30" in text
-    assert "the resident floor applies only where no count unload comes before the call" in text
-    assert "a confirm whose count unloads waits for the idle baseline immediately before the measured request" in text
+    assert "the resident floor applies only where no count comes before the call" in text
+    assert "the wait follows any count, whoever unloads the runner (keep_alive 0 included)" in text
+    assert "the resident floor applies only where no count unload comes before the call" not in text
+    assert "a confirm whose count unloads waits for the idle baseline immediately before the measured request" not in text
     assert "that settled reading is the pre-call reading, and the reading before the count is the pre-count reading" in text
     assert "a call at the same num_ctx as the resident runner keeps the resident floor" not in text
     assert "a num_ctx change unloads first and settles to the idle baseline, then the call loads at the new num_ctx" in text
@@ -1286,8 +1456,10 @@ def test_dry_run_names_the_confirmation_count(monkeypatch):
     smoke = dry_run(ROOT / "experiments" / "e5-smoke" / "spec.yaml", ROOT)
     assert "settle_tolerance_mib: 512" in smoke
     assert "settle_timeout_s: 30" in smoke
-    assert "the resident floor applies only where no count unload comes before the call" in smoke
-    assert "a confirm whose count unloads waits for the idle baseline immediately before the measured request" in smoke
+    assert "the resident floor applies only where no count comes before the call" in smoke
+    assert "the wait follows any count, whoever unloads the runner (keep_alive 0 included)" in smoke
+    assert "the resident floor applies only where no count unload comes before the call" not in smoke
+    assert "a confirm whose count unloads waits for the idle baseline immediately before the measured request" not in smoke
     assert "a call at the same num_ctx as the resident runner keeps the resident floor" not in smoke
     assert "a num_ctx change unloads first and settles to the idle baseline, then the call loads at the new num_ctx" in smoke
     assert "a measured abort on the confirm walk is margin" in smoke

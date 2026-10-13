@@ -299,9 +299,9 @@ def dry_run(
             "settles within settle_tolerance_mib of the expected pre-call level"
         )
         lines.append("between models and after an unload that level is the idle baseline")
-        lines.append("the resident floor applies only where no count unload comes before the call")
+        lines.append("the resident floor applies only where no count comes before the call")
         lines.append(
-            "a confirm whose count unloads waits for the idle baseline immediately before the measured request"
+            "the wait follows any count, whoever unloads the runner (keep_alive 0 included)"
         )
         lines.append(
             "that settled reading is the pre-call reading, and the reading before the count is the pre-count reading"
