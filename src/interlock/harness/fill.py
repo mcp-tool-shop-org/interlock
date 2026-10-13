@@ -2010,17 +2010,6 @@ def _measure_model(
             if harness_unloaded:
                 pre_calls[-1]["unloaded"] = True
             pre_calls[-1]["count_ran"] = True
-        else:
-            pre_calls.append(
-                {
-                    "kind": kind,
-                    "ctx": ctx,
-                    "mib": reading,
-                    "resident_ctx": ctx,
-                    "unloaded": harness_unloaded,
-                    "count_ran": True,
-                }
-            )
         if earlier is not None:
             pre_count_calls.append(earlier)
 
