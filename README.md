@@ -1,5 +1,16 @@
 <p align="center">
-  <img src="assets/logo.png" width="480" alt="interlock">
+  <a href="README.md">English</a> | <a href="README.ja.md">日本語</a> | <a href="README.zh.md">中文</a> | <a href="README.es.md">Español</a> | <a href="README.fr.md">Français</a> | <a href="README.hi.md">हिन्दी</a> | <a href="README.it.md">Italiano</a> | <a href="README.pt-BR.md">Português (BR)</a>
+</p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/mcp-tool-shop-org/brand/main/logos/interlock/readme.png" width="480" alt="interlock">
+</p>
+
+<p align="center">
+  <a href="https://github.com/mcp-tool-shop-org/interlock/actions/workflows/ci.yml"><img src="https://github.com/mcp-tool-shop-org/interlock/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
+  <a href="https://mcp-tool-shop-org.github.io/interlock/"><img src="https://img.shields.io/badge/docs-landing%20page-blue" alt="Landing page"></a>
+  <a href="https://codecov.io/gh/mcp-tool-shop-org/interlock"><img src="https://codecov.io/gh/mcp-tool-shop-org/interlock/graph/badge.svg" alt="Coverage"></a>
 </p>
 
 # interlock: local AI device router
@@ -29,7 +40,7 @@ pip install mcptoolshop-interlock
 uv tool install mcptoolshop-interlock
 ```
 
-The distribution name is `mcptoolshop-interlock`. The import and the command are `interlock`.
+The distribution name is `mcptoolshop-interlock`. The import and the command are `interlock`. Python 3.12 only (`requires-python` is `>=3.12,<3.13`). CI runs the tests on Ubuntu. A live measurement run is written for the Windows rig this table was measured on.
 
 What this program is allowed to touch is in the [threat model](#threat-model).
 
@@ -101,6 +112,7 @@ interlock touches local devices and local HTTP, and the network only to download
 - A 5090 step without `--grant` does not start. An NPU or iGPU step without `--npu-session` does not start.
 - The 5090 path checks that the VRAM watchdog heartbeat is at most 60 seconds old and that no model is loaded. The heartbeat file is not opened. Only its modified time is read.
 - Nothing here listens on a port.
+- interlock does not send telemetry.
 - interlock does not rent a GPU, set a spending cap, or open offrig's database. A remote price enters only as a dated snapshot file.
 
 ## Layout
@@ -127,7 +139,7 @@ A remote suggestion includes an `offrig_plan` object. interlock does not call `o
 
 ## Run an experiment
 
-Every experiment is pre-registered: its spec under `experiments/<id>/spec.yaml` is committed, with the question, the decision it feeds, the arms, the dataset, the metrics and the stop rules, before any device time. `interlock run` refuses a spec that was edited after its commit, and records the spec's blob in the receipt. By practice, a rule is not changed after results are seen; a dated amendment comes before the run whose results count, and a run set aside as void is recorded as such.
+Every experiment is pre-registered: its spec under `experiments/<id>/spec.yaml` is committed, with the question, the decision it feeds, the arms, the dataset, the metrics and the stop rules, before any device time. `interlock run` refuses a spec that was edited after its commit. The spec's blob is checked against that commit before the run (`require_unmodified`) and printed by `--dry-run`. It is not written into the receipt. An E4b receipt records the harness `git_sha` and `clean_tree`. A fill-card receipt records `experiment_spec` and `run_id`, and when preflight ran it also records `git_sha` and `clean_tree`. Any other shared-runner receipt records `experiment_spec` and `run_id` only. By practice, a rule is not changed after results are seen; a dated amendment comes before the run whose results count, and a run set aside as void is recorded as such.
 
 ```
 interlock run experiments/e4/spec.yaml --dry-run
@@ -169,3 +181,6 @@ uv sync --frozen
 uv run interlock check
 uv run pytest
 ```
+
+Built by <a href="https://mcp-tool-shop.github.io/">MCP Tool Shop</a>
+

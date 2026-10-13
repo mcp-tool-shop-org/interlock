@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Handbook: the experiments page no longer says the receipt records the spec blob. The blob is checked against the commit before the run and printed by `--dry-run`. An E4b receipt records `git_sha` and `clean_tree`. A fill-card receipt records `experiment_spec` and `run_id`, and when preflight ran it also records `git_sha` and `clean_tree`. Any other shared-runner receipt records `experiment_spec` and `run_id` only. The block 3 section says the Intel pairs were refused because the harness started those calls before the 5090 companion was steadily decoding, and that the dated amendment made the harness wait for one steady warm decode. The band, the 22.5 MHz tolerance and the estimator did not change.
+
 - E5's shared gate counts only under capacity pressure. It applies when the window's peak dedicated on the pinned adapter is at or above `shared_gate_from_mib` (28452, which is abort_mib minus one grain). Below that, shared growth is recorded and is not a spill. The prompt-rate gate is a cliff against the next lower confirmed window, not against the floor. After two resident loads, the next peak is predicted from their measured slope, and `predicted_over` applies only when that prediction reaches abort_mib. When that stops the search, the receipt limit is `predicted`. `interlock run --models` measures a subset of a fill-card roster and records that subset. (spec amendment 2026-10-13, after e5-2026-10-13b)
 
 - E5 measures the floor window first, one grain, and loads and confirms it before any candidate. That confirm is the reference for the shared gate and the prompt-rate gate. A model that is resident at its first load is still judged against the floor, not against itself. The CUDA_Host check uses the floor confirm. The earlier "lowest resident window" sentence is superseded and left in place. (spec amendment 2026-10-13, after the live read on the e5 smoke)
@@ -16,6 +18,7 @@
 
 - Fixtures: `truncate_over_num_ctx` re-recorded on the rig at `num_ctx` 2048 with a 2,500-word prompt (qwen3:8b, Ollama 0.35.1). `truncate: false` refuses it ("request (2511 tokens) exceeds the available context size (2048 tokens)"), which is the behaviour E5's fill-card confirmation relies on. The catalogue case now requests what was recorded and expects `error`.
 
+- Full treatment at 0.1.0. Still a prototype, still not on PyPI, and the version is not bumped. Landing page, Starlight handbook, shipcheck scorecard, `pip-audit` in CI, and a Codecov badge. The README header uses the brand mark at 480 px. The old wordmark image, which still says switchyard, is no longer shown. The previous rail-crossing icon files under `assets/logo/` are removed. The mark is `assets/logo.png`.
 - README: labelled a prototype research instrument ahead of making the repository public; install from a clone until the first release.
 
 - E4b: a paired Intel slot with no 5090 companion call spanning the measurement is refused as `companion_not_covering` instead of falling back to the latest companion call (R&D on #92).

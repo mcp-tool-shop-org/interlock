@@ -29,3 +29,9 @@ table/*.tmp
 
 # offrig: local project database and watchdog logs
 .offrig/
+
+# landing page and handbook (site-theme). The source stays tracked.
+site/.astro/
+site/dist/
+site/node_modules/
+.polyglot-cache.json

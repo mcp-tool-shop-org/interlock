@@ -34,59 +34,73 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 0,
-      "changed": 0,
-      "moved": 86,
-      "parts": 3,
-      "removed": 0
+      "added": 29,
+      "changed": 6,
+      "moved": 0,
+      "parts": 4,
+      "removed": 7
     },
     "items": [
       {
-        "kind": "import-added",
-        "sentence": "scripts now imports src.",
+        "kind": "door",
+        "sentence": "Deploy site to GitHub Pages (.github/workflows/pages.yml) is a new door. It starts on a push to main touching 2 paths; or by hand. It runs site/astro.config.mjs and site/src/.",
         "subjects": [
-          "scripts",
-          "src"
+          ".github/workflows/pages.yml",
+          "site/astro.config.mjs",
+          "site/src/"
         ]
       },
       {
-        "kind": "import-added",
-        "sentence": "tests now imports scripts.",
+        "kind": "landing",
+        "sentence": "site/src/content/docs/ is now read by site/astro.config.mjs.",
         "subjects": [
-          "tests",
-          "scripts"
+          "site/src/content/docs/",
+          "site/astro.config.mjs"
         ]
       },
       {
-        "kind": "part",
-        "sentence": "receipts is a new part, drawn from `receipts/**`.",
+        "kind": "landing",
+        "sentence": "site/src/content/docs/handbook/ is now read by site/astro.config.mjs.",
         "subjects": [
-          "receipts"
+          "site/src/content/docs/handbook/",
+          "site/astro.config.mjs"
         ]
       },
       {
-        "kind": "part",
-        "sentence": "scripts is a new part, drawn from `scripts/**`.",
+        "kind": "unassigned",
+        "sentence": "site/astro.config.mjs is new and belongs to no part, so atlas check fails on it against the previous map.",
         "subjects": [
-          "scripts"
+          "site/astro.config.mjs"
         ]
       },
       {
-        "kind": "part",
-        "sentence": "table is a new part, drawn from `table/**`.",
+        "kind": "unassigned",
+        "sentence": "site/package-lock.json is new and belongs to no part, so atlas check fails on it against the previous map.",
         "subjects": [
-          "table"
+          "site/package-lock.json"
         ]
+      },
+      {
+        "kind": "unassigned",
+        "sentence": "site/package.json is new and belongs to no part, so atlas check fails on it against the previous map.",
+        "subjects": [
+          "site/package.json"
+        ]
+      },
+      {
+        "kind": "unassigned",
+        "sentence": "And 15 more new files that belong to no part.",
+        "subjects": []
       },
       {
         "kind": "counts",
-        "sentence": "86 files moved, across 3 parts.",
+        "sentence": "29 files added, 7 removed and 6 changed content, across 4 parts.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "0db35c8299b647b7a65db85a8e37d44e919edd71",
-      "generatedAt": "2026-10-13T17:23:12.084Z"
+      "commit": "cc91aedf0475ce6a5621cce98c53b2c000f9d930",
+      "generatedAt": "2026-10-13T17:54:00.739Z"
     },
     "unchanged": false
   },
@@ -128,9 +142,9 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 8 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 1,
-  "commit": "cc91aedf0475ce6a5621cce98c53b2c000f9d930",
+  "commit": "e8628cab287088a160660d64d63444c98908f96d",
   "defaultBranch": "main",
-  "derived": "10 parts, mostly Python (87 files). Work enters through 3 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. People run interlock.",
+  "derived": "10 parts, mostly Python (87 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 4 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
   "doors": [
     {
       "checks": [],
@@ -207,6 +221,31 @@
       "checks": [],
       "checksCount": 0,
       "checksMore": 0,
+      "file": ".github/workflows/pages.yml",
+      "id": ".github/workflows/pages.yml",
+      "landings": [],
+      "name": "Deploy site to GitHub Pages",
+      "pushes": false,
+      "reach": [],
+      "runs": [
+        "site/astro.config.mjs",
+        "site/src/"
+      ],
+      "runsCount": 2,
+      "runsMore": 0,
+      "sends": [
+        "deploys the site"
+      ],
+      "stages": [],
+      "triggers": [
+        "on a push to main touching 2 paths",
+        "or by hand"
+      ]
+    },
+    {
+      "checks": [],
+      "checksCount": 0,
+      "checksMore": 0,
       "file": "pyproject.toml",
       "id": "pyproject.toml#interlock",
       "kind": "command",
@@ -242,12 +281,13 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-13T17:54:00.739Z",
+  "generatedAt": "2026-10-13T18:18:15.631Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "3 writes and 4 reads use paths built at run time and are not named here.",
     "12 writes and 39 reads go to a path their caller passes, not to this repository.",
     "3 reads go to the directory the command is run in (receipts/), not to this repository.",
+    "18 files belong to no part: site/astro.config.mjs, site/package-lock.json, site/package.json and 15 more.",
     "Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window."
   ],
   "mainDoor": ".github/workflows/ci.yml",
@@ -286,6 +326,8 @@
   "unreadFiles": 0,
   "unreadNote": [],
   "untested": [],
-  "untestedNote": [],
+  "untestedNote": [
+    "verify.sh runs in no workflow."
+  ],
   "written": 0
 }

@@ -9,8 +9,12 @@
       "externals": 0,
       "files": [
         {
-          "hash": "bf0655bac60ce5e98372354cf212258c348402d90f4ad014103816bc0f027cb8",
+          "hash": "673385f554100650951a5ea1440cd93fce4f86c5fa19fd0b075462d0a5e62634",
           "path": ".github/workflows/ci.yml"
+        },
+        {
+          "hash": "69f9ca582ea4ae030875bc8b80d62a67f9b60a432152a3165d5a4e3df3c2ffee",
+          "path": ".github/workflows/pages.yml"
         },
         {
           "hash": "22086eca137291cf9c3b3b1d49e31d74c3fb42b2c7f4a6dc2cee4cc43153b4a7",
@@ -38,34 +42,6 @@
         {
           "hash": "1c7ea5b3d8984da5817b44730c55722b84d65aa566b5738374853b9d0fc87455",
           "path": "assets/logo.png"
-        },
-        {
-          "hash": "f38c761d32778e2f22c47d9723f58cbbe9b3bf40d66cd5a8dbcb2661e05318a8",
-          "path": "assets/logo/interlock-master.png"
-        },
-        {
-          "hash": "d3c590594b41d72ee23570402f81311696fa9bfd0633400bceddca2a07b14276",
-          "path": "assets/logo/interlock_128.png"
-        },
-        {
-          "hash": "a887ddf1d460202de16c30beeb5bf13fe1ed5e25bb6a644f90ddfc65fabaf70c",
-          "path": "assets/logo/interlock_16.png"
-        },
-        {
-          "hash": "e94e1b3137a601ebdf97a85091ae7b26490798a4628fc5e48ce3375b4807841b",
-          "path": "assets/logo/interlock_256.png"
-        },
-        {
-          "hash": "f648e0a450e726d47d008741273f01e5436f3a80f5c7c8d41bdbf371952c3586",
-          "path": "assets/logo/interlock_32.png"
-        },
-        {
-          "hash": "02e5fa604a00ac8b589876b79382a911f82749db6c23e17c9da6ea2cc8694621",
-          "path": "assets/logo/interlock_512.png"
-        },
-        {
-          "hash": "4efa92eb4d171ec48edcd5db23b3a91aece21aca7806570cb6ea21d1c6826902",
-          "path": "assets/logo/interlock_64.png"
         }
       ],
       "globs": [
@@ -107,7 +83,7 @@
           "path": "docs/handoff/feedback_read_exit_before_next_gpu_step.md"
         },
         {
-          "hash": "e8b99f37da4553d53feb738a828cde5507baeb80d9e3988296db8b7c210b352a",
+          "hash": "9dde4a02976199152b9921c2462438694b3b3946333e442ffcdf33a56346773a",
           "path": "docs/handoff/switchyard-router-buildout-handoff.md"
         },
         {
@@ -560,7 +536,7 @@
           "path": ".gitattributes"
         },
         {
-          "hash": "6172cf28ceaf39d209a5f2dc2caefb0e25f1ed5d919be3e9baad755cb8ea52c1",
+          "hash": "e7a3d8f5a4abc8569624f97da3e6167ca8afb3f0ce2057304652990228658564",
           "path": ".gitignore"
         },
         {
@@ -568,7 +544,7 @@
           "path": ".python-version"
         },
         {
-          "hash": "22a4426dd2edc6600843f1e5cdf765069b1ebbccddb59f3ef061d54ffceb744f",
+          "hash": "93ec563523b9e394684593e331aba9bcb90425b6015ad94232e69ef0d7810bab",
           "path": "CHANGELOG.md"
         },
         {
@@ -576,12 +552,48 @@
           "path": "LICENSE"
         },
         {
-          "hash": "c37bbaaaa1e3f55b32f5b8dc27aab0db365cfeb4bffac81a0846b4faae3820f9",
+          "hash": "7fe76f5f46f2787b5b4bedafd7ba35252eb82371c6f726041a3f7927805d3a0a",
+          "path": "README.es.md"
+        },
+        {
+          "hash": "d414a65504701cda59768bac74cef7e60c688ae34baaa9804efc6ac7ba237a74",
+          "path": "README.fr.md"
+        },
+        {
+          "hash": "cad05f0dedd6b5aac741a3377afc7d632cfbb9ffb912221fa12962f9e66fa480",
+          "path": "README.hi.md"
+        },
+        {
+          "hash": "19dfea9c4adc05a8ca770d4a3f7ae95bf52fa355219198e43ab6046ad7ad0814",
+          "path": "README.it.md"
+        },
+        {
+          "hash": "3059601bba36a033ef7b244b11909865de02bc86a3477d576b2cec326217774c",
+          "path": "README.ja.md"
+        },
+        {
+          "hash": "64970a4280a14d137bdddb8aa33dc1ec6500927466eb1cb323e993a534f9649c",
           "path": "README.md"
         },
         {
-          "hash": "0b95546735b918f374b1fe2171ba994013d7f733595df7900842d828f31ae0d2",
+          "hash": "487a86fadd5a581f4ae2f1160fbda3d0f93e4c56c0e6fc226388f313eb642034",
+          "path": "README.pt-BR.md"
+        },
+        {
+          "hash": "3629b6c013283b0eb8fd14d58ff64670e87b3c2cd9d06416e82da6fd78c2a8d7",
+          "path": "README.zh.md"
+        },
+        {
+          "hash": "8a3bc62bd7bb8cfc04f22b0483719da6e404b5d18d910486e4e69f8c58437a63",
+          "path": "SCORECARD.md"
+        },
+        {
+          "hash": "6ffa3abdbf25550d572137b0d9a9b47eae8ba9c24144a7e5a39b07c137ef5687",
           "path": "SECURITY.md"
+        },
+        {
+          "hash": "d43715d6a1da363bff130cbda153fd85d8d90da07c8f4d6dac3466ba447153c1",
+          "path": "SHIP_GATE.md"
         },
         {
           "hash": "8355bbf8be42ff1c5c8bf7dd2e4e1ca4b7db1440c92e15daaf5856558e7301c1",
@@ -594,6 +606,10 @@
         {
           "hash": "0358624e29404b0f8f08f7028d5bbe8a28fa06372ca181179a59c7e25764611b",
           "path": "uv.lock"
+        },
+        {
+          "hash": "9346facd144ab345c22200fd133d536398a1ed85814825492af348c27e95eed3",
+          "path": "verify.sh"
         }
       ],
       "globs": [
@@ -11083,6 +11099,14 @@
           "programs": [
             "uv"
           ],
+          "step": "Dependency audit"
+        },
+        {
+          "dir": "",
+          "job": "test",
+          "programs": [
+            "uv"
+          ],
           "step": "Test"
         },
         {
@@ -11234,6 +11258,142 @@
         "actions/checkout",
         "astral-sh/setup-uv",
         "codecov/codecov-action"
+      ],
+      "usesWorkflowToken": false
+    },
+    {
+      "checksCount": 0,
+      "commands": [
+        {
+          "dir": "site",
+          "job": "build",
+          "programs": [
+            "npm"
+          ],
+          "step": "Install site dependencies"
+        },
+        {
+          "dir": "site",
+          "job": "build",
+          "programs": [
+            "npm"
+          ],
+          "step": "Build site"
+        }
+      ],
+      "elsewhere": [],
+      "file": ".github/workflows/pages.yml",
+      "jobs": [
+        {
+          "basis": "declared",
+          "name": "build",
+          "runsOn": [
+            {
+              "labels": [
+                "ubuntu-latest"
+              ],
+              "platform": {
+                "cpu": "x64",
+                "libc": "glibc",
+                "os": "linux"
+              }
+            }
+          ],
+          "setup": [
+            {
+              "ranges": [
+                {
+                  "from": "22",
+                  "range": ">=22.0.0 <23.0.0-0"
+                }
+              ],
+              "step": "1",
+              "uses": "actions/setup-node",
+              "version": "22"
+            }
+          ]
+        },
+        {
+          "basis": "declared",
+          "environment": {
+            "name": "github-pages"
+          },
+          "name": "deploy",
+          "runsOn": [
+            {
+              "labels": [
+                "ubuntu-latest"
+              ],
+              "platform": {
+                "cpu": "x64",
+                "libc": "glibc",
+                "os": "linux"
+              }
+            }
+          ]
+        }
+      ],
+      "landings": [],
+      "mentions": [],
+      "name": "Deploy site to GitHub Pages",
+      "permissions": [
+        "contents:read",
+        "id-token:write",
+        "pages:write"
+      ],
+      "pushes": false,
+      "reach": [],
+      "readers": [],
+      "runs": [
+        {
+          "job": "build",
+          "matched": true,
+          "path": "site/astro.config.mjs",
+          "runKind": "executes",
+          "via": "astro build"
+        },
+        {
+          "directory": true,
+          "job": "build",
+          "matched": true,
+          "path": "site/src/",
+          "runKind": "executes",
+          "via": "astro build"
+        }
+      ],
+      "runsCount": 2,
+      "secrets": [],
+      "sends": {
+        "deploysPages": true,
+        "dispatchesTo": [],
+        "opensIssues": false,
+        "opensIssuesOnFailure": false,
+        "opensPullRequests": false,
+        "publishes": false,
+        "publishesTo": [],
+        "releases": false
+      },
+      "stages": [],
+      "triggers": [
+        {
+          "branches": [
+            "main"
+          ],
+          "event": "push",
+          "paths": [
+            ".github/workflows/pages.yml",
+            "site/**"
+          ]
+        },
+        {
+          "event": "workflow_dispatch"
+        }
+      ],
+      "uses": [
+        "actions/checkout",
+        "actions/deploy-pages",
+        "actions/setup-node",
+        "actions/upload-pages-artifact"
       ],
       "usesWorkflowToken": false
     },
@@ -11426,8 +11586,8 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "cc91aedf0475ce6a5621cce98c53b2c000f9d930",
-    "tracked": 239
+    "commit": "e8628cab287088a160660d64d63444c98908f96d",
+    "tracked": 261
   },
   "landings": [
     {
@@ -11616,6 +11776,28 @@
     {
       "readers": [
         {
+          "by": "site/astro.config.mjs",
+          "call": "content-collection",
+          "confidence": "ast"
+        }
+      ],
+      "target": "site/src/content/docs",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "site/astro.config.mjs",
+          "call": "autogenerate",
+          "confidence": "ast"
+        }
+      ],
+      "target": "site/src/content/docs/handbook",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
           "by": "pyproject.toml",
           "call": "configuration",
           "confidence": "config"
@@ -11686,5 +11868,88 @@
   "submodules": [],
   "symlinks": [],
   "testFiles": 59,
-  "unassigned": []
+  "unassigned": [
+    {
+      "hash": "1173cd7c878d15e9f1aec1e3a8cdad926e2e21cd8613e1f99a662caa6ac399b3",
+      "path": "site/astro.config.mjs"
+    },
+    {
+      "hash": "eb1c85d6f819e166b067c9f628da3eb0b603dada6ba7f4c9d586fb7188e2cf96",
+      "path": "site/package-lock.json"
+    },
+    {
+      "hash": "9c39e620ebae2c5718ecd8c6188bd3451409a614ec8f5308dc15d5fd886e5b91",
+      "path": "site/package.json"
+    },
+    {
+      "hash": "db3c76ae1d22efa9f6c9a1cf3d8b1f45a5e94210d34e4b518006018e7d3d097d",
+      "path": "site/public/favicon.svg"
+    },
+    {
+      "hash": "1c7ea5b3d8984da5817b44730c55722b84d65aa566b5738374853b9d0fc87455",
+      "path": "site/src/assets/logo.png"
+    },
+    {
+      "constantOnly": true,
+      "hash": "ee756dfba4122d2acc94a39b2555d9f200fff56a87a8c0b10f9cd01df26a8b62",
+      "path": "site/src/content.config.ts"
+    },
+    {
+      "hash": "ab63b16da4540f4455281ed119596661d5636de9c3c5415c2ea4149d67d8e3de",
+      "path": "site/src/content/docs/handbook/architecture.md"
+    },
+    {
+      "hash": "0072f6166ed3822c2707b668d02080fd9e29b5be581b8c7b4a517d55b3569a32",
+      "path": "site/src/content/docs/handbook/configuration.md"
+    },
+    {
+      "hash": "fbc288c20f67d4a7b03572129ff0a33fe26372c287a3b6790c1f906100092565",
+      "path": "site/src/content/docs/handbook/experiments.md"
+    },
+    {
+      "hash": "d39f8bc2583fa29798c17cdc68199ef0c79825fc552e5cd5a544f92457970d1b",
+      "path": "site/src/content/docs/handbook/getting-started.md"
+    },
+    {
+      "hash": "b788a1820a1d5136ac969e830ba78acbbd0403fb68712ed81ba4f2835ef7991a",
+      "path": "site/src/content/docs/handbook/index.md"
+    },
+    {
+      "hash": "5584d9a2d78a27ac4985882e9618d73ef03c89f946b9a540684d4297d1b84b2b",
+      "path": "site/src/content/docs/handbook/security.md"
+    },
+    {
+      "hash": "a7886d3d61f5494540d8459e70291c2b2fa50affe058bc3dfb446eda4eb3c657",
+      "path": "site/src/content/docs/handbook/usage.md"
+    },
+    {
+      "hash": "4fb84a646c4d833c33f4058e1ed1775849e855c65e5adb7e45d2a633674bd603",
+      "importOrder": [
+        "site/src/styles/global.css",
+        "site/src/site-config.ts"
+      ],
+      "importsFiles": [
+        "site/src/site-config.ts",
+        "site/src/styles/global.css"
+      ],
+      "path": "site/src/pages/index.astro"
+    },
+    {
+      "constantOnly": true,
+      "hash": "c14e64a13607a7d0c3a0979adc59db2df038b100b595aae8a54a0b59510a31a5",
+      "path": "site/src/site-config.ts"
+    },
+    {
+      "hash": "29ee8df91833e694bdba973126b34a6177de4cf01dab6d9ef7d3126e8e2b67fb",
+      "path": "site/src/styles/global.css"
+    },
+    {
+      "hash": "cdb0845dea4e7835ceb5c750caa9358e03cb03132cd85c17931a9fb96299b94f",
+      "path": "site/src/styles/starlight-custom.css"
+    },
+    {
+      "hash": "b5b0a5b04a14cddd7713c5e1c82e86c79c17c2f86b170e26e9b170b3d5e01cd9",
+      "path": "site/tsconfig.json"
+    }
+  ]
 }
