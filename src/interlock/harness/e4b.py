@@ -13,8 +13,12 @@ at block end. An unload in the middle would reload it and refuse the next slot.
 The run-owned server inherits the process environment with every OLLAMA_* and
 LLAMA_ARG_* key removed, then the recorded host, models directory and debug
 flag. Before it starts, the watchdog heartbeat and an empty card are required.
-After the first load, the run refuses unless this start's log names cuda_v13,
-size_vram equals size, and the digest matches the spec pin.
+A dirty worktree at the start refuses before any device starts. After the
+first load, the run refuses unless this start's log names cuda_v13,
+size_vram equals size, and the digest matches the spec pin. Flash attention
+and the KV cache type on the header come from that load. The environment
+value is kept as config_flash_attention. A missing load line refuses before
+any measured slot.
 
 Live seams sample the GPU through NVML, then nvidia-smi, and the CPU through
 typeperf. The burn's threads stop when the burn returns, including on abort.
@@ -518,7 +522,58 @@ def read_git(repo: Path, run) -> dict:
     if not re.fullmatch(r"[0-9a-f]{40}", sha):
         raise E4bError(f"git rev-parse HEAD did not return a 40-hex sha ({sha!r})")
     porcelain = _out(["git", "-C", repo.as_posix(), "status", "--porcelain"])
-    return {"git_sha": sha, "clean_tree": porcelain.strip() == ""}
+    lines = [line for line in porcelain.splitlines() if line.strip()]
+    return {"git_sha": sha, "clean_tree": not lines, "porcelain": lines}
+
+
+# A home directory, not a particular account. The reason must not carry one.
+_HOME_PREFIX = re.compile(
+    r"(?i)(?:[A-Za-z]:[\\/]+Users[\\/]+[^\\/]+|[\\/]Users[\\/]+[^\\/]+|[\\/]home[\\/]+[^\\/]+)"
+)
+
+
+def _public_status_line(line: str) -> str:
+    return _HOME_PREFIX.sub("~", line)
+
+
+def refuse_dirty_worktree(recorded: dict | None) -> None:
+    """A dirty tree at the start is a refusal. A clean tree, or no read, is not."""
+
+    if not isinstance(recorded, dict) or recorded.get("clean_tree") is not False:
+        return
+    raw = recorded.get("porcelain")
+    lines = [line for line in raw if isinstance(line, str) and line.strip()] if isinstance(raw, list) else []
+    shown = [_public_status_line(line) for line in lines[:3]]
+    if len(lines) > 3:
+        shown.append(f"and {len(lines) - 3} more")
+    detail = "; ".join(shown) if shown else "git status --porcelain was not empty"
+    raise E4bError(f"REFUSED: the worktree is dirty at the start ({detail})")
+
+
+def _flash_flag(state: str | None) -> str | None:
+    """The load line says enabled or disabled. The header keeps true or false."""
+
+    if state == "enabled":
+        return "true"
+    if state == "disabled":
+        return "false"
+    return None
+
+
+def _load_facts(segment: str) -> dict:
+    from interlock.harness.fill import load_line_facts
+
+    return load_line_facts(segment)
+
+
+def _require_load_lines(seams, running) -> dict:
+    """The same first-load reader E5 uses. A missing line refuses the slot."""
+
+    facts = _load_facts(_log_text(seams, running))
+    reason = facts.get("reason") if isinstance(facts, dict) else "the first load did not record flash attention"
+    if reason:
+        raise E4bError("REFUSED: " + str(reason))
+    return facts
 
 
 def card_models_at_ceiling(read_mib, *, ceiling: int) -> list:
@@ -1615,6 +1670,10 @@ def _header(spec, seams, repo, running, caches, prompt, *, aborted: bool, git: d
     vram = note_vram(getattr(seams, "vram", None))
     segment = _log_text(seams, running)
     config = server_config_env(segment)
+    facts = getattr(seams, "load_facts", None)
+    if not isinstance(facts, dict):
+        facts = _load_facts(segment)
+    usable = isinstance(facts, dict) and not facts.get("reason")
     header = {
         "kind": "e4b-header",
         "id": spec["id"],
@@ -1628,8 +1687,9 @@ def _header(spec, seams, repo, running, caches, prompt, *, aborted: bool, git: d
         "prompt_sha256": _sha256(prompt),
         "aborted": aborted,
         "server_config_line": _server_config_line(segment),
-        "flash_attention": config.get("OLLAMA_FLASH_ATTENTION"),
-        "kv_cache_type": config.get("OLLAMA_KV_CACHE_TYPE"),
+        "flash_attention": _flash_flag(facts.get("flash_attention")) if usable else None,
+        "kv_cache_type": facts.get("kv_cache_type") if usable else None,
+        "config_flash_attention": config.get("OLLAMA_FLASH_ATTENTION"),
     }
     header.update(vram)
     header.update(_sample_note(seams))
@@ -1702,6 +1762,7 @@ def run_block(
     receipt = root / "receipts" / f"{run_id}.jsonl"
     # Before caches, the server, and the receipt. The header keeps this read.
     recorded = _git_at_start(seams, repo, git)
+    refuse_dirty_worktree(recorded)
     started_at = utc_now()
     arms = {arm["id"]: arm for arm in spec["arms"]}
     caches = [_make_cache(root, run_id, arm_id) for arm_id in arms]
@@ -1723,6 +1784,7 @@ def run_block(
             try:
                 seams.load_resident()
                 _require_owned_server(spec, seams, running)
+                seams.load_facts = _require_load_lines(seams, running)
                 body = execute_block(spec, seams, root=root, run_id=run_id, pairs=pairs)
                 rows = _rows_of(body)
                 prompt = body["prompt"]
@@ -1811,6 +1873,7 @@ def run_pilot(
         raise E4bError("the pilot measures 5090-alone")
     # Before the server and before pilot-e4b/ is written. The document keeps this read.
     recorded = _git_at_start(seams, repo, git)
+    refuse_dirty_worktree(recorded)
     measurement = _measurement(spec)
     ranges = []
     full = []
@@ -1828,6 +1891,7 @@ def run_pilot(
         try:
             seams.load_resident()
             _require_owned_server(spec, seams, running)
+            seams.load_facts = _require_load_lines(seams, running)
             # The prompt is counted on the run-owned server, so only once it is up and proven.
             prompt = prepare_prompt(spec, seams.count_tokens)
             for index in range(calls):

@@ -57,6 +57,9 @@ from interlock.ollama_supervisor import (
     port_of,
     read_card_mib,
     read_cuda,
+    RestartRecord,
+    executables_match,
+    pid_executable,
     real_seams,
     restart_policy_lines,
     retry_budget,
@@ -113,6 +116,8 @@ class World:
         self.stopped = []
         self.spawned = []
         self.next_pid = 100
+        self.platform = "win32"
+        self.localappdata = "D:/OllamaInstall"
 
     def fingerprint(self) -> ServerFingerprint:
         return ServerFingerprint(
@@ -220,6 +225,25 @@ class World:
             baseline_mib=self.baseline,
         )
 
+    def listening(self, port):
+        return [
+            row.pid
+            for row in self.processes
+            if (
+                row.listening
+                and row.port == port
+                and isinstance(row.pid, int)
+                and not isinstance(row.pid, bool)
+                and row.pid > 0
+            )
+        ]
+
+    def executable(self, pid):
+        # Spawned pids are the same install. A test that needs a bad path replaces this.
+        if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
+            raise OSError("the executable path could not be read")
+        return serve_argv("win32", localappdata=self.localappdata)[0]
+
     def argv(self):
         return list(self.argv_value or ["ollama", "serve"])
 
@@ -248,6 +272,10 @@ class World:
             process_env=self.process_env,
             log_size=self.log_size if self.log is not None else None,
             log_segment=self.log_segment if self.log is not None else None,
+            listening=self.listening,
+            executable=self.executable,
+            localappdata=self.localappdata,
+            platform=self.platform,
         )
 
 
@@ -1708,3 +1736,245 @@ def test_real_seams_and_the_remaining_fakes_do_not_touch_a_server(tmp_path: Path
         argv=lambda: ["ollama", "serve"],
     )
     assert defaulted.now().endswith("Z")
+
+
+# The install serve_argv starts. Not a home path, so a receipt can record it.
+_INSTALL_ROOT = "D:/OllamaInstall"
+
+
+def _install_exe() -> str:
+    return serve_argv("win32", localappdata=_INSTALL_ROOT)[0]
+
+
+def _arm_listener(world: World) -> None:
+    """The path and the port query the restart will read. Main ignores both."""
+
+    world.platform = "win32"
+    world.localappdata = _INSTALL_ROOT
+    world.executable = lambda pid: _install_exe() if pid == 10 else None
+
+
+def test_two_listening_pids_are_refused_and_nothing_is_stopped():
+    world = World()
+    _arm_listener(world)
+    world.processes = [
+        Process(pid=10, name="ollama", port=11434, listening=True),
+        Process(pid=11, name="ollama", port=11434, listening=True),
+        Process(pid=20, name="ollama", port=11490, listening=True),
+    ]
+    supervisor = _supervisor(world)
+    with pytest.raises(SupervisorStop, match=r"listening pids \(10, 11\)"):
+        supervisor.after_failure(URL_5090, model="qwen3:8b", kind="transport")
+    assert world.stopped == []
+    assert world.spawned == []
+    assert supervisor.restarts == []
+
+
+def test_zero_listening_pids_are_refused_and_nothing_is_stopped():
+    world = World()
+    _arm_listener(world)
+    world.processes = [
+        Process(pid=20, name="ollama", port=11490, listening=True),
+        Process(pid=30, name="ollama app.exe", port=None, listening=False),
+    ]
+    supervisor = _supervisor(world)
+    with pytest.raises(SupervisorStop, match=r"listening pids \(none\)"):
+        supervisor.after_failure(URL_5090, model="qwen3:8b", kind="transport")
+    assert world.stopped == []
+    assert world.spawned == []
+    assert supervisor.restarts == []
+
+
+def test_a_pid_whose_path_is_not_the_install_is_refused():
+    world = World()
+    _arm_listener(world)
+    world.executable = lambda pid: "D:/other/app.exe"
+    supervisor = _supervisor(world)
+    with pytest.raises(SupervisorStop, match="not the Ollama install") as caught:
+        supervisor.after_failure(URL_5090, model="qwen3:8b", kind="transport")
+    assert world.stopped == []
+    assert world.spawned == []
+    assert str(Path.home()) not in str(caught.value)
+
+
+def test_a_pid_whose_path_cannot_be_read_is_refused():
+    def _unreadable(pid):
+        raise OSError("access is denied")
+
+    for reader in (lambda pid: None, _unreadable, None):
+        world = World()
+        _arm_listener(world)
+        world.executable = reader
+        supervisor = _supervisor(world)
+        with pytest.raises(SupervisorStop, match="could not be read"):
+            supervisor.after_failure(URL_5090, model="qwen3:8b", kind="transport")
+        assert world.stopped == []
+        assert world.spawned == []
+        assert supervisor.restarts == []
+
+
+def test_one_pid_at_the_install_path_is_stopped_once():
+    world = World()
+    _arm_listener(world)
+    checked = _install_exe().swapcase()
+    world.executable = lambda pid: checked if pid == 10 else None
+    supervisor = _supervisor(world)
+    decision = supervisor.after_failure(URL_5090, model="qwen3:8b", kind="transport")
+    assert world.stopped == [10]
+    assert decision.action == "restarted"
+    record = decision.record.as_dict()
+    assert record["old_pid"] == 10
+    assert record["checked_path"] == checked
+    assert record["port"] == 11434
+
+
+def test_port_11490_is_never_queried():
+    world = World()
+    _arm_listener(world)
+    asked = []
+
+    def listening(port):
+        asked.append(port)
+        return [
+            row.pid
+            for row in world.processes
+            if row.listening and row.port == port and isinstance(row.pid, int) and row.pid > 0
+        ]
+
+    world.listening = listening
+    supervisor = _supervisor(world)
+    with pytest.raises(SupervisorStop, match="11490"):
+        supervisor.after_failure(URL_CPU, model="qwen3:8b", kind="transport")
+    assert asked == []
+    assert world.stopped == []
+    decision = supervisor.after_failure(URL_5090, model="qwen3:8b", kind="transport")
+    assert decision.action == "restarted"
+    assert asked
+    assert set(asked) == {11434}
+    assert world.stopped == [10]
+
+
+def test_duplicate_rows_of_one_pid_are_stopped_once():
+    world = World()
+    _arm_listener(world)
+
+    def listening(port):
+        ids = [
+            row.pid
+            for row in world.processes
+            if row.listening and row.port == port and isinstance(row.pid, int) and row.pid > 0
+        ]
+        if port == 11434 and 10 in ids:
+            return [True, 10, 10]
+        return ids
+
+    world.listening = listening
+    decision = _supervisor(world).after_failure(URL_5090, model="qwen3:8b", kind="transport")
+    assert decision.action == "restarted"
+    assert world.stopped == [10]
+
+
+def test_a_restart_without_a_listening_seam_uses_the_process_table():
+    world = World()
+    world.listening = None
+    decision = _supervisor(world).after_failure(URL_5090, model="qwen3:8b", kind="transport")
+    assert decision.action == "restarted"
+    assert world.stopped == [10]
+
+
+def test_a_linux_listener_is_stopped_when_its_name_is_ollama():
+    world = World()
+    world.platform = "linux"
+    world.executable = lambda pid: "/usr/bin/ollama"
+    decision = _supervisor(world).after_failure(URL_5090, model="qwen3:8b", kind="transport")
+    assert decision.action == "restarted"
+    assert world.stopped == [10]
+    assert decision.record.as_dict()["checked_path"] == "/usr/bin/ollama"
+
+
+def test_a_linux_executable_matches_the_name_only(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    assert executables_match("/usr/bin/ollama", "ollama", platform="linux") is True
+    assert executables_match("ollama", "ollama", platform="linux") is True
+    assert executables_match("/usr/bin/ollama", "not-ollama", platform="linux") is False
+    assert executables_match("/usr/bin/ollama", "/usr/bin/ollama", platform="linux") is True
+    swapped = "D:/OllamaInstall/Programs/Ollama/ollama.exe"
+    assert executables_match(swapped.swapcase(), swapped, platform="win32") is True
+
+
+def test_pid_executable_returns_none_when_the_path_cannot_be_read():
+    class _Boom:
+        class Process:
+            def __init__(self, pid):
+                raise OSError("denied")
+
+    assert pid_executable(10, _Boom) is None
+
+    class _Text:
+        class Process:
+            def __init__(self, pid):
+                self.pid = pid
+
+            def exe(self):
+                return "D:/OllamaInstall/Programs/Ollama/ollama.exe"
+
+    assert pid_executable(10, _Text).endswith("ollama.exe")
+
+    class _Number:
+        class Process:
+            def __init__(self, pid):
+                return None
+
+            def exe(self):
+                return 5
+
+    assert pid_executable(10, _Number) is None
+
+
+def test_real_listening_asks_11434_and_refuses_11490_without_a_query():
+    asked = []
+
+    def run(argv, capture_output, text, timeout, check):
+        asked.append(" ".join(str(part) for part in argv))
+        return subprocess.CompletedProcess(argv, 0, stdout="10\n", stderr="")
+
+    seams = real_seams(run=run, platform="win32")
+    with pytest.raises(SupervisorStop, match="11490"):
+        seams.listening(11490)
+    assert asked == []
+    assert seams.listening(11434) == [10]
+    assert asked
+    assert all("11490" not in text for text in asked)
+    assert any("11434" in text for text in asked)
+    # The seam's own reader. A missing process is None; this does not ask a port.
+    assert seams.executable(2**31 - 1) is None or isinstance(seams.executable(2**31 - 1), str)
+
+
+def test_a_checked_home_path_is_stripped_from_the_restart_record():
+    home = Path.home()
+    path = str(home / "Programs" / "Ollama" / "ollama.exe")
+    record = RestartRecord(
+        when="2026-10-13T00:00:00Z",
+        port=11434,
+        why="down",
+        old_pid=10,
+        new_pid=11,
+        seconds_to_healthy=0.0,
+        version="0.35.1",
+        checked_path=path,
+    )
+    stored = record.as_dict()["checked_path"]
+    assert isinstance(stored, str)
+    assert str(home) not in stored
+    assert "ollama.exe" in stored
+    assert "Users" not in stored
+    blank = RestartRecord(
+        when="2026-10-13T00:00:00Z",
+        port=11434,
+        why="down",
+        old_pid=None,
+        new_pid=None,
+        seconds_to_healthy=None,
+        version=None,
+    )
+    assert blank.as_dict()["checked_path"] is None

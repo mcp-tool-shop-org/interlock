@@ -101,6 +101,15 @@ E4 = ROOT / "experiments" / "e4" / "spec.yaml"
 E5 = ROOT / "experiments" / "e5" / "spec.yaml"
 PIN = "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41"
 CUDA_LINE = "load_backend: loaded CUDA backend from cuda_v13\n"
+# A first load the default fake can pass. The flash and KV values are the load, not the env.
+LOAD_LINES = (
+    "starting llama-server --flash-attn auto\n"
+    "llama_kv_cache: K (q8_0): 1.00 MiB, V (q8_0): 1.00 MiB\n"
+    "Flash Attention enabled\n"
+    "CUDA_Host model buffer size = 1.00 MiB\n"
+    "CUDA_Host compute buffer size = 1.00 MiB\n"
+    "CUDA_Host output buffer size = 1.00 MiB\n"
+)
 
 
 def _measurement(**overrides):
@@ -280,7 +289,7 @@ def _seams(server, call, *, companion=None, resamples=20):
     seams.heartbeat = heartbeat
     seams.wall = time.time
     seams.card_models = lambda: []
-    seams.log_segment = lambda: CUDA_LINE
+    seams.log_segment = lambda: CUDA_LINE + LOAD_LINES
 
     def probe(method, path):
         seams.probes.append((method, path))
@@ -1944,17 +1953,18 @@ def test_live_sample_gpu_records_nvml_then_smi(monkeypatch):
 
 
 def test_the_block_receipt_carries_the_server_config_and_the_probe(tmp_path: Path):
-    line = 'time=t msg="server config" env="map[OLLAMA_FLASH_ATTENTION:true OLLAMA_KV_CACHE_TYPE:q8_0]"'
+    line = 'time=t msg="server config" env="map[OLLAMA_FLASH_ATTENTION:false OLLAMA_KV_CACHE_TYPE:q8_0]"'
     running = SimpleNamespace(argv=["ollama", "serve"], environment={}, version_start={}, version_stop=None)
     record = type("R", (), {"probe": "smi", "intervals": [0.21, 0.25]})()
     seams = SimpleNamespace(
         git=lambda repo: {"git_sha": "a" * 40, "clean_tree": True},
         vram=lambda: 12,
-        log_segment=lambda: line + "\n" + "load_backend: loaded CUDA backend from cuda_v13\n",
+        log_segment=lambda: line + "\n" + CUDA_LINE + LOAD_LINES,
         sample_record=record,
     )
     header = _header(_spec([PAIRS[0]]), seams, tmp_path, running, [], "prompt", aborted=False)
     assert header["flash_attention"] == "true"
+    assert header["config_flash_attention"] == "false"
     assert header["kv_cache_type"] == "q8_0"
     assert header["server_config_line"] == line
     assert header["gpu_probe"] == "smi"
@@ -2236,21 +2246,145 @@ def test_a_dirty_tree_at_the_start_is_recorded_false(tmp_path: Path):
         return {"git_sha": "abc123", "clean_tree": False}
 
     spec = _spec([PAIRS[0]])
-    pilot_root = tmp_path / "pilot"
-    pilot_root.mkdir()
-    seams = _seams(_Server(), lambda arm, **kwargs: _clean(arm, num_predict=kwargs["num_predict"], kind=kwargs["kind"]))
-    seams.git = git
-    document = run_pilot(spec, seams, root=pilot_root, run_id="dirty-start", repo=pilot_root, calls=1)
-    assert document["clean_tree"] is False
-    assert document["git_sha"] == "abc123"
-    written = json.loads((pilot_root / "pilot-e4b" / "dirty-start.json").read_text(encoding="utf-8"))
-    assert written["clean_tree"] is False
+    for pilot in (False, True):
+        root = tmp_path / ("pilot" if pilot else "block")
+        root.mkdir()
+        server = _Server()
+        seams = _seams(server, lambda arm, **kwargs: _clean(arm, num_predict=kwargs["num_predict"], kind=kwargs["kind"]))
+        seams.git = git
+        with pytest.raises(E4bError, match="porcelain"):
+            if pilot:
+                run_pilot(spec, seams, root=root, run_id="dirty-start", repo=root, calls=1)
+            else:
+                run_block(spec, seams, root=root, run_id="dirty-start", repo=root)
+        assert server.events == []
+        assert not (root / "receipts").exists()
+        assert not (root / "pilot-e4b").exists()
 
-    block_root = tmp_path / "block"
-    block_root.mkdir()
-    block = _seams(_Server(), lambda arm, **kwargs: _clean(arm, num_predict=kwargs["num_predict"], kind=kwargs["kind"]))
-    block.git = git
-    run_block(spec, block, root=block_root, run_id="dirty-start", repo=block_root)
-    header = _rows(block_root / "receipts" / "dirty-start.jsonl")[0]
-    assert header["clean_tree"] is False
-    assert header["git_sha"] == "abc123"
+
+def _git_completed(stdout: str):
+    return SimpleNamespace(returncode=0, stdout=stdout)
+
+
+def _porcelain_reader(porcelain: str):
+    def run(args):
+        if "rev-parse" in args:
+            return _git_completed("a" * 40 + "\n")
+        return _git_completed(porcelain)
+
+    return run
+
+
+def test_a_dirty_start_refuses_before_any_device_or_server(tmp_path: Path):
+    home = Path.home()
+    lines = [
+        " M src/interlock/harness/e4b.py",
+        "?? " + (home / "notes.txt").as_posix(),
+        " M experiments/e4b/spec.yaml",
+        "?? FOURTH-LINE-NOT-IN-REASON",
+    ]
+    recorded = read_git(tmp_path, _porcelain_reader("\n".join(lines) + "\n"))
+    spec = _spec([PAIRS[0]])
+
+    def call(arm, *, num_predict, measured, kind, prompt):
+        raise AssertionError("a device call ran")
+
+    for pilot in (False, True):
+        root = tmp_path / ("pilot-dirty" if pilot else "block-dirty")
+        root.mkdir()
+        server = _Server()
+        seams = _seams(server, call)
+        seams.git = lambda repo, _recorded=recorded: dict(_recorded)
+        with pytest.raises(E4bError, match="e4b.py") as caught:
+            if pilot:
+                run_pilot(spec, seams, root=root, run_id="dirty", repo=root, calls=1)
+            else:
+                run_block(spec, seams, root=root, run_id="dirty", repo=root)
+        assert server.events == []
+        assert seams.loads == []
+        assert seams.calls == []
+        text = str(caught.value)
+        assert "spec.yaml" in text
+        assert "FOURTH-LINE-NOT-IN-REASON" not in text
+        assert str(home) not in text
+        assert not (root / "compile-cache").exists()
+        assert not (root / "pilot-e4b").exists()
+        assert not (root / "receipts").exists()
+
+
+def test_a_clean_start_runs_the_block_and_the_pilot(tmp_path: Path):
+    recorded = read_git(tmp_path, _porcelain_reader(""))
+    assert recorded["clean_tree"] is True
+    spec = _spec([PAIRS[0]])
+
+    def call(arm, *, num_predict, measured, kind, prompt):
+        return _clean(arm, num_predict=num_predict, kind=kind)
+
+    for pilot in (False, True):
+        root = tmp_path / ("pilot-clean" if pilot else "block-clean")
+        root.mkdir()
+        server = _Server()
+        seams = _seams(server, call)
+        seams.git = lambda repo, _recorded=recorded: dict(_recorded)
+        if pilot:
+            document = run_pilot(spec, seams, root=root, run_id="clean", repo=root, calls=1)
+            assert document["clean_tree"] is True
+        else:
+            run_block(spec, seams, root=root, run_id="clean", repo=root)
+            assert _rows(root / "receipts" / "clean.jsonl")[0]["clean_tree"] is True
+        assert "start" in server.events
+
+
+def _e4b_log(*parts: str) -> str:
+    return "\n".join(part.strip("\n") for part in parts if part) + "\n"
+
+
+def test_flash_attention_disabled_on_the_load_line_is_false():
+    from interlock.harness.e4b import _flash_flag
+
+    assert _flash_flag("enabled") == "true"
+    assert _flash_flag("disabled") == "false"
+    assert _flash_flag(None) is None
+
+
+def test_a_recorded_load_line_sets_flash_attention_true(tmp_path: Path):
+    config = (ROOT / "tests" / "fixtures" / "e5" / "server-config-11434.txt").read_text(encoding="utf-8")
+    load = (ROOT / "tests" / "fixtures" / "e5" / "load-lines-11434.txt").read_text(encoding="utf-8")
+    assert "OLLAMA_FLASH_ATTENTION:false" in config
+    assert "Flash Attention enabled" in load
+    segment = _e4b_log(config, CUDA_LINE, load)
+    server = _Server()
+    seams = _seams(server, lambda arm, **kwargs: _clean(arm, num_predict=kwargs["num_predict"], kind=kwargs["kind"]))
+    seams.log_segment = lambda: segment
+    run_block(_spec([PAIRS[0]]), seams, root=tmp_path, run_id="flash-on", repo=tmp_path)
+    header = _rows(tmp_path / "receipts" / "flash-on.jsonl")[0]
+    assert header["flash_attention"] == "true"
+    assert header["config_flash_attention"] == "false"
+    assert header["kv_cache_type"] == "f16"
+
+
+def test_a_missing_load_line_refuses_before_the_first_measured_slot(tmp_path: Path):
+    config = (ROOT / "tests" / "fixtures" / "e5" / "server-config-11434.txt").read_text(encoding="utf-8")
+    segment = _e4b_log(config, CUDA_LINE)
+    assert "flash-attn" not in segment
+    spec = _spec([PAIRS[0]])
+    measured_slots = []
+
+    def call(arm, *, num_predict, measured, kind, prompt):
+        if kind == "measure":
+            measured_slots.append(arm["id"])
+        return _clean(arm, num_predict=num_predict, kind=kind)
+
+    for pilot in (False, True):
+        root = tmp_path / ("pilot-missing" if pilot else "block-missing")
+        root.mkdir()
+        before = len(measured_slots)
+        server = _Server()
+        seams = _seams(server, call)
+        seams.log_segment = lambda: segment
+        with pytest.raises(E4bError, match="first load"):
+            if pilot:
+                run_pilot(spec, seams, root=root, run_id="missing-load", repo=root, calls=1)
+            else:
+                run_block(spec, seams, root=root, run_id="missing-load", repo=root)
+        assert measured_slots[before:] == []
