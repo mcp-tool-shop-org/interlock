@@ -13,6 +13,15 @@ fall is recorded with that note. Closing the request lets the unload take
 effect and stops the decode. It does not take back memory the load has
 already allocated.
 
+Before each measured load or confirm, the pinned adapter's dedicated reading
+must sit within ``settle_tolerance_mib`` of the expected pre-call level.
+Between models, and after an unload, that level is the idle baseline taken
+before the model loads. The search keeps the model resident between windows,
+so within a model the level is the resident floor. A card that does not
+settle within ``settle_timeout_s`` refuses that call. The measurement is not
+kept. ``num_predict`` of 1 is not a decode rate: the row stores null and a
+reason.
+
 Before a load, two resident loads predict the next card reading from their
 measured peak-per-token slope. ``predicted_over`` applies when that prediction
 reaches ``abort_mib``. With one resident load, the next context is bounded by
@@ -87,8 +96,10 @@ UNRECORDED = "unrecorded"
 INCONCLUSIVE = "the step is inconclusive"
 ABORT_ERROR = "card memory reached abort_mib"
 PREDICTED_OVER = "predicted_over"
+UNSETTLED = "card did not settle before the call"
 UNLOAD_SETTLE_S = 10.0
 _SETTLE_STEP_S = 0.2
+_PRE_CALL_POLL_S = 0.2
 MEMORY_ARGV = ("nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits")
 DRIVER_ARGV = ("nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader,nounits")
 NVIDIA_SMI_ARGV = ("nvidia-smi",)
@@ -1192,6 +1203,81 @@ def _settled_card(seams: FillSeams, abort_mib: int) -> int | None:
         waited += _SETTLE_STEP_S
 
 
+def _read_dedicated(read) -> int | None:
+    try:
+        return _optional_int(read())
+    except Exception:
+        return None
+
+
+def wait_for_dedicated(read, sleep, clock, *, expected: int, tolerance_mib: int, timeout_s: float) -> tuple[int | None, str | None]:
+    """The pinned dedicated reading, once it is within ``tolerance_mib`` of ``expected``.
+
+    One reading is taken before any sleep. Past ``timeout_s`` the call is refused.
+    A measurement taken on that unsettled card is not kept.
+    """
+
+    start = clock()
+    last: int | None = None
+    while True:
+        reading = _read_dedicated(read)
+        if reading is not None:
+            last = reading
+            if abs(reading - expected) <= tolerance_mib:
+                return reading, None
+        if clock() - start >= timeout_s:
+            return last, UNSETTLED
+        sleep(_PRE_CALL_POLL_S)
+
+
+def wait_until_stable(read, sleep, clock, *, tolerance_mib: int, timeout_s: float, first: int | None) -> tuple[int | None, str | None]:
+    """The resident floor: dedicated once a further reading is within tolerance of ``first``.
+
+    ``first`` was already read. A card that is still freeing keeps this wait going.
+    Two readings within tolerance settle without another sleep. Past ``timeout_s``
+    the call is refused.
+    """
+
+    start = clock()
+    previous = first
+    last = first
+    while True:
+        reading = _read_dedicated(read)
+        if reading is not None and previous is not None and abs(reading - previous) <= tolerance_mib:
+            return reading, None
+        if reading is not None:
+            previous = reading
+            last = reading
+        if clock() - start >= timeout_s:
+            return last, UNSETTLED
+        sleep(_PRE_CALL_POLL_S)
+
+
+def _attach_pre_calls(row: dict, pre_calls: list) -> None:
+    """Record each measured call's settled dedicated reading beside ``search_calls``.
+
+    ``predicted_over`` is not a measured call, so it has no pre-call reading.
+    A later load of the same context is a different call and keeps its own.
+    """
+
+    calls = row.get("settings", {}).get("search_calls")
+    if not pre_calls or not calls:
+        return
+    queue = list(pre_calls)
+    paired = []
+    for call in calls:
+        if len(call) >= 6 and call[5] == PREDICTED_OVER:
+            continue
+        if not queue:
+            break
+        if queue[0][0] != call[0] or queue[0][1] != call[1]:
+            continue
+        kind, ctx, mib = queue.pop(0)
+        paired.append({"kind": kind, "ctx": ctx, "mib": mib})
+    if paired:
+        row["settings"]["pre_call_dedicated_mib"] = paired
+
+
 def _predict_mib(measured: list[tuple[int, int]], ctx: int) -> int | None:
     """Card MiB for ``ctx`` from the last two measured windows of this model.
 
@@ -1259,6 +1345,8 @@ def _strip_measurement(row: dict) -> None:
         "one_window_bound",
         "slope_predictions",
         "window_gates",
+        "pre_call_dedicated_mib",
+        "decode_reason",
     ):
         settings.pop(key, None)
     for key in ("max_resident_ctx", "peak_mib", "ttft_ms", "decode_tok_s", "prompt_tok_s", "shared_mib"):
@@ -1620,9 +1708,11 @@ def _measure_model(
         built = _row(spec, entry, **kwargs)
         if spill_fields:
             built["settings"].update(spill_fields)
+        _attach_pre_calls(built, pre_calls)
         return built
 
     baseline = _optional_int(seams.card_mib())
+    pre_calls: list = []
 
     def _kind(error: str) -> str | None:
         if supervisor is None:
@@ -1784,6 +1874,16 @@ def _measure_model(
             hung["note"] = note
             raise _UnloadTimeout(note)
 
+    # The search does not unload between windows (generate keep_alive stays at
+    # 5m). Unload runs on abort and at the end of the model. Within a model the
+    # expected pre-call level is therefore the resident floor. Between models,
+    # and after an unload, it is this idle dedicated reading.
+    idle_dedicated = _read_dedicated(seams.dedicated_mib)
+    model_resident = False
+    resident_floor: int | None = None
+    tolerance = spec.get("settle_tolerance_mib", 512)
+    timeout_s = float(spec.get("settle_timeout_s", 30))
+
     sampler = CardSampler(seams, spec["abort_mib"], sample_ms, on_abort)
 
     count_timeout = roster_timeout(adapter, spec)
@@ -1944,6 +2044,44 @@ def _measure_model(
             dedicated_delta=dedicated_delta,
         )
 
+    def _settle_before_call() -> tuple[int | None, str | None]:
+        """Wait until dedicated is within tolerance of the expected pre-call level."""
+
+        nonlocal resident_floor
+        reading = _read_dedicated(seams.dedicated_mib)
+        if not model_resident:
+            if reading is not None and abs(reading - idle_dedicated) <= tolerance:
+                return reading, None
+            return wait_for_dedicated(
+                seams.dedicated_mib,
+                seams.sleep,
+                seams.clock,
+                expected=idle_dedicated,
+                tolerance_mib=tolerance,
+                timeout_s=timeout_s,
+            )
+        if resident_floor is not None and reading is not None and abs(reading - resident_floor) <= tolerance:
+            return reading, None
+        found, reason = wait_until_stable(
+            seams.dedicated_mib,
+            seams.sleep,
+            seams.clock,
+            tolerance_mib=tolerance,
+            timeout_s=timeout_s,
+            first=reading,
+        )
+        if reason is None:
+            resident_floor = found
+        return found, reason
+
+    def _note_resident(obs: Observation) -> None:
+        nonlocal model_resident, resident_floor
+        if obs.error or not obs.resident:
+            model_resident = False
+            resident_floor = None
+            return
+        model_resident = True
+
     def probe(ctx: int, kind: str) -> Observation:
         sampler.wait_for_abort()
         if hung["note"]:
@@ -1981,12 +2119,18 @@ def _measure_model(
             if ctx not in predicted_over:
                 predicted_over.append(ctx)
             return Observation(False, predicted, error=PREDICTED_OVER)
+        if idle_dedicated is not None:
+            reading, reason = _settle_before_call()
+            pre_calls.append((kind, ctx, reading))
+            if reason:
+                return Observation(False, None, error=reason)
         sampler.reset()
         try:
             obs = sampler.cover(lambda: observe(ctx, kind))
         except _WindowOver:
             aborted.append(ctx)
             obs = _over(sampler.peak)
+        _note_resident(obs)
         if kind == "load" and isinstance(obs.peak_mib, int) and obs.error != ABORT_ERROR:
             measured.append((ctx, obs.peak_mib))
             resident_at[ctx] = bool(obs.resident)
@@ -2204,6 +2348,11 @@ def _row(
     flash_attn: str | None = None,
 ) -> dict:
     num_predict = _refuse_confirm_num_predict(spec.get("confirm_num_predict", 1))
+    decode = None if found is None else found.tok_s
+    decode_reason = None
+    if num_predict <= 1:
+        decode = None
+        decode_reason = f"decode not measured: num_predict {num_predict}"
     settings = {
         "thinking_level": None,
         "num_predict": num_predict,
@@ -2215,7 +2364,7 @@ def _row(
         "max_resident_ctx": None if found is None else found.max_ctx,
         "peak_mib": None if found is None else found.peak_mib,
         "ttft_ms": None if found is None else found.ttft_ms,
-        "decode_tok_s": None if found is None else found.tok_s,
+        "decode_tok_s": decode,
         "prompt_tok_s": None if found is None else found.prompt_tok_s,
         "shared_mib": None if found is None else found.shared_mib,
         "idle_baseline_mib": baseline,
@@ -2232,6 +2381,8 @@ def _row(
         "shift": spec.get("shift"),
         "truncate": spec.get("truncate"),
     }
+    if decode_reason:
+        settings["decode_reason"] = decode_reason
     if server_reason:
         settings["server_facts_reason"] = server_reason
     if ggml_reason:
@@ -2290,7 +2441,9 @@ def _row(
     if size_meta is not None:
         model["size"] = size_meta[0]
         model["size_vram"] = size_meta[1]
-    throughput = None if found is None else found.tok_s
+    latency = _blank_latency(decode)
+    if decode_reason:
+        latency["throughput_reason"] = decode_reason
     row = {
         "id": f"{spec['id']}/{entry['model']}/{run_id}",
         "task": "generate",
@@ -2299,7 +2452,7 @@ def _row(
         "device": "5090",
         "settings": settings,
         "quality": [],
-        "latency": _blank_latency(throughput),
+        "latency": latency,
         "date": date,
         "repeats": 1,
         "provisional": True,

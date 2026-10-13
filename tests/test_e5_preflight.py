@@ -697,7 +697,7 @@ def test_both_specs_load_and_carry_the_spill_baseline_amendment():
         loaded = load_spec(path)
         validate_spec(loaded)
         text = path.read_text(encoding="utf-8")
-        assert text.count("Amendment, 2026-10-13") == 3
+        assert text.count("Amendment, 2026-10-13") == 4
         amendments = [line for line in text.splitlines() if "Amendment, 2026-10-13" in line]
         earlier = amendments[0]
         assert "lowest resident window" in earlier
@@ -714,6 +714,14 @@ def test_both_specs_load_and_carry_the_spill_baseline_amendment():
         assert "next lower confirmed window" in latest
         assert "measured peak-per-token slope" in latest
         assert "receipt limit is predicted" in latest
+        settled = amendments[3]
+        assert "after e5-2026-10-13c" in settled
+        assert "settle_tolerance_mib (512)" in settled
+        assert "settle_timeout_s (30)" in settled
+        assert "resident floor" in settled
+        assert "idle baseline" in settled
+        assert loaded["settle_tolerance_mib"] == 512
+        assert loaded["settle_timeout_s"] == 30
         assert loaded["spill_shared_mib"] == 256
         assert loaded["spill_prompt_ratio"] == 0.5
         assert loaded["shared_gate_from_mib"] == 28452

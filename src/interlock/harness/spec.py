@@ -296,6 +296,12 @@ def _fill_card(data: dict) -> None:
         raise SpecError(f"spill_prompt_ratio is {PROMPT_RATIO}")
     if data.get("shared_gate_from_mib") != SHARED_GATE_FROM_MIB:
         raise SpecError(f"shared_gate_from_mib is {SHARED_GATE_FROM_MIB}")
+    if data.get("settle_tolerance_mib") != 512:
+        raise SpecError(
+            "settle_tolerance_mib is 512, a settle allowance, not the adapter pin and not the spill threshold"
+        )
+    if data.get("settle_timeout_s") != 30:
+        raise SpecError("settle_timeout_s is 30")
     models = data.get("models")
     if not isinstance(models, list) or not models:
         raise SpecError("fill-card names the model roster")

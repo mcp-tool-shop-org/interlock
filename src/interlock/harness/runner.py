@@ -291,6 +291,18 @@ def dry_run(
         lines.append("after two resident loads the next peak is predicted from their measured slope")
         lines.append("predicted_over applies when that slope reaches abort_mib")
         lines.append("limit is predicted when predicted_over stopped the search")
+        lines.append("a measured abort on the confirm walk is margin")
+        lines.append(f"settle_tolerance_mib: {spec['settle_tolerance_mib']}")
+        lines.append(f"settle_timeout_s: {spec['settle_timeout_s']}")
+        lines.append(
+            "before a measured load or confirm, the pinned adapter's dedicated reading "
+            "settles within settle_tolerance_mib of the expected pre-call level"
+        )
+        lines.append("between models and after an unload that level is the idle baseline")
+        lines.append("within a model the model stays resident, so that level is the resident floor")
+        lines.append(
+            "a card that does not settle within settle_timeout_s refuses that call and the measurement is not kept"
+        )
         lines.append("a second window with no bound stops the row")
         lines.append("one model at a time; unloaded between models; rest is not taken here")
         lines.append("the ceiling is never loaded")

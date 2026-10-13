@@ -1257,6 +1257,8 @@ def test_e4_and_e5_specs_pin_the_rules():
     assert e5["adapter_match_tolerance_mib"] != e5["spill_shared_mib"]
     assert e5["spill_prompt_ratio"] == PROMPT_RATIO == 0.5
     assert e5["shared_gate_from_mib"] == SHARED_GATE_FROM_MIB == 28452
+    assert e5["settle_tolerance_mib"] == 512
+    assert e5["settle_timeout_s"] == 30
     assert "spill_tok_ratio" not in e5 and "spill_ttft_ratio" not in e5
     assert e5["rest_s"] == 900
     assert len(e5["models"]) == 6
@@ -1630,6 +1632,12 @@ def test_spec_rejects_a_contract_that_is_not_pre_registered(tmp_path: Path):
         validate_spec({**card, "shared_gate_from_mib": 1})
     with pytest.raises(SpecError, match="shared_gate_from_mib"):
         validate_spec({key: value for key, value in card.items() if key != "shared_gate_from_mib"})
+    with pytest.raises(SpecError, match="settle_tolerance_mib"):
+        validate_spec({**card, "settle_tolerance_mib": 256})
+    with pytest.raises(SpecError, match="settle_timeout_s"):
+        validate_spec({**card, "settle_timeout_s": 10})
+    with pytest.raises(SpecError, match="settle_tolerance_mib"):
+        validate_spec({key: value for key, value in card.items() if key != "settle_tolerance_mib"})
     # rest_s is no longer read: any value, or none, is accepted
     validate_spec({**card, "rest_s": 899})
     validate_spec({**good, "rest_s": True})

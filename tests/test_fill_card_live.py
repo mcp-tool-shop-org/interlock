@@ -39,9 +39,12 @@ from interlock.harness.fill import (
     match_adapter_instance,
     parse_counter_text,
     parse_mib,
+    UNSETTLED,
+    _attach_pre_calls,
     quiet_fill_seams,
     real_fill_seams,
     run_fill_card,
+    wait_until_stable,
     runner_pid,
     window_delta,
 )
@@ -66,7 +69,7 @@ def _model(tag="qwen3:8b"):
     }
 
 
-def _spec(models, *, max_ctx=8192):
+def _spec(models, *, max_ctx=8192, confirm_num_predict=1):
     return {
         "id": "E5",
         "procedure": "fill-card",
@@ -76,12 +79,14 @@ def _spec(models, *, max_ctx=8192):
         "ceiling_mib": 31200,
         "grain": 2048,
         "confirm_prompt_fraction": 0.9,
-        "confirm_num_predict": 1,
+        "confirm_num_predict": confirm_num_predict,
         "sample_ms": 200,
         "spill_shared_mib": 256,
         "adapter_match_tolerance_mib": 512,
         "spill_prompt_ratio": 0.5,
         "shared_gate_from_mib": 28452,
+        "settle_tolerance_mib": 512,
+        "settle_timeout_s": 30,
         "max_ctx": max_ctx,
         "shift": False,
         "truncate": False,
@@ -128,7 +133,7 @@ def _fresh(tmp_path: Path) -> Path:
 
 
 class _Transport:
-    def __init__(self, seams, *, show_error=None, explode=False, spill_shared=False, spill_prompt=False, missing_shared=False, missing_prompt=False, abort_at=None, stick=False, linear=None, cold_disagrees=False, omit_tags=False, tag_bytes=None, busy_mib=20000, hide_baseline=False, settle_high=0, self_sample=True, split_vram=False, hold_abort=False, slow_unload=0, hang_unload=False, trained=4096, unresident_at=None, idle_mib=1500, peaks=None, fallback_peak=None, gate_peak_at=None):
+    def __init__(self, seams, *, show_error=None, explode=False, spill_shared=False, spill_prompt=False, missing_shared=False, missing_prompt=False, abort_at=None, stick=False, linear=None, cold_disagrees=False, omit_tags=False, tag_bytes=None, busy_mib=20000, hide_baseline=False, settle_high=0, self_sample=True, split_vram=False, hold_abort=False, slow_unload=0, hang_unload=False, trained=4096, unresident_at=None, idle_mib=1500, peaks=None, fallback_peak=None, gate_peak_at=None, dedicated_script=None):
         self.seams = seams
         self.show_error = show_error
         self.explode = explode
@@ -156,6 +161,8 @@ class _Transport:
         self.peaks = peaks
         self.fallback_peak = fallback_peak
         self.gate_peak_at = gate_peak_at
+        self.dedicated_script = dedicated_script
+        self._dedicated_index = 0
         self.block_count = False
         self.released = threading.Event()
         self._hang = threading.Event()
@@ -215,7 +222,14 @@ class _Transport:
         return 1000
 
     def dedicated_mib(self):
-        return 12
+        script = self.dedicated_script
+        if script is None:
+            return 12
+        index = self._dedicated_index
+        self._dedicated_index += 1
+        if index < len(script):
+            return script[index]
+        return script[-1]
 
     def __call__(self, method, url, body):
         require_recorded_behaviour(method, url, body)
@@ -324,9 +338,9 @@ def _seams(transport: _Transport) -> FillSeams:
     return seams
 
 
-def _run(tmp_path, transport, *, models=None, max_ctx=8192, grant="g", seams=None, folder="repo", unload_timeout=None):
+def _run(tmp_path, transport, *, models=None, max_ctx=8192, grant="g", seams=None, folder="repo", unload_timeout=None, confirm_num_predict=1):
     repo = tmp_path / folder
-    spec_path = _bind(repo, _spec(models or [_model()], max_ctx=max_ctx))
+    spec_path = _bind(repo, _spec(models or [_model()], max_ctx=max_ctx, confirm_num_predict=confirm_num_predict))
     adapter_kwargs = {}
     if unload_timeout is not None:
         adapter_kwargs["unload_timeout"] = unload_timeout
@@ -364,7 +378,11 @@ def test_a_clean_search_records_the_confirmed_window(tmp_path: Path):
     assert row["settings"]["peak_mib"] == 20000
     assert row["settings"]["shared_mib"] == 1000
     assert row["settings"]["prompt_tok_s"] == 100
-    assert row["settings"]["decode_tok_s"] == 1
+    assert row["settings"]["decode_tok_s"] is None
+    assert row["settings"]["decode_reason"] == "decode not measured: num_predict 1"
+    assert row["latency"]["throughput"] is None
+    assert row["latency"]["throughput_unit"] is None
+    assert row["latency"]["throughput_reason"] == "decode not measured: num_predict 1"
     assert row["settings"]["ttft_ms"] == 100
     assert row["settings"]["idle_baseline_mib"] == 1500
     assert row["settings"]["ollama_version"] == "0.35.1"
@@ -414,6 +432,146 @@ def test_a_clean_search_records_the_confirmed_window(tmp_path: Path):
     assert not (repo / "table").exists()
     assert check_tree(repo) == []
     assert transport.unloads
+
+
+def _advance(seams):
+    """A clock that moves only when the harness sleeps, so a timeout cannot spin."""
+
+    clock = {"t": 0.0}
+    slept = []
+
+    def sleep(seconds):
+        slept.append(seconds)
+        clock["t"] += float(seconds)
+
+    seams.sleep = sleep
+    seams.slept = slept
+    seams.clock = lambda: clock["t"]
+    return slept
+
+
+def test_a_card_still_freeing_memory_waits_then_measures(tmp_path: Path):
+    # Idle is captured first. The next readings are still well above it, then the card returns.
+    transport = _Transport(None, dedicated_script=[100, 8000, 4000, 1000, 100])
+    seams = _seams(transport)
+    _repo, rows = _run(tmp_path, transport, seams=seams)
+    row = rows[0]
+    assert seams.slept
+    assert all(pause == 0.2 for pause in seams.slept)
+    assert _ctxs(transport)
+    assert row["settings"]["max_resident_ctx"] == 4096
+    pre = row["settings"]["pre_call_dedicated_mib"]
+    assert pre[0] == {"kind": "load", "ctx": 2048, "mib": 100}
+    assert all(item["mib"] == 100 for item in pre)
+    assert 8000 not in [item["mib"] for item in pre]
+
+
+def test_a_card_that_never_settles_refuses_the_call(tmp_path: Path):
+    transport = _Transport(None, dedicated_script=[100, 9000])
+    seams = _seams(transport)
+    _advance(seams)
+    _repo, rows = _run(tmp_path, transport, seams=seams)
+    row = rows[0]
+    assert row["settings"]["max_resident_ctx"] is None
+    assert row["settings"]["peak_mib"] is None
+    assert row["settings"]["search_calls"] == [
+        ["load", 2048, None, None, None, UNSETTLED],
+    ]
+    assert row["settings"]["pre_call_dedicated_mib"] == [
+        {"kind": "load", "ctx": 2048, "mib": 9000},
+    ]
+    assert _ctxs(transport) == []
+    assert seams.slept
+    # Resident floor: a card that keeps moving is the same refusal, and the reading is not kept.
+    jump = {"n": 0}
+
+    def read():
+        jump["n"] += 1000
+        return jump["n"]
+
+    clock = {"t": 0.0}
+    slept = []
+
+    def sleep(seconds):
+        slept.append(seconds)
+        clock["t"] += float(seconds)
+
+    found, reason = wait_until_stable(
+        read,
+        sleep,
+        lambda: clock["t"],
+        tolerance_mib=512,
+        timeout_s=30,
+        first=27329,
+    )
+    assert reason == UNSETTLED
+    assert slept
+    assert found != 27329
+
+
+def test_the_pre_call_reading_is_on_the_receipt(tmp_path: Path):
+    transport = _Transport(None, dedicated_script=[250])
+    seams = _seams(transport)
+    repo, rows = _run(tmp_path, transport, seams=seams)
+    row = rows[0]
+    pre = row["settings"]["pre_call_dedicated_mib"]
+    measured = [call for call in row["settings"]["search_calls"] if call[5] != "predicted_over"]
+    assert pre == [{"kind": call[0], "ctx": call[1], "mib": 250} for call in measured]
+    assert len(pre) == len(measured)
+    stored = load_jsonl(repo / "receipts" / "fill-1.jsonl")[0]
+    assert stored["settings"]["pre_call_dedicated_mib"] == pre
+    # A predicted_over of the same context is not a measured call, so it does not take the next reading.
+    paired = {
+        "settings": {
+            "search_calls": [
+                ["load", 8192, 100, None, None, "predicted_over"],
+                ["load", 8192, 20000, 1000, 100, "resident"],
+                ["confirm", 8192, 20000, 1000, 100, "confirmed"],
+            ]
+        }
+    }
+    _attach_pre_calls(paired, [("load", 8192, 400), ("confirm", 8192, 410)])
+    assert paired["settings"]["pre_call_dedicated_mib"] == [
+        {"kind": "load", "ctx": 8192, "mib": 400},
+        {"kind": "confirm", "ctx": 8192, "mib": 410},
+    ]
+
+
+def test_num_predict_1_does_not_publish_a_decode_rate(tmp_path: Path):
+    transport = _Transport(None)
+    seams = _seams(transport)
+    _repo, rows = _run(tmp_path, transport, seams=seams)
+    row = rows[0]
+    assert row["settings"]["num_predict"] == 1
+    assert row["settings"]["decode_tok_s"] is None
+    assert row["latency"]["throughput"] is None
+    assert row["settings"]["decode_reason"] == "decode not measured: num_predict 1"
+    assert row["latency"]["throughput_reason"] == "decode not measured: num_predict 1"
+    confirms = [
+        body
+        for _method, _url, body in transport.calls
+        if isinstance(body, dict) and body.get("raw") is not True and body.get("prompt") not in (None, "", SEED)
+    ]
+    assert confirms[-1]["options"]["num_predict"] == 1
+
+
+def test_num_predict_above_1_keeps_the_measured_rate(tmp_path: Path):
+    transport = _Transport(None)
+    seams = _seams(transport)
+    _repo, rows = _run(tmp_path, transport, seams=seams, confirm_num_predict=8)
+    row = rows[0]
+    assert row["settings"]["num_predict"] == 8
+    assert row["settings"]["decode_tok_s"] == 1.0
+    assert row["latency"]["throughput"] == 1.0
+    assert row["latency"]["throughput_unit"] == "tok/s"
+    assert "decode_reason" not in row["settings"]
+    assert "throughput_reason" not in row["latency"]
+    confirms = [
+        body
+        for _method, _url, body in transport.calls
+        if isinstance(body, dict) and body.get("raw") is not True and body.get("prompt") not in (None, "", SEED)
+    ]
+    assert confirms[-1]["options"]["num_predict"] == 8
 
 
 def test_the_sampler_unloads_when_the_window_reaches_abort_mib(tmp_path: Path):
@@ -784,6 +942,17 @@ def test_dry_run_names_the_confirmation_count(monkeypatch):
     assert "the prompt-rate gate is a cliff against the next lower confirmed window" in text
     assert "after two resident loads the next peak is predicted from their measured slope" in text
     assert "limit is predicted when predicted_over stopped the search" in text
+    assert "a measured abort on the confirm walk is margin" in text
+    assert "settle_tolerance_mib: 512" in text
+    assert "settle_timeout_s: 30" in text
+    assert "resident floor" in text
+    assert "between models and after an unload that level is the idle baseline" in text
+    assert "a card that does not settle within settle_timeout_s refuses that call and the measurement is not kept" in text
+    smoke = dry_run(ROOT / "experiments" / "e5-smoke" / "spec.yaml", ROOT)
+    assert "settle_tolerance_mib: 512" in smoke
+    assert "settle_timeout_s: 30" in smoke
+    assert "resident floor" in smoke
+    assert "a measured abort on the confirm walk is margin" in smoke
     assert "a second window with no bound stops the row" in text
     assert "the next load waits until the abort has finished" in text
     assert "an unload that does not finish within 60 seconds stops the run; the model may still be resident" in text

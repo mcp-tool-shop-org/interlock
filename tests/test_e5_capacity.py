@@ -12,8 +12,8 @@ import pytest
 
 from interlock.adapters.ollama import OllamaAdapter
 from interlock.cli import main
-from interlock.harness.e5 import SHARED_GATE_FROM_MIB, Observation, is_spill, search
-from interlock.harness.fill import _predict_mib
+from interlock.harness.e5 import PREDICTED_OVER, SHARED_GATE_FROM_MIB, Observation, is_spill, search
+from interlock.harness.fill import _predict_mib, wait_until_stable
 from interlock.harness.runner import RunnerError, dry_run, parse_models, resolve_models, run_spec
 from interlock.harness.spec import load_spec
 from tests.test_fill_card_live import _Transport, _ctxs, _fresh, _model, _run, _seams, _spec, _bind
@@ -21,6 +21,7 @@ from tests.test_harness import E4, _resident
 
 ROOT = Path(__file__).resolve().parents[1]
 RECEIPT = ROOT / "receipts" / "e5-2026-10-13b.jsonl"
+RECEIPT_C = ROOT / "receipts" / "e5-2026-10-13c.jsonl"
 # Above the recorded granite peak and below the shared gate, so a new load
 # does not invert the measured slope.
 FALLBACK_PEAK = 28000
@@ -279,3 +280,88 @@ def test_models_subset_is_validated_and_recorded(tmp_path: Path):
     whole = _Transport(None, trained=4096)
     _whole_repo, whole_rows = _run(tmp_path, whole, seams=_seams(whole), folder="whole", max_ctx=4096)
     assert "models" not in whole_rows[0]["settings"]
+
+
+def _receipt_c() -> dict[str, dict]:
+    found = {}
+    for line in RECEIPT_C.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        found[row["model"]["repo_or_tag"]] = row
+    return found
+
+
+def _replay(row: dict):
+    """Walk ``search`` through one recorded trace. The probe refuses a different call."""
+
+    recorded = row["settings"]["search_calls"]
+    cursor = {"i": 0}
+
+    def probe(ctx, kind):
+        call = recorded[cursor["i"]]
+        cursor["i"] += 1
+        assert (kind, ctx) == (call[0], call[1])
+        reason = call[5]
+        peak, shared, prompt = call[2], call[3], call[4]
+        if reason == "predicted_over":
+            return Observation(False, peak, error=PREDICTED_OVER)
+        if reason == "card memory reached abort_mib":
+            return Observation(False, peak, error=reason, shared_mib=shared, prompt_tok_s=prompt)
+        return Observation(True, peak, shared_mib=shared, prompt_tok_s=prompt)
+
+    num = row["settings"]["num_ctx"]
+    found = search(default_ctx=num, probe=probe, abort_mib=30500, grain=2048, max_ctx=num)
+    assert cursor["i"] == len(recorded)
+    return found
+
+
+def test_a_measured_confirm_abort_is_margin_and_a_predicted_stop_stays_predicted():
+    rows = _receipt_c()
+    gemma = _replay(rows["gemma4:31b"])
+    assert gemma.limit == "margin"
+    assert gemma.max_ctx == 86016
+    granite = _replay(rows["granite4.1:30b"])
+    assert granite.limit == "predicted"
+    assert granite.max_ctx == 43008
+
+
+def test_granite_4096_confirm_would_have_waited():
+    calls = {
+        (call[0], call[1]): call[2]
+        for call in _receipt_c()["granite4.1:30b"]["settings"]["search_calls"]
+    }
+    assert calls[("confirm", 4096)] == 27329
+    assert calls[("confirm", 2048)] == 20366
+    assert calls[("confirm", 6144)] == 21655
+    assert calls[("load", 43008)] == 30233
+    assert calls[("confirm", 4096)] - calls[("confirm", 6144)] > 512
+    # Within a model the search keeps the model resident, so the waiter is the resident floor.
+    # 27329 is still moving; the settled reading is the later neighbour, not that peak.
+    script = [26000, 24000, 22000, 21655]
+    index = {"i": 0}
+
+    def read():
+        i = index["i"]
+        index["i"] += 1
+        return script[min(i, len(script) - 1)]
+
+    clock = {"t": 0.0}
+    slept = []
+
+    def sleep(seconds):
+        slept.append(seconds)
+        clock["t"] += float(seconds)
+
+    found, reason = wait_until_stable(
+        read,
+        sleep,
+        lambda: clock["t"],
+        tolerance_mib=512,
+        timeout_s=30,
+        first=27329,
+    )
+    assert reason is None
+    assert slept
+    assert found == 21655
+    assert found != 27329
