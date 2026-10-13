@@ -1,6 +1,6 @@
 # interlock: how it works
 
-Mapped at 2026-10-13 from commit d899ac0 by Atlas 1.24.0.
+Mapped at 2026-10-13 from commit 6e8cab6 by Atlas 1.24.0.
 
 ## What this is
 
@@ -8,9 +8,10 @@ interlock routes each job to a model, engine and device from a receipt-backed ta
 
 7 parts, mostly Python (86 files). Work enters through 3 doors; the busiest is CI, which reaches 2 parts. It publishes to PyPI. People run interlock.
 
-## What changed since 2026-10-13 (7c1508b)
+## What changed since 2026-10-13 (d899ac0)
 
-Nothing structural changed since 2026-10-13; 8 files added and 11 changed content.
+- receipts/e5-2026-10-13b.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
+- 1 file added.
 
 ## What comes in
 
@@ -82,7 +83,7 @@ Read those in order to follow one run of interlock end to end. This path follows
 - 3 writes and 4 reads use paths built at run time and are not named here.
 - 12 writes and 38 reads go to a path their caller passes, not to this repository.
 - 3 reads go to the directory the command is run in (receipts/), not to this repository.
-- 84 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 81 more.
+- 85 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 82 more.
 - Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window.
 
 Regenerate with `npx --yes @dogfood-lab/atlas map`.

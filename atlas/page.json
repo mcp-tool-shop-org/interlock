@@ -20,24 +20,31 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 8,
-      "changed": 11,
+      "added": 1,
+      "changed": 0,
       "moved": 0,
-      "parts": 4,
+      "parts": 0,
       "removed": 0
     },
     "items": [
       {
+        "kind": "unassigned",
+        "sentence": "receipts/e5-2026-10-13b.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.",
+        "subjects": [
+          "receipts/e5-2026-10-13b.jsonl"
+        ]
+      },
+      {
         "kind": "counts",
-        "sentence": "Nothing structural changed since 2026-10-13; 8 files added and 11 changed content.",
+        "sentence": "1 file added.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "7c1508b5474f1ed476bc97767c995a02cd4ddb90",
-      "generatedAt": "2026-10-13T00:20:55.054Z"
+      "commit": "d899ac0a629d5ffae13f602eae3aef4138ba802f",
+      "generatedAt": "2026-10-13T08:48:24.770Z"
     },
-    "unchanged": true
+    "unchanged": false
   },
   "changesTogether": [
     {
@@ -92,7 +99,7 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 8 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 1,
-  "commit": "d899ac0a629d5ffae13f602eae3aef4138ba802f",
+  "commit": "6e8cab6f20c647eff0847912364ba2695f6f1757",
   "defaultBranch": "main",
   "derived": "7 parts, mostly Python (86 files). Work enters through 3 doors; the busiest is CI, which reaches 2 parts. It publishes to PyPI. People run interlock.",
   "doors": [
@@ -195,13 +202,13 @@
   "edges": [],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-13T08:48:24.770Z",
+  "generatedAt": "2026-10-13T14:17:52.194Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "3 writes and 4 reads use paths built at run time and are not named here.",
     "12 writes and 38 reads go to a path their caller passes, not to this repository.",
     "3 reads go to the directory the command is run in (receipts/), not to this repository.",
-    "84 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 81 more.",
+    "85 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 82 more.",
     "Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window."
   ],
   "mainDoor": ".github/workflows/ci.yml",
