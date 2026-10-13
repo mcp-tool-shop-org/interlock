@@ -1,17 +1,16 @@
 # interlock: how it works
 
-Mapped at 2026-10-13 from commit 6e8cab6 by Atlas 1.24.0.
+Mapped at 2026-10-13 from commit 4da1acd by Atlas 1.24.0.
 
 ## What this is
 
 interlock routes each job to a model, engine and device from a receipt-backed table. (written by a person)
 
-7 parts, mostly Python (86 files). Work enters through 3 doors; the busiest is CI, which reaches 2 parts. It publishes to PyPI. People run interlock.
+7 parts, mostly Python (87 files). Work enters through 3 doors; the busiest is CI, which reaches 2 parts. It publishes to PyPI. People run interlock.
 
-## What changed since 2026-10-13 (d899ac0)
+## What changed since 2026-10-13 (6e8cab6)
 
-- receipts/e5-2026-10-13b.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
-- 1 file added.
+Nothing structural changed since 2026-10-13; 1 file added and 12 changed content.
 
 ## What comes in
 
@@ -43,7 +42,6 @@ CI writes nothing this map can see.
 
 - **src/switchyard/adapters/openvino.py** and **tests/test_openvino_adapter.py** changed together in 17 of 22 commits.
 - **src/switchyard/harness/receipts.py** and **src/switchyard/receipt.py** changed together in 7 of 13 commits.
-- **src/switchyard/harness/fill.py** and **tests/test_fill_card_live.py** changed together in 5 of 10 commits.
 
 1 file changed together with its own test, as expected.
 
@@ -81,7 +79,7 @@ Read those in order to follow one run of interlock end to end. This path follows
 
 - 1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.
 - 3 writes and 4 reads use paths built at run time and are not named here.
-- 12 writes and 38 reads go to a path their caller passes, not to this repository.
+- 12 writes and 39 reads go to a path their caller passes, not to this repository.
 - 3 reads go to the directory the command is run in (receipts/), not to this repository.
 - 85 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 82 more.
 - Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window.

@@ -13,12 +13,13 @@ fall is recorded with that note. Closing the request lets the unload take
 effect and stops the decode. It does not take back memory the load has
 already allocated.
 
-Before a load, two measured windows extrapolate the next card reading. With
-one measured window, the next context is bounded by that window's share of
-the card above the idle baseline and the weight size from ``/api/tags``.
-A share of 0 or less is not a bound, and a window that is not fully
-resident (``size_vram`` equal to ``size``) is not a bound either. A window
-predicted to reach ``abort_mib`` is ``predicted_over`` and is not loaded.
+Before a load, two resident loads predict the next card reading from their
+measured peak-per-token slope. ``predicted_over`` applies when that prediction
+reaches ``abort_mib``. With one resident load, the next context is bounded by
+that window's share of the card above the idle baseline and the weight size
+from ``/api/tags``. A share of 0 or less is not a bound, and a window that is
+not fully resident (``size_vram`` equal to ``size``) is not a bound either.
+A window predicted to reach ``abort_mib`` is ``predicted_over`` and is not loaded.
 The first window still loads. If the weight size or the baseline cannot be
 read, or the share is not positive, or that window is not fully resident,
 the second window is not loaded and the row stops. An aborted window is
@@ -1256,6 +1257,8 @@ def _strip_measurement(row: dict) -> None:
         "predicted_over",
         "weights_mib",
         "one_window_bound",
+        "slope_predictions",
+        "window_gates",
     ):
         settings.pop(key, None)
     for key in ("max_resident_ctx", "peak_mib", "ttft_ms", "decode_tok_s", "prompt_tok_s", "shared_mib"):
@@ -1343,8 +1346,13 @@ def run_fill_card(
     marker,
     notes: str = "",
     supervisor=None,
+    models: list[str] | None = None,
 ) -> list[dict]:
-    """Measure each roster model. Unload at the end of the model and on any exit."""
+    """Measure each roster model. Unload at the end of the model and on any exit.
+
+    ``models`` is a subset of the spec roster, in spec order. None measures
+    every model. The subset is written on each row.
+    """
 
     _refuse_confirm_num_predict(spec.get("confirm_num_predict", 1))
     rows: list[dict] = []
@@ -1352,11 +1360,15 @@ def run_fill_card(
     retries: dict[str, int] = {}
     pending_retry: set[str] = set()
     index = 0
-    models = list(spec["models"])
+    if models is None:
+        roster = list(spec["models"])
+    else:
+        wanted = set(models)
+        roster = [entry for entry in spec["models"] if entry["model"] in wanted]
     record_checked = False
     try:
-        while index < len(models):
-            entry = models[index]
+        while index < len(roster):
+            entry = roster[index]
             if supervisor is not None and not record_checked:
                 supervisor.check_start_record(url_for("5090"))
                 reason = supervisor.restarts_disabled
@@ -1415,6 +1427,9 @@ def run_fill_card(
                 extra = _unload(adapter, entry["model"])
                 if supervisor is not None:
                     supervisor.end_measurement()
+            if models is not None:
+                row.setdefault("settings", {})["models"] = [item["model"] for item in roster]
+                validate_row(row)
             if extra and extra not in (row.get("notes") or ""):
                 row["notes"] = _join(row.get("notes") or "", extra)
                 row["aborted"] = True
@@ -1588,6 +1603,7 @@ def _measure_model(
     }
     spill_fields: dict = {}
     load_state = {"done": False, "offset": 0}
+    slope_predictions: list[dict] = []
 
     def row(**kwargs):
         kwargs["flash"] = chosen["flash"]
@@ -1600,6 +1616,7 @@ def _measure_model(
         kwargs.setdefault("ggml_reason", ggml_reason)
         kwargs.setdefault("runner_pid", runner)
         kwargs.setdefault("preflight", getattr(seams, "preflight_record", None))
+        kwargs.setdefault("slope_predictions", slope_predictions)
         built = _row(spec, entry, **kwargs)
         if spill_fields:
             built["settings"].update(spill_fields)
@@ -1931,20 +1948,38 @@ def _measure_model(
         sampler.wait_for_abort()
         if hung["note"]:
             raise _UnloadTimeout(hung["note"])
-        points = _measured_points(measured)
-        predicted = _predict_mib(measured, ctx) if len(points) >= 2 else None
-        # A larger window needs a bound. A smaller one is the downward search:
-        # the trained window did not fit, and the next try is a halve.
-        if len(points) == 1 and ctx > points[0][0]:
-            ctx_1, reading_1 = points[0]
+        resident_points = [point for point in _measured_points(measured) if resident_at.get(point[0])]
+        predicted = None
+        if len(resident_points) >= 2:
+            predicted = _predict_mib(resident_points, ctx)
+            if kind == "load" and predicted is not None:
+                (left_ctx, left_mib), (right_ctx, right_mib) = resident_points[-2], resident_points[-1]
+                slope_predictions.append(
+                    {
+                        "ctx": ctx,
+                        "mib": predicted,
+                        "left_ctx": left_ctx,
+                        "left_peak_mib": left_mib,
+                        "right_ctx": right_ctx,
+                        "right_peak_mib": right_mib,
+                        "rise_mib": right_mib - left_mib,
+                        "span_tokens": right_ctx - left_ctx,
+                    }
+                )
+        # One resident load still bounds the next larger context from its share.
+        # A smaller context is the downward search: the trained window did not fit.
+        elif len(resident_points) == 1 and ctx > resident_points[0][0]:
+            ctx_1, reading_1 = resident_points[0]
             if weights_mib is None or baseline is None or not resident_at.get(ctx_1, False):
                 raise _NoBound("the second window had no bound")
             predicted = _one_window_mib(reading_1, ctx_1, baseline, weights_mib, ctx)
             if predicted is None:
                 raise _NoBound("the second window had no bound")
             one_window_bound.append((ctx, predicted))
-        if predicted is not None and predicted >= spec["abort_mib"]:
-            predicted_over.append(ctx)
+        already_resident = kind == "confirm" and resident_at.get(ctx, False)
+        if not already_resident and predicted is not None and predicted >= spec["abort_mib"]:
+            if ctx not in predicted_over:
+                predicted_over.append(ctx)
             return Observation(False, predicted, error=PREDICTED_OVER)
         sampler.reset()
         try:
@@ -1955,6 +1990,8 @@ def _measure_model(
         if kind == "load" and isinstance(obs.peak_mib, int) and obs.error != ABORT_ERROR:
             measured.append((ctx, obs.peak_mib))
             resident_at[ctx] = bool(obs.resident)
+            if obs.resident and obs.error != PREDICTED_OVER:
+                predicted_over[:] = [item for item in predicted_over if item != ctx]
         sampler.wait_for_abort()
         if hung["note"]:
             raise _UnloadTimeout(hung["note"])
@@ -1972,6 +2009,7 @@ def _measure_model(
             grain=spec["grain"],
             shared_growth_mib=spec["spill_shared_mib"],
             prompt_ratio=spec["spill_prompt_ratio"],
+            shared_gate_from_mib=spec["shared_gate_from_mib"],
             max_ctx=search_cap,
         )
     except _Repairable as exc:
@@ -2156,6 +2194,7 @@ def _row(
     predicted_over: list[int] | None = None,
     weights_mib: int | None = None,
     one_window_bound: list[tuple[int, int]] | None = None,
+    slope_predictions: list[dict] | None = None,
     default_context: str = UNRECORDED,
     backend_library: str = UNRECORDED,
     server_reason: str | None = None,
@@ -2208,6 +2247,8 @@ def _row(
         settings["search_calls"] = [list(call) for call in found.calls]
         if found.dedicated_delta is not None:
             settings["dedicated_delta_mib"] = found.dedicated_delta
+        if found.gates:
+            settings["window_gates"] = [dict(item) for item in found.gates]
     if aborted_windows:
         settings["aborted_windows"] = list(aborted_windows)
     if after_unload:
@@ -2218,6 +2259,8 @@ def _row(
         settings["weights_mib"] = weights_mib
     if one_window_bound:
         settings["one_window_bound"] = [{"ctx": ctx, "mib": mib} for ctx, mib in one_window_bound]
+    if slope_predictions:
+        settings["slope_predictions"] = [dict(item) for item in slope_predictions]
     if prompt_meta is not None:
         settings["prompt_tokens"] = prompt_meta[0]
         settings["prompt_token_method"] = prompt_meta[1]

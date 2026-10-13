@@ -45,6 +45,7 @@ from interlock.harness.fill import (
     runner_pid,
     window_delta,
 )
+from interlock.harness.e5 import SHARED_GATE_FROM_MIB
 from interlock.harness.runner import RunnerError, dry_run, run_spec
 from interlock.receipt import check_tree, load_jsonl
 
@@ -80,6 +81,7 @@ def _spec(models, *, max_ctx=8192):
         "spill_shared_mib": 256,
         "adapter_match_tolerance_mib": 512,
         "spill_prompt_ratio": 0.5,
+        "shared_gate_from_mib": 28452,
         "max_ctx": max_ctx,
         "shift": False,
         "truncate": False,
@@ -126,7 +128,7 @@ def _fresh(tmp_path: Path) -> Path:
 
 
 class _Transport:
-    def __init__(self, seams, *, show_error=None, explode=False, spill_shared=False, spill_prompt=False, missing_shared=False, missing_prompt=False, abort_at=None, stick=False, linear=None, cold_disagrees=False, omit_tags=False, tag_bytes=None, busy_mib=20000, hide_baseline=False, settle_high=0, self_sample=True, split_vram=False, hold_abort=False, slow_unload=0, hang_unload=False, trained=4096, unresident_at=None):
+    def __init__(self, seams, *, show_error=None, explode=False, spill_shared=False, spill_prompt=False, missing_shared=False, missing_prompt=False, abort_at=None, stick=False, linear=None, cold_disagrees=False, omit_tags=False, tag_bytes=None, busy_mib=20000, hide_baseline=False, settle_high=0, self_sample=True, split_vram=False, hold_abort=False, slow_unload=0, hang_unload=False, trained=4096, unresident_at=None, idle_mib=1500, peaks=None, fallback_peak=None, gate_peak_at=None):
         self.seams = seams
         self.show_error = show_error
         self.explode = explode
@@ -150,6 +152,10 @@ class _Transport:
         self.hang_unload = hang_unload
         self.trained = trained
         self.unresident_at = unresident_at
+        self.idle_mib = idle_mib
+        self.peaks = peaks
+        self.fallback_peak = fallback_peak
+        self.gate_peak_at = gate_peak_at
         self.block_count = False
         self.released = threading.Event()
         self._hang = threading.Event()
@@ -181,13 +187,23 @@ class _Transport:
                 return 30500
             if self.unloads:
                 self.events.append("settle")
-            return 1500
+            return self.idle_mib
         ctx = self.state["ctx"]
         if self.abort_at is not None and isinstance(ctx, int) and ctx >= self.abort_at:
             return 30500
         if self.linear is not None and isinstance(ctx, int):
             base, per_ctx = self.linear
             return base + per_ctx * ctx
+        pressured = self.spill_shared or (
+            self.gate_peak_at is not None and isinstance(ctx, int) and ctx >= self.gate_peak_at
+        )
+        if pressured and self.state["confirm"] and isinstance(ctx, int) and ctx >= 8192:
+            return SHARED_GATE_FROM_MIB
+        if self.peaks is not None and isinstance(ctx, int):
+            if ctx in self.peaks:
+                return self.peaks[ctx]
+            if self.fallback_peak is not None:
+                return self.fallback_peak
         return self.busy_mib
 
     def shared_mib(self):
@@ -601,8 +617,8 @@ def test_shared_growth_steps_the_candidate_back(tmp_path: Path):
     assert rows[0]["settings"]["shared_mib"] == 1000
     calls = rows[0]["settings"]["search_calls"]
     spilled = [call for call in calls if call[0] == "confirm" and call[1] == 8192]
-    assert spilled == [["confirm", 8192, 20000, 1257, 100, "spill"]]
-    assert calls[-1] == ["confirm", 6144, 20000, 1000, 100, "confirmed"]
+    assert ["confirm", 6144, 20000, 1000, 100, "confirmed"] in calls
+    assert calls[-1] == ["confirm", 8192, SHARED_GATE_FROM_MIB, 1257, 100, "spill"]
 
 
 def test_a_fallen_prompt_rate_steps_the_candidate_back(tmp_path: Path):
@@ -762,6 +778,12 @@ def test_dry_run_names_the_confirmation_count(monkeypatch):
     assert "quant is read from /api/show at run time" in text
     assert "closing the request does not return the memory a load already allocated" in text
     assert "one measured window bounds the next context from that window's share" in text
+    assert "shared_gate_from_mib: 28452" in text
+    assert "the shared gate counts only under capacity pressure" in text
+    assert "below shared_gate_from_mib, shared growth is recorded and is not a spill" in text
+    assert "the prompt-rate gate is a cliff against the next lower confirmed window" in text
+    assert "after two resident loads the next peak is predicted from their measured slope" in text
+    assert "limit is predicted when predicted_over stopped the search" in text
     assert "a second window with no bound stops the row" in text
     assert "the next load waits until the abort has finished" in text
     assert "an unload that does not finish within 60 seconds stops the run; the model may still be resident" in text
@@ -820,10 +842,11 @@ def test_shared_growth_is_measured_from_the_floor_confirm(tmp_path: Path):
 
     The floor confirm sits at 100. The cap's load also sits at 100, so a
     comparison with that load would be 0. The 8192 confirm reads 2200, which
-    is 2100 over the floor. The search steps back and confirms 6144 at 200.
+    is 2100 over the floor, and its peak is at the shared gate. The confirmed
+    window below it is 6144 at 200.
     """
 
-    transport = _Transport(None, trained=8192)
+    transport = _Transport(None, trained=8192, gate_peak_at=8192)
     seams = _seams(transport)
     script = [
         (_GPU, 100, 12),
@@ -832,10 +855,12 @@ def test_shared_growth_is_measured_from_the_floor_confirm(tmp_path: Path):
         (_GPU, 100, 12),
         (_GPU, 100, 12),
         (_GPU, 100, 12),
-        (_GPU, 2000, 12),
-        (_GPU, 2200, 20),
+        (_GPU, 100, 12),
+        (_GPU, 150, 12),
         (_GPU, 150, 12),
         (_GPU, 200, 14),
+        (_GPU, 2000, 12),
+        (_GPU, 2200, 20),
     ]
 
     def adapter_reading():
@@ -849,8 +874,8 @@ def test_shared_growth_is_measured_from_the_floor_confirm(tmp_path: Path):
     calls = rows[0]["settings"]["search_calls"]
     assert rows[0]["settings"]["max_resident_ctx"] == 6144
     assert rows[0]["settings"]["shared_mib"] == 200
-    assert ["confirm", 8192, 20000, 2200, 100, "spill"] in calls
-    assert calls[-1] == ["confirm", 6144, 20000, 200, 100, "confirmed"]
+    assert ["confirm", 6144, 20000, 200, 100, "confirmed"] in calls
+    assert calls[-1] == ["confirm", 8192, SHARED_GATE_FROM_MIB, 2200, 100, "spill"]
 
 
 def test_the_5090_is_the_dedicated_match_and_a_bad_match_is_a_spill(tmp_path: Path):
@@ -870,7 +895,7 @@ def test_the_5090_is_the_dedicated_match_and_a_bad_match_is_a_spill(tmp_path: Pa
     assert window_delta((_GPU, 1000, 12), (_GPU, 1257, 20)) == (1257, 1000, 8)
     assert window_delta(None, (_GPU, 1, 1)) == (None, None, None)
 
-    transport = _Transport(None, trained=8192)
+    transport = _Transport(None, trained=8192, gate_peak_at=8192)
     seams = _seams(transport)
 
     def matched():
@@ -883,8 +908,9 @@ def test_the_5090_is_the_dedicated_match_and_a_bad_match_is_a_spill(tmp_path: Pa
     _repo, rows = _run(tmp_path, transport, seams=seams, max_ctx=8192)
     calls = rows[0]["settings"]["search_calls"]
     assert rows[0]["settings"]["max_resident_ctx"] == 6144
-    assert ["confirm", 8192, 20000, 1257, 100, "spill"] in calls
-    assert calls[-1][3] == 1000
+    assert rows[0]["settings"]["shared_mib"] == 1000
+    assert ["confirm", 6144, 20000, 1000, 100, "confirmed"] in calls
+    assert ["confirm", 8192, SHARED_GATE_FROM_MIB, 1257, 100, "spill"] in calls
 
     transport = _Transport(None, trained=4096)
     seams = _seams(transport)

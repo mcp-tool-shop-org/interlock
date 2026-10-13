@@ -30,6 +30,7 @@ from interlock.guards import GuardError
 from interlock.harness.environment import driver_version_from_lines, package_versions
 from interlock.harness.e5 import (
     PROMPT_RATIO,
+    SHARED_GATE_FROM_MIB,
     SHARED_GROWTH_MIB,
     Observation,
     SearchError,
@@ -1255,6 +1256,7 @@ def test_e4_and_e5_specs_pin_the_rules():
     assert e5["adapter_match_tolerance_mib"] == 512
     assert e5["adapter_match_tolerance_mib"] != e5["spill_shared_mib"]
     assert e5["spill_prompt_ratio"] == PROMPT_RATIO == 0.5
+    assert e5["shared_gate_from_mib"] == SHARED_GATE_FROM_MIB == 28452
     assert "spill_tok_ratio" not in e5 and "spill_ttft_ratio" not in e5
     assert e5["rest_s"] == 900
     assert len(e5["models"]) == 6
@@ -1299,6 +1301,10 @@ def test_an_edited_spec_is_refused_and_dry_run_does_not_touch_devices(tmp_path: 
     assert "abort_mib: 30500" in e5_text
     assert "spill_shared_mib: 256" in e5_text
     assert "spill_prompt_ratio: 0.5" in e5_text
+    assert "shared_gate_from_mib: 28452" in e5_text
+    assert "the shared gate counts only under capacity pressure" in e5_text
+    assert "the prompt-rate gate is a cliff against the next lower confirmed window" in e5_text
+    assert "limit is predicted when predicted_over stopped the search" in e5_text
     assert "adapter_match_tolerance_mib: 512" in e5_text
     assert "the tolerance is a matching allowance and is not the spill threshold" in e5_text
     assert "pinned once at run start" in e5_text
@@ -1423,7 +1429,7 @@ def test_fill_card_doubles_bisects_and_steps_back():
 
     def spill_top(ctx, kind):
         shared = 1000 + 257 if kind == "confirm" and ctx >= 8192 else 1000
-        return _resident(20000, shared=shared)
+        return _resident(SHARED_GATE_FROM_MIB, shared=shared)
 
     slowed = search(default_ctx=4096, probe=spill_top, abort_mib=30500, max_ctx=8192)
     assert slowed.max_ctx == 6144
@@ -1486,14 +1492,18 @@ def test_search_spill_and_schedule_refuse_bad_inputs():
     assert is_spill(Observation(True, 1), reference, shared_growth_mib=256, prompt_ratio=0.5) is True
     assert is_spill(Observation(True, 1, shared_mib=1000), reference, shared_growth_mib=256, prompt_ratio=0.5) is True
     assert is_spill(_resident(1, shared=1256, prompt=20, tok_s=1, ttft=9_999), reference, shared_growth_mib=256, prompt_ratio=0.5) is False
-    assert is_spill(_resident(1, shared=1257, prompt=20), reference, shared_growth_mib=256, prompt_ratio=0.5) is True
+    assert is_spill(_resident(1, shared=1257, prompt=20), reference, shared_growth_mib=256, prompt_ratio=0.5) is False
+    assert is_spill(_resident(SHARED_GATE_FROM_MIB, shared=1257, prompt=20), reference, shared_growth_mib=256, prompt_ratio=0.5) is True
+    assert is_spill(_resident(SHARED_GATE_FROM_MIB - 1, shared=1300, prompt=20), reference, shared_growth_mib=256, prompt_ratio=0.5) is False
     assert is_spill(_resident(1, shared=1000, prompt=10), reference, shared_growth_mib=256, prompt_ratio=0.5) is False
     assert is_spill(_resident(1, shared=1000, prompt=9), reference, shared_growth_mib=256, prompt_ratio=0.5) is True
     # The pre-window reading is the idle sample. The baseline is the reference window.
     under = Observation(True, 1, shared_mib=1200, prompt_tok_s=20, shared_baseline=1000, baseline_taken=True)
     assert is_spill(under, reference, shared_growth_mib=256, prompt_ratio=0.5) is False
-    over = Observation(True, 1, shared_mib=1257, prompt_tok_s=20, shared_baseline=1000, baseline_taken=True)
+    over = Observation(True, SHARED_GATE_FROM_MIB, shared_mib=1257, prompt_tok_s=20, shared_baseline=1000, baseline_taken=True)
     assert is_spill(over, reference, shared_growth_mib=256, prompt_ratio=0.5) is True
+    below = Observation(True, 1, shared_mib=1257, prompt_tok_s=20, shared_baseline=1000, baseline_taken=True)
+    assert is_spill(below, reference, shared_growth_mib=256, prompt_ratio=0.5) is False
     idle_missing = Observation(True, 1, shared_mib=1100, prompt_tok_s=20, shared_baseline=None, baseline_taken=True)
     assert is_spill(idle_missing, reference, shared_growth_mib=256, prompt_ratio=0.5) is False
     assert is_spill(_resident(1, shared=1100, prompt=20), _resident(1, shared=None, prompt=20), shared_growth_mib=256, prompt_ratio=0.5) is True
@@ -1521,6 +1531,10 @@ def test_search_spill_and_schedule_refuse_bad_inputs():
         search(default_ctx=4096, probe=confirm_fails, abort_mib=30500, prompt_ratio=0)
     with pytest.raises(SearchError):
         search(default_ctx=4096, probe=confirm_fails, abort_mib=30500, prompt_ratio=1.1)
+    with pytest.raises(SearchError, match="shared_gate_from_mib"):
+        search(default_ctx=4096, probe=confirm_fails, abort_mib=30500, shared_gate_from_mib=-1)
+    with pytest.raises(SearchError, match="shared_gate_from_mib"):
+        search(default_ctx=4096, probe=confirm_fails, abort_mib=30500, shared_gate_from_mib=True)
 
     with pytest.raises(TimingError):
         schedule([], warmups=0, repeats=1)
@@ -1612,6 +1626,10 @@ def test_spec_rejects_a_contract_that_is_not_pre_registered(tmp_path: Path):
         validate_spec({key: value for key, value in card.items() if key != "adapter_match_tolerance_mib"})
     with pytest.raises(SpecError, match="spill_prompt_ratio"):
         validate_spec({**card, "spill_prompt_ratio": 0.7})
+    with pytest.raises(SpecError, match="shared_gate_from_mib"):
+        validate_spec({**card, "shared_gate_from_mib": 1})
+    with pytest.raises(SpecError, match="shared_gate_from_mib"):
+        validate_spec({key: value for key, value in card.items() if key != "shared_gate_from_mib"})
     # rest_s is no longer read: any value, or none, is accepted
     validate_spec({**card, "rest_s": 899})
     validate_spec({**good, "rest_s": True})

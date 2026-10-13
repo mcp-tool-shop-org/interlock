@@ -475,10 +475,10 @@ def _smoke_host() -> dict:
     }
 
 
-def _window(shared: int, *, prompt: float = _SMOKE_PROMPT) -> Observation:
+def _window(shared: int, *, prompt: float = _SMOKE_PROMPT, peak: int = 1000) -> Observation:
     return Observation(
         True,
-        1000,
+        peak,
         shared_mib=shared,
         prompt_tok_s=prompt,
         tok_s=10,
@@ -550,14 +550,16 @@ def test_a_model_resident_at_its_first_load_is_judged_against_the_floor():
     spills. A cap within 256 of the floor confirms, and baseline_ctx stays 2048.
     """
 
-    def spilling(ctx, _kind):
-        return _window(805 if ctx == 8192 else 505)
+    def spilling(ctx, kind):
+        shared = 805 if ctx == 8192 else 505
+        peak = 28452 if kind == "confirm" and ctx == 8192 else 1000
+        return _window(shared, peak=peak)
 
     found = search(default_ctx=8192, probe=spilling, abort_mib=30500, grain=2048, max_ctx=8192)
     assert found.calls[0] == ("load", 2048, 1000, 505, _SMOKE_PROMPT, "resident")
     assert found.calls[1] == ("confirm", 2048, 1000, 505, _SMOKE_PROMPT, "confirmed")
     assert ("load", 8192, 1000, 805, _SMOKE_PROMPT, "resident") in found.calls
-    assert ("confirm", 8192, 1000, 805, _SMOKE_PROMPT, "spill") in found.calls
+    assert ("confirm", 8192, 28452, 805, _SMOKE_PROMPT, "spill") in found.calls
     assert found.max_ctx == 6144
     assert found.reason == "confirmed"
     host = _smoke_host()
@@ -584,21 +586,24 @@ def test_a_model_resident_at_its_first_load_is_judged_against_the_floor():
 
 def test_a_window_300_mib_over_the_baseline_spills():
     reference = _window(505)
-    assert is_spill(_window(505 + 256), reference, shared_growth_mib=256, prompt_ratio=0.5) is False
-    assert is_spill(_window(505 + 300), reference, shared_growth_mib=256, prompt_ratio=0.5) is True
+    assert is_spill(_window(505 + 256, peak=28452), reference, shared_growth_mib=256, prompt_ratio=0.5) is False
+    assert is_spill(_window(505 + 300, peak=28452), reference, shared_growth_mib=256, prompt_ratio=0.5) is True
+    assert is_spill(_window(505 + 300, peak=28451), reference, shared_growth_mib=256, prompt_ratio=0.5) is False
 
     def probe(ctx, kind):
         shared = _SMOKE_SHARED[ctx]
+        peak = 1000
         if kind == "confirm" and ctx == 8192:
             shared = 505 + 300
-        return _window(shared)
+            peak = 28452
+        return _window(shared, peak=peak)
 
     found = search(default_ctx=2048, probe=probe, abort_mib=30500, grain=2048, max_ctx=8192)
     spilled = [call for call in found.calls if call[0] == "confirm" and call[1] == 8192]
-    assert spilled == [("confirm", 8192, 1000, 805, _SMOKE_PROMPT, "spill")]
+    assert spilled == [("confirm", 8192, 28452, 805, _SMOKE_PROMPT, "spill")]
     assert found.max_ctx == 6144
     assert found.reason == "confirmed"
-    assert found.calls[-1][5] == "confirmed"
+    assert any(call[0] == "confirm" and call[1] == 6144 and call[5] == "confirmed" for call in found.calls)
 
 
 def test_a_baseline_past_the_cuda_host_sum_is_inconclusive():
@@ -692,7 +697,7 @@ def test_both_specs_load_and_carry_the_spill_baseline_amendment():
         loaded = load_spec(path)
         validate_spec(loaded)
         text = path.read_text(encoding="utf-8")
-        assert text.count("Amendment, 2026-10-13") == 2
+        assert text.count("Amendment, 2026-10-13") == 3
         amendments = [line for line in text.splitlines() if "Amendment, 2026-10-13" in line]
         earlier = amendments[0]
         assert "lowest resident window" in earlier
@@ -703,8 +708,15 @@ def test_both_specs_load_and_carry_the_spill_baseline_amendment():
         assert "superseded" in later
         assert "floor window" in later
         assert "loaded and confirmed first" in later
+        latest = amendments[2]
+        assert "capacity pressure" in latest
+        assert "shared_gate_from_mib (28452)" in latest
+        assert "next lower confirmed window" in latest
+        assert "measured peak-per-token slope" in latest
+        assert "receipt limit is predicted" in latest
         assert loaded["spill_shared_mib"] == 256
         assert loaded["spill_prompt_ratio"] == 0.5
+        assert loaded["shared_gate_from_mib"] == 28452
         assert loaded["abort_mib"] == 30500
         assert loaded["ceiling_mib"] == 31200
     assert load_spec(E5)["id"] == "E5"

@@ -13,7 +13,7 @@ from pathlib import Path
 
 import yaml
 
-from interlock.harness.e5 import ADAPTER_MATCH_TOLERANCE_MIB, PROMPT_RATIO, SHARED_GROWTH_MIB
+from interlock.harness.e5 import ADAPTER_MATCH_TOLERANCE_MIB, PROMPT_RATIO, SHARED_GATE_FROM_MIB, SHARED_GROWTH_MIB
 from interlock.tasks import TASKS
 
 PROCEDURES = frozenset({"interleaved", "fill-card", "offrig-calibrate"})
@@ -294,6 +294,8 @@ def _fill_card(data: dict) -> None:
         )
     if data.get("spill_prompt_ratio") != PROMPT_RATIO:
         raise SpecError(f"spill_prompt_ratio is {PROMPT_RATIO}")
+    if data.get("shared_gate_from_mib") != SHARED_GATE_FROM_MIB:
+        raise SpecError(f"shared_gate_from_mib is {SHARED_GATE_FROM_MIB}")
     models = data.get("models")
     if not isinstance(models, list) or not models:
         raise SpecError("fill-card names the model roster")
