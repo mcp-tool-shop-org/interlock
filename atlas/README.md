@@ -1,17 +1,21 @@
 # interlock: how it works
 
-Mapped at 2026-10-13 from commit 0db35c8 by Atlas 1.24.0.
+Mapped at 2026-10-13 from commit cc91aed by Atlas 1.24.0.
 
 ## What this is
 
 interlock routes each job to a model, engine and device from a receipt-backed table. (written by a person)
 
-7 parts, mostly Python (87 files). Work enters through 3 doors; the busiest is CI, which reaches 2 parts. It publishes to PyPI. People run interlock.
+10 parts, mostly Python (87 files). Work enters through 3 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. People run interlock.
 
-## What changed since 2026-10-13 (4da1acd)
+## What changed since 2026-10-13 (0db35c8)
 
-- receipts/e5-2026-10-13c.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.
-- 1 file added.
+- scripts now imports src.
+- tests now imports scripts.
+- receipts is a new part, drawn from `receipts/**`.
+- scripts is a new part, drawn from `scripts/**`.
+- table is a new part, drawn from `table/**`.
+- 86 files moved, across 3 parts.
 
 ## What comes in
 
@@ -22,7 +26,7 @@ interlock routes each job to a model, engine and device from a receipt-backed ta
 ## What happens through CI
 
 1. The workflow runs tests/ in tests.
-2. That reaches src (47 files).
+2. That reaches scripts (1 file) and src (47 files).
 3. It uploads coverage to Codecov.
 
 ## Who reads the results
@@ -37,7 +41,8 @@ CI writes nothing this map can see.
 
 ## What breaks what
 
-- **src** is imported only from tests, by 1 part (tests), and sits on the path of 3 doors.
+- **src** is imported by 1 part (scripts), and by 1 more only from tests; it sits on the path of 3 doors.
+- **scripts** is imported only from tests, by 1 part (tests), and sits on the path of 1 door.
 
 ## What tends to change together
 
@@ -68,7 +73,7 @@ Nothing in this repository writes to a tracked place this map can see.
 
 ## Hand-authored
 
-People write .github/, assets/, docs/, experiments/ and the repository root; 3 writes with paths built at run time may land here.
+People write .github/, assets/, docs/, experiments/, receipts/, the repository root and table/; 3 writes with paths built at run time may land here.
 
 ## Where to start
 
@@ -82,7 +87,6 @@ Read those in order to follow one run of interlock end to end. This path follows
 - 3 writes and 4 reads use paths built at run time and are not named here.
 - 12 writes and 39 reads go to a path their caller passes, not to this repository.
 - 3 reads go to the directory the command is run in (receipts/), not to this repository.
-- 86 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 83 more.
 - Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window.
 
 Regenerate with `npx --yes @dogfood-lab/atlas map`.

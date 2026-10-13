@@ -4,45 +4,89 @@
     "assets/",
     "docs/",
     "experiments/",
-    "root"
+    "receipts/",
+    "root",
+    "table/"
   ],
   "breaks": [
     {
       "doors": 3,
-      "importedBy": [],
+      "importedBy": [
+        "scripts"
+      ],
       "importedByTests": [
         "tests"
       ],
       "kind": "part",
       "name": "src",
       "partLabel": "src"
+    },
+    {
+      "doors": 1,
+      "importedBy": [],
+      "importedByTests": [
+        "tests"
+      ],
+      "kind": "part",
+      "name": "scripts",
+      "partLabel": "scripts"
     }
   ],
   "changes": {
     "fileCounts": {
-      "added": 1,
+      "added": 0,
       "changed": 0,
-      "moved": 0,
-      "parts": 0,
+      "moved": 86,
+      "parts": 3,
       "removed": 0
     },
     "items": [
       {
-        "kind": "unassigned",
-        "sentence": "receipts/e5-2026-10-13c.jsonl is new and belongs to no part, so atlas check fails on it against the previous map.",
+        "kind": "import-added",
+        "sentence": "scripts now imports src.",
         "subjects": [
-          "receipts/e5-2026-10-13c.jsonl"
+          "scripts",
+          "src"
+        ]
+      },
+      {
+        "kind": "import-added",
+        "sentence": "tests now imports scripts.",
+        "subjects": [
+          "tests",
+          "scripts"
+        ]
+      },
+      {
+        "kind": "part",
+        "sentence": "receipts is a new part, drawn from `receipts/**`.",
+        "subjects": [
+          "receipts"
+        ]
+      },
+      {
+        "kind": "part",
+        "sentence": "scripts is a new part, drawn from `scripts/**`.",
+        "subjects": [
+          "scripts"
+        ]
+      },
+      {
+        "kind": "part",
+        "sentence": "table is a new part, drawn from `table/**`.",
+        "subjects": [
+          "table"
         ]
       },
       {
         "kind": "counts",
-        "sentence": "1 file added.",
+        "sentence": "86 files moved, across 3 parts.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "4da1acd026b09630f9a845e5f432a5ad415ddefe",
-      "generatedAt": "2026-10-13T14:47:52.222Z"
+      "commit": "0db35c8299b647b7a65db85a8e37d44e919edd71",
+      "generatedAt": "2026-10-13T17:23:12.084Z"
     },
     "unchanged": false
   },
@@ -84,9 +128,9 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 8 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 1,
-  "commit": "0db35c8299b647b7a65db85a8e37d44e919edd71",
+  "commit": "cc91aedf0475ce6a5621cce98c53b2c000f9d930",
   "defaultBranch": "main",
-  "derived": "7 parts, mostly Python (87 files). Work enters through 3 doors; the busiest is CI, which reaches 2 parts. It publishes to PyPI. People run interlock.",
+  "derived": "10 parts, mostly Python (87 files). Work enters through 3 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. People run interlock.",
   "doors": [
     {
       "checks": [],
@@ -102,6 +146,11 @@
           "boundary": "tests",
           "depth": 0,
           "files": 36
+        },
+        {
+          "boundary": "scripts",
+          "depth": 1,
+          "files": 1
         },
         {
           "boundary": "src",
@@ -184,16 +233,21 @@
   "duplicates": [],
   "duplicatesLead": null,
   "duplicatesNote": [],
-  "edges": [],
+  "edges": [
+    {
+      "from": "scripts",
+      "fromTests": false,
+      "to": "src"
+    }
+  ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-13T17:23:12.084Z",
+  "generatedAt": "2026-10-13T17:54:00.739Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "3 writes and 4 reads use paths built at run time and are not named here.",
     "12 writes and 39 reads go to a path their caller passes, not to this repository.",
     "3 reads go to the directory the command is run in (receipts/), not to this repository.",
-    "86 files belong to no part: receipts/e1-intel-2026-10-09-rerun-b8tail.jsonl, receipts/e1-intel-2026-10-09-rerun.jsonl, receipts/e1-intel-2026-10-09-rerun2-b8tail.jsonl and 83 more.",
     "Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window."
   ],
   "mainDoor": ".github/workflows/ci.yml",
@@ -202,11 +256,14 @@
     "assets": "assets",
     "docs": "docs",
     "experiments": "experiments",
+    "receipts": "receipts",
     "root": "the repository root",
+    "scripts": "scripts",
     "src": "src",
+    "table": "table",
     "tests": "tests"
   },
-  "parts": 7,
+  "parts": 10,
   "readers": [],
   "repo": "mcp-tool-shop-org/interlock",
   "sequences": [],
@@ -221,6 +278,7 @@
   "summaryFrom": "person",
   "testFiles": 59,
   "testedBy": {
+    "scripts": 1,
     "src": 33
   },
   "unnamedWrites": 3,
