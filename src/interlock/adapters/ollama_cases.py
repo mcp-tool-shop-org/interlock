@@ -3,8 +3,10 @@
 Each case is one fixture file the recorder writes. ``no_reply`` is a call that
 must not be waited out: Ollama 0.35.1 reads ``num_predict`` 0, null, or missing
 as no limit. Those three recordings used ``num_ctx`` 64 and were not bounded by
-it. ``truncate_over_num_ctx`` is a reply: on 0.35.1, ``truncate`` false with
-``num_ctx`` 8 answered, because a small ``num_ctx`` is raised to a floor. A
+it. ``truncate_over_num_ctx`` is an error at a realistic window: on 0.35.1,
+``truncate`` false with ``num_ctx`` 2048 and a 2,500-word prompt is refused
+("exceeds the available context size"). At ``num_ctx`` 8 it replied, because a
+small ``num_ctx`` is raised to a floor, so the case is recorded at 2048. A
 parameter the adapter can send and no case covers is a missing fixture.
 """
 
@@ -20,6 +22,7 @@ from interlock.adapters.ollama import generate_body
 MODEL = "qwen3:8b"
 SHORT_PROMPT = "hi"
 LONG_PROMPT = "word " * 64
+OVER_WINDOW_PROMPT = "word " * 2500  # about 2,511 tokens, over num_ctx 2048
 # The committed recording. num_ctx 64 did not stop the generate.
 NO_LIMIT_NOTE = (
     "num_ctx 64 did not bound this generate (11 prompt tokens and 144 eval tokens, "
@@ -119,11 +122,11 @@ CASES: tuple[Case, ...] = (
         "POST",
         "/api/generate",
         _generate(
-            {"num_predict": 1, "temperature": 0, "num_ctx": 8},
+            {"num_predict": 1, "temperature": 0, "num_ctx": 2048},
             truncate=False,
-            prompt=LONG_PROMPT,
+            prompt=OVER_WINDOW_PROMPT,
         ),
-        "reply",
+        "error",
         frozenset({"truncate", "num_ctx"}),
     ),
     Case(

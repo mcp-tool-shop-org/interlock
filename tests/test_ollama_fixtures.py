@@ -201,9 +201,9 @@ def test_only_records_truncate_at_the_override_window(tmp_path: Path):
     assert document["behaviour"] == "reply"
     assert any(isinstance(body, dict) and body.get("keep_alive") == 0 for _method, _url, body in bodies)
     catalog = case_by_name("truncate_over_num_ctx")
-    assert catalog.behaviour == "reply"
-    assert catalog.body["options"]["num_ctx"] == 8
-    assert catalog.body["prompt"] == "word " * 64
+    assert catalog.behaviour == "error"
+    assert catalog.body["options"]["num_ctx"] == 2048
+    assert catalog.body["prompt"] == "word " * 2500
     called = []
     refused = module.main(
         ["--model", "qwen3:8b", "--grant", "grant-t", "--only", "not-a-case"],
@@ -312,7 +312,7 @@ def _recording_transport(timeouts: list):
         options = body.get("options") if isinstance(body, dict) else None
         if isinstance(options, dict) and ("num_predict" not in options or options.get("num_predict") in (0, None)):
             return {"done": True, "eval_count": 64}
-        if isinstance(options, dict) and options.get("num_ctx") == 8:
+        if isinstance(options, dict) and options.get("num_ctx") == 2048 and len(str(body.get("prompt", "")).split()) > 2048:
             return {"error": "the prompt exceeds the context length"}
         return {"done": True, "prompt_eval_count": 1}
 
