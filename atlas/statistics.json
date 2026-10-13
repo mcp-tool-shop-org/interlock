@@ -99,7 +99,7 @@
       "confidence": "low",
       "highWater": null,
       "name": "src",
-      "qualifyingSourceCommits": 1,
+      "qualifyingSourceCommits": 2,
       "rebaseline": null
     },
     {
@@ -115,7 +115,7 @@
       "confidence": "full",
       "highWater": null,
       "name": "tests",
-      "qualifyingSourceCommits": 62,
+      "qualifyingSourceCommits": 63,
       "rebaseline": null
     }
   ],
@@ -148,8 +148,8 @@
         "path": ".python-version"
       },
       {
-        "commits": 19,
-        "lines": 70,
+        "commits": 20,
+        "lines": 72,
         "path": "CHANGELOG.md"
       },
       {
@@ -213,8 +213,8 @@
         "path": "assets/logo/switchyard_64.png"
       },
       {
-        "commits": 27,
-        "lines": 652,
+        "commits": 28,
+        "lines": 661,
         "path": "atlas/README.md"
       },
       {
@@ -223,18 +223,18 @@
         "path": "atlas/boundaries.yaml"
       },
       {
-        "commits": 27,
-        "lines": 1964,
+        "commits": 28,
+        "lines": 1991,
         "path": "atlas/page.json"
       },
       {
-        "commits": 27,
-        "lines": 5257,
+        "commits": 28,
+        "lines": 5322,
         "path": "atlas/statistics.json"
       },
       {
-        "commits": 27,
-        "lines": 29964,
+        "commits": 28,
+        "lines": 29976,
         "path": "atlas/structure.json"
       },
       {
@@ -1054,6 +1054,11 @@
       },
       {
         "commits": 1,
+        "lines": 13,
+        "path": "src/interlock/adapters/ollama_cases.py"
+      },
+      {
+        "commits": 1,
         "lines": 11,
         "path": "src/interlock/cli.py"
       },
@@ -1433,8 +1438,8 @@
         "path": "tests/fixtures/ollama/0.35.1/think_off.json"
       },
       {
-        "commits": 1,
-        "lines": 116,
+        "commits": 2,
+        "lines": 213,
         "path": "tests/fixtures/ollama/0.35.1/truncate_over_num_ctx.json"
       },
       {
@@ -1533,8 +1538,8 @@
         "path": "tests/test_old_name.py"
       },
       {
-        "commits": 3,
-        "lines": 593,
+        "commits": 4,
+        "lines": 601,
         "path": "tests/test_ollama_fixtures.py"
       },
       {
@@ -1613,51 +1618,51 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-10-12T23:17:58.951Z",
+  "generatedAt": "2026-10-13T00:20:55.054Z",
   "generatedFrom": {
-    "commit": "3cdd4cae332185bbf7addf53a04ea72f3dcd72c5"
+    "commit": "7c1508b5474f1ed476bc97767c995a02cd4ddb90"
   },
   "pairs": [
     {
       "a": "atlas/README.md",
       "b": "atlas/page.json",
-      "either": 24,
-      "shared": 24,
+      "either": 25,
+      "shared": 25,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/statistics.json",
-      "either": 24,
-      "shared": 24,
+      "either": 25,
+      "shared": 25,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/structure.json",
-      "either": 24,
-      "shared": 24,
+      "either": 25,
+      "shared": 25,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/statistics.json",
-      "either": 24,
-      "shared": 24,
+      "either": 25,
+      "shared": 25,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/structure.json",
-      "either": 24,
-      "shared": 24,
+      "either": 25,
+      "shared": 25,
       "strength": 1
     },
     {
       "a": "atlas/statistics.json",
       "b": "atlas/structure.json",
-      "either": 24,
-      "shared": 24,
+      "either": 25,
+      "shared": 25,
       "strength": 1
     },
     {
@@ -1769,16 +1774,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-10-12T19:17:40-04:00",
-    "inScopeFiles": 234,
+    "headDate": "2026-10-12T17:19:02-07:00",
+    "inScopeFiles": 233,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 89,
+    "qualifyingCommits": 90,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-04-15T23:17:40.000Z",
+    "since": "2026-04-16T00:19:02.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",
