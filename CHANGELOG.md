@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The Ollama supervisor stops a listener only when port 11434 has exactly one, and only when that process is the Ollama install `serve` starts. Zero listeners, two or more, a different executable, or a path that cannot be read refuses and stops nothing. The restart record keeps the pid and the path that was checked. Port 11490 is not queried on that path. E4b refuses a dirty worktree at the start, before any device, for the block and the pilot. E4b reads flash attention and the KV cache type from the model's first-load lines, and keeps the environment value as `config_flash_attention`. A missing load line refuses before any measured slot. The committed E4b receipts are unchanged. (R&D after #83 and #88, 2026-10-13)
+
 - OpenSSF Scorecard. `.github/workflows/scorecard.yml` runs weekly, on demand, and when branch protection changes. It publishes the result and uploads the SARIF file. The README and its translations show the Scorecard badge. CI and the release workflow now set a top-level read-only token permission. The workflow does not run on push.
 
 - E5 waits until the pinned adapter's dedicated reading is back within `settle_tolerance_mib` (512) of the idle reading taken before the model's first load after any confirm count, whoever unloads the runner (`keep_alive` 0 included), and only then sends the measured request. That reading is the call's pre-call reading and it carries `count_ran`. `unloaded` still means the harness unloaded. The reading taken before the count is the pre-count reading. The resident floor applies only where no count comes before the call. A card that does not settle makes the model inconclusive. A load, which does not count, keeps the resident-floor wait. (spec amendment 2026-10-13, after #110)

@@ -42,7 +42,7 @@ def test_read_git_refuses_a_short_sha(tmp_path):
 
 def test_read_git_is_clean_only_on_a_successful_empty_porcelain(tmp_path):
     clean = read_git(tmp_path, lambda args: _done(SHA + "\n") if "rev-parse" in args else _done(""))
-    assert clean == {"git_sha": SHA, "clean_tree": True}
+    assert clean == {"git_sha": SHA, "clean_tree": True, "porcelain": []}
     dirty = read_git(tmp_path, lambda args: _done(SHA) if "rev-parse" in args else _done(" M x\n"))
     assert dirty["clean_tree"] is False
 

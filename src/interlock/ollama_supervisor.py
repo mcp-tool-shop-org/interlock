@@ -10,11 +10,15 @@ alone.
 Only port 11434 is restarted. Port 11490 is offrig's CPU indexer, and no
 grant covers it. Health still reports it. A down 11490 stops the run.
 
-The process that is stopped is the one listening on 11434. Nothing is
-killed by name. The other port's server is not touched. The tray app is
-not touched unless it is the listener. Immediately before that stop, the
-restart re-checks the grant, the watchdog heartbeat, and that ``/api/ps``
-lists no model from another session.
+The process that is stopped is the one listening on 11434, and only when
+that port has exactly one listener whose executable is the Ollama install
+``serve`` starts. Zero, or two or more, or a path that is missing or is
+not that install, refuses and stops nothing. Nothing is killed by name.
+The other port's server is not touched, and 11490 is not queried on the
+way to that decision. The tray app is not touched unless it is the
+listener. Immediately before that stop, the restart re-checks the grant,
+the watchdog heartbeat, and that ``/api/ps`` lists no model from another
+session. The record keeps the pid and the path that was checked.
 
 ``ollama serve`` is replayed from the start line recorded at run start:
 the argv, every ``OLLAMA_*`` and ``LLAMA_ARG_*`` variable, and the log
@@ -165,6 +169,7 @@ class RestartRecord:
     seconds_to_healthy: float | None
     version: str | None
     note: str | None = None
+    checked_path: str | None = None
 
     def as_dict(self) -> dict:
         return {
@@ -176,6 +181,7 @@ class RestartRecord:
             "seconds_to_healthy": self.seconds_to_healthy,
             "version": self.version,
             "note": self.note,
+            "checked_path": _receipt_path(self.checked_path),
         }
 
 
@@ -218,6 +224,10 @@ class SupervisorSeams:
     process_env: object = None
     log_size: object = None
     log_segment: object = None
+    listening: object = None
+    executable: object = None
+    localappdata: object = None
+    platform: object = None
 
     def __post_init__(self) -> None:
         if self.now is None:
@@ -777,6 +787,50 @@ def serve_argv(platform: str | None = None, *, localappdata: str | None = None) 
     return [exe, "serve"]
 
 
+# A home directory, not a particular account. Receipts refuse the prefix.
+_HOME_PREFIX = re.compile(
+    r"(?i)(?:[A-Za-z]:[\\/]+Users[\\/]+[^\\/]+|[\\/]Users[\\/]+[^\\/]+|[\\/]home[\\/]+[^\\/]+)"
+)
+
+
+def _receipt_path(path: str | None) -> str | None:
+    """The path a receipt may store. A home prefix becomes ``~``."""
+
+    if not isinstance(path, str):
+        return None
+    return _HOME_PREFIX.sub("~", path)
+
+
+def executables_match(found: str, expected: str, *, platform: str) -> bool:
+    """Whether ``found`` is the executable ``expected`` names.
+
+    Windows compares the resolved paths without regard to case. Elsewhere a
+    bare expected name matches the file name, and is not resolved against
+    the working directory. An absolute expected path has to match exactly.
+    """
+
+    if platform != "win32" and expected == Path(expected).name:
+        return Path(found).name == expected
+    left = str(Path(found).resolve())
+    right = str(Path(expected).resolve())
+    if platform == "win32":
+        return left.replace("\\", "/").casefold() == right.replace("\\", "/").casefold()
+    return left == right
+
+
+def pid_executable(pid: int, psutil_module=None) -> str | None:
+    """The executable path of ``pid``. A path that cannot be read is None."""
+
+    module = psutil_module if psutil_module is not None else _load_psutil()
+    try:
+        path = module.Process(pid).exe()
+    except Exception:
+        return None
+    if not isinstance(path, str) or not path.strip():
+        return None
+    return path
+
+
 def spawn_detached(
     argv: list[str],
     env: dict,
@@ -964,6 +1018,7 @@ class OllamaSupervisor:
         self.log_offset: int | None = None
         self._backend_pending = False
         self._segment_env: dict | None = None
+        self._checked_path: str | None = None
 
     @property
     def recorded(self) -> ServerFingerprint | None:
@@ -1320,7 +1375,59 @@ class OllamaSupervisor:
             return False
         return model_listed(payload, model)
 
+    def _listening_ids(self, port: int) -> list[int]:
+        """Distinct listening pids on ``port``. A seam asks that port only."""
+
+        ask = getattr(self.seams, "listening", None)
+        if callable(ask):
+            raw = ask(port)
+        else:
+            raw = [row.pid for row in owners(list(self.seams.processes()), port)]
+        found: list[int] = []
+        for pid in raw or []:
+            if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0 or pid in found:
+                continue
+            found.append(pid)
+        return found
+
+    def _install_exe(self) -> str:
+        platform = getattr(self.seams, "platform", None) or sys.platform
+        local = getattr(self.seams, "localappdata", None)
+        if platform == "win32":
+            return serve_argv("win32", localappdata=local if isinstance(local, str) else None)[0]
+        return serve_argv(str(platform))[0]
+
+    def _one_listener(self, port: int) -> tuple[int, str]:
+        """The one pid this restart may stop, and the path that was checked.
+
+        ``processes()`` asks every local port, including 11490. This does not.
+        """
+
+        pids = self._listening_ids(port)
+        if len(pids) != 1:
+            listed = ", ".join(str(pid) for pid in pids) if pids else "none"
+            raise SupervisorStop(
+                f"refusing to stop: port {port} has {len(pids)} listening pids ({listed})"
+            )
+        pid = pids[0]
+        read = getattr(self.seams, "executable", None)
+        path = None
+        if callable(read):
+            try:
+                path = read(pid)
+            except Exception:
+                path = None
+        if not isinstance(path, str) or not path.strip():
+            raise SupervisorStop(f"refusing to stop pid {pid}: its executable path could not be read")
+        platform = getattr(self.seams, "platform", None) or sys.platform
+        if not executables_match(path, self._install_exe(), platform=str(platform)):
+            raise SupervisorStop(
+                f"refusing to stop pid {pid}: {_receipt_path(path)} is not the Ollama install"
+            )
+        return pid, path
+
     def _restart(self, url: str, why: str, model: str | None = None) -> RestartRecord:
+        self._checked_path = None
         port = port_of(url)
         if port == 11490:
             raise SupervisorStop(
@@ -1350,10 +1457,10 @@ class OllamaSupervisor:
             raise SupervisorStop(
                 f"restart cap of {self.config.max_restarts} reached; the run stops"
             )
-        owned = owners(list(self.seams.processes()), port)
-        old_pids = [row.pid for row in owned]
-        for pid in old_pids:
-            self.seams.stop(pid)
+        pid, checked = self._one_listener(port)
+        self._checked_path = checked
+        self.seams.stop(pid)
+        old_pids = [pid]
         started = float(self.seams.clock())
         self.log_offset = self._note_offset()
         try:
@@ -1381,8 +1488,7 @@ class OllamaSupervisor:
                 "the process that owned the port is still the one that came back; the run stops",
             )
         version, healthy_at = self._wait_until_healthy(url, why, old_pids, new_pid, started)
-        listening = [row.pid for row in owners(list(self.seams.processes()), port)]
-        if new_pid not in listening:
+        if new_pid not in self._listening_ids(port):
             self._fail(
                 url,
                 why,
@@ -1482,6 +1588,7 @@ class OllamaSupervisor:
             seconds_to_healthy=seconds,
             version=version,
             note=note,
+            checked_path=self._checked_path,
         )
         self.restarts.append(record)
         self._epoch += 1
@@ -1562,6 +1669,17 @@ def real_seams(*, run=None, platform: str | None = None, popen=None, connection=
             return None
         return payload
 
+    def listening(port: int) -> list[int]:
+        # 11490 is the CPU indexer. Refuse before any query, including this seam.
+        if int(port) == 11490:
+            raise SupervisorStop(
+                "Ollama on port 11490 is not restarted. It is the CPU indexer, and no grant covers it."
+            )
+        return listening_pids(int(port), run=run, platform=system)
+
+    def executable(pid: int) -> str | None:
+        return pid_executable(pid)
+
     def process_env(url: str):
         """The listener's environment. A test that injects ``run`` has no live process."""
 
@@ -1588,4 +1706,8 @@ def real_seams(*, run=None, platform: str | None = None, popen=None, connection=
         process_env=process_env,
         log_size=log_byte_size,
         log_segment=read_log_from,
+        listening=listening,
+        executable=executable,
+        localappdata=os.environ.get("LOCALAPPDATA"),
+        platform=system,
     )
