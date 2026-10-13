@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Tests: the run-guard tests pass a fake slot reader. The real reader walks every process on the host, about 2.4 s a reading on the rig (some 500 processes), so the watcher test ran 13–16 s there against its 10 s bound while CI, with a few dozen processes, passed. The file runs in 24 s on the rig instead of 53 s.
+
 - Handbook: the experiments page no longer says the receipt records the spec blob. The blob is checked against the commit before the run and printed by `--dry-run`. An E4b receipt records `git_sha` and `clean_tree`. A fill-card receipt records `experiment_spec` and `run_id`, and when preflight ran it also records `git_sha` and `clean_tree`. Any other shared-runner receipt records `experiment_spec` and `run_id` only. The block 3 section says the Intel pairs were refused because the harness started those calls before the 5090 companion was steadily decoding, and that the dated amendment made the harness wait for one steady warm decode. The band, the 22.5 MHz tolerance and the estimator did not change.
 
 - E5's shared gate counts only under capacity pressure. It applies when the window's peak dedicated on the pinned adapter is at or above `shared_gate_from_mib` (28452, which is abort_mib minus one grain). Below that, shared growth is recorded and is not a spill. The prompt-rate gate is a cliff against the next lower confirmed window, not against the floor. After two resident loads, the next peak is predicted from their measured slope, and `predicted_over` applies only when that prediction reaches abort_mib. When that stops the search, the receipt limit is `predicted`. `interlock run --models` measures a subset of a fill-card roster and records that subset. (spec amendment 2026-10-13, after e5-2026-10-13b)

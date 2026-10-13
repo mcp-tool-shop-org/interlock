@@ -128,6 +128,9 @@ def _hooks(clock, gate_exit, *, ram=None, rss=5 * GIB, interval=0.01):
         rss_sampler=lambda: rss,
         exit_fn=gate_exit,
         interval_s=interval,
+        # The real slot reader walks every process on the host: about 2.4 s a reading on the
+        # rig (some 500 processes), which put the watcher test over its 10 s bound.
+        slot_reader=lambda drive: {},
     ), ram
 
 
@@ -353,7 +356,12 @@ def test_ram_below_the_stop_does_nothing_and_every_row_records_the_guard(tmp_pat
 
 def test_without_psutil_the_guard_records_unrecorded_and_the_run_goes_on(tmp_path):
     repo, spec_path = _spec(tmp_path)
-    hooks = WatchHooks(ram_sampler=None, rss_sampler=None, exit_fn=lambda code: pytest.fail("must not exit"))
+    hooks = WatchHooks(
+        ram_sampler=None,
+        rss_sampler=None,
+        exit_fn=lambda code: pytest.fail("must not exit"),
+        slot_reader=lambda drive: {},  # no psutil means no process walk either
+    )
 
     class Plain(BlockingAdapter):
         def run(self, request):
