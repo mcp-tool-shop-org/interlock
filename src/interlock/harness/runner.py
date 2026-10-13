@@ -136,8 +136,48 @@ def _storage_lines(spec: dict) -> list[str]:
     return lines
 
 
-def dry_run(spec_path: Path, repo: Path, pilot: bool = False, pairs: list[str] | None = None) -> str:
+def parse_models(text: str | None) -> list[str] | None:
+    """Comma-separated fill-card model names. None means the whole roster."""
+
+    if text is None:
+        return None
+    names = [part.strip() for part in str(text).split(",")]
+    if not names or any(not name for name in names):
+        raise RunnerError("--models names at least one model")
+    return names
+
+
+def resolve_models(spec: dict, models: list[str] | None) -> tuple[list[dict], list[str] | None]:
+    """The roster entries this run measures, in spec order. None records no subset."""
+
+    roster = [entry for entry in spec.get("models") or [] if isinstance(entry, dict)]
+    if models is None:
+        return roster, None
+    if not isinstance(models, (list, tuple)) or not models:
+        raise RunnerError("--models names at least one model")
+    known = [entry.get("model") for entry in roster]
+    unknown = [name for name in models if name not in known]
+    if unknown:
+        raise RunnerError(f"unknown model: {unknown[0]}")
+    if len(list(models)) != len(set(models)):
+        raise RunnerError("a model is named more than once")
+    chosen = [entry for entry in roster if entry.get("model") in set(models)]
+    return chosen, [entry["model"] for entry in chosen]
+
+
+def dry_run(
+    spec_path: Path,
+    repo: Path,
+    pilot: bool = False,
+    pairs: list[str] | None = None,
+    models: list[str] | None = None,
+) -> str:
     spec = load_spec(spec_path)
+    if models is not None and spec.get("procedure") != "fill-card":
+        raise RunnerError("--models is for a fill-card spec")
+    recorded_models = None
+    if models is not None:
+        _chosen, recorded_models = resolve_models(spec, models)
     if pilot and spec.get("id") != "E4b":
         from interlock.harness.e4b import E4bError
 
@@ -193,6 +233,8 @@ def dry_run(spec_path: Path, repo: Path, pilot: bool = False, pairs: list[str] |
         lines.append(f"abort_mib: {spec['abort_mib']}")
         lines.append(f"ceiling_mib: {spec['ceiling_mib']}")
         lines.append(f"models: {len(spec['models'])}")
+        if recorded_models is not None:
+            lines.append("models measured: " + ", ".join(recorded_models))
         lines.append(f"spill_shared_mib: {spec['spill_shared_mib']}")
         lines.append(f"spill_prompt_ratio: {spec['spill_prompt_ratio']}")
         lines.append("the sampler aborts at abort_mib and does not wait for the watchdog")
@@ -208,6 +250,14 @@ def dry_run(spec_path: Path, repo: Path, pilot: bool = False, pairs: list[str] |
         lines.append("later shared and dedicated reads use the pinned instance")
         lines.append("that floor confirm is the reference for the shared gate and the prompt-rate gate")
         lines.append("a window spills when its shared reading exceeds that floor confirm by more than spill_shared_mib")
+        lines.append("that sentence is superseded when the peak dedicated is below shared_gate_from_mib")
+        lines.append(f"shared_gate_from_mib: {spec['shared_gate_from_mib']}")
+        lines.append("the shared gate counts only under capacity pressure")
+        lines.append("the shared gate applies at or above shared_gate_from_mib")
+        lines.append("below shared_gate_from_mib, shared growth is recorded and is not a spill")
+        lines.append("the prompt-rate gate is a cliff against the next lower confirmed window")
+        lines.append("a confirm spills when its prompt rate is under spill_prompt_ratio times that neighbour")
+        lines.append("the floor confirm stays the reference for the CUDA_Host check")
         lines.append("a missing shared reading during a window is still a spill")
         lines.append("the floor confirm is checked against the idle shared reading and the CUDA_Host buffer sum")
         lines.append("a baseline that exceeds that sum by more than 256 MiB is inconclusive and is not confirmed")
@@ -238,6 +288,9 @@ def dry_run(spec_path: Path, repo: Path, pilot: bool = False, pairs: list[str] |
         lines.append("closing the request does not return the memory a load already allocated")
         lines.append("a window predicted to reach abort_mib is predicted_over and is not loaded")
         lines.append("one measured window bounds the next context from that window's share")
+        lines.append("after two resident loads the next peak is predicted from their measured slope")
+        lines.append("predicted_over applies when that slope reaches abort_mib")
+        lines.append("limit is predicted when predicted_over stopped the search")
         lines.append("a second window with no bound stops the row")
         lines.append("one model at a time; unloaded between models; rest is not taken here")
         lines.append("the ceiling is never loaded")
@@ -2017,6 +2070,7 @@ def run_spec(
     e4b_seams=None,
     quarantine: Path | None = None,
     pairs: list[str] | None = None,
+    models: list[str] | None = None,
 ) -> list[dict]:
     """Run a committed spec. Every refusal lands before device contact.
 
@@ -2035,6 +2089,11 @@ def run_spec(
 
     _refuse_repo_interpreter(root, Path(python_path or sys.executable))
     spec = load_spec(spec_path)
+    recorded_models = None
+    if models is not None:
+        if spec.get("procedure") != "fill-card":
+            raise RunnerError("--models is for a fill-card spec")
+        _chosen, recorded_models = resolve_models(spec, models)
     if spec.get("id") == "E4b":
         from interlock.harness.e4b import run_from_cli
 
@@ -2105,6 +2164,7 @@ def run_spec(
                 marker=marker,
                 notes=notes,
                 supervisor=supervisor,
+                models=recorded_models,
             )
         if spec["procedure"] != "interleaved":
             raise GuardError(

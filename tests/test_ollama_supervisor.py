@@ -1293,6 +1293,7 @@ def _fill_spec(models: list[dict], **extra) -> dict:
         "spill_shared_mib": 256,
         "adapter_match_tolerance_mib": 512,
         "spill_prompt_ratio": 0.5,
+        "shared_gate_from_mib": 28452,
         "max_ctx": 8192,
         "shift": False,
         "truncate": False,
