@@ -1,0 +1,18 @@
+# Two adapters within 512 MiB of nvidia-smi 2490. The pin must refuse.
+# 2508 MiB is 2629828608 bytes. 2400 MiB is 2516582400 bytes.
+# Neither instance is chosen.
+
+[nvidia-smi]
+2490
+
+[dedicated]
+luid_0x00000000_0x000140e1_phys_0=2629828608
+luid_0x00000000_0x00011111_phys_0=2516582400
+luid_0x00000000_0x00012222_phys_0=0
+luid_0x00000000_0x00013333_phys_0=0
+
+[shared]
+luid_0x00000000_0x000140e1_phys_0=77594624
+luid_0x00000000_0x00011111_phys_0=0
+luid_0x00000000_0x00012222_phys_0=0
+luid_0x00000000_0x00013333_phys_0=0

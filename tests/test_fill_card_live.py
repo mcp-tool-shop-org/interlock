@@ -6,6 +6,7 @@ Nothing here opens a socket, runs nvidia-smi, or reads a GPU counter.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import subprocess
 import threading
@@ -27,6 +28,7 @@ from interlock.harness.fill import (
     MEMORY_ARGV,
     NVIDIA_SMI_ARGV,
     CardSampler,
+    FillPreflightError,
     FillSeams,
     adapter_usage,
     driver_cuda,
@@ -75,6 +77,7 @@ def _spec(models, *, max_ctx=8192):
         "confirm_num_predict": 1,
         "sample_ms": 200,
         "spill_shared_mib": 256,
+        "adapter_match_tolerance_mib": 512,
         "spill_prompt_ratio": 0.5,
         "max_ctx": max_ctx,
         "shift": False,
@@ -154,6 +157,7 @@ class _Transport:
         self._release = threading.Event()
         self.shown = None
         self.calls = []
+        self.before_generate = None
         self.unloads = []
         self.abort_unloads = []
         self.order = []
@@ -203,6 +207,8 @@ class _Transport:
             if self.loaded is None:
                 return {"models": []}
             return {"models": [self.loaded]}
+        if url.endswith("/api/version"):
+            return {"version": "0.35.1"}
         if url.endswith("/api/tags"):
             if self.omit_tags:
                 return {"models": []}
@@ -241,6 +247,8 @@ class _Transport:
         self.state["confirm"] = (not body.get("raw")) and body.get("prompt") != SEED
         self.state["busy"] = True
         self.events.append(("load", self.state["ctx"]))
+        if callable(self.before_generate) and not body.get("raw") and body.get("prompt") != "":
+            self.before_generate()
         if self.explode and not body.get("raw"):
             raise RuntimeError("generate exploded")
         holding = (
@@ -707,6 +715,24 @@ def test_dry_run_names_the_confirmation_count(monkeypatch):
     assert "prompt built at run time by prompt_eval_count" not in text
     assert "abort_mib: 30500" in text
     assert "ceiling_mib: 31200" in text
+    assert "adapter_match_tolerance_mib: 512" in text
+    assert "the tolerance is a matching allowance and is not the spill threshold" in text
+    assert "pinned once at run start" in text
+    assert "zero or several instances within tolerance refuses before any load" in text
+    assert "later shared and dedicated reads use the pinned instance" in text
+    assert "a missing shared reading during a window is still a spill" in text
+    assert "preflight samples nvidia-smi, both counters, the server log, the ggml-cuda sha, git, and driver CUDA before any load" in text
+    assert "driver CUDA accepts CUDA Version and CUDA UMD Version" in text
+    assert "a missing log or dll refuses at preflight" in text
+    assert "the log is INTERLOCK_OLLAMA_LOG, else the 11434 listener parent's redirect" in text
+    assert "the tray app log is never a fallback" in text
+    assert "an unresolved log refuses at preflight" in text
+    assert "OLLAMA_HOST 127.0.0.1:11434" in text
+    assert "an empty KV cache type is unset" in text
+    assert "gated on the first-load lines" in text
+    assert "a missing load line refuses before any measured window" in text
+    assert "the runner pid is llama-server.exe and stays record-only" in text
+    assert "the exe is INTERLOCK_OLLAMA_EXE, else the 11434 listener" in text
     assert "quant is read from /api/show at run time" in text
     assert "closing the request does not return the memory a load already allocated" in text
     assert "one measured window bounds the next context from that window's share" in text
@@ -874,7 +900,9 @@ def test_readers_parse_fake_output_and_do_not_guess(tmp_path: Path):
     assert driver_cuda(header) == "driver 13.2"
     assert driver_cuda("no cuda header\n") is None
     assert runner_pid(["42 7 ollama.exe", "9 7 ollama.exe"]) is None
-    assert runner_pid(["42 7 OLLAMA.EXE"]) == 42
+    assert runner_pid(["42 7 ollama.exe"]) is None
+    assert runner_pid(["42 7 llama-server.exe"]) == 42
+    assert runner_pid(["42 7 LLAMA-SERVER.EXE"]) == 42
     assert runner_pid([]) is None
     missing = facts_from_log(None)
     assert missing["flash_attention"] == "unrecorded"
@@ -916,7 +944,8 @@ def test_readers_parse_fake_output_and_do_not_guess(tmp_path: Path):
         if "cuda_version" in script or "cuda_version" in " ".join(argv):
             raise AssertionError(argv)
         if "11434" in script:
-            return Completed("42 100 ollama.exe\n")
+            assert "llama-server.exe" in script
+            return Completed("42 100 llama-server.exe\n")
         raise AssertionError(argv)
 
     seen = []
@@ -929,6 +958,8 @@ def test_readers_parse_fake_output_and_do_not_guess(tmp_path: Path):
 
     seams = real_fill_seams(Adapter(), run=run, read_counter=read_counter)
     assert seams.card_mib() == 20000
+    assert seams.shared_mib() is None
+    seams.bind_pin(_GPU)
     assert seams.shared_mib() == 30
     assert seams.dedicated_mib() == 20000
     assert seams.driver() == "581.29"
@@ -942,8 +973,8 @@ def test_readers_parse_fake_output_and_do_not_guess(tmp_path: Path):
     assert not any("cuda_version" in " ".join(argv) for argv in seen)
     assert seams.threaded is True
     counters["mode"] = "ambiguous"
-    assert seams.shared_mib() is None
-    assert seams.dedicated_mib() is None
+    assert seams.shared_mib() == 30
+    assert seams.dedicated_mib() == 20000
 
 
 def test_the_sampler_loop_stops_at_abort_without_a_device():
@@ -1013,3 +1044,407 @@ def test_the_runtime_check_refuses_confirm_num_predict_before_the_card(tmp_path:
             wall=lambda: 0.0,
             marker=Marker(),
         )
+
+
+_SERVER_LOG = (
+    'msg="server config" env="map[OLLAMA_FLASH_ATTENTION:true OLLAMA_KV_CACHE_TYPE:q8_0 '
+    'OLLAMA_HOST:http://127.0.0.1:11434 OLLAMA_CONTEXT_LENGTH:8192]"\n'
+    "load_backend: loaded CUDA backend from C:/ollama/lib/ollama/cuda_v13/ggml-cuda.dll\n"
+)
+_DLL_BYTES = b"cuda-bytes"
+_GPU_LUID = "luid_0x00000000_0x000140e1_phys_0"
+
+
+def _clear_fill_env(monkeypatch) -> None:
+    for name in (
+        "INTERLOCK_OLLAMA_LOG",
+        "INTERLOCK_OLLAMA_EXE",
+        "SWITCHYARD_OLLAMA_LOG",
+        "SWITCHYARD_OLLAMA_EXE",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+
+def _fixture_text(name: str) -> dict[str, str]:
+    sections: dict[str, list[str]] = {}
+    current = None
+    for line in (ROOT / "tests" / "fixtures" / "e5" / name).read_text(encoding="utf-8").splitlines():
+        if line.startswith("#") or not line.strip():
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            current = line[1:-1]
+            sections[current] = []
+            continue
+        if current is not None:
+            sections[current].append(line)
+    return {key: "\n".join(lines) + "\n" for key, lines in sections.items()}
+
+
+class _Completed:
+    def __init__(self, stdout: str, returncode: int = 0) -> None:
+        self.stdout = stdout
+        self.returncode = returncode
+
+
+def _install_tree(tmp_path: Path, *, log: bool = True, dll: bool = True) -> dict:
+    root = tmp_path / "dist"
+    exe = root / "ollama.exe"
+    exe.parent.mkdir(parents=True, exist_ok=True)
+    exe.write_bytes(b"exe")
+    dll_path = root / "lib" / "ollama" / "cuda_v13" / "ggml-cuda.dll"
+    if dll:
+        dll_path.parent.mkdir(parents=True, exist_ok=True)
+        dll_path.write_bytes(_DLL_BYTES)
+    app = tmp_path / "appdata"
+    log_path = app / "Ollama" / "server.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    if log:
+        log_path.write_text(_SERVER_LOG, encoding="utf-8", newline="\n")
+    return {"exe": exe, "dll": dll_path, "log": log_path, "app": app}
+
+
+def _zero_dedicated(text: str) -> str:
+    lines = []
+    for line in text.splitlines():
+        if "=" not in line:
+            continue
+        name, _value = line.split("=", 1)
+        lines.append(f"{name}=0")
+    return "\n".join(lines) + "\n"
+
+
+def _live_commands(install: dict, fault: str):
+    idle = _fixture_text("idle-card-pin.txt")
+    header = (ROOT / "tests" / "fixtures" / "e5" / "nvidia-smi-617.42.txt").read_text(encoding="utf-8")
+    if fault == "several":
+        dedicated = _fixture_text("two-adapters-within-tolerance.txt")["dedicated"]
+    elif fault == "zero":
+        dedicated = _zero_dedicated(idle["dedicated"])
+    else:
+        dedicated = idle["dedicated"]
+    shared = "luid_0x00000000_0x00011111_phys_0=0\n" if fault == "shared" else idle["shared"]
+    nvidia = "nope\n" if fault == "nvidia" else idle["nvidia-smi"]
+    if fault == "cuda":
+        header = "NVIDIA-SMI 617.42    Driver Version: 617.42    KMD Version: 617.42\n"
+    seen = []
+
+    def run(argv, **kwargs):
+        argv = tuple(argv)
+        seen.append(argv)
+        if argv == MEMORY_ARGV:
+            return _Completed(nvidia)
+        if argv == NVIDIA_SMI_ARGV:
+            return _Completed(header)
+        if argv == DRIVER_ARGV:
+            return _Completed("617.42\n")
+        if argv and argv[0] == "powershell":
+            script = argv[-1]
+            if "llama-server.exe" in script:
+                return _Completed("77 5 llama-server.exe\n")
+            if "CommandLine" in script:
+                return _Completed(f'cmd.exe /c ollama serve >> "{install["log"]}" 2>&1')
+            if "ConvertTo-Json" in script:
+                return _Completed(json.dumps({"exe": str(install["exe"])}))
+        raise AssertionError(argv)
+
+    def read_counter(counter):
+        if counter == ADAPTER_DEDICATED:
+            return dedicated
+        if counter == ADAPTER_SHARED:
+            return shared
+        raise AssertionError(counter)
+
+    return run, read_counter, seen
+
+
+def _committed_repo(tmp_path: Path, spec: dict, *, dirty: bool = False, folder: str = "repo"):
+    repo = tmp_path / folder
+    repo.mkdir()
+    (repo / ".gitignore").write_text(
+        "receipts/*.run.json\nreceipts/*.tmp\nreceipts/*.stop\nreceipts/*.stop.done\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    spec_path = _bind(repo, spec)
+    if dirty:
+        (repo / "DIRTY").write_text("dirty\n", encoding="utf-8", newline="\n")
+    return repo, spec_path
+
+
+class _Probe:
+    """Accepts the empty-card check and refuses anything that would load."""
+
+    def __init__(self) -> None:
+        self.calls = []
+
+    def __call__(self, method, url, body):
+        self.calls.append((method, url, body))
+        if str(url).endswith("/api/ps"):
+            return {"models": []}
+        raise AssertionError(f"load before refusal: {method} {url}")
+
+
+def _no_load(calls) -> None:
+    assert not any(str(url).endswith("/api/show") or str(url).endswith("/api/generate") for _m, url, _b in calls)
+
+
+@pytest.mark.parametrize(
+    ("fault", "message"),
+    [
+        ("nvidia", "nvidia-smi memory.used returned no number"),
+        ("zero", "zero instances within adapter_match_tolerance_mib"),
+        ("several", "several instances within adapter_match_tolerance_mib"),
+        ("shared", "Shared Usage returned no number"),
+        ("log", "server log"),
+        ("dll", "ggml-cuda.dll"),
+        ("cuda", "driver CUDA did not parse"),
+        ("git", "40-hex"),
+        ("git-down", "exit code"),
+        ("tolerance", "matching allowance"),
+    ],
+)
+def test_a_preflight_failure_refuses_before_any_load(tmp_path: Path, monkeypatch, fault, message):
+    _clear_fill_env(monkeypatch)
+    install = _install_tree(tmp_path, log=fault != "log", dll=fault != "dll")
+    monkeypatch.setenv("LOCALAPPDATA", str(install["app"]))
+    if fault == "git":
+        monkeypatch.setattr(
+            "interlock.harness.e4b.read_git",
+            lambda repo, run: {"git_sha": "abc", "clean_tree": True},
+        )
+    if fault == "git-down":
+        def _down(repo, run):
+            from interlock.harness.e4b import E4bError
+
+            raise E4bError("git rev-parse HEAD failed with exit code 1")
+
+        monkeypatch.setattr("interlock.harness.e4b.read_git", _down)
+    spec = _spec([_model()])
+    if fault == "tolerance":
+        spec["adapter_match_tolerance_mib"] = 256
+    repo, spec_path = _committed_repo(tmp_path, spec, folder=f"refuse-{fault}")
+    run, read_counter, _seen = _live_commands(install, fault)
+    transport = _Probe()
+    adapter = OllamaAdapter(transport=transport)
+    seams = real_fill_seams(adapter, run=run, read_counter=read_counter)
+    with pytest.raises((RunnerError, SpecError), match=message):
+        run_spec(
+            spec_path,
+            root=repo,
+            grant="g",
+            adapters={"ollama": adapter},
+            heartbeat=_fresh(tmp_path),
+            date="2026-10-12",
+            run_id=f"fill-{fault}",
+            seams=seams,
+        )
+    _no_load(transport.calls)
+    assert seams.shared_mib() is None
+    assert not (repo / "receipts" / f"fill-{fault}.jsonl").exists()
+
+
+def test_preflight_refuses_a_wrong_tolerance_before_any_sample(tmp_path: Path):
+    seen = []
+
+    def run(argv, **kwargs):
+        seen.append(tuple(argv))
+        raise AssertionError(argv)
+
+    seams = real_fill_seams(object(), run=run, read_counter=lambda counter: (_ for _ in ()).throw(AssertionError(counter)))
+    spec = _spec([_model()])
+    spec["adapter_match_tolerance_mib"] = 256
+    with pytest.raises(FillPreflightError, match="matching allowance"):
+        seams.preflight(spec, tmp_path)
+    assert seen == []
+    assert seams.shared_mib() is None
+
+
+def test_a_dirty_start_is_recorded_false_on_the_aborted_receipt(tmp_path: Path, monkeypatch):
+    _clear_fill_env(monkeypatch)
+    install = _install_tree(tmp_path)
+    monkeypatch.setenv("INTERLOCK_OLLAMA_LOG", str(install["log"]))
+    monkeypatch.setenv("INTERLOCK_OLLAMA_EXE", str(install["exe"]))
+    repo, spec_path = _committed_repo(tmp_path, _spec([_model()]), dirty=True, folder="dirty")
+    run, read_counter, seen = _live_commands(install, "ok")
+    transport = _Probe()
+    adapter = OllamaAdapter(transport=transport)
+    seams = real_fill_seams(adapter, run=run, read_counter=read_counter)
+    with pytest.raises(RunnerError, match="git porcelain is not empty"):
+        run_spec(
+            spec_path,
+            root=repo,
+            grant="g",
+            adapters={"ollama": adapter},
+            heartbeat=_fresh(tmp_path),
+            date="2026-10-12",
+            run_id="fill-dirty",
+            seams=seams,
+        )
+    _no_load(transport.calls)
+    assert not any(argv and argv[0] == "powershell" for argv in seen)
+    receipt = repo / "receipts" / "fill-dirty.jsonl"
+    rows = load_jsonl(receipt)
+    row = rows[0]
+    sha = subprocess.run(
+        ["git", "-C", repo.as_posix(), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert row["aborted"] is True
+    assert row["provenance"]["git_sha"] == sha
+    assert row["provenance"]["clean_tree"] is False
+    assert row["settings"]["adapter_instance"] == _GPU_LUID
+    assert row["settings"]["adapter_match_dedicated_mib"] == 2508
+    assert row["settings"]["adapter_match_nvidia_mib"] == 2490
+    assert row["settings"]["preflight_shared_mib"] == 74
+    assert row["settings"]["preflight_driver_cuda"] == "driver 13.4"
+    assert row["settings"]["log_source"] == "INTERLOCK_OLLAMA_LOG"
+    assert row["settings"]["exe_source"] == "INTERLOCK_OLLAMA_EXE"
+    text = receipt.read_text(encoding="utf-8")
+    assert "Users" not in text
+    assert str(install["log"]) not in text
+    assert str(install["exe"]) not in text
+
+
+def _recorded_log(name: str) -> str:
+    return (ROOT / "tests" / "fixtures" / "e5" / name).read_text(encoding="utf-8")
+
+
+def _decoy_tray(tmp_path: Path, monkeypatch) -> None:
+    tray = tmp_path / "tray"
+    (tray / "Ollama").mkdir(parents=True)
+    (tray / "Ollama" / "server.log").write_text(
+        'msg="server config" env="map[OLLAMA_HOST:http://127.0.0.1:11490 OLLAMA_FLASH_ATTENTION:true]"\n',
+        encoding="utf-8",
+        newline="\n",
+    )
+    monkeypatch.setenv("LOCALAPPDATA", str(tray))
+
+
+def test_a_clean_preflight_records_the_sample_the_sources_and_git(tmp_path: Path, monkeypatch, capsys):
+    _clear_fill_env(monkeypatch)
+    install = _install_tree(tmp_path)
+    _decoy_tray(tmp_path, monkeypatch)
+    install["log"].write_text(_recorded_log("server-config-11434.txt"), encoding="utf-8", newline="\n")
+    load_lines = _recorded_log("load-lines-11434.txt")
+
+    def append() -> None:
+        with install["log"].open("a", encoding="utf-8", newline="") as handle:
+            handle.write(load_lines if load_lines.endswith("\n") else load_lines + "\n")
+
+    repo, spec_path = _committed_repo(tmp_path, _spec([_model()]), folder="clean")
+    run, read_counter, seen = _live_commands(install, "ok")
+    transport = _Transport(None)
+    transport.before_generate = append
+    adapter = OllamaAdapter(transport=transport)
+    seams = real_fill_seams(adapter, run=run, read_counter=read_counter)
+    seams.threaded = False
+    seams.sleep = lambda _seconds: None
+    transport.seams = seams
+    rows = run_spec(
+        spec_path,
+        root=repo,
+        grant="g",
+        adapters={"ollama": adapter},
+        heartbeat=_fresh(tmp_path),
+        date="2026-10-12",
+        run_id="fill-clean",
+        seams=seams,
+    )
+    printed = capsys.readouterr().out
+    assert "driver_cuda=driver 13.4" in printed
+    assert "config_flash_attention=false" in printed
+    assert "config_kv_cache_type=unset" in printed
+    assert "log_source=listener-parent" in printed
+    assert "LOCALAPPDATA" not in printed
+    assert "exe_source=listener" in printed
+    assert _GPU_LUID in printed
+    assert any("CommandLine" in (argv[-1] if argv else "") for argv in seen)
+    assert any("ConvertTo-Json" in (argv[-1] if argv else "") for argv in seen)
+    row = rows[0]
+    sha = subprocess.run(
+        ["git", "-C", repo.as_posix(), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    settings = row["settings"]
+    assert row["provenance"]["git_sha"] == sha
+    assert row["provenance"]["clean_tree"] is True
+    assert settings["adapter_instance"] == _GPU_LUID
+    assert settings["adapter_match_dedicated_mib"] == 2508
+    assert settings["adapter_match_nvidia_mib"] == 2490
+    assert settings["preflight_shared_mib"] == 74
+    assert settings["shared_mib"] == 74
+    assert settings["dedicated_mib"] == 2508
+    assert settings["preflight_driver_cuda"] == "driver 13.4"
+    assert settings["cuda_backend"] == "driver 13.4"
+    assert settings["config_flash_attention"] == "false"
+    assert settings["config_kv_cache_type"] == "unset"
+    assert settings["flash_attention"] == "enabled"
+    assert settings["flash_attn"] == "auto"
+    assert settings["kv_cache_type"] == "f16"
+    assert settings["ggml_cuda_sha"] == hashlib.sha256(_DLL_BYTES).hexdigest()
+    assert settings["log_source"] == "listener-parent"
+    assert settings["exe_source"] == "listener"
+    assert settings["runner_pid"] == 77
+    assert settings["max_resident_ctx"] == 4096
+    urls = [url for _method, url, _body in transport.calls]
+    assert urls[0].endswith("/api/ps")
+    assert any(url.endswith("/api/show") for url in urls)
+    assert any(url.endswith("/api/generate") for url in urls)
+    text = (repo / "receipts" / "fill-clean.jsonl").read_text(encoding="utf-8")
+    assert "Users" not in text
+    assert str(install["log"]) not in text
+    assert str(install["exe"]) not in text
+
+
+def test_a_missing_load_line_refuses_before_a_measured_window(tmp_path: Path, monkeypatch):
+    _clear_fill_env(monkeypatch)
+    install = _install_tree(tmp_path)
+    _decoy_tray(tmp_path, monkeypatch)
+    # The lines are already in the file, from an earlier model. This load writes nothing.
+    install["log"].write_text(
+        _recorded_log("server-config-11434.txt") + _recorded_log("load-lines-11434.txt"),
+        encoding="utf-8",
+        newline="\n",
+    )
+    repo, spec_path = _committed_repo(tmp_path, _spec([_model()]), folder="stale-load")
+    run, read_counter, _seen = _live_commands(install, "ok")
+    transport = _Transport(None)
+    adapter = OllamaAdapter(transport=transport)
+    seams = real_fill_seams(adapter, run=run, read_counter=read_counter)
+    seams.threaded = False
+    seams.sleep = lambda _seconds: None
+    transport.seams = seams
+    with pytest.raises(RunnerError, match="first load"):
+        run_spec(
+            spec_path,
+            root=repo,
+            grant="g",
+            adapters={"ollama": adapter},
+            heartbeat=_fresh(tmp_path),
+            date="2026-10-12",
+            run_id="fill-stale",
+            seams=seams,
+        )
+    row = load_jsonl(repo / "receipts" / "fill-stale.jsonl")[0]
+    assert row["aborted"] is True
+    assert row["settings"]["max_resident_ctx"] is None
+    assert "search_calls" not in row["settings"]
+    assert row["settings"]["flash_attention"] == "unrecorded"
+    assert row["settings"]["kv_cache_type"] == "unrecorded"
+    assert "flash_attn" not in row["settings"]
+    assert row["settings"]["config_flash_attention"] == "false"
+    assert row["settings"]["config_kv_cache_type"] == "unset"
+    assert row["settings"]["runner_pid"] == 77
+    assert row["settings"]["log_source"] == "listener-parent"
+    prompts = [
+        body.get("prompt")
+        for _method, url, body in transport.calls
+        if str(url).endswith("/api/generate") and isinstance(body, dict) and body.get("prompt")
+    ]
+    assert len(prompts) == 1
+    text = (repo / "receipts" / "fill-stale.jsonl").read_text(encoding="utf-8")
+    assert "Users" not in text

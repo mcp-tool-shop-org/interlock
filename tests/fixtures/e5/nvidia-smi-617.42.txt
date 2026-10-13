@@ -1,0 +1,1 @@
+NVIDIA-SMI 617.42    Driver Version: 617.42    CUDA UMD Version: 13.4    KMD Version: 617.42

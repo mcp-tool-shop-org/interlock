@@ -35,6 +35,8 @@ class SearchError(Exception):
 
 SHARED_GROWTH_MIB = 256
 PROMPT_RATIO = 0.5
+# A matching allowance for the idle-card pin. Not the spill threshold.
+ADAPTER_MATCH_TOLERANCE_MIB = 512
 
 
 @dataclass(frozen=True)

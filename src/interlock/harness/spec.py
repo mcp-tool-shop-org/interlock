@@ -13,7 +13,7 @@ from pathlib import Path
 
 import yaml
 
-from interlock.harness.e5 import PROMPT_RATIO, SHARED_GROWTH_MIB
+from interlock.harness.e5 import ADAPTER_MATCH_TOLERANCE_MIB, PROMPT_RATIO, SHARED_GROWTH_MIB
 from interlock.tasks import TASKS
 
 PROCEDURES = frozenset({"interleaved", "fill-card", "offrig-calibrate"})
@@ -288,6 +288,10 @@ def _fill_card(data: dict) -> None:
         raise SpecError("confirm_prompt_fraction must be between 0 and 1")
     if data.get("spill_shared_mib") != SHARED_GROWTH_MIB:
         raise SpecError(f"spill_shared_mib is {SHARED_GROWTH_MIB} MiB over the pre-window shared baseline")
+    if data.get("adapter_match_tolerance_mib") != ADAPTER_MATCH_TOLERANCE_MIB:
+        raise SpecError(
+            "adapter_match_tolerance_mib is 512 MiB, a matching allowance, not the spill threshold"
+        )
     if data.get("spill_prompt_ratio") != PROMPT_RATIO:
         raise SpecError(f"spill_prompt_ratio is {PROMPT_RATIO}")
     models = data.get("models")
