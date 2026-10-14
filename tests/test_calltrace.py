@@ -8,8 +8,8 @@ from pathlib import Path
 import pytest
 
 from interlock.calltrace import (
-    Tracer,
     TraceError,
+    Tracer,
     classify,
     instrument,
     release,
@@ -29,6 +29,8 @@ URL = "http://127.0.0.1:11434"
         ("/api/generate", {"model": "m", "keep_alive": 0, "prompt": ""}, "unload"),
         ("/api/generate", {"model": "m", "raw": True, "prompt": "x"}, "count"),
         ("/api/generate", {"model": "m", "companion": "start"}, "companion"),
+        ("/api/embed", {"model": "m", "input": "x"}, "embed"),
+        ("/api/embeddings", {"model": "m", "prompt": "x"}, "embed"),
         ("/api/generate", None, "other"),
         ("/api/version", None, "other"),
     ],
@@ -64,7 +66,8 @@ def test_the_events_log_writes_one_parsable_line_per_call_and_marks(tmp_path: Pa
         tracer.end_slot()
         tracer.mark("stop_file", reason="test")
         tracer.flush()
-    lines = [json.loads(line) for line in (tmp_path / "logs" / "r.events.jsonl").read_text(encoding="utf-8").splitlines()]
+    text = (tmp_path / "logs" / "r.events.jsonl").read_text(encoding="utf-8")
+    lines = [json.loads(line) for line in text.splitlines()]
     calls = [line for line in lines if "call_id" in line]
     assert [c["kind"] for c in calls] == ["count", "generate"]
     assert calls[0]["status"] == "timeout"
@@ -183,3 +186,66 @@ def test_instrument_wraps_ollama_once_and_sets_the_openvino_tracer(tmp_path: Pat
     assert openvino._TRACER is tracer
     release(adapters)
     assert openvino._TRACER is None
+
+
+def test_a_timeout_with_no_message_is_still_a_timeout(tmp_path: Path):
+    def transport(method, url, body, **kwargs):
+        raise TimeoutError()
+
+    tracer = Tracer(root=tmp_path, run_id="r")
+    with tracer:
+        with pytest.raises(TimeoutError):
+            traced_transport(transport, tracer)("POST", URL + "/api/tags", None)
+    assert tracer.counts_for("_run")["tags"]["timeouts"] == 1
+
+
+def test_the_request_size_is_measured_only_for_relay(tmp_path: Path):
+    seen = []
+
+    class Sink:
+        scope_id = None
+
+        def __init__(self, *args):
+            pass
+
+        def start(self, record):
+            seen.append(record.request_bytes)
+
+        def end(self, record):
+            pass
+
+        def mark(self, *args):
+            pass
+
+        def flush(self):
+            pass
+
+        def close(self, end_ns=None):
+            pass
+
+    body = {"model": "m", "prompt": "x" * 100}
+    for mode in ("events", "relay"):
+        tracer = Tracer(root=tmp_path, run_id=mode, mode=mode, relay_factory=Sink)
+        with tracer:
+            traced_transport(lambda *a, **k: {}, tracer)("POST", URL + "/api/generate", body)
+    assert seen == [len(json.dumps(body))]
+
+
+def test_an_openvino_worker_fault_is_an_exception_not_ok(tmp_path: Path):
+    from interlock.adapters import openvino
+
+    def boom():
+        raise RuntimeError("device said no")
+
+    tracer = Tracer(root=tmp_path, run_id="ov")
+    openvino.set_tracer(tracer)
+    try:
+        with tracer:
+            with pytest.raises(RuntimeError):
+                openvino._timed_call(boom, 1.0, kind="embed", model="m", device="NPU")
+            status, _ = openvino._timed_call(lambda: 1, 1.0, kind="embed", model="m", device="NPU")
+            assert status == "ok"
+    finally:
+        openvino.set_tracer(None)
+    counts = tracer.counts_for("_run")["embed"]
+    assert (counts["n"], counts["errors"], counts["timeouts"]) == (2, 1, 0)

@@ -1473,8 +1473,12 @@ def run_fill_card(
     notes: str = "",
     supervisor=None,
     models: list[str] | None = None,
+    tracer=None,
 ) -> list[dict]:
     """Measure each roster model. Unload at the end of the model and on any exit.
+
+    ``tracer`` (interlock.calltrace) counts and, when tracing, logs every model call. Each roster model is one slot,
+    its unload included, and its row carries the counts.
 
     ``models`` is a subset of the spec roster, in spec order. None measures
     every model. The subset is written on each row.
@@ -1535,6 +1539,8 @@ def run_fill_card(
             repair: list[tuple[str, str]] = []
             if supervisor is not None:
                 supervisor.begin_measurement()
+            if tracer is not None:
+                tracer.begin_slot(arm=entry["model"], index=f"fill:{entry['model']}")
             try:
                 row = _measure_model(
                     spec,
@@ -1553,6 +1559,8 @@ def run_fill_card(
                 extra = _unload(adapter, entry["model"])
                 if supervisor is not None:
                     supervisor.end_measurement()
+                if tracer is not None:
+                    tracer.end_slot()
             if models is not None:
                 row.setdefault("settings", {})["models"] = [item["model"] for item in roster]
                 validate_row(row)
@@ -1601,6 +1609,14 @@ def run_fill_card(
         try:
             if rows:
                 _stamp_restarts(rows, marker)
+                if tracer is not None:
+                    from interlock.receipt import CAPABILITY_OUTCOMES
+
+                    for row in rows:
+                        # The slot is named by the roster tag, which a row keeps as model.repo_or_tag.
+                        tag = (row.get("model") or {}).get("repo_or_tag")
+                        if row.get("outcome") not in CAPABILITY_OUTCOMES and tag:
+                            row.setdefault("artifacts", {}).update(tracer.artifacts(tag))
                 write_receipt(root, run_id, rows)
         finally:
             if marker.entered:

@@ -97,7 +97,10 @@ def main(argv: list[str] | None = None) -> int:
         "--trace",
         choices=("off", "events", "relay"),
         default="off",
-        help="log every model call in order under logs/: events (stdlib) or relay (NeMo Relay ATOF, needs interlock[relay])",
+        help=(
+            "log every model call in order under logs/: events (stdlib) or relay "
+            "(NeMo Relay ATOF, needs interlock[relay])"
+        ),
     )
     run.add_argument(
         "--pairs",

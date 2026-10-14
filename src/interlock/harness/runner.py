@@ -696,6 +696,14 @@ def run_interleaved(
         finally:
             if held:
                 state_lock.release()
+            # The watcher exits the process next (os._exit), so the run's tracer never reaches its own close.
+            # Close it here: the call in flight is closed as abandoned and the trace is flushed whole.
+            if tracer is not None:
+                try:
+                    tracer.mark("halt", error=error, operator=operator)
+                    tracer.close()
+                except Exception as exc:  # the process must still end
+                    print(f"interlock: the trace could not be closed: {exc}", file=sys.stderr)
 
     def _on_compile_timeout(info: dict) -> None:
         arm = arms[current.step_id] if current is not None else None
@@ -1081,6 +1089,10 @@ def run_interleaved(
                             cache_dirs.get(companion["id"]),
                             prompt_cache,
                         )
+                    # A failed or refused slot still ends here, so recovery calls between slots are not
+                    # attributed to it (Argon I1). The success path has already taken its call ids.
+                    if tracer is not None and slot_calls is None:
+                        tracer.end_slot()
                 if pending is not None:
                     _resume_after_repair(slot, block_id, arm, pending[0], pending[1])
         finally:
@@ -2133,10 +2145,12 @@ def run_spec(
         if spec.get("procedure") != "fill-card":
             raise RunnerError("--models is for a fill-card spec")
         _chosen, recorded_models = resolve_models(spec, models)
-    if trace != "off" and (spec.get("id") == "E4b" or spec.get("procedure") == "fill-card"):
-        # Stage 0 of the interlock-relay design wires the interleaved path first. A trace that would silently
-        # record nothing is refused instead.
-        raise RunnerError(f"REFUSED: --trace {trace} is wired for interleaved specs only; run this spec with --trace off")
+    if trace != "off" and spec.get("id") == "E4b":
+        # E4b's model calls go through its own injected seams, not the hook points. A trace that would silently
+        # record nothing is refused instead (interlock-relay amendment A3).
+        raise RunnerError(
+            f"REFUSED: --trace {trace} is not wired for E4b; run this spec with --trace off"
+        )
     if spec.get("id") == "E4b":
         from interlock.harness.e4b import run_from_cli
 
@@ -2193,22 +2207,31 @@ def run_spec(
                 chosen = quiet_fill_seams()
             else:
                 chosen = real_fill_seams(adapters["ollama"])
-            return run_fill_card(
-                spec,
-                adapters=adapters,
-                seams=chosen,
-                grant=grant,
-                root=root,
-                spec_rel=spec_rel,
-                run_id=name,
-                date=stamp,
-                heartbeat=heartbeat_path(heartbeat),
-                wall=wall,
-                marker=marker,
-                notes=notes,
-                supervisor=supervisor,
-                models=recorded_models,
-            )
+            from interlock.calltrace import Tracer, instrument, release
+
+            tracer = Tracer(root=root, run_id=name, mode=trace)
+            with tracer:
+                instrument(adapters, tracer)
+                try:
+                    return run_fill_card(
+                        spec,
+                        adapters=adapters,
+                        seams=chosen,
+                        grant=grant,
+                        root=root,
+                        spec_rel=spec_rel,
+                        run_id=name,
+                        date=stamp,
+                        heartbeat=heartbeat_path(heartbeat),
+                        wall=wall,
+                        marker=marker,
+                        notes=notes,
+                        supervisor=supervisor,
+                        models=recorded_models,
+                        tracer=tracer,
+                    )
+                finally:
+                    release(adapters)
         if spec["procedure"] != "interleaved":
             raise GuardError(
                 f"REFUSED: a {spec['procedure']!r} spec has no run path; this command runs interleaved specs"

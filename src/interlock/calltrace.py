@@ -12,7 +12,10 @@ That is a summary, not a log.
   (``logs/<run_id>.atof.jsonl``). Relay is imported only on this path.
 
 Calls are classified from the request itself, so counts and unloads made on
-worker threads need no context. Every timestamp comes from one clock: an epoch
+worker threads need no context. A call is attributed to the slot whose window
+it starts in, whatever its thread: a companion session is started and stopped
+inside its slot, so its calls belong to that slot by construction, under their
+own kind (``companion``). Every timestamp comes from one clock: an epoch
 offset taken once when the run opens, plus ``perf_counter_ns``. Prompts and
 responses are never recorded, only their byte lengths.
 """
@@ -47,6 +50,8 @@ def classify(method: str, url: str, body: dict | None) -> str:
         return "ps"
     if path.endswith("/api/show"):
         return "show"
+    if path.endswith(("/api/embed", "/api/embeddings")):
+        return "embed"
     if path.endswith("/api/generate") and isinstance(body, dict):
         if body.get("companion") == "start":
             return "companion"
@@ -94,6 +99,8 @@ class _EventSink:
         self.path = path
         self._file = path.open("w", encoding="utf-8")
         self._lock = threading.Lock()
+        # The watcher may close the log while a worker or the run thread still calls in; later calls are dropped.
+        self._closed = False
 
     def start(self, record: CallRecord) -> None:
         return None
@@ -116,20 +123,25 @@ class _EventSink:
         }
         text = json.dumps(line, sort_keys=True) + "\n"
         with self._lock:
-            self._file.write(text)
+            if not self._closed:
+                self._file.write(text)
 
     def mark(self, name: str, t_ns: int, data: dict) -> None:
         with self._lock:
-            self._file.write(json.dumps({"mark": name, "t_ns": t_ns, **data}, sort_keys=True) + "\n")
+            if not self._closed:
+                self._file.write(json.dumps({"mark": name, "t_ns": t_ns, **data}, sort_keys=True) + "\n")
 
     def flush(self) -> None:
         with self._lock:
-            self._file.flush()
+            if not self._closed:
+                self._file.flush()
 
     def close(self, end_ns: int | None = None) -> None:
         with self._lock:
-            self._file.flush()
-            self._file.close()
+            if not self._closed:
+                self._closed = True
+                self._file.flush()
+                self._file.close()
 
 
 class Tracer:
@@ -233,7 +245,9 @@ class Tracer:
 
     # -- calls ------------------------------------------------------------------
 
-    def start(self, kind: str, endpoint: str, *, model: str | None, device: str | None, request_bytes: int = 0) -> CallRecord:
+    def start(
+        self, kind: str, endpoint: str, *, model: str | None, device: str | None, request_bytes: int = 0
+    ) -> CallRecord:
         record = CallRecord(
             call_id=next(self._ids),
             kind=kind,
@@ -265,7 +279,8 @@ class Tracer:
     def _finish(self, record: CallRecord) -> None:
         arm = record.extra.get("arm") or "_run"
         with self._lock:
-            entry = self._counts.setdefault(arm, {}).setdefault(record.kind, {"n": 0, "ms": 0.0, "errors": 0, "timeouts": 0})
+            fresh = {"n": 0, "ms": 0.0, "errors": 0, "timeouts": 0}
+            entry = self._counts.setdefault(arm, {}).setdefault(record.kind, fresh)
             entry["n"] += 1
             entry["ms"] = round(entry["ms"] + (record.ms or 0.0), 3)
             if record.status == "timeout":
@@ -301,7 +316,8 @@ def traced_transport(transport, tracer: Tracer, *, device: str | None = None):
     def wrapped(method: str, url: str, body: dict | None, *args, **kwargs):
         kind = classify(method, url, body)
         model = body.get("model") if isinstance(body, dict) else None
-        size = len(json.dumps(body)) if body is not None else 0
+        # Only Relay's request record uses the size. Serialising a long prompt again costs measured time.
+        size = len(json.dumps(body)) if body is not None and tracer.mode == "relay" else 0
         record = tracer.start(kind, urlsplit(url).path, model=model, device=device, request_bytes=size)
         status, payload = "exception", None
         try:
@@ -309,7 +325,7 @@ def traced_transport(transport, tracer: Tracer, *, device: str | None = None):
             status = "ok"
             return payload
         except Exception as exc:
-            status = "timeout" if "timed out" in str(exc) else "http_error"
+            status = "timeout" if isinstance(exc, TimeoutError) or "timed out" in str(exc).lower() else "http_error"
             raise
         finally:
             tracer.end(record, status, payload)
