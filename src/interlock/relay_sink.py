@@ -29,6 +29,19 @@ def _length_only(payload, _context=None) -> dict:
     return {"bytes": len(json.dumps(payload, default=str))}
 
 
+def _request_length_only(request, _context=None):
+    """Relay's request sanitizer must hand back an ``LLMRequest``: one whose content is only its byte length."""
+
+    import nemo_relay
+
+    content = getattr(request, "content", request)
+    return nemo_relay.LLMRequest({}, _length_only(content))
+
+
+_REQUEST = "interlock-length-only-request"
+_RESPONSE = "interlock-length-only-response"
+
+
 class RelaySink:
     def __init__(self, logs: Path, filename: str, start_ns: int, run_id: str):
         import nemo_relay
@@ -55,8 +68,9 @@ class RelaySink:
             raise TraceError("REFUSED: Relay would layer in other plugins.toml files; remove them before tracing")
         self._loop = asyncio.new_event_loop()
         self._activation = self._loop.run_until_complete(plugin.initialize(config))
-        guardrails.register_llm_sanitize_request("interlock-length-only-request", 0, _length_only)
-        guardrails.register_llm_sanitize_response("interlock-length-only-response", 0, _length_only)
+        self._guardrails = guardrails
+        guardrails.register_llm_sanitize_request(_REQUEST, 0, _request_length_only)
+        guardrails.register_llm_sanitize_response(_RESPONSE, 0, _length_only)
         self._run = scope.push(f"interlock-run {run_id}", scope.ScopeType.Agent, timestamp=_when(start_ns))
         self.scope_id = self._run.uuid
         self._spans: dict[int, object] = {}
@@ -97,5 +111,7 @@ class RelaySink:
             self._scope.pop(self._run, timestamp=_when(end_ns) if end_ns is not None else None)
         finally:
             self._relay.subscribers.flush()
+            self._guardrails.deregister_llm_sanitize_request(_REQUEST)
+            self._guardrails.deregister_llm_sanitize_response(_RESPONSE)
             self._loop.run_until_complete(self._activation.close())
             self._loop.close()

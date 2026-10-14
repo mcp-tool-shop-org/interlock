@@ -81,7 +81,7 @@ from interlock.ollama_supervisor import (
     restart_policy_lines,
     retry_budget,
 )
-from interlock.receipt import validate_row
+from interlock.receipt import CAPABILITY_OUTCOMES, validate_row
 
 try:  # the CPU-window evidence of ruling #36's addendum; never a step failure
     import psutil
@@ -641,7 +641,9 @@ def run_interleaved(
         window = {"start": _iso(started_at), "end": _iso(wall())}
         restarts = marker.restart_records()
         for row in rows:
-            if tracer is not None:
+            # A capability row (hang, device lost, compile refused) carries no artifacts by the receipt rule:
+            # it is not a speed. Its calls stay in the ordered trace.
+            if tracer is not None and row.get("outcome") not in CAPABILITY_OUTCOMES:
                 arm_of_row = row["id"].rsplit("/", 2)[-2]
                 row.setdefault("artifacts", {}).update(tracer.artifacts(arm_of_row))
             row["settings"]["run_window"] = window
@@ -2131,6 +2133,10 @@ def run_spec(
         if spec.get("procedure") != "fill-card":
             raise RunnerError("--models is for a fill-card spec")
         _chosen, recorded_models = resolve_models(spec, models)
+    if trace != "off" and (spec.get("id") == "E4b" or spec.get("procedure") == "fill-card"):
+        # Stage 0 of the interlock-relay design wires the interleaved path first. A trace that would silently
+        # record nothing is refused instead.
+        raise RunnerError(f"REFUSED: --trace {trace} is wired for interleaved specs only; run this spec with --trace off")
     if spec.get("id") == "E4b":
         from interlock.harness.e4b import run_from_cli
 
