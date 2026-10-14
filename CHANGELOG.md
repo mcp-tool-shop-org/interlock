@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## [0.1.0] - 2026-10-14
+
+Prototype advisory router for one rig. It suggests a model, an engine and a device from measured receipts, and it does not serve traffic. It is not a beta, and it is not on PyPI.
+
 - Dependabot opens a grouped pull request monthly for the uv lock, the docs-site npm lock, and GitHub Actions, at most three open per ecosystem. A coverage-guided fuzz target feeds bytes to the receipt-line reader (`check_tree`) and the spec loader (`load_spec`). A published GitHub release attaches the wheel, the sdist, and a SLSA provenance file.
 
 - CONTRIBUTING.md says how to report a bug, where a security report goes, and the bar for a pull request. CI runs `ruff check` (0.17.0; rules E, F, W, B, I, UP, and S) on every change and fails on any finding.

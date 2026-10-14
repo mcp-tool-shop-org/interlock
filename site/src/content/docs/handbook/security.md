@@ -23,7 +23,7 @@ A receipt may record a model repo and a revision or digest, an engine and versio
 
 A receipt must not carry a home path, a hostname beyond loopback, a token, or a user identity. `interlock check` enforces the path, host, and token rules. It does not detect a person's name. The maintainers run a separate identity scan before a push. That scan is not this program.
 
-`interlock check` refuses a home-directory path, including one an expanded profile variable would produce, a UNC path, an `ssh://` or `sftp://` host, a `git@host:` form, a `user@host` form, and a token-shaped value. Hex or base64 values of 32 or more characters are refused only in fields named like key, token, secret, or password.
+`interlock check` refuses a home-directory path, including one an expanded profile variable would produce, a UNC path, an `ssh://` or `sftp://` host, a `git@host:` form, a `user@host.domain` form, and a token-shaped value. Hex or base64 values of 32 or more characters are refused only in fields named like key, token, secret, or password.
 
 A bare single-label host and port is a known limit of that check. `interlock check --host-port` turns the extra check on. It does not flag a model tag.
 
@@ -37,4 +37,6 @@ A remote price enters only as a dated snapshot file. interlock does not open off
 
 Supported versions are 0.1.x. Report a vulnerability through a GitHub private advisory on [mcp-tool-shop-org/interlock](https://github.com/mcp-tool-shop-org/interlock/security/advisories/new). Do not open a public issue for a vulnerability. The maintainers read those advisories. This prototype does not publish a response-time promise.
 
-The same text is in `SECURITY.md` at the repository root.
+Release assets carry a SLSA provenance file (`*.intoto.jsonl`) on the same GitHub release; verify with `slsa-verifier verify-artifact --provenance-path <name>.intoto.jsonl --source-uri github.com/mcp-tool-shop-org/interlock --source-tag <the-tag> <the-asset>`.
+
+`SECURITY.md` at the repository root is the reporting file. This page is the short form of it, not the same text.

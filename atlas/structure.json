@@ -552,7 +552,7 @@
           "path": ".python-version"
         },
         {
-          "hash": "dafaed12c4daff249fb3a9d99187e8a1dd2105f5a4b386cf603e9e221f94f515",
+          "hash": "70dd98c204f5ca5990f72297348b5f6df346ee4f32402ed66dde10a7a8e144c5",
           "path": "CHANGELOG.md"
         },
         {
@@ -584,7 +584,7 @@
           "path": "README.ja.md"
         },
         {
-          "hash": "9a4f4ebeca722b0c8e4cb25814b23b4f1afd96515a7b328bbb86fa38326382eb",
+          "hash": "a1417f5dd15ef72ffc3c6c94b332b60c2629fff106ec481c653a5865dfbd43ec",
           "path": "README.md"
         },
         {
@@ -596,7 +596,7 @@
           "path": "README.zh.md"
         },
         {
-          "hash": "8a3bc62bd7bb8cfc04f22b0483719da6e404b5d18d910486e4e69f8c58437a63",
+          "hash": "866c2f17ac3e9ff19db6cb2e50cfb897ab8a29f046c780ac85b0783b18f1027e",
           "path": "SCORECARD.md"
         },
         {
@@ -604,7 +604,7 @@
           "path": "SECURITY.md"
         },
         {
-          "hash": "d43715d6a1da363bff130cbda153fd85d8d90da07c8f4d6dac3466ba447153c1",
+          "hash": "cb4855924eb72215a60ced6aa3a983d6a3d15bcb5e69714efed072c2d64072b3",
           "path": "SHIP_GATE.md"
         },
         {
@@ -11928,7 +11928,7 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "a532013a20d82b7d9374b9649407ed3378c71bcd",
+    "commit": "0deac11d46af4fa1c35d96c42591e7d3e3423c31",
     "tracked": 265
   },
   "landings": [
@@ -12438,7 +12438,7 @@
       "path": "site/src/content/docs/handbook/index.md"
     },
     {
-      "hash": "5584d9a2d78a27ac4985882e9618d73ef03c89f946b9a540684d4297d1b84b2b",
+      "hash": "bd9cf9cae067da72fdfe3398147cefc4eeaff356611a3e7fb9bdd36bb09c4efe",
       "path": "site/src/content/docs/handbook/security.md"
     },
     {

@@ -12,6 +12,7 @@
   <a href="https://mcp-tool-shop-org.github.io/interlock/"><img src="https://img.shields.io/badge/docs-landing%20page-blue" alt="Landing page"></a>
   <a href="https://codecov.io/gh/mcp-tool-shop-org/interlock"><img src="https://codecov.io/gh/mcp-tool-shop-org/interlock/graph/badge.svg" alt="Coverage"></a>
   <a href="https://scorecard.dev/viewer/?uri=github.com/mcp-tool-shop-org/interlock"><img src="https://api.scorecard.dev/projects/github.com/mcp-tool-shop-org/interlock/badge" alt="OpenSSF Scorecard"></a>
+  <a href="https://www.bestpractices.dev/projects/15467"><img src="https://www.bestpractices.dev/projects/15467/badge" alt="OpenSSF Best Practices"></a>
 </p>
 
 # interlock: local AI device router
@@ -24,14 +25,14 @@ You give it a task (embed, rerank, NLI, verify, generate) and the constraints th
 
 ## Install
 
-Not published yet. Until the first release, install from a clone:
+From a clone:
 
 ```
 uv sync
 uv run interlock --help
 ```
 
-After the first release:
+From PyPI, from v0.1.0:
 
 ```
 pip install mcptoolshop-interlock
@@ -49,7 +50,7 @@ The receipt schema, the routing table, and the harness came first. `interlock ro
 
 ## What the table says today
 
-The routing table holds 502 rows from committed receipts. A few of the answers it already gives:
+The routing table holds 509 rows from committed receipts. A few of the answers it already gives:
 
 - **A small model runs well on the Intel side.** Phi-3.5-mini decodes at about 20–22 tokens/s on the CPU and the iGPU, and about 15 tokens/s on the NPU, at a 1024-token prompt with thinking off. That leaves the 5090 free for bigger work.
 - **An 8B model doesn't belong on the Intel side.** At the same 1024-token prompt with thinking off, Qwen3-8B decodes at about 10–12 tokens/s on the CPU, iGPU and NPU. On the 5090 it decodes at about 208 tokens/s with thinking off and 211 with it on. Ask for 15 tokens/s with the 5090 busy, and the router refuses and names the experiment behind the gap: `interlock route --task generate --model qwen3-8b --min-tok-s 15 --busy 5090`.
@@ -175,7 +176,7 @@ Each restart is written on the run marker and on `settings.ollama_restarts`: whe
 
 ## Develop
 
-The environment is its own, at `E:/AI/envs/interlock`, Python 3.12. It does not share the NPU environment. OpenVINO 2026.4.1 is the `intel` extra, pinned to the same versions as that environment. Tests do not need it.
+Python 3.12. `uv sync --frozen` creates the project environment from the lockfile. It does not share the NPU environment. OpenVINO 2026.4.1 is the `intel` extra. Tests do not need it.
 
 ```
 uv sync --frozen
