@@ -61,7 +61,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install
-        run: uv sync --frozen
+        run: uv sync --frozen --extra relay
 
       - name: Lint
         run: uv run ruff check
