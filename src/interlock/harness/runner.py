@@ -457,6 +457,11 @@ def run_interleaved(
     wall = wall or time.time
     started_at = wall()
     hooks = watch or WatchHooks()
+    per_arm_trace = any("trace" in arm for arm in spec.get("arms") or [])
+    if per_arm_trace and tracer is not None:
+        tracer.set_emitting(False)  # only a traced arm's slots reach the trace; nothing between slots does
+    barrier_ms = spec.get("trace_barrier_ms") or 0
+    salts: dict[str, int] = {}
     tracker = CompileTracker(hooks.clock)
     state_lock = threading.RLock()  # the main loop's mutations and the watcher's flush
     halted_by_watch = False
@@ -922,21 +927,28 @@ def run_interleaved(
                     adapter._slot_probe = probe
                     probe.open()
                 if tracer is not None:
-                    tracer.begin_slot(arm=arm["id"], index=f"{slot.phase}:{slot.round_index}:{slot.role}")
+                    pair_tag = f":{slot.pair}" if slot.pair else ""
+                    tracer.begin_slot(arm=arm["id"], index=f"{slot.phase}:{slot.round_index}:{slot.role}{pair_tag}")
+                    if per_arm_trace:
+                        tracer.set_emitting(arm.get("trace") is True)
                 slot_calls = None
                 try:
                     kind = "ok"
                     error = ""
                     try:
                         result = adapter.run(
-                            _request(
+                            _salted(
                                 arm,
-                                spec,
-                                spec_rel,
-                                cache_dirs.get(arm["id"]),
-                                adapters[arm["engine"]],
-                                prompt_cache,
-                                bound_s=bound,
+                                salts,
+                                _request(
+                                    arm,
+                                    spec,
+                                    spec_rel,
+                                    cache_dirs.get(arm["id"]),
+                                    adapters[arm["engine"]],
+                                    prompt_cache,
+                                    bound_s=bound,
+                                ),
                             )
                         )
                     except AdapterError as exc:
@@ -1031,6 +1043,11 @@ def run_interleaved(
                             if tracer is not None:
                                 slot_calls = tracer.end_slot()
                                 sample["call_ids"] = slot_calls["call_ids"]
+                                sample["hook_us"] = slot_calls["hook_us"]
+                                if per_arm_trace:
+                                    sample["traced"] = arm.get("trace") is True
+                            if arm.get("prompt_salt") == "per_call":
+                                sample["prompt_salt"] = salts[arm["id"]]
                             if epoch is not None:
                                 try:
                                     sample = supervisor.keep_sample(epoch, sample)
@@ -1093,6 +1110,13 @@ def run_interleaved(
                     # attributed to it (Argon I1). The success path has already taken its call ids.
                     if tracer is not None and slot_calls is None:
                         tracer.end_slot()
+                    if tracer is not None and per_arm_trace:
+                        tracer.set_emitting(False)
+                    # Stage 1's barrier, after every slot in both arms: the trace flushed, a collection, a fixed rest.
+                    if tracer is not None and barrier_ms:
+                        tracer.flush()
+                        gc.collect()
+                        hooks.sleep(barrier_ms / 1000)
                 if pending is not None:
                     _resume_after_repair(slot, block_id, arm, pending[0], pending[1])
         finally:
@@ -1453,6 +1477,27 @@ def _request(
     )
 
 
+def _salted(arm: dict, salts: dict[str, int], request: StepRequest) -> StepRequest:
+    """``prompt_salt: per_call``: each call's prompt starts with its own number, so the server's prompt cache
+    can't reuse the previous call's prefill. The number is kept on the sample."""
+
+    if arm.get("prompt_salt") != "per_call":
+        return request
+    # One counter for the run, not per arm: the two arms of a trace contrast send the same prompt otherwise.
+    salts["_run"] = salts.get("_run", 0) + 1
+    salts[arm["id"]] = salts["_run"]
+    settings = dict(request.settings)
+    settings["prompt"] = f"[{salts['_run']}] " + str(settings.get("prompt") or "")
+    return StepRequest(
+        step_id=request.step_id,
+        task=request.task,
+        model=request.model,
+        device=request.device,
+        engine=request.engine,
+        settings=settings,
+    )
+
+
 def _record(
     slot: Slot,
     result,
@@ -1543,6 +1588,9 @@ def _artifacts(records: list[dict], arm_id: str) -> dict | None:
             item["bound_s"] = row["bound_s"]
         if row.get("call_ids"):
             item["call_ids"] = row["call_ids"]
+        for key in ("hook_us", "traced", "prompt_salt"):  # interlock-relay stage 1
+            if row.get(key) is not None:
+                item[key] = row[key]
         if row.get("cpu") is not None:
             item["cpu"] = row["cpu"]
         if row.get("sample"):
@@ -2145,6 +2193,9 @@ def run_spec(
         if spec.get("procedure") != "fill-card":
             raise RunnerError("--models is for a fill-card spec")
         _chosen, recorded_models = resolve_models(spec, models)
+    if trace == "off" and any("trace" in arm for arm in spec.get("arms") or [] if isinstance(arm, dict)):
+        # A spec that switches tracing per arm would run both arms untraced: the comparison would be empty.
+        raise RunnerError("REFUSED: this spec traces some arms and not others; run it with --trace relay or events")
     if trace != "off" and spec.get("id") == "E4b":
         # E4b's model calls go through its own injected seams, not the hook points. A trace that would silently
         # record nothing is refused instead (interlock-relay amendment A3).

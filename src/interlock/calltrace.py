@@ -25,6 +25,7 @@ from __future__ import annotations
 import itertools
 import json
 import os
+import sys
 import threading
 import time
 from contextlib import contextmanager
@@ -86,6 +87,7 @@ class CallRecord:
     completion_tokens: int | None = None
     request_bytes: int = 0
     extra: dict = field(default_factory=dict)
+    emitted: bool = False
 
     @property
     def ms(self) -> float | None:
@@ -164,6 +166,9 @@ class Tracer:
         # Every sink call happens under self._lock (the lock order is always tracer, then sink), so a watcher
         # close can't land between a call's count and its sink event (Argon round 2, M-New-1).
         self._closed = False
+        # Stage 1's off-on-off triples switch the sink's events per slot. The counter stays on (design v3.1).
+        self._emit = True
+        self._slot_overhead_ns = 0
         self._offset_ns = 0
         self.trace_file: str | None = None
         self.scope_id: str | None = None
@@ -209,6 +214,19 @@ class Tracer:
             if self._sink is not None:
                 sink, self._sink = self._sink, None
                 sink.close(self.now_ns())
+                self._write_calls()
+
+    def _write_calls(self) -> None:
+        """Every count, run-level calls included, beside the trace: ``logs/<run_id>.calls.json``. A receipt row
+        carries only its own arm's counts, and stage 1's H1 check compares the whole table with an independent
+        count of requests."""
+
+        try:
+            path = self.root / "logs" / f"{self.run_id}.calls.json"
+            path.write_text(json.dumps({"run_id": self.run_id, "mode": self.mode, "counts": self._counts},
+                                       indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        except OSError as exc:  # the trace is already closed; a missing summary is reported, not fatal
+            print(f"interlock: could not write the call summary: {exc}", file=sys.stderr)
 
     def __enter__(self) -> Tracer:
         return self.open()
@@ -231,19 +249,34 @@ class Tracer:
 
     # -- slots and rows ---------------------------------------------------------
 
+    @property
+    def emitting(self) -> bool:
+        return self._emit and self._sink is not None
+
+    def set_emitting(self, on: bool) -> None:
+        """Turn the sink's call events on or off for the calls that start from now. A call keeps the choice it
+        started with, so no start is ever left without its end."""
+
+        with self._lock:
+            self._emit = bool(on)
+
     def begin_slot(self, **slot) -> None:
         with self._lock:
             self._slot = dict(slot)
             self._slot_calls = []
+            self._slot_overhead_ns = 0
 
     def end_slot(self) -> dict:
-        """The slot's calls: their ids, and the measured call's id."""
+        """The slot's calls, and the client time the hooks spent on them (the tracer's own bookkeeping and its
+        sink, in microseconds): stage 1's client-time gate compares this between traced and untraced slots."""
 
         with self._lock:
             calls = list(self._slot_calls)
+            overhead_us = round(self._slot_overhead_ns / 1000, 3)
             self._slot = {}
             self._slot_calls = []
-        return {"call_ids": calls}
+            self._slot_overhead_ns = 0
+        return {"call_ids": calls, "hook_us": overhead_us}
 
     def counts_for(self, arm_id: str) -> dict:
         """``artifacts.call_counts`` for one arm's row."""
@@ -273,9 +306,17 @@ class Tracer:
             if self._slot:
                 self._slot_calls.append(record.call_id)
                 record.extra = {"arm": self._slot.get("arm"), "slot": self._slot.get("index")}
-            if self._sink is not None:
+            if self._sink is not None and self._emit:
+                record.emitted = True
                 self._sink.start(record)
         return record
+
+    def charge(self, record: CallRecord, hook_ns: int) -> None:
+        """Add a call's hook time (everything its hook did outside the model call) to the slot it started in."""
+
+        with self._lock:
+            if self._slot and record.extra.get("slot") == self._slot.get("index"):
+                self._slot_overhead_ns += hook_ns
 
     def end(self, record: CallRecord, status: str, payload: object = None) -> None:
         record.end_ns = self.now_ns()
@@ -298,7 +339,7 @@ class Tracer:
             entry["timeouts"] += 1
         elif record.status != "ok":
             entry["errors"] += 1
-        if self._sink is not None:
+        if self._sink is not None and record.emitted:
             self._sink.end(record)
 
     @contextmanager
@@ -336,22 +377,29 @@ class _TracedTransport:
         return getattr(self.__wrapped__, name)
 
     def __call__(self, method: str, url: str, body: dict | None, *args, **kwargs):
+        entered = time.perf_counter_ns()
         tracer = self._tracer
         kind = classify(method, url, body)
         model = body.get("model") if isinstance(body, dict) else None
         # Only Relay's request record uses the size. Serialising a long prompt again costs measured time.
-        size = len(json.dumps(body)) if body is not None and tracer.mode == "relay" else 0
+        size = len(json.dumps(body)) if body is not None and tracer.mode == "relay" and tracer.emitting else 0
         record = tracer.start(kind, urlsplit(url).path, model=model, device=self._device, request_bytes=size)
         status, payload = "exception", None
+        sent = time.perf_counter_ns()
+        returned = sent
         try:
             payload = self.__wrapped__(method, url, body, *args, **kwargs)
+            returned = time.perf_counter_ns()
             status = "ok"
             return payload
         except Exception as exc:
+            returned = time.perf_counter_ns()
             status = "timeout" if isinstance(exc, TimeoutError) or "timed out" in str(exc).lower() else "http_error"
             raise
         finally:
             tracer.end(record, status, payload)
+            # Hook time: before the request went out, and after it came back.
+            tracer.charge(record, (sent - entered) + (time.perf_counter_ns() - returned))
 
 
 def traced_transport(transport, tracer: Tracer, *, device: str | None = None):

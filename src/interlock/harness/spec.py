@@ -151,6 +151,14 @@ def _interleaved(data: dict) -> None:
             # needs its own prompt, or a dataset seed and target the harness builds one from.
             raise SpecError(f"generate arm {arm['id']} has no prompt")
         _arm_storage(arm)
+        # interlock-relay stage 1: an arm traced or not, and a distinct prompt start per call.
+        if "trace" in arm and not isinstance(arm["trace"], bool):
+            raise SpecError(f"arm {arm['id']} trace must be true or false")
+        if arm.get("prompt_salt") not in (None, "per_call"):
+            raise SpecError(f"arm {arm['id']} prompt_salt must be per_call")
+    barrier = data.get("trace_barrier_ms")
+    if barrier is not None and (isinstance(barrier, bool) or not isinstance(barrier, int) or not 0 <= barrier <= 5000):
+        raise SpecError("trace_barrier_ms must be an integer from 0 to 5000")
     for arm in arms:
         companion = arm.get("companion")
         if companion is not None and companion not in seen:
@@ -350,6 +358,10 @@ def _pairs(data: dict, arm_ids: set) -> None:
         if alone not in arm_ids or paired_id not in arm_ids:
             raise SpecError("a pair names an arm that is not in the spec")
         paired = arms[paired_id]
+        contrast = pair.get("contrast")
+        if contrast is not None:
+            _trace_contrast(pair["id"], contrast, arms[alone], paired)
+            continue
         companion = paired.get("companion")
         if companion not in arm_ids:
             raise SpecError(f"paired arm {paired_id} needs a companion arm")
@@ -358,6 +370,22 @@ def _pairs(data: dict, arm_ids: set) -> None:
             raise SpecError(f"paired arm {paired_id} needs companion_device")
         if arms[companion]["device"] != expected:
             raise SpecError(f"arm {paired_id} companion_device does not match the companion arm")
+
+
+def _trace_contrast(pair_id: str, contrast: object, alone: dict, paired: dict) -> None:
+    """``contrast: trace`` (interlock-relay stage 1): the paired slot is the alone arm with tracing on.
+
+    No companion runs. The two arms are the same in every key but their id and ``trace``, which is off for the
+    alone arm and on for the paired one, so the only thing an off-on-off triple changes is the trace."""
+
+    if contrast != "trace":
+        raise SpecError(f"pair {pair_id} contrast must be trace")
+    if alone.get("trace") is not False or paired.get("trace") is not True:
+        raise SpecError(f"pair {pair_id}: the alone arm needs trace false and the paired arm trace true")
+    keys = (set(alone) | set(paired)) - {"id", "trace"}
+    differ = sorted(key for key in keys if alone.get(key) != paired.get(key))
+    if differ:
+        raise SpecError(f"pair {pair_id}: a trace contrast's arms differ in {', '.join(differ)}")
 
 
 def _close(got: object, expected: float, where: str) -> None:

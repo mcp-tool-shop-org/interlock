@@ -592,17 +592,24 @@ def _timed_call(fn, timeout_s: float, *, kind: str = "generate", model: str | No
     tracer = _TRACER
     if tracer is None:
         return _bounded_call(fn, timeout_s)
+    entered = time.perf_counter_ns()
     record = tracer.start(kind, f"openvino/{kind}", model=model, device=device)
     status = "exception"
+    sent = time.perf_counter_ns()
+    returned = sent
     try:
         result = _bounded_call(fn, timeout_s)
+        returned = time.perf_counter_ns()
         # _bounded_call returns ("ok", value) or ("hang", None), or re-raises. Anything else is not called ok.
         status = {"ok": "ok", "hang": "timeout"}.get(result[0], "exception")
         if status == "timeout":
             record.extra["worker_still_running"] = True
         return result
     finally:
+        if returned == sent:
+            returned = time.perf_counter_ns()
         tracer.end(record, status)
+        tracer.charge(record, (sent - entered) + (time.perf_counter_ns() - returned))
 
 
 def _bounded_call(fn, timeout_s: float):

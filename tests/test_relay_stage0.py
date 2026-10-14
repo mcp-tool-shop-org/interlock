@@ -87,7 +87,7 @@ def test_h3_the_trace_holds_no_prompt_host_user_or_home(tmp_path: Path, mode):
         instrument({"ollama": adapter}, tracer)
         adapter.transport("POST", "http://127.0.0.1:11434/api/generate", {"model": "m", "prompt": CANARY})
         tracer.mark("grant", grant="g")
-    text = next((tmp_path / "logs").glob("h3.*")).read_text(encoding="utf-8")
+    text = next((tmp_path / "logs").glob("h3.*.jsonl")).read_text(encoding="utf-8")
     assert CANARY not in text
     for needle in (socket.gethostname(), os.environ.get("USERNAME") or os.environ.get("USER"), str(Path.home())):
         if needle:
@@ -105,7 +105,7 @@ def test_h3_an_interrupted_run_leaves_a_closed_parsable_trace(tmp_path: Path, mo
             tracer.start("generate", "/api/generate", model="m", device="5090")  # in flight at the stop
             tracer.mark("stop_file")
             raise KeyboardInterrupt
-    lines = [json.loads(x) for x in next((tmp_path / "logs").glob("stop.*")).read_text(encoding="utf-8").splitlines()]
+    lines = [json.loads(x) for x in next((tmp_path / "logs").glob("stop.*.jsonl")).read_text(encoding="utf-8").splitlines()]
     if mode == "events":
         assert [x["status"] for x in lines if "call_id" in x] == ["ok", "abandoned"]
     else:
@@ -344,7 +344,7 @@ def test_h3_the_real_stop_file_leaves_a_closed_parsable_trace(tmp_path: Path, mo
         with pytest.raises(AdapterError, match="released"):
             _invoke(repo, spec_path, adapter, hooks, tracer=tracer)
     assert exits.codes == [77]
-    text = next((repo / "logs").glob("run-1.*")).read_text(encoding="utf-8")
+    text = next((repo / "logs").glob("run-1.*.jsonl")).read_text(encoding="utf-8")
     lines = [json.loads(x) for x in text.splitlines()]
     if mode == "events":
         calls = [x for x in lines if "call_id" in x]
