@@ -23,7 +23,7 @@ class Seams(relay_s1.Seams):
         self.state = {
             "environ": {}, "nemo-relay": "0.10.1", "config_paths": [], "status": "", "ignored": 0, "sha": "abc",
             "/api/version": {"version": "0.35.1"}, "/api/ps": {"models": []}, "listeners": 1,
-            "gpu": {"used_mib": 2008, "workloads": []}, "heartbeat": 5.0,
+            "gpu": {"used_mib": 2008, "workloads": []}, "heartbeat": 5.0, "cpu": 6.0,
         }
         self.state.update(changes)
         self.status_args = []
@@ -63,11 +63,14 @@ class Seams(relay_s1.Seams):
     def heartbeat_age_s(self):
         return self.state["heartbeat"]
 
+    def cpu_percent(self, seconds=5.0):
+        return self.state["cpu"]
+
 
 def test_a_healthy_preflight_returns_what_it_read(tmp_path: Path):
     facts = relay_s1.preflight(tmp_path, "g-1", Seams())
     assert facts == {"heartbeat_age_s": 5.0, "nemo_relay": "0.10.1", "git_sha": "abc", "ollama_version": "0.35.1",
-                     "idle_vram_mib": 2008}
+                     "idle_vram_mib": 2008, "cpu_pct": 6.0}
 
 
 @pytest.mark.parametrize(
@@ -85,6 +88,7 @@ def test_a_healthy_preflight_returns_what_it_read(tmp_path: Path):
         ("g", {"listeners": 2}, "2 listeners"),
         ("g", {"gpu": {"used_mib": 2008, "workloads": ["python.exe"]}}, "workload is on the GPU: python.exe"),
         ("g", {"gpu": {"used_mib": 9000, "workloads": []}}, "9000 MiB"),
+        ("g", {"cpu": 36.0}, "CPU is at 36%"),
     ],
 )
 def test_each_preflight_item_refuses(tmp_path: Path, grant, changes, message):

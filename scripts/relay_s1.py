@@ -41,7 +41,9 @@ SPEC_DIR = Path("experiments/relay-s1")
 RELAY_VERSION = "0.10.1"
 OLLAMA_VERSION = "0.35.1"
 IDLE_VRAM_MIB = 3500  # the first preflight: the desktop's own use (2,0xx to 2,7xx MiB measured), not a model
-SETTLE_MARGIN_MIB = 512  # later steps: back within this of the first preflight's reading
+SETTLE_MARGIN_MIB = 512
+# H2 measures client-side time: a busy CPU adds noise where equivalence is tested.
+CPU_QUIET_PCT = 25.0  # later steps: back within this of the first preflight's reading
 # On Windows (WDDM) nvidia-smi lists every desktop app that draws on the GPU, with no memory. A compute workload is a
 # process whose name says it runs models; any of these on the GPU refuses the run.
 WORKLOAD_NAMES = ("python", "ollama", "llama", "comfy", "vllm", "lms", "lm studio", "koboldcpp", "torch", "onnx",
@@ -140,6 +142,13 @@ class Seams:
         workloads = sorted({n for n in names if any(w in n.lower() for w in WORKLOAD_NAMES)})
         return {"used_mib": int(used[0]), "workloads": workloads}
 
+    def cpu_percent(self, seconds: float = 5.0) -> float:
+        """The system's CPU use, averaged over ``seconds``."""
+
+        import psutil
+
+        return float(psutil.cpu_percent(interval=seconds))
+
     def listeners(self, port: int) -> int:
         # interlock's own reader: on Windows build 26340 a listening socket reports state 0 to psutil.
         from interlock.ollama_supervisor import listening_pids
@@ -197,6 +206,9 @@ def preflight(root: Path, grant: str | None, seams: Seams, *, first: bool = True
     ceiling = IDLE_VRAM_MIB if baseline_mib is None else baseline_mib + SETTLE_MARGIN_MIB
     need(gpu["used_mib"] <= ceiling, f"{gpu['used_mib']} MiB in use; idle is at most {ceiling}")
     facts["idle_vram_mib"] = gpu["used_mib"]
+    cpu = seams.cpu_percent()
+    need(cpu <= CPU_QUIET_PCT, f"the CPU is at {cpu:.0f}% over 5 s; at most {CPU_QUIET_PCT:.0f}% before a step")
+    facts["cpu_pct"] = round(cpu, 1)
     return facts
 
 
