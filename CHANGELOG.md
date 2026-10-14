@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Dependabot opens a grouped pull request monthly for the uv lock, the docs-site npm lock, and GitHub Actions, at most three open per ecosystem. A coverage-guided fuzz target feeds bytes to the receipt-line reader (`check_tree`) and the spec loader (`load_spec`). A published GitHub release attaches the wheel, the sdist, and a SLSA provenance file.
+
 - CONTRIBUTING.md says how to report a bug, where a security report goes, and the bar for a pull request. CI runs `ruff check` (0.17.0; rules E, F, W, B, I, UP, and S) on every change and fails on any finding.
 
 - The Ollama supervisor stops a listener only when port 11434 has exactly one, and only when that process is the Ollama install `serve` starts. Zero listeners, two or more, a different executable, or a path that cannot be read refuses and stops nothing. The restart record keeps the pid and the path that was checked. Port 11490 is not queried on that path. E4b refuses a dirty worktree at the start, before any device, for the block and the pilot. E4b reads flash attention and the KV cache type from the model's first-load lines, and keeps the environment value as `config_flash_attention`. A missing load line refuses before any measured slot. The committed E4b receipts are unchanged. (R&D after #83 and #88, 2026-10-13)

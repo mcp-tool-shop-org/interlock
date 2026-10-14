@@ -10,8 +10,8 @@
 # NAMED_COMPENSATORS: 2. This workflow only checks out the repo and runs tests.
 #   It does not publish, deploy, or write outside the runner. Undo is to close
 #   the pull request. Owner: the author of the pull request. The Publisher merges.
-# DECOMPOSE_BY_SECRETS: 2. One push-triggered workflow. Lint, test and the map
-#   check live in this file.
+# DECOMPOSE_BY_SECRETS: 2. One push-triggered workflow. Lint, test, a bounded
+#   fuzz target, and the map check live in this file.
 # UNCERTAINTY_GATED_HUMANS: 2. A failing check stops the merge. R&D reviews the
 #   pull request. The Publisher merges.
 # EXTERNAL_VERIFIER: n/a. No specialised claim is decided here. R&D reviews the
@@ -48,7 +48,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     permissions:
       contents: read
       id-token: write
@@ -71,6 +71,12 @@ jobs:
 
       - name: Test
         run: uv run pytest --cov-report=xml
+
+      - name: Fuzz receipt and spec parsers
+        timeout-minutes: 10
+        run: |
+          uv sync --group fuzz
+          uv run --group fuzz python tests/fuzz_receipts.py -max_total_time=30
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1

@@ -24,15 +24,18 @@ REQUIRED = ("id", "question", "decision", "procedure", "needs", "stop_rules", "d
 
 
 class SpecError(Exception):
-    """The spec is missing a pre-registration field or asks for a forbidden setup."""
+    """The spec cannot be read, is missing a pre-registration field, or asks for a forbidden setup."""
 
 
 def load_spec(path: Path) -> dict:
-    text = path.read_text(encoding="utf-8")
-    if path.suffix == ".json":
-        data = json.loads(text)
-    else:
-        data = yaml.safe_load(text)
+    try:
+        text = path.read_text(encoding="utf-8")
+        if path.suffix == ".json":
+            data = json.loads(text)
+        else:
+            data = yaml.safe_load(text)
+    except (UnicodeDecodeError, json.JSONDecodeError, yaml.YAMLError) as exc:
+        raise SpecError(f"{path}: {exc}") from exc
     return validate_spec(data)
 
 

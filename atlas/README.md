@@ -1,24 +1,20 @@
 # interlock: how it works
 
-Mapped at 2026-10-14 from commit e4aba2d by Atlas 1.24.0.
+Mapped at 2026-10-14 from commit a532013 by Atlas 1.24.0.
 
 ## What this is
 
 interlock routes each job to a model, engine and device from a receipt-backed table. (written by a person)
 
-10 parts, mostly Python (87 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.
+10 parts, mostly Python (88 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.
 
-## What changed since 2026-10-13 (2e4b1b5)
+## What changed since 2026-10-14 (1b79b6f)
 
-- src/interlock/adapters/openvino.py is now read by pyproject.toml.
-- src/interlock/harness/e4b.py is now read by pyproject.toml.
-- src/interlock/harness/environment.py is now read by pyproject.toml.
-- And 14 more new writers and readers of places.
-- 1 file added and 54 changed content, across 5 parts.
+Nothing structural changed since 2026-10-14; 6 files changed content.
 
 ## What comes in
 
-1. **CI.** On a pull request to main; on a push to main touching 11 paths; or by hand. Runs tests/.
+1. **CI.** On a pull request to main; on a push to main touching 11 paths; or by hand. Runs tests/fuzz_receipts.py and tests/.
 2. **Release.** When a release is published; or by hand. Checks src/interlock/.
 3. **Deploy site to GitHub Pages.** On a push to main touching 2 paths; or by hand. Runs site/astro.config.mjs and site/src/.
 4. **OpenSSF Scorecard.** On a `branch_protection_rule` event; on a schedule (`43 15 * * 1`), Monday at 15:43 UTC; or by hand. Runs no file this map can see.
@@ -26,7 +22,7 @@ interlock routes each job to a model, engine and device from a receipt-backed ta
 
 ## What happens through CI
 
-1. The workflow runs tests/ in tests.
+1. The workflow runs tests/fuzz_receipts.py and tests/ in tests.
 2. That reaches scripts (1 file) and src (47 files).
 3. It uploads coverage to Codecov.
 
@@ -36,7 +32,7 @@ CI writes nothing this map can see.
 
 ## The other doors
 
-**Release** checks src/interlock/ and publishes to PyPI.
+**Release** checks src/interlock/, publishes to PyPI, and uploads dist/*.tar.gz and dist/*.whl to the release.
 
 **Deploy site to GitHub Pages** runs site/astro.config.mjs and site/src/, and deploys the site.
 
