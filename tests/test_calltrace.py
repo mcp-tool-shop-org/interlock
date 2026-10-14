@@ -249,3 +249,20 @@ def test_an_openvino_worker_fault_is_an_exception_not_ok(tmp_path: Path):
         openvino.set_tracer(None)
     counts = tracer.counts_for("_run")["embed"]
     assert (counts["n"], counts["errors"], counts["timeouts"]) == (2, 1, 0)
+
+
+def test_the_traced_transport_keeps_the_transports_own_methods(tmp_path: Path):
+    class Transport:
+        cancelled = 0
+
+        def __call__(self, method, url, body=None, **kwargs):
+            return {}
+
+        def cancel(self):
+            self.cancelled += 1
+
+    inner = Transport()
+    wrapped = traced_transport(inner, Tracer(root=tmp_path, run_id="r"))
+    wrapped.cancel()
+    assert inner.cancelled == 1
+    assert not hasattr(traced_transport(lambda *a: {}, Tracer(root=tmp_path, run_id="s")), "cancel")

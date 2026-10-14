@@ -310,18 +310,30 @@ class Tracer:
         return out
 
 
-def traced_transport(transport, tracer: Tracer, *, device: str | None = None):
-    """Wrap an Ollama transport: every request is classified, timed and counted on the calling thread."""
+class _TracedTransport:
+    """An Ollama transport, classified, timed and counted on the calling thread.
 
-    def wrapped(method: str, url: str, body: dict | None, *args, **kwargs):
+    Every other attribute goes to the wrapped transport, so methods the adapter looks for on its transport (such
+    as ``cancel``, which ends an in-flight request before an unload) still reach it."""
+
+    def __init__(self, transport, tracer: Tracer, device: str | None):
+        self.__wrapped__ = transport
+        self._tracer = tracer
+        self._device = device
+
+    def __getattr__(self, name):
+        return getattr(self.__wrapped__, name)
+
+    def __call__(self, method: str, url: str, body: dict | None, *args, **kwargs):
+        tracer = self._tracer
         kind = classify(method, url, body)
         model = body.get("model") if isinstance(body, dict) else None
         # Only Relay's request record uses the size. Serialising a long prompt again costs measured time.
         size = len(json.dumps(body)) if body is not None and tracer.mode == "relay" else 0
-        record = tracer.start(kind, urlsplit(url).path, model=model, device=device, request_bytes=size)
+        record = tracer.start(kind, urlsplit(url).path, model=model, device=self._device, request_bytes=size)
         status, payload = "exception", None
         try:
-            payload = transport(method, url, body, *args, **kwargs)
+            payload = self.__wrapped__(method, url, body, *args, **kwargs)
             status = "ok"
             return payload
         except Exception as exc:
@@ -330,8 +342,11 @@ def traced_transport(transport, tracer: Tracer, *, device: str | None = None):
         finally:
             tracer.end(record, status, payload)
 
-    wrapped.__wrapped__ = transport
-    return wrapped
+
+def traced_transport(transport, tracer: Tracer, *, device: str | None = None):
+    """Wrap an Ollama transport: every request is classified, timed and counted on the calling thread."""
+
+    return _TracedTransport(transport, tracer, device)
 
 
 def instrument(adapters: dict, tracer: Tracer) -> None:
