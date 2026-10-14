@@ -45,6 +45,8 @@ IMPORT_TRIPLES = 15
 STOP_AFTER_SPANS = 10
 VRAM_CEILING_MIB = 30500
 STEP_TIMEOUT_S = 3600
+GRANT_CAP_MIN = 90
+STOP_GRACE_S = 120
 EXIT_OPERATOR_STOP = 77
 
 
@@ -256,15 +258,33 @@ def _spawn(step: str, prefix: str, grant: str, root: Path, popen):
     return popen(argv, cwd=root)
 
 
+def _wait_or_stop(proc, stop_file: Path, limit_s: float) -> tuple[int, bool]:
+    """Wait for the step. At its time limit, write its stop file so the run's watcher ends it cleanly, then wait the
+    grace period; a run that still hasn't ended is killed. Returns the exit code and whether the limit was hit."""
+
+    try:
+        return proc.wait(timeout=max(limit_s, 1.0)), False
+    except subprocess.TimeoutExpired:
+        stop_file.parent.mkdir(exist_ok=True)
+        stop_file.write_text("interlock-relay stage 1: the grant's time limit\n", encoding="utf-8")
+        try:
+            return proc.wait(timeout=STOP_GRACE_S), True
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            return proc.wait(timeout=30), True
+
+
 def run_step(step: str, prefix: str, grant: str, root: Path, *, seams: Seams, popen=subprocess.Popen,
-             watch=VramWatch) -> dict:
-    """One traced run in its own process, watched for VRAM."""
+             watch=VramWatch, limit_s: float = STEP_TIMEOUT_S) -> dict:
+    """One traced run in its own process, watched for VRAM and stopped at the time limit."""
 
     run_id = f"{prefix}-{step}"
+    stop_file = root / "receipts" / f"{run_id}.stop"
     proc = _spawn(step, prefix, grant, root, popen)
-    with watch(seams, root / "receipts" / f"{run_id}.stop") as card:
-        code = proc.wait(timeout=STEP_TIMEOUT_S)
-    return {"run_id": run_id, "exit": code, "vram_peak_mib": card.peak, "vram_breach": card.breached}
+    with watch(seams, stop_file) as card:
+        code, timed_out = _wait_or_stop(proc, stop_file, limit_s)
+    return {"run_id": run_id, "exit": code, "vram_peak_mib": card.peak, "vram_breach": card.breached,
+            "timed_out": timed_out}
 
 
 def spans_started(trace: Path) -> int:
@@ -285,7 +305,8 @@ def spans_started(trace: Path) -> int:
 
 
 def run_stop(prefix: str, grant: str, root: Path, *, seams: Seams, popen=subprocess.Popen, sleep=time.sleep,
-             spans: int = STOP_AFTER_SPANS, timeout_s: float = 300.0, watch=VramWatch) -> dict:
+             spans: int = STOP_AFTER_SPANS, timeout_s: float = 300.0, watch=VramWatch,
+             limit_s: float = STEP_TIMEOUT_S) -> dict:
     """The decode spec in its own process, stopped through its stop file once the trace holds ``spans`` model calls.
 
     Waiting on the trace, not a clock, means the stop lands mid-run however fast the card is (Argon, B3). The step
@@ -305,9 +326,11 @@ def run_stop(prefix: str, grant: str, root: Path, *, seams: Seams, popen=subproc
         if written:
             stop.parent.mkdir(exist_ok=True)
             stop.write_text("interlock-relay stage 1: the stop-file run\n", encoding="utf-8")
-        code = proc.wait(timeout=STEP_TIMEOUT_S)
+        code, _timed_out = _wait_or_stop(proc, stop, limit_s)
+    # The stop counts only if it landed mid-run on enough traced calls, and the watch didn't write it (Argon round 2).
+    stopped = written and seen >= spans and not card.breached and code == EXIT_OPERATOR_STOP
     return {"run_id": run_id, "exit": code, "expected_exit": EXIT_OPERATOR_STOP, "stop_written": written,
-            "spans_before_stop": seen, "stopped": written and code == EXIT_OPERATOR_STOP, "vram_peak_mib": card.peak}
+            "spans_before_stop": seen, "stopped": stopped, "vram_peak_mib": card.peak, "vram_breach": card.breached}
 
 
 def unload_all(seams: Seams) -> list[str]:
@@ -327,12 +350,13 @@ def wait_idle(seams: Seams, *, sleep=time.sleep, timeout_s: float = 90.0) -> flo
     waited = 0.0
     while True:
         loaded = (seams.ollama("/api/ps") or {}).get("models") or []
-        used = seams.gpu()["used_mib"]
-        if not loaded and used <= IDLE_VRAM_MIB:
+        gpu = seams.gpu()
+        used, apps = gpu["used_mib"], gpu["compute_apps"]
+        if not loaded and used <= IDLE_VRAM_MIB and apps == 0:
             return waited
         if waited >= timeout_s:
             raise PreflightError(f"REFUSED: the card did not settle in {timeout_s:.0f}s ({len(loaded)} loaded, "
-                                 f"{used} MiB)")
+                                 f"{used} MiB, {apps} process(es) on the GPU)")
         sleep(1.0)
         waited += 1.0
 
@@ -402,8 +426,10 @@ def run_import(prefix: str, root: Path, *, triples: int = IMPORT_TRIPLES, child=
 
 
 def drive(root: Path, grant: str, prefix: str, steps: tuple[str, ...], *, seams: Seams | None = None,
-          step=run_step, stop=run_stop, imports=run_import, check=None, sleep=time.sleep) -> dict:
+          step=run_step, stop=run_stop, imports=run_import, check=None, sleep=time.sleep, watch=None,
+          cap_min: float = GRANT_CAP_MIN, clock=time.monotonic) -> dict:
     seams = seams or Seams()
+    watch = watch or VramWatch
     if check is None:
         def check():
             from interlock.cli import main
@@ -413,33 +439,54 @@ def drive(root: Path, grant: str, prefix: str, steps: tuple[str, ...], *, seams:
         "host": socket.gethostname(), "user": os.environ.get("USERNAME") or os.environ.get("USER") or "",
         "home": str(Path.home())}}
     out["preflight"] = preflight(root, grant, seams)
+    deadline = clock() + cap_min * 60
+    out["cap_min"] = cap_min
+
+    def remaining() -> float:
+        left = deadline - clock()
+        if left <= 0:
+            raise PreflightError(f"REFUSED: the grant's {cap_min:g}-minute cap is reached; no further step starts")
+        return left
+
     try:
         for index, name in enumerate(steps):
             if name not in STEPS:
                 raise PreflightError(f"REFUSED: unknown step {name}")
+            remaining()
             if index:
                 unload_all(seams)
                 wait_idle(seams, sleep=sleep)
                 preflight(root, grant, seams, first=False)  # the card is idle again; nothing else changed
             if name == "stop":
-                out["steps"][name] = result = stop(prefix, grant, root, seams=seams)
+                out["steps"][name] = result = stop(prefix, grant, root, seams=seams, limit_s=remaining())
+                if result.get("vram_breach"):
+                    raise PreflightError(f"REFUSED: VRAM passed {VRAM_CEILING_MIB} MiB in the stop run")
                 if not result["stopped"]:
                     raise PreflightError(f"REFUSED: the stop run ended {result['exit']}, not by its stop file (77)")
             elif name == "import":
-                def recheck():
+                card = watch(seams, None)
+
+                def recheck(card=card):
+                    """Before each child: the heartbeat, and the VRAM watch (a breach stops the check at once)."""
+
                     from interlock.guards import HEARTBEAT_MAX_AGE_S
 
+                    if card.breached:
+                        raise PreflightError(f"REFUSED: VRAM passed {VRAM_CEILING_MIB} MiB in the import check")
+                    remaining()  # no child starts past the grant's cap
                     age = seams.heartbeat_age_s()
                     if age > HEARTBEAT_MAX_AGE_S:
                         raise PreflightError(f"REFUSED: the watchdog heartbeat is {age:.0f}s old")
 
-                with VramWatch(seams, None) as card:
+                with card:
                     out["steps"][name] = imports(prefix, root, between=recheck)
                 out["steps"][name]["vram_peak_mib"] = card.peak
                 if card.breached:
                     raise PreflightError(f"REFUSED: VRAM passed {VRAM_CEILING_MIB} MiB in the import check")
             else:
-                out["steps"][name] = result = step(name, prefix, grant, root, seams=seams)
+                out["steps"][name] = result = step(name, prefix, grant, root, seams=seams, limit_s=remaining())
+                if result.get("timed_out"):
+                    raise PreflightError(f"REFUSED: {name} reached the grant's cap and was stopped")
                 if result.get("vram_breach"):
                     raise PreflightError(f"REFUSED: VRAM passed {VRAM_CEILING_MIB} MiB in {name}; the run stopped")
                 if result["exit"] != 0:
@@ -462,13 +509,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--prefix", required=True)
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--steps", default=",".join(STEPS))
+    parser.add_argument("--max-minutes", type=float, default=GRANT_CAP_MIN,
+                        help="the grant's cap: no step starts after it, and a running step is stopped at it")
     parser.add_argument("--child-run", choices=("decode", "long", "unload", "companion", "stop"),
                         help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     if args.child_run:
         return child_run(args.child_run, args.prefix, args.grant, args.root.resolve())
     try:
-        drive(args.root.resolve(), args.grant, args.prefix, tuple(s for s in args.steps.split(",") if s))
+        drive(args.root.resolve(), args.grant, args.prefix, tuple(s for s in args.steps.split(",") if s),
+              cap_min=args.max_minutes)
     except PreflightError as exc:
         print(exc, file=sys.stderr)
         return 2

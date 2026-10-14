@@ -161,7 +161,7 @@ def test_a_step_runs_in_its_own_process_under_the_vram_watch(tmp_path: Path):
     started = []
     record = relay_s1.run_step("long", "p", "g", tmp_path, seams=Seams(),
                                popen=lambda argv, cwd: started.append(argv) or Proc(0), watch=NoWatch)
-    assert record == {"run_id": "p-long", "exit": 0, "vram_peak_mib": 0, "vram_breach": False}
+    assert record == {"run_id": "p-long", "exit": 0, "vram_peak_mib": 0, "vram_breach": False, "timed_out": False}
     assert started[0][2:4] == ["--child-run", "long"] and started[0][1].endswith("relay_s1.py")
 
 
@@ -234,8 +234,8 @@ def _drive(tmp_path, steps, *, seams=None, step=None, stop=None):
     checks = []
     out = relay_s1.drive(
         tmp_path, "g", "p", steps, seams=seams or Seams(),
-        step=step or (lambda name, prefix, grant, root, seams: {"run_id": f"p-{name}", "exit": 0}),
-        stop=stop or (lambda prefix, grant, root, seams: {"stopped": True, "exit": 77}),
+        step=step or (lambda name, prefix, grant, root, seams, limit_s: {"run_id": f"p-{name}", "exit": 0}),
+        stop=stop or (lambda prefix, grant, root, seams, limit_s: {"stopped": True, "exit": 77}),
         imports=lambda prefix, root, between: {"triples": 15},
         check=lambda: checks.append(1) or True, sleep=lambda s: None)
     return out, checks
@@ -251,7 +251,8 @@ def test_between_steps_the_card_is_unloaded_settled_and_preflighted(tmp_path: Pa
 
 def test_a_stop_step_that_did_not_stop_fails_the_run(tmp_path: Path):
     with pytest.raises(relay_s1.PreflightError, match="not by its stop file"):
-        _drive(tmp_path, ("stop", "import"), stop=lambda prefix, grant, root, seams: {"stopped": False, "exit": 0})
+        _drive(tmp_path, ("stop", "import"),
+               stop=lambda prefix, grant, root, seams, limit_s: {"stopped": False, "exit": 0})
     driver = json.loads((tmp_path / "logs" / "p.driver.json").read_text(encoding="utf-8"))
     assert "import" not in driver["steps"]
 
@@ -259,13 +260,13 @@ def test_a_stop_step_that_did_not_stop_fails_the_run(tmp_path: Path):
 def test_a_vram_breach_fails_the_run(tmp_path: Path):
     with pytest.raises(relay_s1.PreflightError, match="VRAM passed"):
         _drive(tmp_path, ("companion",),
-               step=lambda name, prefix, grant, root, seams: {"exit": 77, "vram_breach": True})
+               step=lambda name, prefix, grant, root, seams, limit_s: {"exit": 77, "vram_breach": True})
 
 
 def test_a_failed_step_stops_the_run_and_the_record_is_still_written(tmp_path: Path):
     ran = []
 
-    def step(name, prefix, grant, root, seams):
+    def step(name, prefix, grant, root, seams, limit_s):
         ran.append(name)
         return {"run_id": f"p-{name}", "exit": 1}
 
@@ -282,3 +283,111 @@ def test_a_refused_preflight_runs_nothing(tmp_path: Path):
     with pytest.raises(relay_s1.PreflightError):
         _drive(tmp_path, ("decode",), seams=Seams(listeners=0), step=lambda *a, **k: ran.append(1))
     assert ran == []
+
+
+class BreachWatch(NoWatch):
+    def __init__(self, seams, stop_file):
+        super().__init__(seams, stop_file)
+        self.breached = True
+
+
+def test_a_stop_after_the_timeout_with_too_few_spans_does_not_pass(tmp_path: Path):
+    stop = tmp_path / "receipts" / "p-stop.stop"
+    _spans(tmp_path / "logs" / "p-stop.atof.jsonl", 3)  # the run traced only 3 calls before the timeout
+    record = relay_s1.run_stop("p", "g", tmp_path, seams=Seams(), popen=lambda argv, cwd: Proc(77, until_stop=stop),
+                               sleep=lambda s: None, timeout_s=2, watch=NoWatch)
+    assert record["stop_written"] is True and record["spans_before_stop"] == 3
+    assert record["stopped"] is False
+
+
+def test_a_stop_written_by_a_vram_breach_does_not_pass_and_the_run_refuses(tmp_path: Path):
+    stop = tmp_path / "receipts" / "p-stop.stop"
+    _spans(tmp_path / "logs" / "p-stop.atof.jsonl", 12)
+    record = relay_s1.run_stop("p", "g", tmp_path, seams=Seams(), popen=lambda argv, cwd: Proc(77, until_stop=stop),
+                               sleep=lambda s: None, watch=BreachWatch)
+    assert record["vram_breach"] is True and record["stopped"] is False
+    with pytest.raises(relay_s1.PreflightError, match="VRAM passed .* in the stop run"):
+        _drive(tmp_path, ("stop",), stop=lambda prefix, grant, root, seams, limit_s: {"stopped": True, "exit": 77,
+                                                                                       "vram_breach": True})
+
+
+def test_the_idle_wait_also_waits_for_no_process_on_the_gpu(tmp_path: Path):
+    busy = Seams(gpu={"used_mib": 2008, "compute_apps": 1})
+    with pytest.raises(relay_s1.PreflightError, match="1 process"):
+        relay_s1.wait_idle(busy, sleep=lambda s: None, timeout_s=3)
+
+    class Draining(Seams):
+        def __init__(self):
+            super().__init__(gpu={"used_mib": 2008, "compute_apps": 1})
+            self.reads = 0
+
+        def gpu(self):
+            self.reads += 1
+            if self.reads > 2:
+                self.state["gpu"] = {"used_mib": 2008, "compute_apps": 0}
+            return self.state["gpu"]
+
+    assert relay_s1.wait_idle(Draining(), sleep=lambda s: None) == 2.0
+
+
+def test_a_vram_breach_stops_the_import_check_before_the_next_child(tmp_path: Path):
+    children = []
+
+    def imports(prefix, root, between):
+        for _ in range(45):
+            between()
+            children.append(1)
+        return {"triples": 15}
+
+    class LateBreach(NoWatch):
+        def __init__(self, seams, stop_file):
+            super().__init__(seams, stop_file)
+            self.calls = 0
+
+        @property
+        def breached(self):
+            return len(children) >= 4
+
+        @breached.setter
+        def breached(self, value):
+            pass
+
+    with pytest.raises(relay_s1.PreflightError, match="VRAM passed .* in the import check"):
+        relay_s1.drive(tmp_path, "g", "p", ("import",), seams=Seams(), imports=imports, check=lambda: True,
+                       sleep=lambda s: None, watch=LateBreach)
+    assert len(children) == 4  # the fifth child never started
+
+
+def test_the_grant_cap_starts_no_step_after_it(tmp_path: Path):
+    now = [0.0]
+    ran = []
+
+    def step(name, prefix, grant, root, seams, limit_s):
+        ran.append((name, limit_s))
+        now[0] += 50 * 60  # each step takes 50 minutes
+        return {"run_id": f"p-{name}", "exit": 0}
+
+    with pytest.raises(relay_s1.PreflightError, match="90-minute cap"):
+        relay_s1.drive(tmp_path, "g", "p", ("decode", "long", "unload"), seams=Seams(), step=step,
+                       check=lambda: True, sleep=lambda s: None, clock=lambda: now[0])
+    assert [name for name, _ in ran] == ["decode", "long"]
+    assert ran[0][1] == 90 * 60 and ran[1][1] == 40 * 60  # the second step gets only what's left
+
+
+def test_a_step_still_running_at_its_limit_is_stopped_through_its_stop_file(tmp_path: Path):
+    stop = tmp_path / "receipts" / "p-decode.stop"
+
+    class Slow:
+        def __init__(self):
+            self.waits = 0
+
+        def wait(self, timeout):
+            self.waits += 1
+            if not stop.is_file():
+                raise subprocess.TimeoutExpired("interlock", timeout)
+            return 77
+
+    record = relay_s1.run_step("decode", "p", "g", tmp_path, seams=Seams(), popen=lambda argv, cwd: Slow(),
+                               watch=NoWatch, limit_s=5)
+    assert record["timed_out"] is True and record["exit"] == 77 and stop.is_file()
+
