@@ -4,7 +4,7 @@
 
 ## [0.1.0] - 2026-10-14
 
-Prototype advisory router for one rig. It suggests a model, an engine and a device from measured receipts, and it does not serve traffic. It is not a beta, and it is not on PyPI.
+Prototype advisory router for one rig. It suggests a model, an engine and a device from measured receipts, and it does not serve traffic. It is a prototype, not a beta. The first release on PyPI, as `mcptoolshop-interlock`, with SLSA provenance on the GitHub release assets.
 
 - Dependabot opens a grouped pull request monthly for the uv lock, the docs-site npm lock, and GitHub Actions, at most three open per ecosystem. A coverage-guided fuzz target feeds bytes to the receipt-line reader (`check_tree`) and the spec loader (`load_spec`). A published GitHub release attaches the wheel, the sdist, and a SLSA provenance file.
 
