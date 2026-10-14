@@ -266,3 +266,82 @@ def test_the_traced_transport_keeps_the_transports_own_methods(tmp_path: Path):
     wrapped.cancel()
     assert inner.cancelled == 1
     assert not hasattr(traced_transport(lambda *a: {}, Tracer(root=tmp_path, run_id="s")), "cancel")
+
+
+def test_after_the_close_a_call_is_neither_counted_nor_logged(tmp_path: Path):
+    tracer = Tracer(root=tmp_path, run_id="r", mode="events")
+    tracer.open()
+    in_flight = tracer.start("generate", "/api/generate", model="m", device="5090")
+    tracer.close()  # the watcher's close before os._exit
+    late = tracer.start("generate", "/api/generate", model="m", device="5090")  # a thread still calling in
+    tracer.end(late, "ok")
+    tracer.end(in_flight, "ok")
+    tracer.mark("late")
+    tracer.flush()
+    tracer.close()  # the run's own close afterwards does nothing
+    lines = [json.loads(x) for x in (tmp_path / "logs" / "r.events.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert [x["status"] for x in lines] == ["abandoned"]
+    assert tracer.counts_for("_run")["generate"] == {"n": 1, "ms": tracer.counts_for("_run")["generate"]["ms"],
+                                                     "errors": 1, "timeouts": 0}
+
+
+def test_a_close_racing_starts_leaves_every_logged_start_with_its_end(tmp_path: Path):
+    import threading
+
+    class Sink:
+        scope_id = None
+
+        def __init__(self, *args):
+            self.events = []
+            self.closed = False
+
+        def start(self, record):
+            assert not self.closed
+            self.events.append(("start", record.call_id))
+
+        def end(self, record):
+            assert not self.closed
+            self.events.append(("end", record.call_id))
+
+        def mark(self, *args):
+            pass
+
+        def flush(self):
+            pass
+
+        def close(self, end_ns=None):
+            self.closed = True
+
+    tracer = Tracer(root=tmp_path, run_id="race", mode="relay", relay_factory=Sink)
+    tracer.open()
+    sink = tracer._sink
+    stop = threading.Event()
+
+    def caller():
+        while not stop.is_set():
+            record = tracer.start("generate", "/api/generate", model="m", device="5090")
+            tracer.end(record, "ok")
+
+    workers = [threading.Thread(target=caller) for _ in range(3)]
+    for w in workers:
+        w.start()
+    tracer.close()
+    stop.set()
+    for w in workers:
+        w.join()
+    starts = {i for kind, i in sink.events if kind == "start"}
+    ends = {i for kind, i in sink.events if kind == "end"}
+    assert starts == ends
+
+
+def test_release_unwraps_the_transport_so_a_reused_adapter_counts_in_its_next_run(tmp_path: Path):
+    adapter = _Ollama()
+    inner = adapter.transport
+    first, second = Tracer(root=tmp_path, run_id="a"), Tracer(root=tmp_path, run_id="b")
+    for tracer in (first, second):
+        with tracer:
+            instrument({"ollama": adapter}, tracer)
+            adapter.transport("GET", URL + "/api/tags", None)
+            release({"ollama": adapter})
+        assert adapter.transport is inner
+    assert first.counts_for("_run")["tags"]["n"] == second.counts_for("_run")["tags"]["n"] == 1

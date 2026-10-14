@@ -161,6 +161,9 @@ class Tracer:
         self._slot_calls: list[int] = []
         self._open: dict[int, CallRecord] = {}
         self._sink = None
+        # Every sink call happens under self._lock (the lock order is always tracer, then sink), so a watcher
+        # close can't land between a call's count and its sink event (Argon round 2, M-New-1).
+        self._closed = False
         self._offset_ns = 0
         self.trace_file: str | None = None
         self.scope_id: str | None = None
@@ -191,18 +194,21 @@ class Tracer:
         return self
 
     def close(self) -> None:
-        """Close any call left open, then flush and close the sink. Runs on every exit path."""
+        """Close any call left open, then flush and close the sink. Runs on every exit path, and on the watcher's
+        thread before a halt's os._exit. A second close does nothing; calls that arrive after it are not recorded."""
 
         with self._lock:
-            leftover = list(self._open.values())
+            if self._closed:
+                return
+            self._closed = True
+            for record in list(self._open.values()):
+                record.end_ns = self.now_ns()
+                record.status = "abandoned"
+                self._finish_locked(record)
             self._open.clear()
-        for record in leftover:
-            record.end_ns = self.now_ns()
-            record.status = "abandoned"
-            self._finish(record)
-        if self._sink is not None:
-            sink, self._sink = self._sink, None
-            sink.close(self.now_ns())
+            if self._sink is not None:
+                sink, self._sink = self._sink, None
+                sink.close(self.now_ns())
 
     def __enter__(self) -> Tracer:
         return self.open()
@@ -214,12 +220,14 @@ class Tracer:
         return self._offset_ns + time.perf_counter_ns()
 
     def mark(self, name: str, **data) -> None:
-        if self._sink is not None:
-            self._sink.mark(name, self.now_ns(), data)
+        with self._lock:
+            if self._sink is not None:
+                self._sink.mark(name, self.now_ns(), data)
 
     def flush(self) -> None:
-        if self._sink is not None:
-            self._sink.flush()
+        with self._lock:
+            if self._sink is not None:
+                self._sink.flush()
 
     # -- slots and rows ---------------------------------------------------------
 
@@ -259,12 +267,14 @@ class Tracer:
             request_bytes=request_bytes,
         )
         with self._lock:
+            if self._closed:
+                return record  # after the close: not counted, not logged
             self._open[record.call_id] = record
             if self._slot:
                 self._slot_calls.append(record.call_id)
                 record.extra = {"arm": self._slot.get("arm"), "slot": self._slot.get("index")}
-        if self._sink is not None:
-            self._sink.start(record)
+            if self._sink is not None:
+                self._sink.start(record)
         return record
 
     def end(self, record: CallRecord, status: str, payload: object = None) -> None:
@@ -274,19 +284,20 @@ class Tracer:
         with self._lock:
             if self._open.pop(record.call_id, None) is None:
                 return
-        self._finish(record)
+            self._finish_locked(record)
 
-    def _finish(self, record: CallRecord) -> None:
+    def _finish_locked(self, record: CallRecord) -> None:
+        """Count a finished call and log its end. The caller holds self._lock."""
+
         arm = record.extra.get("arm") or "_run"
-        with self._lock:
-            fresh = {"n": 0, "ms": 0.0, "errors": 0, "timeouts": 0}
-            entry = self._counts.setdefault(arm, {}).setdefault(record.kind, fresh)
-            entry["n"] += 1
-            entry["ms"] = round(entry["ms"] + (record.ms or 0.0), 3)
-            if record.status == "timeout":
-                entry["timeouts"] += 1
-            elif record.status != "ok":
-                entry["errors"] += 1
+        fresh = {"n": 0, "ms": 0.0, "errors": 0, "timeouts": 0}
+        entry = self._counts.setdefault(arm, {}).setdefault(record.kind, fresh)
+        entry["n"] += 1
+        entry["ms"] = round(entry["ms"] + (record.ms or 0.0), 3)
+        if record.status == "timeout":
+            entry["timeouts"] += 1
+        elif record.status != "ok":
+            entry["errors"] += 1
         if self._sink is not None:
             self._sink.end(record)
 
@@ -365,10 +376,16 @@ def instrument(adapters: dict, tracer: Tracer) -> None:
 
 
 def release(adapters: dict) -> None:
-    """Undo ``instrument`` for the OpenVINO module, whose tracer is module-wide."""
+    """Undo ``instrument``: the Ollama transport is unwrapped, so a reused adapter is counted by its next run's
+    tracer, and the OpenVINO module's tracer is cleared (Argon round 2, M-New-2)."""
 
-    if "openvino" in adapters:
-        import importlib
+    for engine, adapter in adapters.items():
+        if engine == "ollama" and hasattr(adapter, "transport"):
+            inner = getattr(adapter.transport, "__wrapped__", None)
+            if inner is not None:
+                adapter.transport = inner
+        elif engine == "openvino":
+            import importlib
 
-        module = importlib.import_module("interlock.adapters.openvino")
-        module.set_tracer(None)
+            module = importlib.import_module("interlock.adapters.openvino")
+            module.set_tracer(None)
