@@ -23,7 +23,7 @@ class Seams(relay_s1.Seams):
         self.state = {
             "environ": {}, "nemo-relay": "0.10.1", "config_paths": [], "status": "", "ignored": 0, "sha": "abc",
             "/api/version": {"version": "0.35.1"}, "/api/ps": {"models": []}, "listeners": 1,
-            "gpu": {"used_mib": 2008, "compute_apps": 0}, "heartbeat": 5.0,
+            "gpu": {"used_mib": 2008, "workloads": []}, "heartbeat": 5.0,
         }
         self.state.update(changes)
         self.status_args = []
@@ -55,7 +55,7 @@ class Seams(relay_s1.Seams):
     def unload(self, model):
         self.unloaded.append(model)
         self.state["/api/ps"] = {"models": []}
-        self.state["gpu"] = {"used_mib": 2008, "compute_apps": 0}
+        self.state["gpu"] = {"used_mib": 2008, "workloads": []}
 
     def listeners(self, port):
         return self.state["listeners"]
@@ -83,8 +83,8 @@ def test_a_healthy_preflight_returns_what_it_read(tmp_path: Path):
         ("g", {"/api/version": {"version": "0.36.0"}}, "0.36.0"),
         ("g", {"/api/ps": {"models": [{"name": "m"}]}}, "already on the card"),
         ("g", {"listeners": 2}, "2 listeners"),
-        ("g", {"gpu": {"used_mib": 2008, "compute_apps": 1}}, "other process"),
-        ("g", {"gpu": {"used_mib": 9000, "compute_apps": 0}}, "9000 MiB"),
+        ("g", {"gpu": {"used_mib": 2008, "workloads": ["python.exe"]}}, "workload is on the GPU: python.exe"),
+        ("g", {"gpu": {"used_mib": 9000, "workloads": []}}, "9000 MiB"),
     ],
 )
 def test_each_preflight_item_refuses(tmp_path: Path, grant, changes, message):
@@ -195,7 +195,7 @@ def test_a_stop_run_that_finishes_first_does_not_pass(tmp_path: Path):
 
 def test_the_vram_watch_writes_the_stop_file_once_over_the_ceiling(tmp_path: Path):
     stop = tmp_path / "receipts" / "x.stop"
-    seams = Seams(gpu={"used_mib": 31_000, "compute_apps": 1})
+    seams = Seams(gpu={"used_mib": 31_000, "workloads": ["ollama.exe"]})
     watch = relay_s1.VramWatch(seams, stop)
     watch.read_once()
     first = stop.read_text(encoding="utf-8")
@@ -207,7 +207,8 @@ def test_the_vram_watch_writes_the_stop_file_once_over_the_ceiling(tmp_path: Pat
 
 
 def test_unload_all_and_wait_idle(tmp_path: Path):
-    seams = Seams(**{"/api/ps": {"models": [{"name": "qwen3:8b"}]}, "gpu": {"used_mib": 15000, "compute_apps": 1}})
+    seams = Seams(**{"/api/ps": {"models": [{"name": "qwen3:8b"}]},
+                     "gpu": {"used_mib": 15000, "workloads": ["ollama.exe"]}})
     assert relay_s1.unload_all(seams) == ["qwen3:8b"] and seams.unloaded == ["qwen3:8b"]
     assert relay_s1.wait_idle(seams, sleep=lambda s: None) == 0.0
     stuck = Seams(**{"/api/ps": {"models": [{"name": "m"}]}})
@@ -312,19 +313,19 @@ def test_a_stop_written_by_a_vram_breach_does_not_pass_and_the_run_refuses(tmp_p
 
 
 def test_the_idle_wait_also_waits_for_no_process_on_the_gpu(tmp_path: Path):
-    busy = Seams(gpu={"used_mib": 2008, "compute_apps": 1})
-    with pytest.raises(relay_s1.PreflightError, match="1 process"):
+    busy = Seams(gpu={"used_mib": 2008, "workloads": ["ComfyUI.exe"]})
+    with pytest.raises(relay_s1.PreflightError, match="workloads: ComfyUI.exe"):
         relay_s1.wait_idle(busy, sleep=lambda s: None, timeout_s=3)
 
     class Draining(Seams):
         def __init__(self):
-            super().__init__(gpu={"used_mib": 2008, "compute_apps": 1})
+            super().__init__(gpu={"used_mib": 2008, "workloads": ["ollama.exe"]})
             self.reads = 0
 
         def gpu(self):
             self.reads += 1
             if self.reads > 2:
-                self.state["gpu"] = {"used_mib": 2008, "compute_apps": 0}
+                self.state["gpu"] = {"used_mib": 2008, "workloads": []}
             return self.state["gpu"]
 
     assert relay_s1.wait_idle(Draining(), sleep=lambda s: None) == 2.0
@@ -390,4 +391,23 @@ def test_a_step_still_running_at_its_limit_is_stopped_through_its_stop_file(tmp_
     record = relay_s1.run_step("decode", "p", "g", tmp_path, seams=Seams(), popen=lambda argv, cwd: Slow(),
                                watch=NoWatch, limit_s=5)
     assert record["timed_out"] is True and record["exit"] == 77 and stop.is_file()
+
+
+def test_later_steps_hold_the_card_to_the_first_reading_plus_a_margin(tmp_path: Path):
+    relay_s1.preflight(tmp_path, "g", Seams(gpu={"used_mib": 3000, "workloads": []}), first=False, baseline_mib=2700)
+    with pytest.raises(relay_s1.PreflightError, match="idle is at most 3212"):
+        relay_s1.preflight(tmp_path, "g", Seams(gpu={"used_mib": 3300, "workloads": []}), first=False,
+                           baseline_mib=2700)
+
+
+def test_the_live_gpu_reader_names_only_compute_workloads(monkeypatch):
+    def run(argv, **kwargs):
+        if "--query-gpu=memory.used" in argv:
+            return subprocess.CompletedProcess(argv, 0, "2751\n", "")
+        rows = ("1, C:\\Windows\\explorer.exe\n2, C:\\Program Files\\Google\\chrome.exe\n"
+                "3, E:\\AI\\envs\\py\\python.exe\n")
+        return subprocess.CompletedProcess(argv, 0, rows, "")
+
+    monkeypatch.setattr(relay_s1.subprocess, "run", run)
+    assert relay_s1.Seams().gpu() == {"used_mib": 2751, "workloads": ["python.exe"]}
 

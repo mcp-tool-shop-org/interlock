@@ -40,7 +40,12 @@ STEPS = ("decode", "long", "unload", "companion", "stop", "import")
 SPEC_DIR = Path("experiments/relay-s1")
 RELAY_VERSION = "0.10.1"
 OLLAMA_VERSION = "0.35.1"
-IDLE_VRAM_MIB = 2400
+IDLE_VRAM_MIB = 3500  # the first preflight: the desktop's own use (2,0xx to 2,7xx MiB measured), not a model
+SETTLE_MARGIN_MIB = 512  # later steps: back within this of the first preflight's reading
+# On Windows (WDDM) nvidia-smi lists every desktop app that draws on the GPU, with no memory. A compute workload is a
+# process whose name says it runs models; any of these on the GPU refuses the run.
+WORKLOAD_NAMES = ("python", "ollama", "llama", "comfy", "vllm", "lms", "lm studio", "koboldcpp", "torch", "onnx",
+                  "whisper", "tensorrt", "triton")
 IMPORT_TRIPLES = 15
 STOP_AFTER_SPANS = 10
 VRAM_CEILING_MIB = 30500
@@ -129,13 +134,17 @@ class Seams:
             return subprocess.run(["nvidia-smi", *args], capture_output=True, text=True, check=True).stdout  # noqa: S603, S607
 
         used = query(["--query-gpu=memory.used", "--format=csv,noheader,nounits"]).strip().splitlines()
-        apps = [line for line in query(["--query-compute-apps=pid", "--format=csv,noheader"]).splitlines() if line]
-        return {"used_mib": int(used[0]), "compute_apps": len(apps)}
+        names = [line.split(",", 1)[-1].strip().replace("\\", "/").rsplit("/", 1)[-1]
+                 for line in query(["--query-compute-apps=pid,process_name", "--format=csv,noheader"]).splitlines()
+                 if line.strip()]
+        workloads = sorted({n for n in names if any(w in n.lower() for w in WORKLOAD_NAMES)})
+        return {"used_mib": int(used[0]), "workloads": workloads}
 
     def listeners(self, port: int) -> int:
-        import psutil
+        # interlock's own reader: on Windows build 26340 a listening socket reports state 0 to psutil.
+        from interlock.ollama_supervisor import listening_pids
 
-        return sum(1 for c in psutil.net_connections(kind="tcp") if c.status == "LISTEN" and c.laddr.port == port)
+        return len(listening_pids(port))
 
     def heartbeat_age_s(self) -> float:
         from interlock.guards import heartbeat_age_s
@@ -144,7 +153,8 @@ class Seams:
         return heartbeat_age_s(heartbeat_path(None), time.time())
 
 
-def preflight(root: Path, grant: str | None, seams: Seams, *, first: bool = True) -> dict:
+def preflight(root: Path, grant: str | None, seams: Seams, *, first: bool = True,
+              baseline_mib: int | None = None) -> dict:
     """Every item, in order. The first failure raises before any model call. Returns what was read.
 
     Before the first step the whole tree must be clean. Before a later step, everything but ``receipts/`` and
@@ -183,9 +193,9 @@ def preflight(root: Path, grant: str | None, seams: Seams, *, first: bool = True
     listeners = seams.listeners(11434)
     need(listeners == 1, f"{listeners} listeners on 11434; the supervisor needs exactly one")
     gpu = seams.gpu()
-    need(gpu["compute_apps"] == 0, f"{gpu['compute_apps']} other process(es) on the GPU")
-    need(gpu["used_mib"] <= IDLE_VRAM_MIB,
-         f"{gpu['used_mib']} MiB in use; the idle baseline is at most {IDLE_VRAM_MIB}")
+    need(not gpu["workloads"], f"another compute workload is on the GPU: {', '.join(gpu['workloads'])}")
+    ceiling = IDLE_VRAM_MIB if baseline_mib is None else baseline_mib + SETTLE_MARGIN_MIB
+    need(gpu["used_mib"] <= ceiling, f"{gpu['used_mib']} MiB in use; idle is at most {ceiling}")
     facts["idle_vram_mib"] = gpu["used_mib"]
     return facts
 
@@ -344,19 +354,20 @@ def unload_all(seams: Seams) -> list[str]:
     return [n for n in names if n]
 
 
-def wait_idle(seams: Seams, *, sleep=time.sleep, timeout_s: float = 90.0) -> float:
-    """Wait for an empty card at the idle baseline. A card that doesn't settle refuses the next step."""
+def wait_idle(seams: Seams, *, sleep=time.sleep, timeout_s: float = 90.0, ceiling_mib: int = IDLE_VRAM_MIB) -> float:
+    """Wait for an empty card at the idle baseline, with no compute workload on it. A card that doesn't settle
+    refuses the next step."""
 
     waited = 0.0
     while True:
         loaded = (seams.ollama("/api/ps") or {}).get("models") or []
         gpu = seams.gpu()
-        used, apps = gpu["used_mib"], gpu["compute_apps"]
-        if not loaded and used <= IDLE_VRAM_MIB and apps == 0:
+        used, workloads = gpu["used_mib"], gpu["workloads"]
+        if not loaded and used <= ceiling_mib and not workloads:
             return waited
         if waited >= timeout_s:
             raise PreflightError(f"REFUSED: the card did not settle in {timeout_s:.0f}s ({len(loaded)} loaded, "
-                                 f"{used} MiB, {apps} process(es) on the GPU)")
+                                 f"{used} MiB, workloads: {', '.join(workloads) or 'none'})")
         sleep(1.0)
         waited += 1.0
 
@@ -455,8 +466,9 @@ def drive(root: Path, grant: str, prefix: str, steps: tuple[str, ...], *, seams:
             remaining()
             if index:
                 unload_all(seams)
-                wait_idle(seams, sleep=sleep)
-                preflight(root, grant, seams, first=False)  # the card is idle again; nothing else changed
+                baseline = out["preflight"]["idle_vram_mib"]
+                wait_idle(seams, sleep=sleep, ceiling_mib=baseline + SETTLE_MARGIN_MIB)
+                preflight(root, grant, seams, first=False, baseline_mib=baseline)  # idle again; nothing else changed
             if name == "stop":
                 out["steps"][name] = result = stop(prefix, grant, root, seams=seams, limit_s=remaining())
                 if result.get("vram_breach"):
