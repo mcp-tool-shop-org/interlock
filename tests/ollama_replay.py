@@ -31,7 +31,7 @@ class ReplayTransport:
         self.documents = list(documents)
 
     @classmethod
-    def load(cls, folder: Path) -> "ReplayTransport":
+    def load(cls, folder: Path) -> ReplayTransport:
         documents = []
         if folder.is_dir():
             for path in sorted(folder.glob("*.json")):

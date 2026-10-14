@@ -8,7 +8,9 @@ Ranking, one metric per task. The bound is never a median.
 | Task | Rank by | Conservative bound |
 |---|---|---|
 | ``generate`` | highest decode tok/s | minimum ``phase=repeat`` slot throughput |
-| every other task | lowest warm latency | maximum ``phase=repeat`` slot ``latency_ms``, or ``claim_wall_s.max`` in milliseconds when the row has no repeat slots |
+| every other task | lowest warm latency | maximum ``phase=repeat`` slot ``latency_ms`` |
+
+Or ``claim_wall_s.max`` in milliseconds when the row has no repeat slots.
 
 A higher-is-better floor (``--min-<metric>``) uses that same minimum for
 ``tok-s``, and the quality interval's low end for any other metric name.
@@ -50,9 +52,9 @@ kept and marked budget unchecked. This function does not read a balance.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date, timedelta
-from typing import Mapping, Sequence
 
 EXCLUDED_OUTCOMES = (
     "native_binary_rejected",
@@ -183,11 +185,11 @@ def _document(
     pool: Sequence[Mapping],
 ) -> dict:
     bound = _rank_bound(winner, request)
-    assert bound is not None
+    assert bound is not None  # noqa: S101  # rank only sees a row that has a bound
     if len(ranked) > 1:
         nxt = ranked[1]
         next_bound = _rank_bound(nxt, request)
-        assert next_bound is not None
+        assert next_bound is not None  # noqa: S101  # rank only sees a row that has a bound
         delta = (bound - next_bound) if direction == "higher" else (next_bound - bound)
         next_id: str | None = str(nxt["id"])
     else:
@@ -322,7 +324,8 @@ def _why(row: Mapping, winner: Mapping, request: Request) -> tuple[str, str]:
     return metric, f"conservative bound {mine:g} lost to {theirs:g}"
 
 
-def _empty(constraint: str, limit: object, dropped: Sequence[Mapping], excluded: list[dict], request: Request) -> Refusal:
+def _empty(constraint: str, limit: object, dropped: Sequence[Mapping], excluded: list[dict],
+    request: Request) -> Refusal:
     closest_row, closest = _closest(constraint, limit, dropped)
     experiment = experiment_of(closest_row) if closest_row is not None else "unregistered"
     gap = ""
@@ -332,8 +335,12 @@ def _empty(constraint: str, limit: object, dropped: Sequence[Mapping], excluded:
         gap = f" Closest miss is {closest['id']}."
     else:
         gap = " Nothing was close."
-    hint = f"The constraint that emptied the set is {constraint}.{gap} Experiment {experiment} is the cell that would fill it."
-    if constraint.startswith("min:") or constraint in {"decode_tok_s", "warm_latency_ms", "max_latency_ms", "max_ttft_ms"}:
+    hint = (
+        f"The constraint that emptied the set is {constraint}.{gap} Experiment {experiment} is the cell that would "
+        f"fill it."
+    )
+    if constraint.startswith("min:") or constraint in {"decode_tok_s", "warm_latency_ms", "max_latency_ms",
+        "max_ttft_ms"}:
         hint += " The bound is the conservative end of the measured spread, not the median."
     return Refusal(
         {
@@ -372,7 +379,8 @@ def _ttft_refusal(rows: Sequence[Mapping], request: Request, excluded: list[dict
             "message": "TTFT is not comparable on these rows",
             "hint": hint,
             "constraint": "max_ttft_ms",
-            "closest": {"id": str(sample["id"]), "metric": "ttft_ms", "bound": None, "limit": request.max_ttft_ms, "gap": None},
+            "closest": {"id": str(sample["id"]), "metric": "ttft_ms", "bound": None, "limit": request.max_ttft_ms,
+                "gap": None},
             "experiment": experiment_of(sample),
             "excluded": excluded,
         }
@@ -393,7 +401,8 @@ def _closest(constraint: str, limit: object, dropped: Sequence[Mapping]) -> tupl
         return _closest_missing_bound(dropped, constraint)
     row = min(dropped, key=lambda item: str(item["id"]))
     bound = _identity_bound(row, constraint)
-    return row, {"id": str(row["id"]), "metric": _public_constraint(constraint), "bound": bound, "limit": limit if isinstance(limit, (int, float)) else None, "gap": None}
+    return row, {"id": str(row["id"]), "metric": _public_constraint(constraint), "bound": bound,
+        "limit": limit if isinstance(limit, (int, float)) else None, "gap": None}
 
 
 def _closest_short(
@@ -445,7 +454,8 @@ def _identity_bound(row: Mapping, constraint: str) -> float | None:
     return None
 
 
-def _split(rows: Sequence[Mapping], request: Request, constraint: str, limit: object) -> tuple[list[Mapping], list[Mapping]]:
+def _split(rows: Sequence[Mapping], request: Request, constraint: str, limit: object) -> tuple[list[Mapping],
+    list[Mapping]]:
     kept: list[Mapping] = []
     dropped: list[Mapping] = []
     for row in rows:
@@ -547,7 +557,7 @@ def _rank_bound(row: Mapping, request: Request) -> float | None:
 
 def _rank_key(row: Mapping, request: Request) -> tuple:
     bound = _rank_bound(row, request)
-    assert bound is not None
+    assert bound is not None  # noqa: S101  # rank only sees a row that has a bound
     better = -bound if request.task == "generate" else bound
     leaves_card_free = 0 if row.get("device") != "5090" else 1
     return (better, leaves_card_free, str(row.get("id")))

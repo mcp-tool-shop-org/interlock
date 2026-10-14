@@ -292,7 +292,8 @@ def _bisect(low: int, high: int, grain: int, measure, abort_mib: int) -> int:
     return low
 
 
-def baseline_is_spilling(idle_mib: int, baseline_mib: int, host_sum_mib: float, *, allowance_mib: int = SHARED_GROWTH_MIB) -> bool:
+def baseline_is_spilling(idle_mib: int, baseline_mib: int, host_sum_mib: float, *,
+    allowance_mib: int = SHARED_GROWTH_MIB) -> bool:
     """The floor confirm, minus idle, is more than the CUDA_Host sum plus the allowance.
 
     Equality at the allowance is not spilling. The caller has the three readings.

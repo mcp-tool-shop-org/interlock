@@ -26,44 +26,44 @@ from interlock.ollama_supervisor import (
     Health,
     OllamaSupervisor,
     Process,
+    RestartRecord,
     RestartRefused,
-    ServeStart,
     ServerFingerprint,
+    ServeStart,
     SupervisorConfig,
     SupervisorSeams,
     SupervisorStop,
     _load_psutil,
-    card_mib_from_text,
     backend_line_from_log,
+    card_mib_from_text,
+    env_from_log,
     environ_of,
     environment_mismatch,
-    env_from_log,
-    log_byte_size,
-    ollama_env_mismatch,
-    read_log_from,
-    server_config_env,
+    executables_match,
     failure_kind,
     file_sha256,
     foreign_models,
-    load_serve_start,
     health,
     health_report,
     http_get,
     listening_pids,
+    load_serve_start,
+    log_byte_size,
     model_listed,
+    ollama_env_mismatch,
+    pid_executable,
     pids_from_psutil,
     pids_from_ss,
     pids_from_windows,
     port_of,
     read_card_mib,
     read_cuda,
-    RestartRecord,
-    executables_match,
-    pid_executable,
+    read_log_from,
     real_seams,
     restart_policy_lines,
     retry_budget,
     serve_argv,
+    server_config_env,
     spawn_detached,
     stop_pid,
 )
@@ -670,8 +670,8 @@ def test_an_old_backend_line_before_the_offset_is_ignored(tmp_path: Path):
     different = World()
     different.log = prefix
     different.append_on_spawn = _config_line(different.start_record().env) + (
-        "load_backend: loaded CUDA backend from cuda_v12\n"
-    ).encode()
+        b"load_backend: loaded CUDA backend from cuda_v12\n"
+    )
     with pytest.raises(SupervisorStop, match="cuda_v12"):
         _supervisor(different).after_failure(URL_5090, model="qwen3:8b", kind="transport")
     assert different.stopped == [10]
@@ -1662,7 +1662,8 @@ def test_real_seams_and_the_remaining_fakes_do_not_touch_a_server(tmp_path: Path
     assert card_mib_from_text("nope") is None
     assert card_mib_from_text("-1") is None
     assert read_card_mib(run=lambda argv, **kwargs: subprocess.CompletedProcess(argv, 1, stdout="", stderr="")) is None
-    assert read_cuda(run=lambda argv, **kwargs: subprocess.CompletedProcess(argv, 0, stdout="13.0\n12.0\n", stderr="")) is None
+    assert read_cuda(run=lambda argv, **kwargs: subprocess.CompletedProcess(argv, 0, stdout="13.0\n12.0\n",
+        stderr="")) is None
 
     class _Boom:
         def __init__(self, host, port, timeout=None):

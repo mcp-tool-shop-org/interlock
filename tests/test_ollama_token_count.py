@@ -274,7 +274,8 @@ def test_the_count_call_is_raw_and_asks_for_one_token_never_zero():
     assert count["options"]["num_predict"] == 1
     assert count["options"]["num_ctx"] == 2048
     assert count["keep_alive"] == "5m"
-    assert all(body["options"]["num_predict"] != 0 for url, body in seen if isinstance(body, dict) and "options" in body)
+    assert all(body["options"]["num_predict"] != 0 for url, body in seen if isinstance(body,
+        dict) and "options" in body)
     with pytest.raises(AdapterError, match="invalid num_predict"):
         OllamaAdapter(transport=lambda *_args: {"error": "invalid num_predict"}, device="5090").count_tokens(
             "qwen3:8b", "hello", settings={"num_ctx": 32}
@@ -319,14 +320,17 @@ def test_an_exact_ollama_count_lands_on_the_receipt_after_the_guards(tmp_path: P
     assert rows[0]["settings"]["prompt_tokens"] == 3
     assert rows[0]["settings"]["prompt_token_search"] == 3
     assert rows[0]["settings"]["prompt_token_cold"] == 3
-    assert rows[0]["settings"]["prompt_token_method"] == "prompt_eval_count"
+    assert rows[0]["settings"]["prompt_token_method"] == "prompt_eval_count"  # noqa: S105  # a field name, not a secret
 
 
 def test_the_shortest_prefix_at_or_above_is_recorded(tmp_path: Path):
     transport = _Transport(lambda prompt: 2 * len(prompt.split()))
     rows, _events = _run(tmp_path, _spec(_arm(), target=5), transport)
     assert rows[0]["settings"]["prompt_tokens"] == 6
-    assert rows[0]["settings"]["prompt_token_method"] == "prompt_eval_count (shortest prefix at or above)"
+    assert (
+        rows[0]["settings"]["prompt_token_method"]
+        == "prompt_eval_count (shortest prefix at or above)"  # noqa: S105  # a field name, not a secret
+    )
     counts = [body for _method, _url, body in transport.calls if isinstance(body, dict) and body.get("raw") is True]
     assert counts[-1]["prompt"] == "aa bb aa"
 
@@ -457,7 +461,6 @@ def test_dry_run_names_the_count_and_does_not_call_it(tmp_path: Path, monkeypatc
 def test_a_generate_with_no_completion_limit_is_refused_before_any_request(value):
     # Ollama reads num_predict 0, null or missing as no limit (E4, 2026-10-11).
     calls = []
-    adapter = OllamaAdapter(transport=lambda *args: calls.append(args) or {}, device="5090")
     request = StepRequest(step_id="s", task="generate", model="qwen3:8b", device="5090", engine="ollama",
                           settings={"prompt": "hi", "num_predict": value})
     with pytest.raises(AdapterError, match="num_predict must be"):

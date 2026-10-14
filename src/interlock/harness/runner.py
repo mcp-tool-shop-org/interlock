@@ -4,8 +4,8 @@ The command-line dry-run does not stat the heartbeat, does not call an adapter,
 and does not launch offrig. An Ollama dataset target is named there as a
 run-time prompt_eval_count and is not counted. A library run with fake adapters is how the timing
 math and the receipt shape are tested. The command's real path is run_spec:
-every guard (interpreter, procedure, flag, committed blob, card state) refuses before an adapter is built or called; then run_interleaved
-measures.
+every guard (interpreter, procedure, flag, committed blob, card state) refuses
+before an adapter is built or called; then run_interleaved measures.
 
 The library run loads the spec only after the committed blob matches the
 working tree. That is the same lock the dry-run uses, on the path Phase 3 runs.
@@ -30,13 +30,13 @@ from interlock.adapters.base import (
     AdapterError,
     BuildRefused,
     CompileRejected,
-    NativeBinaryRejected,
     CompileTracker,
+    NativeBinaryRejected,
     StepRequest,
     compile_rejected_error,
 )
-from interlock.adapters.ollama import COUNT_TIMEOUT_NOTE
 from interlock.adapters.offrig_calibrate import plan_argv
+from interlock.adapters.ollama import COUNT_TIMEOUT_NOTE, url_for
 from interlock.adapters.registry import for_engine
 from interlock.cli import announce_run
 from interlock.devices import CARD_5090
@@ -49,14 +49,6 @@ from interlock.guards import (
 from interlock.harness.count_budget import roster_timeout
 from interlock.harness.e5 import SearchError, fit_prompt, fit_prompt_words
 from interlock.harness.fill import quiet_fill_seams, real_fill_seams, run_fill_card
-from interlock.ollama_supervisor import (
-    SupervisorStop,
-    failure_kind,
-    restart_policy_lines,
-    retry_budget,
-)
-from interlock.adapters.ollama import url_for
-from interlock.harness.steady import BlockPlan, SlotStream, UntilSteady, call_metric, warmup_policy, warmup_trace
 from interlock.harness.lock import require_unmodified
 from interlock.harness.marker import RunMarker
 from interlock.harness.receipts import (
@@ -68,6 +60,8 @@ from interlock.harness.receipts import (
     write_run,
 )
 from interlock.harness.spec import load_spec
+from interlock.harness.steady import BlockPlan, SlotStream, UntilSteady, call_metric, warmup_policy, warmup_trace
+from interlock.harness.timing import Slot, TimingError, aba_call, schedule, schedule_aba, summarize
 from interlock.harness.watch import (
     BUILD_GUARD_PCT,
     COMPILE_CEILING_S,
@@ -81,8 +75,13 @@ from interlock.harness.watch import (
     read_bytes,
     slot_probe,
 )
-from interlock.receipt import ReceiptError, load_jsonl, validate_row
-from interlock.harness.timing import Slot, TimingError, aba_call, schedule, schedule_aba, summarize
+from interlock.ollama_supervisor import (
+    SupervisorStop,
+    failure_kind,
+    restart_policy_lines,
+    retry_budget,
+)
+from interlock.receipt import validate_row
 
 try:  # the CPU-window evidence of ruling #36's addendum; never a step failure
     import psutil
@@ -210,7 +209,8 @@ def dry_run(
             )
         lines.append(f"order: {spec.get('order', 'interleaved')}")
         if spec.get("order") == "blocked":
-            lines.append("blocks: " + ", ".join(f"{block['id']} ({len(block['arms'])} arms)" for block in spec["blocks"]))
+            lines.append("blocks: " + ", ".join(f"{block['id']} ({len(block['arms'])} arms)" for block in spec[
+                "blocks"]))
             lines.append(
                 f"between blocks: unload, then used RAM within {RELEASE_TOLERANCE_BYTES // 2**30} GiB of the "
                 f"run's start (waits up to {RELEASE_WAIT_S:g} s, else the run stops)"
@@ -264,7 +264,9 @@ def dry_run(
         lines.append("CUDA_Host model, compute, and output sizes come from the first-load lines")
         lines.append("a missing CUDA_Host line refuses after the first load")
         lines.append("the dedicated delta is recorded and is not a gate")
-        lines.append("preflight samples nvidia-smi, both counters, the server log, the ggml-cuda sha, git, and driver CUDA before any load")
+        lines.append(
+            "preflight samples nvidia-smi, both counters, the server log, the ggml-cuda sha, git, and driver CUDA "
+                "before any load")
         lines.append("driver CUDA accepts CUDA Version and CUDA UMD Version")
         lines.append("a missing log or dll refuses at preflight")
         lines.append("the log is INTERLOCK_OLLAMA_LOG, else the 11434 listener parent's redirect")
@@ -683,8 +685,8 @@ def run_interleaved(
             if (root / "receipts" / f"{run_id}.jsonl").is_file():
                 try:
                     announce_run(import_receipt(root, run_id), finished=False)
-                except Exception:
-                    pass  # the receipt is written; the table import is the later step
+                except Exception:  # noqa: S110  # pragma: no cover  # the receipt is already written
+                    pass  # pragma: no cover  # the table import is the later step
         finally:
             if held:
                 state_lock.release()
@@ -1718,7 +1720,8 @@ def _ollama_prompt_method(fit: str) -> str:
     return "prompt_eval_count (shortest prefix at or above)"
 
 
-def _dataset_prompt(arm: dict, spec: dict, adapter, prompt_cache: dict[str, tuple[str, int, str | None, int | None, int | None]]) -> str | None:
+def _dataset_prompt(arm: dict, spec: dict, adapter, prompt_cache: dict[str, tuple[str, int, str | None, int | None,
+    int | None]]) -> str | None:
     """The spec's prefix: repeat the seed until the model tokenizer reaches the target.
 
     One prefix per model, shared by every device of that model. A spec with a
@@ -2037,7 +2040,7 @@ def _card_guards(probe, path: Path, now: float) -> None:
 
 
 def _iso(epoch: float) -> str:
-    return datetime.datetime.fromtimestamp(epoch, tz=datetime.timezone.utc).isoformat(timespec="seconds")
+    return datetime.datetime.fromtimestamp(epoch, tz=datetime.UTC).isoformat(timespec="seconds")
 
 
 STOP_SUFFIX = ".stop"

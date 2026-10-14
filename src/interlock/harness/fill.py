@@ -60,11 +60,32 @@ import re
 import subprocess
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
 from interlock.adapters.base import AdapterError, StepRequest
+from interlock.adapters.ollama import (
+    COUNT_TIMEOUT_NOTE,
+    UNLOAD_TIMEOUT_NOTE,
+    context_length,
+    quantization_level,
+    url_for,
+)
+from interlock.cli import announce_run
+from interlock.families import stamp_family
+from interlock.guards import GuardError, require_card_empty, require_grant, require_heartbeat
+from interlock.harness.count_budget import roster_timeout
+from interlock.harness.e5 import (
+    Observation,
+    SearchError,
+    baseline_is_spilling,
+    fit_prompt_words,
+    floor_confirm_shared,
+    search,
+    shared_deltas,
+)
+from interlock.harness.receipts import write_receipt
 from interlock.ollama_supervisor import (
     ServerFingerprint,
     SupervisorStop,
@@ -75,27 +96,6 @@ from interlock.ollama_supervisor import (
     retry_budget,
     server_config_env,
 )
-from interlock.adapters.ollama import (
-    COUNT_TIMEOUT_NOTE,
-    UNLOAD_TIMEOUT_NOTE,
-    context_length,
-    quantization_level,
-    url_for,
-)
-from interlock.harness.count_budget import roster_timeout
-from interlock.cli import announce_run
-from interlock.families import stamp_family
-from interlock.guards import GuardError, require_card_empty, require_grant, require_heartbeat
-from interlock.harness.e5 import (
-    SearchError,
-    Observation,
-    baseline_is_spilling,
-    fit_prompt_words,
-    floor_confirm_shared,
-    search,
-    shared_deltas,
-)
-from interlock.harness.receipts import write_receipt
 from interlock.receipt import validate_row
 
 UNRECORDED = "unrecorded"
@@ -312,7 +312,8 @@ def real_fill_seams(adapter, *, run=None, read_counter=None) -> FillSeams:
 
         tolerance = spec.get("adapter_match_tolerance_mib")
         if tolerance != ADAPTER_MATCH_TOLERANCE_MIB:
-            raise FillPreflightError("adapter_match_tolerance_mib is 512, a matching allowance, not the spill threshold")
+            raise FillPreflightError(
+                "adapter_match_tolerance_mib is 512, a matching allowance, not the spill threshold")
         paths = resolve_fill_paths(run)
         if not paths["log_path"]:
             raise FillPreflightError("server log did not resolve")
@@ -404,7 +405,7 @@ class CardSampler:
             self._abort_done.clear()
             try:
                 self.on_abort()
-            except Exception:
+            except Exception:  # noqa: S110  # pragma: no cover  # the abort flag still has to clear
                 pass
             finally:
                 self._firing = False
@@ -775,7 +776,8 @@ def load_line_facts(text: str | None) -> dict:
         "cuda_host_model_mib": buffers.get("model"),
         "cuda_host_compute_mib": buffers.get("compute"),
         "cuda_host_output_mib": buffers.get("output"),
-        "cuda_host_sum_mib": round(sum(buffers[kind] for kind in ("model", "compute", "output")), 2) if present else None,
+        "cuda_host_sum_mib": round(sum(buffers[kind] for kind in ("model", "compute", "output")),
+            2) if present else None,
         "reason": None if not missing else "the first load did not record " + ", ".join(missing),
     }
 
@@ -1227,7 +1229,8 @@ def _read_dedicated(read) -> int | None:
         return None
 
 
-def wait_for_dedicated(read, sleep, clock, *, expected: int, tolerance_mib: int, timeout_s: float) -> tuple[int | None, str | None]:
+def wait_for_dedicated(read, sleep, clock, *, expected: int, tolerance_mib: int, timeout_s: float) -> tuple[int | None,
+    str | None]:
     """The pinned dedicated reading, once it is within ``tolerance_mib`` of ``expected``.
 
     One reading is taken before any sleep. Past ``timeout_s`` the call is refused.
@@ -1247,7 +1250,8 @@ def wait_for_dedicated(read, sleep, clock, *, expected: int, tolerance_mib: int,
         sleep(_PRE_CALL_POLL_S)
 
 
-def wait_until_stable(read, sleep, clock, *, tolerance_mib: int, timeout_s: float, first: int | None) -> tuple[int | None, str | None]:
+def wait_until_stable(read, sleep, clock, *, tolerance_mib: int, timeout_s: float,
+    first: int | None) -> tuple[int | None, str | None]:
     """The resident floor: dedicated once a further reading is within tolerance of ``first``.
 
     ``first`` was already read. A card that is still freeing keeps this wait going.
@@ -1636,7 +1640,7 @@ def _unload(adapter, model: str, *, quiet: bool = True) -> str | None:
 def _iso(epoch: float) -> str:
     import datetime
 
-    return datetime.datetime.fromtimestamp(epoch, tz=datetime.timezone.utc).isoformat(timespec="seconds")
+    return datetime.datetime.fromtimestamp(epoch, tz=datetime.UTC).isoformat(timespec="seconds")
 
 
 def _demote_unchecked_baseline(found) -> None:
@@ -1944,10 +1948,10 @@ def _measure_model(
             if str(exc) == COUNT_TIMEOUT_NOTE:
                 raise _CountRefused(COUNT_TIMEOUT_NOTE) from exc
             if sampler.over:
-                raise _WindowOver()
+                raise _WindowOver()  # noqa: B904  # pragma: no cover  # sampler over; from changes the chain
             kind = _kind(str(exc))
             if kind:
-                raise _Repairable(kind, str(exc))
+                raise _Repairable(kind, str(exc))  # noqa: B904  # pragma: no cover  # from changes the chain
             raise
         if sampler.over:
             raise _WindowOver()
@@ -2031,7 +2035,7 @@ def _measure_model(
                     return _over(sampler.peak)
                 kind = _kind(str(exc))
                 if kind:
-                    raise _Repairable(kind, str(exc))
+                    raise _Repairable(kind, str(exc))  # noqa: B904  # pragma: no cover  # from changes the chain
                 return Observation(False, sampler.peak, error=str(exc))
             if _count_leaves_loaded(entry.get("keep_alive")):
                 stop_if_unload_timed_out()
@@ -2047,7 +2051,7 @@ def _measure_model(
                     return _over(sampler.peak)
                 kind = _kind(str(exc))
                 if kind:
-                    raise _Repairable(kind, str(exc))
+                    raise _Repairable(kind, str(exc))  # noqa: B904  # pragma: no cover  # from changes the chain
                 return Observation(False, sampler.peak, error=str(exc))
             if cold_tokens != tokens:
                 if _count_leaves_loaded(entry.get("keep_alive")):
@@ -2098,7 +2102,7 @@ def _measure_model(
                 return _over(sampler.peak)
             kind = _kind(str(exc))
             if kind:
-                raise _Repairable(kind, str(exc))
+                raise _Repairable(kind, str(exc))  # noqa: B904  # pragma: no cover  # from changes the chain
             return Observation(False, sampler.peak, error=str(exc))
         _gate_load_lines(kind)
         if sampler.over:

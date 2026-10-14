@@ -108,7 +108,8 @@ def physical_disk_script(letter: str) -> str:
     return (
         f"$p = Get-Partition -DriveLetter {safe} -ErrorAction Stop; "
         f"$d = Get-Disk -Number $p.DiskNumber; "
-        "$phy = @(Get-PhysicalDisk | Where-Object { $_.DeviceId -eq [string]$d.Number -or $_.DeviceId -eq $d.Number }); "
+        "$phy = @(Get-PhysicalDisk | Where-Object "
+            "{ $_.DeviceId -eq [string]$d.Number -or $_.DeviceId -eq $d.Number }); "
         "if (-not $phy) { throw 'no physical disk' }; "
         "[pscustomobject]@{BusType=[string]$phy[0].BusType; MediaType=[string]$phy[0].MediaType} "
         "| ConvertTo-Json -Compress"

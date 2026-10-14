@@ -29,7 +29,8 @@ from interlock.harness.watch import (
     WatchHooks,
 )
 from interlock.receipt import is_speed_row, load_jsonl
-from tests.test_harness import _arm, _bind, _result, _spec as _harness_spec
+from tests.test_harness import _arm, _bind, _result
+from tests.test_harness import _spec as _harness_spec
 
 GIB = 2**30
 QWEN = "OpenVINO/Qwen3-8B-int4-cw-ov"
@@ -318,7 +319,8 @@ def test_the_build_guard_learns_each_models_step_and_refuses_on_the_largest_seen
         guard.check("x/Qwen3-8B-int4")  # 50 + 7 = 57 > 54.4
     assert guard.refused[-1]["model"] == "x/Qwen3-8B-int4"
     # no reading, no refusal
-    quiet = BuildGuard(WatchHooks(ram_sampler=None, rss_sampler=None, used_sampler=None, total_sampler=None, start_thread=False))
+    quiet = BuildGuard(WatchHooks(ram_sampler=None, rss_sampler=None, used_sampler=None, total_sampler=None,
+        start_thread=False))
     quiet.check("x/Qwen3-8B-int4")
     with quiet.building("x/Qwen3-8B-int4"):
         pass

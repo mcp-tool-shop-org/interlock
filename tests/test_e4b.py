@@ -15,18 +15,20 @@ import pytest
 
 from interlock.adapters.base import StepRequest
 from interlock.adapters.ollama import OllamaAdapter
+from interlock.adapters.record_fixtures import read_card_mib
 from interlock.guards import GuardError
 from interlock.harness.e4b import (
-    E4bError,
-    RepeatLimit,
-    IntelLane,
     GENERATE_TIMEOUT_S,
     PILOT_CALLS,
     PILOT_CLOCK_RULE,
     PILOT_MIN_GOOD,
     PROBE_TIMEOUT_S,
     CpuBurn,
+    E4bError,
+    IntelLane,
     LiveGpuSample,
+    RepeatLimit,
+    _header,
     build_live_seams,
     call_time_spent,
     card_models_at_ceiling,
@@ -38,15 +40,14 @@ from interlock.harness.e4b import (
     live_sample_cpu,
     live_sample_gpu,
     note_vram,
+    ollama_pin,
     owned_generate,
     parse_nvidia_smi,
     parse_typeperf,
-    pilot_destination,
-    ollama_pin,
     perform_slot,
+    pilot_destination,
     pilot_summary,
     prepare_prompt,
-    _header,
     prove_owned_server,
     read_git,
     read_nvml,
@@ -80,8 +81,8 @@ from interlock.harness.ollama_serve import (
     LISTENER_SCRIPT,
     READY_INTERVAL_S,
     READY_TIMEOUT_S,
-    Server,
     ServeError,
+    Server,
     assert_port_free,
     get_json,
     pin_install,
@@ -91,7 +92,6 @@ from interlock.harness.ollama_serve import (
     start_line,
     stop_process_tree,
 )
-from interlock.adapters.record_fixtures import read_card_mib
 from interlock.harness.spec import SpecError, load_spec, validate_spec
 from interlock.harness.timing import percentile
 
@@ -497,7 +497,8 @@ def test_block_records_the_estimate_and_keeps_the_burn_out_of_the_verdict(tmp_pa
         assert warm > start
     assert ("npu-alone", "unload") in seams.stops
     assert ("5090-alone", "end-generate") in seams.stops
-    series = next(slot["series"] for row in rows if row["kind"] == "e4b-pair" for slot in row["slots"] if slot.get("series"))
+    series = next(slot["series"] for row in rows if row["kind"] == "e4b-pair" for slot in row["slots"] if slot.get(
+        "series"))
     assert series.startswith("receipts/")
     assert "sm_clock_mhz" in (tmp_path / series).read_text(encoding="utf-8")
     assert not (tmp_path / "compile-cache" / "block-1" / "5090-alone").exists()
@@ -542,17 +543,27 @@ def test_companion_starts_before_warmup_and_steady_takes_a_second_attempt(tmp_pa
 def test_each_refusal_rule():
     flat = {"clocks_mhz": [2000.0, 2000.0], "power_w": [1.0, 1.0], "eval_count": 1024, "load_duration_s": 0.2}
     assert refusal_reason("5090", flat, num_predict=1024, clock_tolerance=7.5, steady_ok=True) is None
-    assert refusal_reason("5090", {**flat, "load_duration_s": 1.0}, num_predict=1024, clock_tolerance=7.5, steady_ok=True) is None
-    assert refusal_reason("5090", {**flat, "load_duration_s": 1.01}, num_predict=1024, clock_tolerance=7.5, steady_ok=True) == "load_duration_s"
-    assert refusal_reason("5090", {**flat, "clocks_mhz": [2000.0, 2007.5]}, num_predict=1024, clock_tolerance=7.5, steady_ok=True) is None
-    assert refusal_reason("5090", {**flat, "clocks_mhz": [2000.0, 2008.0]}, num_predict=1024, clock_tolerance=7.5, steady_ok=True) == "clock_range"
-    assert refusal_reason("5090", {**flat, "clocks_mhz": [2000.0, None]}, num_predict=1024, clock_tolerance=7.5, steady_ok=True) == "missing_clock"
-    assert refusal_reason("5090", {**flat, "power_w": [None]}, num_predict=1024, clock_tolerance=7.5, steady_ok=True) == "missing_power"
+    assert refusal_reason("5090", {**flat, "load_duration_s": 1.0}, num_predict=1024, clock_tolerance=7.5,
+        steady_ok=True) is None
+    assert refusal_reason("5090", {**flat, "load_duration_s": 1.01}, num_predict=1024, clock_tolerance=7.5,
+        steady_ok=True) == "load_duration_s"
+    assert refusal_reason("5090", {**flat, "clocks_mhz": [2000.0, 2007.5]}, num_predict=1024, clock_tolerance=7.5,
+        steady_ok=True) is None
+    assert refusal_reason("5090", {**flat, "clocks_mhz": [2000.0, 2008.0]}, num_predict=1024, clock_tolerance=7.5,
+        steady_ok=True) == "clock_range"
+    assert refusal_reason("5090", {**flat, "clocks_mhz": [2000.0, None]}, num_predict=1024, clock_tolerance=7.5,
+        steady_ok=True) == "missing_clock"
+    assert refusal_reason("5090", {**flat, "power_w": [None]}, num_predict=1024, clock_tolerance=7.5,
+        steady_ok=True) == "missing_power"
     assert refusal_reason("5090", flat, num_predict=1024, clock_tolerance=7.5, steady_ok=False) == "clock_not_steady"
-    assert refusal_reason("5090", {**flat, "eval_count": 1023}, num_predict=1024, clock_tolerance=7.5, steady_ok=True) == "short_decode"
-    assert refusal_reason("NPU", {"truncated_tokens": 0}, num_predict=None, clock_tolerance=None, steady_ok=None) is None
-    assert refusal_reason("iGPU", {"truncated_tokens": 1}, num_predict=None, clock_tolerance=None, steady_ok=None) is None
-    assert refusal_reason("NPU", {"truncated_tokens": 2}, num_predict=None, clock_tolerance=None, steady_ok=None) == "truncated_tokens"
+    assert refusal_reason("5090", {**flat, "eval_count": 1023}, num_predict=1024, clock_tolerance=7.5,
+        steady_ok=True) == "short_decode"
+    assert refusal_reason("NPU", {"truncated_tokens": 0}, num_predict=None, clock_tolerance=None,
+        steady_ok=None) is None
+    assert refusal_reason("iGPU", {"truncated_tokens": 1}, num_predict=None, clock_tolerance=None,
+        steady_ok=None) is None
+    assert refusal_reason("NPU", {"truncated_tokens": 2}, num_predict=None, clock_tolerance=None,
+        steady_ok=None) == "truncated_tokens"
     assert refusal_reason("iGPU", {}, num_predict=None, clock_tolerance=None, steady_ok=None) == "truncated_tokens"
 
 
@@ -562,7 +573,8 @@ def _run_mutated(tmp_path, mutate, *, limit, arm_id="5090-alone", phase_ok=None)
 
     def call(arm, *, num_predict, measured, kind, prompt):
         payload = _clean(arm, num_predict=num_predict, kind=kind)
-        if kind == "measure" and arm["id"] == arm_id and seams.phase != "cold" and (phase_ok is None or phase_ok(seams)):
+        if kind == "measure" and arm["id"] == arm_id and seams.phase != "cold" and (phase_ok is None or phase_ok(
+            seams)):
             if state["n"] < limit:
                 state["n"] += 1
                 payload.update(mutate)
@@ -779,10 +791,12 @@ def test_pairs_runs_only_the_named_pairs_and_records_the_subset(tmp_path: Path):
     assert any(row["kind"] == "e4b-probe" for row in rows)
     server = _Server()
     with pytest.raises(E4bError, match="unknown pair"):
-        run_block(spec, _seams(server, call), root=tmp_path / "bad", run_id="bad", repo=tmp_path, pairs=["npu-5090", "no-such"])
+        run_block(spec, _seams(server, call), root=tmp_path / "bad", run_id="bad", repo=tmp_path, pairs=["npu-5090",
+            "no-such"])
     assert server.events == []
     with pytest.raises(E4bError, match="more than once"):
-        run_block(spec, _seams(_Server(), call), root=tmp_path / "dup", run_id="dup", repo=tmp_path, pairs=["npu-5090", "npu-5090"])
+        run_block(spec, _seams(_Server(), call), root=tmp_path / "dup", run_id="dup", repo=tmp_path, pairs=["npu-5090",
+            "npu-5090"])
 
 
 def test_the_live_5090_companion_waits_until_the_next_decode_is_underway(tmp_path: Path):
@@ -973,8 +987,10 @@ def test_stop_session_unloads_with_keep_alive_0():
     assert seen[0]["keep_alive"] == 0
     assert seen[0]["prompt"] == ""
     assert "companion" not in seen[0]
-    fixture = json.loads((ROOT / "tests" / "fixtures" / "ollama" / "0.35.1" / "companion_stop.json").read_text(encoding="utf-8"))
-    unload = json.loads((ROOT / "tests" / "fixtures" / "ollama" / "0.35.1" / "keep_alive_0.json").read_text(encoding="utf-8"))
+    fixture = json.loads((ROOT / "tests" / "fixtures" / "ollama" / "0.35.1" / "companion_stop.json").read_text(
+        encoding="utf-8"))
+    unload = json.loads((ROOT / "tests" / "fixtures" / "ollama" / "0.35.1" / "keep_alive_0.json").read_text(
+        encoding="utf-8"))
     assert fixture["response"]["done_reason"] == "load"
     assert unload["response"]["done_reason"] == "unload"
 
@@ -1060,7 +1076,8 @@ def test_stats_match_the_hand_counted_cases():
 def test_sampling_parsers_and_the_burn_match_utility_without_a_gpu():
     assert parse_nvidia_smi("1830, 412.50 W\n") == (1830.0, 412.50)
     assert parse_nvidia_smi("[N/A], [N/A]") == (None, None)
-    assert parse_typeperf('(PDH-CSV 4.0),"\\\\HOST\\Processor Information(_Total)\\% Processor Performance"\n"t","123.5"\n') == 123.5
+    assert parse_typeperf(
+        '(PDH-CSV 4.0),"\\\\HOST\\Processor Information(_Total)\\% Processor Performance"\n"t","123.5"\n') == 123.5
     assert sample_gpu(nvml=lambda: (_ for _ in ()).throw(RuntimeError("nvml")), smi=lambda: "10, 2") == (10.0, 2.0)
     assert sample_gpu() == (None, None)
 
@@ -1083,7 +1100,8 @@ def test_sampling_parsers_and_the_burn_match_utility_without_a_gpu():
     assert smi_query(lambda cmd: "9, 3\n") == "9, 3\n"
     assert typeperf_once("counter", lambda cmd: '"x","4.5"\n') == 4.5
     seen = []
-    series = collect_series(sample=lambda: (1, 2), sleep=lambda seconds: seen.append(seconds), every_s=0.2, duration_s=0.4)
+    series = collect_series(sample=lambda: (1, 2), sleep=lambda seconds: seen.append(seconds), every_s=0.2,
+        duration_s=0.4)
     assert series == [(1, 2), (1, 2), (1, 2)]
     assert seen == [0.2, 0.2]
     assert round_up_mhz(0) == 0
@@ -1233,8 +1251,10 @@ def test_run_owned_server_lifecycle(tmp_path: Path):
     resolved = resolve_pin(listener)
     assert resolved.exe == str(exe)
     flags = []
-    spawn_ollama(["exe", "serve"], {"A": "1"}, tmp_path / "child.log", popen=lambda argv, **kwargs: flags.append(kwargs) or SimpleNamespace(pid=1), system="posix")
-    spawn_ollama(["exe", "serve"], {"A": "1"}, tmp_path / "child-nt.log", popen=lambda argv, **kwargs: flags.append(kwargs) or SimpleNamespace(pid=1), system="nt")
+    spawn_ollama(["exe", "serve"], {"A": "1"}, tmp_path / "child.log", popen=lambda argv,
+        **kwargs: flags.append(kwargs) or SimpleNamespace(pid=1), system="posix")
+    spawn_ollama(["exe", "serve"], {"A": "1"}, tmp_path / "child-nt.log", popen=lambda argv,
+        **kwargs: flags.append(kwargs) or SimpleNamespace(pid=1), system="nt")
     assert "creationflags" not in flags[0]
     assert "creationflags" in flags[1]
 
@@ -1252,7 +1272,8 @@ def test_live_seams_post_only_to_11441(tmp_path: Path, monkeypatch):
     def transport(method, url, body=None):
         seen.append((method, url, body))
         assert ":11434" not in url and ":11490" not in url
-        return {"version": "0.35.1", "eval_count": 2, "eval_duration": 1_000_000_000, "load_duration": 10, "prompt_eval_count": 3}
+        return {"version": "0.35.1", "eval_count": 2, "eval_duration": 1_000_000_000, "load_duration": 10,
+            "prompt_eval_count": 3}
 
     def run(cmd):
         return json.dumps({"exe": str(exe), "models_dir": str(models)})
@@ -1404,7 +1425,8 @@ def test_intel_lane_reports_the_companion_truncation(tmp_path: Path):
     assert report["value"] == pytest.approx(20)
     lane.unload(arm)
     assert lane.adapter().unloaded == ("npu-alone", "NPU")
-    bad = IntelLane(tmp_path, "bad", adapter=SimpleNamespace(run=lambda request: SimpleNamespace(ok=False, error="nope")))
+    bad = IntelLane(tmp_path, "bad", adapter=SimpleNamespace(run=lambda request: SimpleNamespace(ok=False,
+        error="nope")))
     with pytest.raises(E4bError, match="nope"):
         bad.call(arm, num_predict=None, measured=True, kind="measure", prompt="cars")
 
@@ -1462,7 +1484,8 @@ def test_pilot_requires_a_grant_and_not_an_npu_session(tmp_path: Path):
             npu_session=None,
             run_id="p",
             pilot=True,
-            seams=_seams(_Server(), lambda **kwargs: _clean(_arm("5090-alone", "5090"), num_predict=1024, kind="measure")),
+            seams=_seams(_Server(), lambda **kwargs: _clean(_arm("5090-alone", "5090"), num_predict=1024,
+                kind="measure")),
         )
 
 
@@ -1652,7 +1675,8 @@ def test_a_digest_mismatch_refuses_the_block_and_the_pilot(tmp_path: Path):
     with pytest.raises(E4bError, match="no model"):
         ollama_pin({"arms": [{"id": "5090-alone", "device": "5090", "model": ""}]})
     with pytest.raises(E4bError, match="no digest"):
-        ollama_pin({"arms": [{"id": "5090-alone", "device": "5090", "model": "qwen3:8b", "revision_or_digest": "unrecorded"}]})
+        ollama_pin({"arms": [{"id": "5090-alone", "device": "5090", "model": "qwen3:8b",
+            "revision_or_digest": "unrecorded"}]})
     prove_owned_server(
         spec,
         segment=CUDA_LINE,
@@ -1865,7 +1889,8 @@ def test_one_missing_pilot_clock_is_recorded_and_seventeen_good_calls_refuse(tmp
             payload["clocks_mhz"] = [2000.0, 2010.0]
         return payload
 
-    document = run_pilot(spec, _seams(_Server(), call), root=tmp_path, run_id="one-miss", repo=tmp_path, calls=PILOT_CALLS)
+    document = run_pilot(spec, _seams(_Server(), call), root=tmp_path, run_id="one-miss", repo=tmp_path,
+        calls=PILOT_CALLS)
     assert document["missing_calls"] == 1
     assert document["good_calls"] == PILOT_CALLS - 1
     assert document["calls"] == PILOT_CALLS
@@ -2046,7 +2071,8 @@ def test_a_repeat_limit_in_the_pilot_is_a_missing_call_and_keeps_its_time(tmp_pa
             raise RepeatLimit(
                 "prediction aborted, token repeat limit reached",
                 call_time_spent(
-                    {"eval_count": 619, "eval_duration": 2_000_000_000, "load_duration": 10_000_000, "prompt_eval_duration": 50_000_000, "prompt_eval_count": 256},
+                    {"eval_count": 619, "eval_duration": 2_000_000_000, "load_duration": 10_000_000,
+                        "prompt_eval_duration": 50_000_000, "prompt_eval_count": 256},
                     kind="warm",
                     reason="token repeat limit",
                 ),
@@ -2057,7 +2083,8 @@ def test_a_repeat_limit_in_the_pilot_is_a_missing_call_and_keeps_its_time(tmp_pa
         payload["total_s"] = payload["load_duration_s"] + payload["prompt_eval_s"] + payload["elapsed_s"]
         return payload
 
-    document = run_pilot(spec, _seams(_Server(), call), root=tmp_path, run_id="repeat-pilot", repo=tmp_path, calls=PILOT_CALLS)
+    document = run_pilot(spec, _seams(_Server(), call), root=tmp_path, run_id="repeat-pilot", repo=tmp_path,
+        calls=PILOT_CALLS)
     assert document["missing_calls"] == 1
     assert document["good_calls"] == PILOT_CALLS - 1
     assert document["calls"] == PILOT_CALLS
@@ -2122,7 +2149,8 @@ def test_any_other_500_stays_fatal(tmp_path: Path, monkeypatch):
 
     def crash(request, timeout=None):
         body = b'{"error":"model runner crashed"}'
-        raise urllib.error.HTTPError(request.full_url, 500, "Internal Server Error", hdrs=None, fp=__import__("io").BytesIO(body))
+        raise urllib.error.HTTPError(request.full_url, 500, "Internal Server Error", hdrs=None,
+            fp=__import__("io").BytesIO(body))
 
     monkeypatch.setattr("urllib.request.urlopen", crash)
     with pytest.raises(urllib.error.HTTPError):
@@ -2130,7 +2158,8 @@ def test_any_other_500_stays_fatal(tmp_path: Path, monkeypatch):
 
     def repeat(request, timeout=None):
         body = b'{"error":"prediction aborted, token repeat limit reached","eval_count":619,"eval_duration":2000000000}'
-        raise urllib.error.HTTPError(request.full_url, 500, "Internal Server Error", hdrs=None, fp=__import__("io").BytesIO(body))
+        raise urllib.error.HTTPError(request.full_url, 500, "Internal Server Error", hdrs=None,
+            fp=__import__("io").BytesIO(body))
 
     monkeypatch.setattr("urllib.request.urlopen", repeat)
     with pytest.raises(RepeatLimit, match="token repeat limit") as caught:
@@ -2250,7 +2279,10 @@ def test_a_dirty_tree_at_the_start_is_recorded_false(tmp_path: Path):
         root = tmp_path / ("pilot" if pilot else "block")
         root.mkdir()
         server = _Server()
-        seams = _seams(server, lambda arm, **kwargs: _clean(arm, num_predict=kwargs["num_predict"], kind=kwargs["kind"]))
+        seams = _seams(
+            server,
+            lambda arm, **kwargs: _clean(arm, num_predict=kwargs["num_predict"], kind=kwargs["kind"]),
+        )
         seams.git = git
         with pytest.raises(E4bError, match="porcelain"):
             if pilot:

@@ -61,7 +61,7 @@ def _verdicts():
     labels = ["supported", "unsupported", "cannot_tell", "unsupported"]
     verdicts = ["supported", "supported", "cannot_tell", "unsupported"]
     rows = []
-    for index, (label, verdict) in enumerate(zip(labels, verdicts)):
+    for index, (_label, verdict) in enumerate(zip(labels, verdicts, strict=True)):
         rows.append(
             {
                 "claim_id": f"c{index}",
@@ -105,7 +105,8 @@ def test_calibration_copies_the_published_interval_and_infers_quote_rule_1():
 
 
 def test_quote_rule_1_and_rule_2_are_different_rows():
-    kwargs = {"metrics": _METRICS, "verdicts": _verdicts(), "tiers": _tiers(), "source_dir": "runs/cal", "commit_sha": "b" * 40}
+    kwargs = {"metrics": _METRICS, "verdicts": _verdicts(), "tiers": _tiers(), "source_dir": "runs/cal",
+        "commit_sha": "b" * 40}
     rule_1 = calibration_rows(_manifest(1), **kwargs)[0]["id"]
     rule_2 = calibration_rows(_manifest(2), **kwargs)[0]["id"]
     assert rule_1 != rule_2
@@ -166,9 +167,11 @@ def test_probe_keeps_a_named_intel_gpu_and_skips_an_unnamed_one():
     named = {
         "openvino": "2026.4.1",
         "devices": {"GPU.0": "Intel(R) Graphics (iGPU)", "CPU": "Intel CPU"},
-        "rows": [{"device": "GPU.0", "kind": "embed", "model": "BAAI/bge-base-en-v1.5", "batch": 1, "ms_per_call": 3.5}],
+        "rows": [{"device": "GPU.0", "kind": "embed", "model": "BAAI/bge-base-en-v1.5", "batch": 1,
+            "ms_per_call": 3.5}],
     }
-    rows, skipped = probe_rows(named, source_path="results/2026-10-09-mac.json", commit_sha="d" * 40, file_date="2026-10-09")
+    rows, skipped = probe_rows(named, source_path="results/2026-10-09-mac.json", commit_sha="d" * 40,
+        file_date="2026-10-09")
     assert skipped == []
     assert rows[0]["device"] == "iGPU"
     assert rows[0]["latency"]["cold_ms"] is None
@@ -183,7 +186,8 @@ def test_nli_row_uses_the_prereg_name_and_copies_the_interval():
     document = {
         "date": "2026-10-09",
         "openvino": "2026.4.1",
-        "model": {"repo": "cross-encoder/nli-deberta-v3-base", "revision": "abc", "device": "GPU.0", "batch": 1, "seq": 512},
+        "model": {"repo": "cross-encoder/nli-deberta-v3-base", "revision": "abc", "device": "GPU.0", "batch": 1,
+            "seq": 512},
         "legs": {
             "grounded/tune": {
                 "metrics": {
@@ -216,7 +220,8 @@ def test_offer_snapshot_is_version_locked_and_does_not_invent_a_budget_pass():
         "gpus": [{"gpu_type": "RTX 4090", "usd_per_hr": 0.44, "vram_gb": 24}],
         "budget": {
             "version": 1,
-            "providers": {"runpod": {"cap": 20, "remaining": 12, "spent": 1, "committed": 0, "balance": None, "cap_source": "fixture", "warning": None}},
+            "providers": {"runpod": {"cap": 20, "remaining": 12, "spent": 1, "committed": 0, "balance": None,
+                "cap_source": "fixture", "warning": None}},
             "ceiling": 20,
         },
     }
@@ -613,7 +618,8 @@ def test_import_reads_a_pinned_tree_and_refuses_a_missing_ladder(tmp_path: Path)
     assert not any(row["task"] == "judge:same-meaning-rewrite" for row in rows)
     assert any(row["task"] == "offer" for row in rows)
     assert any(row["task"] == "nli" for row in rows)
-    assert any(row["settings"].get("quote_rule") == 1 and "8114f07" in row["settings"].get("quote_rule_source", "") for row in rows)
+    assert any(row["settings"].get("quote_rule") == 1 and "8114f07" in row["settings"].get("quote_rule_source",
+        "") for row in rows)
     assert skipped
     assert not any(row["id"].startswith("E1/") for row in rows)
 

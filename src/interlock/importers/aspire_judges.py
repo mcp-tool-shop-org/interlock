@@ -86,7 +86,8 @@ def b_rows(
     agree_not = sum(judged[c].get("outcome") == "not wrong" for c in both_not)
     for side, k in (("both wrong", agree_wrong), ("both not wrong", agree_not)):
         if report["control"][side]["agrees"] != k:
-            raise AspireImportError(f"B's readout says {report['control'][side]['agrees']} for {side}; the verdicts give {k}")
+            raise AspireImportError(
+                f"B's readout says {report['control'][side]['agrees']} for {side}; the verdicts give {k}")
     every = [judged[c] for c in sel["order"]]
     unsure = sum(v.get("outcome") == "unsure" for v in every)
     unusable = sum(v.get("outcome") not in _USABLE_PLANTED for v in every)
@@ -167,7 +168,8 @@ def judge_control_rows(
         missing = [cid for cid in sel["order"] if cid not in judged]
         if missing:
             raise AspireImportError(f"{tag}'s verdicts lack {len(missing)} items")
-        by_side = {side: [c for c in sel["order"] if items[c]["side"] == side] for side in ("harmless", "harmful", "identity")}
+        by_side = {side: [c for c in sel["order"] if items[c]["side"] == side] for side in ("harmless", "harmful",
+            "identity")}
         harmless = [judged[c] for c in by_side["harmless"]]
         harmful = [judged[c] for c in by_side["harmful"]]
         identity = [judged[c] for c in by_side["identity"]]
@@ -212,9 +214,12 @@ def judge_control_rows(
                 selection_sha256=dataset,
             ),
             "quality": [
-                counted_metric("false_reject_rate", sum(v.get("outcome") == "changed" for v in harmless), len(harmless), dataset),
-                counted_metric("false_accept_rate", sum(v.get("outcome") == "same" for v in harmful), len(harmful), dataset),
-                counted_metric("abstain_rate", sum(v.get("outcome") == "unsure" for v in decided), len(decided), dataset),
+                counted_metric("false_reject_rate", sum(v.get("outcome") == "changed" for v in harmless), len(harmless),
+                    dataset),
+                counted_metric("false_accept_rate", sum(v.get("outcome") == "same" for v in harmful), len(harmful),
+                    dataset),
+                counted_metric("abstain_rate", sum(v.get("outcome") == "unsure" for v in decided), len(decided),
+                    dataset),
             ],
             "per_type": per_type,
             "cost": {"seconds": _mean_seconds(harmless + harmful + identity), "tokens": None},
@@ -225,9 +230,11 @@ def judge_control_rows(
             "provenance": source_provenance(f"{source_dir}/judge-control-readout.json", None, readout),
             "notes": (
                 "Single run, provisional. Labels are true by construction (rule-made edits). "
-                f"Strict agreement: harmless 'same' {same_strict}/{len(harmless)}, harmful 'changed' {caught}/{len(harmful)}; "
+                f"Strict agreement: harmless 'same' {same_strict}/{len(harmless)}, harmful 'changed' "
+                    f"{caught}/{len(harmful)}; "
                 f"identity copies called changed {identity_changed}/{len(identity)}. "
-                f"Unusable replies: {sum(v.get('outcome') not in _USABLE_REWRITE for v in harmless + harmful + identity)}. "
+                f"Unusable replies: "
+                    f"{sum(v.get('outcome') not in _USABLE_REWRITE for v in harmless + harmful + identity)}. "
                 f"Chosen by the pre-registered rule: {report['result']['choice'] == tag}. "
                 "Constructed edits are easier than real rewrites: this ranks judges, it doesn't validate them. "
                 "cost.seconds is the mean per call."

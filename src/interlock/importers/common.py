@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import statistics
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 # The z used by offrig's calibrate intervals and by the ladder and difficulty reports.
 WILSON_Z = 1.959963984540054
@@ -54,7 +54,7 @@ def device_for_ollama(url: str) -> str:
 
 
 def date_from_unix(timestamp: int | float) -> str:
-    return datetime.fromtimestamp(timestamp, timezone.utc).strftime("%Y-%m-%d")
+    return datetime.fromtimestamp(timestamp, UTC).strftime("%Y-%m-%d")
 
 
 def spread(values: list[float]) -> dict | None:

@@ -27,7 +27,8 @@ def test_home_directory_paths_and_unpinned_bytes_are_refused():
     homed["notes"] = "C:" + "\\Users\\" + "someone\\receipt.json"
     with pytest.raises(ReceiptError, match="home-directory"):
         validate_row(homed)
-    unpinned = row(provenance={"source_receipt_path": "E:/AI/rnd-ladder/ladder-qwen3_8b/metrics.json", "commit_sha": None})
+    unpinned = row(provenance={"source_receipt_path": "E:/AI/rnd-ladder/ladder-qwen3_8b/metrics.json",
+        "commit_sha": None})
     with pytest.raises(ReceiptError, match="content_sha256"):
         validate_row(unpinned)
     unpinned["provenance"]["content_sha256"] = "deadbeef"
@@ -95,7 +96,8 @@ def test_check_is_green_on_an_empty_tree_and_red_on_a_bad_receipt(tmp_path: Path
 def test_check_reads_a_jsonl_table(tmp_path: Path):
     table = tmp_path / "table"
     table.mkdir()
-    (table / "routing.jsonl").write_text(json.dumps(row()) + "\n" + json.dumps(row(id="fixture/two")) + "\n", encoding="utf-8")
+    (table / "routing.jsonl").write_text(json.dumps(row()) + "\n" + json.dumps(row(id="fixture/two")) + "\n",
+        encoding="utf-8")
     assert check_tree(tmp_path) == []
     (table / "routing.jsonl").write_text("{not json}\n", encoding="utf-8")
     assert check_tree(tmp_path)

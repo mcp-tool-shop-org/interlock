@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pytest
 
+from interlock.adapters import openvino as ovm
 from interlock.adapters import registry
 from interlock.adapters.base import AdapterError, NativeBinaryRejected, StepRequest
-from interlock.adapters import openvino as ovm
 
 
 class FakeClock:
@@ -383,7 +383,7 @@ def test_session_lifecycle_embed(tmp_path):
 
 def test_session_double_start_and_wrong_stop(tmp_path):
     a = make_adapter()
-    m1, m2 = local_model(tmp_path / "a" if False else tmp_path), None
+    m1 = local_model(tmp_path / "a" if False else tmp_path)
     r1 = req(model=m1, device="CPU", static_shape="1x16")
     a.start_session(r1)
     try:
@@ -591,7 +591,8 @@ def test_generate_npu_builds_a_pipeline_per_prompt_size(tmp_path):
                      prompt="hi there " * 20))
     assert short.ok and long.ok
     assert long.compile_ms is not None  # a new pipeline, not the short one reused
-    sizes = sorted(v["pipe"].config["MAX_PROMPT_LEN"] for k, v in a._pipelines.items() if k[:2] == (str(tmp_path), "NPU"))
+    sizes = sorted(v["pipe"].config["MAX_PROMPT_LEN"] for k, v in a._pipelines.items() if k[:2] == (str(tmp_path),
+        "NPU"))
     assert sizes == [68, long.resolved["genai_config"]["MAX_PROMPT_LEN"]] and sizes[1] > 68
     again = a.run(req(task="generate", model=str(tmp_path), device="NPU", num_predict=64, prompt="hi there"))
     assert again.compile_ms is None  # the short pipeline is still cached
@@ -779,7 +780,6 @@ def test_device_loss_in_companion_start_marks_the_device(tmp_path, monkeypatch):
 # and marks the device off for the runner, and a resolved outcome of "not run" writes no row.
 
 def _repo(repo_path):
-    import yaml
     repo_path.mkdir(parents=True, exist_ok=True)
     for argv in (["init"], ["config", "user.email", "dev@example.com"], ["config", "user.name", "dev"],
                  ["config", "core.autocrlf", "false"]):
@@ -998,7 +998,7 @@ def test_cpu_parity_is_exact_across_shapes_and_batches():
         return r.output
 
     def cos(x, y):
-        d = sum(i * j for i, j in zip(x, y))
+        d = sum(i * j for i, j in zip(x, y, strict=True))
         return d / (math.sqrt(sum(i * i for i in x)) * math.sqrt(sum(j * j for j in y)))
 
     cases = [

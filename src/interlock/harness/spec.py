@@ -97,7 +97,7 @@ def _decision_metric(data: dict) -> None:
         return
     head, _, tail = metric.partition(".") if isinstance(metric, str) else ("", "", "")
     if head != "latency" or tail not in _LATENCY_KEYS:
-        raise SpecError(f"decision_metric must be one of: " + ", ".join(f"latency.{key}" for key in _LATENCY_KEYS))
+        raise SpecError("decision_metric must be one of: " + ", ".join(f"latency.{key}" for key in _LATENCY_KEYS))
 
 
 def _prefix_caching(holder: dict, where: str) -> None:
@@ -249,7 +249,8 @@ def _blocks(data: dict, arm_ids: set) -> None:
             if arm_id not in arm_ids:
                 raise SpecError(f"block {block['id']} names an arm that is not in the spec: {arm_id}")
             if arm_id in placed:
-                raise SpecError(f"arm {arm_id} is in blocks {placed[arm_id]} and {block['id']}; an arm is in exactly one block")
+                raise SpecError(
+                    f"arm {arm_id} is in blocks {placed[arm_id]} and {block['id']}; an arm is in exactly one block")
             placed[arm_id] = block["id"]
         block_ids[block["id"]] = members
     missing = sorted(arm_ids - set(placed))

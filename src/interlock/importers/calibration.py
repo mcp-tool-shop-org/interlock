@@ -10,6 +10,7 @@ separate cold and warm.
 
 from __future__ import annotations
 
+from interlock.families import stamp_family
 from interlock.importers.common import (
     UNRECORDED,
     ImportError_,
@@ -24,7 +25,6 @@ from interlock.importers.common import (
     source_provenance,
     spread,
 )
-from interlock.families import stamp_family
 from interlock.receipt import validate_row
 from interlock.tasks import CHECK_TO_TASK
 

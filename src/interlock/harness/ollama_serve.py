@@ -26,7 +26,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
 
-
 HOST = "127.0.0.1"
 PORT = 11441
 SHARED_PORTS = frozenset({11434, 11490})
@@ -322,7 +321,7 @@ class Server:
                 if pid is not None:
                     try:
                         self._stop_tree(pid)
-                    except Exception:
+                    except Exception:  # noqa: S110  # pragma: no cover  # the stop message still has to be raised
                         pass
         text = message if not tail else f"{message}\n{tail}"
         raise ServeError(text)

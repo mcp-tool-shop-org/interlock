@@ -1,6 +1,6 @@
 # interlock: how it works
 
-Mapped at 2026-10-13 from commit 2e4b1b5 by Atlas 1.24.0.
+Mapped at 2026-10-14 from commit e4aba2d by Atlas 1.24.0.
 
 ## What this is
 
@@ -8,10 +8,13 @@ interlock routes each job to a model, engine and device from a receipt-backed ta
 
 10 parts, mostly Python (87 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.
 
-## What changed since 2026-10-13 (e8628ca)
+## What changed since 2026-10-13 (2e4b1b5)
 
-- OpenSSF Scorecard (.github/workflows/scorecard.yml) is a new door. It starts on a `branch_protection_rule` event; on a schedule (`43 15 * * 1`), Monday at 15:43 UTC; or by hand. It runs no file this map can see.
-- 1 file added and 27 changed content, across 6 parts.
+- src/interlock/adapters/openvino.py is now read by pyproject.toml.
+- src/interlock/harness/e4b.py is now read by pyproject.toml.
+- src/interlock/harness/environment.py is now read by pyproject.toml.
+- And 14 more new writers and readers of places.
+- 1 file added and 54 changed content, across 5 parts.
 
 ## What comes in
 

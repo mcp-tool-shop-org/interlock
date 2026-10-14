@@ -4,15 +4,16 @@ from datetime import date
 from pathlib import Path
 
 import pytest
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from interlock.router.policy import (
     EXCLUDED_OUTCOMES,
     Decision,
     Refusal,
     Request,
-    decode_bound,
     decide,
+    decode_bound,
     experiment_of,
     latency_bound_ms,
     prefix_mode,
@@ -501,7 +502,8 @@ def test_remote_without_budget_is_unchecked_and_validates_offrig_plan():
     assert "note" not in chosen.document["offrig_plan"]
     assert chosen.document["offrig_plan"]["no_fallback"] is False
     schema = Draft202012Validator(
-        __import__("json").loads((ROOT / "tests" / "fixtures" / "offrig-plan-input.8f2a94a.json").read_text(encoding="utf-8"))
+        __import__("json").loads((ROOT / "tests" / "fixtures" / "offrig-plan-input.8f2a94a.json").read_text(
+            encoding="utf-8"))
     )
     schema.validate(chosen.document["offrig_plan"])
 
@@ -530,7 +532,8 @@ def test_remote_over_budget_is_a_runner_up():
     dropped = decide([local, bare], ask(budget_left_usd=10))
     assert isinstance(dropped, Decision)
     assert dropped.document["device"] == "CPU"
-    assert "worst_case_usd" in next(item["reason"] for item in dropped.document["runners_up"] if item["id"] == "remote/bare")
+    assert "worst_case_usd" in next(item["reason"] for item in dropped.document["runners_up"] if item[
+        "id"] == "remote/bare")
 
 
 def test_remote_within_budget_is_marked_within():
@@ -586,10 +589,13 @@ def test_mismatched_5090_rows_and_thin_runners_are_named():
         throughput=10,
     )
     cards = [
-        measured("c-think", "5090", repo="phi:mini", thinking="on", quote_rule=2, num_predict=64, num_ctx=2048, throughput=100),
+        measured("c-think", "5090", repo="phi:mini", thinking="on", quote_rule=2, num_predict=64, num_ctx=2048,
+            throughput=100),
         measured("c-l256/x", "5090", repo="phi:mini", thinking="off", quote_rule=2, num_predict=64, throughput=100),
-        measured("c-quote", "5090", repo="phi:mini", thinking="off", quote_rule=1, num_predict=64, num_ctx=2048, throughput=100),
-        measured("c-np", "5090", repo="phi:mini", thinking="off", quote_rule=2, num_predict=32, num_ctx=2048, throughput=100),
+        measured("c-quote", "5090", repo="phi:mini", thinking="off", quote_rule=1, num_predict=64, num_ctx=2048,
+            throughput=100),
+        measured("c-np", "5090", repo="phi:mini", thinking="off", quote_rule=2, num_predict=32, num_ctx=2048,
+            throughput=100),
     ]
     missed = decide(cards + [igpu], ask(model="Phi", thinking="off", ctx=1024, quote_rule=2, num_predict=64))
     assert isinstance(missed, Decision)

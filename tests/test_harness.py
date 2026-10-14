@@ -9,6 +9,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -27,7 +28,6 @@ from interlock.adapters.ollama import (
 )
 from interlock.adapters.registry import for_engine
 from interlock.guards import GuardError
-from interlock.harness.environment import driver_version_from_lines, package_versions
 from interlock.harness.e5 import (
     PROMPT_RATIO,
     SHARED_GATE_FROM_MIB,
@@ -39,6 +39,7 @@ from interlock.harness.e5 import (
     over_margin,
     search,
 )
+from interlock.harness.environment import driver_version_from_lines, package_versions
 from interlock.harness.lock import require_unmodified
 from interlock.harness.receipts import apply_parity, device_lost_row, environment, for_table, import_receipt, write_run
 from interlock.harness.runner import (
@@ -992,7 +993,8 @@ def test_parity_marks_the_arm_that_missed_and_leaves_the_other_lengths():
         _guard_row("NPU", "1x8", [1.0, 0.0], id="bad-batch", settings={"static_shape": "nx8"}),
         _guard_row("NPU", "1x8", [1.0, 0.0], id="zero-len", settings={"batch": 1, "static_shape": "1x0"}),
         _guard_row("NPU", "1x8", [1.0, 0.0], id="from-shape", settings={"static_shape": "2x128"}),
-        _guard_row("NPU", "1x8", [1.0, 0.0], id="cold-only", artifacts={"slots": [{"phase": "cold", "output": [1.0, 0.0]}]}),
+        _guard_row("NPU", "1x8", [1.0, 0.0], id="cold-only", artifacts={"slots": [{"phase": "cold", "output": [1.0,
+            0.0]}]}),
         _guard_row("NPU", "1x8", "nope", id="text-out"),
         _guard_row("NPU", "1x512", [1.0, True], id="bool-out"),
         _guard_row("NPU", "1x64", [1.0, 0.0], id="no-ref"),
@@ -1350,7 +1352,8 @@ def test_ollama_stays_on_loopback_and_refuses_cloud():
         url_for("NPU")
     with pytest.raises(AdapterError):
         refuse_cloud("qwen3:8b-cloud")
-    request = StepRequest("s", "generate", "qwen3:8b", "5090", "ollama", {"num_predict": 1, "shift": False, "truncate": False, "thinking_level": "off"})
+    request = StepRequest("s", "generate", "qwen3:8b", "5090", "ollama", {"num_predict": 1, "shift": False,
+        "truncate": False, "thinking_level": "off"})
     body = generate_body(request)
     assert body["shift"] is False and body["truncate"] is False and body["think"] is False
     seen = {}
@@ -1493,22 +1496,27 @@ def test_search_spill_and_schedule_refuse_bad_inputs():
     reference = _resident(1, shared=1000, prompt=20)
     assert is_spill(Observation(True, 1), reference, shared_growth_mib=256, prompt_ratio=0.5) is True
     assert is_spill(Observation(True, 1, shared_mib=1000), reference, shared_growth_mib=256, prompt_ratio=0.5) is True
-    assert is_spill(_resident(1, shared=1256, prompt=20, tok_s=1, ttft=9_999), reference, shared_growth_mib=256, prompt_ratio=0.5) is False
+    assert is_spill(_resident(1, shared=1256, prompt=20, tok_s=1, ttft=9_999), reference, shared_growth_mib=256,
+        prompt_ratio=0.5) is False
     assert is_spill(_resident(1, shared=1257, prompt=20), reference, shared_growth_mib=256, prompt_ratio=0.5) is False
-    assert is_spill(_resident(SHARED_GATE_FROM_MIB, shared=1257, prompt=20), reference, shared_growth_mib=256, prompt_ratio=0.5) is True
-    assert is_spill(_resident(SHARED_GATE_FROM_MIB - 1, shared=1300, prompt=20), reference, shared_growth_mib=256, prompt_ratio=0.5) is False
+    assert is_spill(_resident(SHARED_GATE_FROM_MIB, shared=1257, prompt=20), reference, shared_growth_mib=256,
+        prompt_ratio=0.5) is True
+    assert is_spill(_resident(SHARED_GATE_FROM_MIB - 1, shared=1300, prompt=20), reference, shared_growth_mib=256,
+        prompt_ratio=0.5) is False
     assert is_spill(_resident(1, shared=1000, prompt=10), reference, shared_growth_mib=256, prompt_ratio=0.5) is False
     assert is_spill(_resident(1, shared=1000, prompt=9), reference, shared_growth_mib=256, prompt_ratio=0.5) is True
     # The pre-window reading is the idle sample. The baseline is the reference window.
     under = Observation(True, 1, shared_mib=1200, prompt_tok_s=20, shared_baseline=1000, baseline_taken=True)
     assert is_spill(under, reference, shared_growth_mib=256, prompt_ratio=0.5) is False
-    over = Observation(True, SHARED_GATE_FROM_MIB, shared_mib=1257, prompt_tok_s=20, shared_baseline=1000, baseline_taken=True)
+    over = Observation(True, SHARED_GATE_FROM_MIB, shared_mib=1257, prompt_tok_s=20, shared_baseline=1000,
+        baseline_taken=True)
     assert is_spill(over, reference, shared_growth_mib=256, prompt_ratio=0.5) is True
     below = Observation(True, 1, shared_mib=1257, prompt_tok_s=20, shared_baseline=1000, baseline_taken=True)
     assert is_spill(below, reference, shared_growth_mib=256, prompt_ratio=0.5) is False
     idle_missing = Observation(True, 1, shared_mib=1100, prompt_tok_s=20, shared_baseline=None, baseline_taken=True)
     assert is_spill(idle_missing, reference, shared_growth_mib=256, prompt_ratio=0.5) is False
-    assert is_spill(_resident(1, shared=1100, prompt=20), _resident(1, shared=None, prompt=20), shared_growth_mib=256, prompt_ratio=0.5) is True
+    assert is_spill(_resident(1, shared=1100, prompt=20), _resident(1, shared=None, prompt=20), shared_growth_mib=256,
+        prompt_ratio=0.5) is True
     assert over_margin(Observation(True, None, error="lost"), 30500) is True
     assert over_margin(Observation(True, None), 30500) is True
 
@@ -1649,7 +1657,8 @@ def test_spec_rejects_a_contract_that_is_not_pre_registered(tmp_path: Path):
     paired = _arm("P", "NPU")
     paired["companion"] = "missing"
     paired["companion_device"] = "5090"
-    aba = {**good, "order": "aba", "arms": [_arm("A", "5090"), paired], "pairs": [{"id": "p", "alone": "A", "paired": "P"}]}
+    aba = {**good, "order": "aba", "arms": [_arm("A", "5090"), paired], "pairs": [{"id": "p", "alone": "A",
+        "paired": "P"}]}
     with pytest.raises(SpecError, match="not an arm"):
         validate_spec(aba)
     paired["companion"] = "A"
@@ -1841,7 +1850,8 @@ def test_adapter_edges_stay_local(monkeypatch):
     assert failed.ok is False and "exited 3" in failed.error
     OffrigCalibrateAdapter().unload("qwen3:8b")
 
-    transport = lambda *_args: {}
+    def transport(*_args):
+        return {}
     assert for_engine("ollama", transport=transport).transport is transport
     wired = for_engine("offrig-calibrate", executor=lambda _argv: 0)
     assert wired.executor is not None
@@ -2570,9 +2580,6 @@ def test_a_generate_row_carries_genai_counter_medians_from_repeats(tmp_path: Pat
 # ---------------------------------------------------------------------------
 
 
-from types import SimpleNamespace
-
-
 class Timed:
     """A fake adapter whose calls take planned seconds, honouring the bound.
 
@@ -2687,7 +2694,8 @@ def test_an_arm_the_spec_says_not_run_is_declined(tmp_path: Path):
     rows = _invoke(repo, _bind(repo, spec), {"fake": script})
     assert script.calls == ["A", "A", "A"]
     assert [row["id"] for row in rows] == ["T/A/run-1"]
-    assert rows[0]["notes"] == "not run: l512 (the spec says not run: not supported at this shape on driver 32.0.100.5540)"
+    assert rows[0][
+        "notes"] == "not run: l512 (the spec says not run: not supported at this shape on driver 32.0.100.5540)"
 
 
 def test_not_run_needs_a_reason():

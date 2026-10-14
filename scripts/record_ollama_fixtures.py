@@ -4,11 +4,16 @@ Run this on the rig, from the interlock repo, against the local server.
 It requires a 5090 grant, a fresh watchdog heartbeat, and an idle card.
 It does not pick a cloud model.
 
-    uv run python scripts/record_ollama_fixtures.py --model qwen3:8b --host http://127.0.0.1:11434 --timeout 15 --out tests/fixtures/ollama --grant GRANT
+    uv run python scripts/record_ollama_fixtures.py --model qwen3:8b \
+        --host http://127.0.0.1:11434 --timeout 15 \
+        --out tests/fixtures/ollama --grant GRANT
 
 One case, at a window large enough that Ollama does not raise num_ctx to a floor:
 
-    uv run python scripts/record_ollama_fixtures.py --model qwen3:8b --host http://127.0.0.1:11434 --timeout 15 --out tests/fixtures/ollama --grant GRANT --only truncate_over_num_ctx --num-ctx 2048 --prompt-repeats 2500
+    uv run python scripts/record_ollama_fixtures.py --model qwen3:8b \
+        --host http://127.0.0.1:11434 --timeout 15 \
+        --out tests/fixtures/ollama --grant GRANT \
+        --only truncate_over_num_ctx --num-ctx 2048 --prompt-repeats 2500
 """
 
 from __future__ import annotations
@@ -59,7 +64,7 @@ def main(
             print(f"unknown case {exc.args[0]}", file=sys.stderr)
             return 2
     if today is None:
-        today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+        today = datetime.datetime.now(datetime.UTC).date().isoformat()
     if heartbeat is None:
         heartbeat = heartbeat_path()
     if now is None:

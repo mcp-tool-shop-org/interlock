@@ -16,7 +16,8 @@ from interlock.harness.runner import RunnerError
 from interlock.harness.spec import SpecError, validate_spec
 from interlock.harness.watch import EXIT_OPERATOR_STOP, WatchHooks, read_start_state
 from interlock.receipt import load_jsonl
-from tests.test_harness import _result, _spec as _harness_spec
+from tests.test_harness import _result
+from tests.test_harness import _spec as _harness_spec
 from tests.test_run_guard import BlockingAdapter, Clock, Exits, _hooks, _invoke, _spec
 
 

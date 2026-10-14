@@ -8,6 +8,7 @@ from the receipt.
 
 from __future__ import annotations
 
+from interlock.families import stamp_family
 from interlock.importers.common import (
     UNRECORDED,
     blank_latency,
@@ -17,7 +18,6 @@ from interlock.importers.common import (
     sha256_bytes,
     source_provenance,
 )
-from interlock.families import stamp_family
 from interlock.receipt import validate_row
 
 _BLOCKS = ("false_accept", "false_accept_unsupported_only", "abstain")
@@ -25,7 +25,8 @@ _BLOCKS = ("false_accept", "false_accept_unsupported_only", "abstain")
 
 def nli_rows(document: dict, *, source_path: str, commit_sha: str, prereg_says_intel_igpu: bool) -> list[dict]:
     if not prereg_says_intel_igpu:
-        raise ValueError("the NLI receipt's GPU id is not imported unless the same commit's prereg names the Intel iGPU")
+        raise ValueError(
+            "the NLI receipt's GPU id is not imported unless the same commit's prereg names the Intel iGPU")
     model = document["model"]
     if model.get("device") != "GPU.0":
         raise ValueError(f"unexpected NLI device {model.get('device')!r}")

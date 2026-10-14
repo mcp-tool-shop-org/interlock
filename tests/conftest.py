@@ -29,5 +29,6 @@ def _no_live_watcher(monkeypatch):
     monkeypatch.setattr(
         runner,
         "WatchHooks",
-        lambda *args, **kwargs: WatchHooks(*args, **{"start_thread": False, "exit_fn": _refuse_exit, "state_sampler": _no_device_state, **kwargs}),
+        lambda *args, **kwargs: WatchHooks(*args, **{"start_thread": False, "exit_fn": _refuse_exit,
+            "state_sampler": _no_device_state, **kwargs}),
     )

@@ -34,10 +34,10 @@ import subprocess
 import sys
 import threading
 import time
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
 from interlock.adapters.base import BuildRefused
 
@@ -103,28 +103,28 @@ def read_start_state(uses_5090: bool) -> dict:
                 timeout=10,
             )
             parts = [item.strip() for item in out.stdout.splitlines()[0].split(",")] if out.returncode == 0 else []
-            for key, raw in zip(keys, parts):
+            for key, raw in zip(keys, parts, strict=False):
                 try:
                     state[key] = float(raw)
                 except ValueError:
                     pass
-        except Exception:
+        except Exception:  # noqa: S110  # a probe failure stays unrecorded
             pass
     state.update(cpu_percent=UNRECORDED, cpu_freq_mhz=UNRECORDED, ram_pct=UNRECORDED)
     if psutil is not None:
         try:
             state["cpu_percent"] = float(psutil.cpu_percent(interval=0.2))
-        except Exception:
+        except Exception:  # noqa: S110  # pragma: no cover  # a probe failure stays unrecorded
             pass
         try:
             mhz = getattr(psutil.cpu_freq(), "current", None)
             if mhz is not None:
                 state["cpu_freq_mhz"] = float(mhz)
-        except Exception:
+        except Exception:  # noqa: S110  # pragma: no cover  # a probe failure stays unrecorded
             pass
         try:
             state["ram_pct"] = float(psutil.virtual_memory().percent)
-        except Exception:
+        except Exception:  # noqa: S110  # pragma: no cover  # a probe failure stays unrecorded
             pass
     return state
 
@@ -234,7 +234,8 @@ def windows_disk_number(letter: str, run=None) -> int:
     else:
         completed = run(script)
     if getattr(completed, "returncode", 1) != 0:
-        detail = (getattr(completed, "stderr", None) or getattr(completed, "stdout", None) or "disk number query failed")
+        detail = (getattr(completed, "stderr", None) or getattr(completed, "stdout",
+            None) or "disk number query failed")
         first = str(detail).strip().splitlines()
         raise OSError(first[0][:200] if first else "disk number query failed")
     text = str(getattr(completed, "stdout", "") or "").strip()
@@ -250,7 +251,8 @@ class _DiskRate:
     failure returns a reason so the receipt can say ``unrecorded``.
     """
 
-    def __init__(self, clock: Callable[[], float] = time.monotonic, disk_number: Callable[[str], int] | None = None) -> None:
+    def __init__(self, clock: Callable[[], float] = time.monotonic, disk_number: Callable[[str],
+        int] | None = None) -> None:
         self._clock = clock
         self._disk_number = disk_number if disk_number is not None else windows_disk_number
         self._last: dict[str, tuple[float, int]] = {}
@@ -363,7 +365,7 @@ def _snapshot_cpu() -> dict[int, tuple[float, str]]:
             if seconds is None:
                 continue
             found[int(proc.pid)] = (seconds, str(proc.name()))
-        except Exception:
+        except Exception:  # noqa: S112  # a dead process is skipped
             continue
     return found
 
@@ -440,7 +442,8 @@ def read_slot(drive: str | None) -> dict:
 class SlotProbe:
     """Readings around one measured call. The runner opens it and closes it."""
 
-    def __init__(self, reader: Callable[[str | None], dict], *, start_thread: bool = True, interval_s: float = 1.0) -> None:
+    def __init__(self, reader: Callable[[str | None], dict], *, start_thread: bool = True,
+        interval_s: float = 1.0) -> None:
         self._reader = reader
         self._start_thread = start_thread
         self.interval_s = float(interval_s)
@@ -671,7 +674,7 @@ class RunWatch:
             return
         try:
             self._peak_rss = max(self._peak_rss, int(sampler()))
-        except Exception:
+        except Exception:  # noqa: S110  # a sampler failure leaves the peak
             pass
 
     def _fire(self, record: Callable[[], None], code: int) -> None:
@@ -681,8 +684,8 @@ class RunWatch:
         except Exception as exc:  # the process must still end
             try:
                 print(f"interlock: the run watch could not write the receipt: {exc}", file=sys.stderr)
-            except Exception:  # pragma: no cover
-                pass
+            except Exception:  # noqa: S110  # pragma: no cover  # the process must still end
+                pass  # pragma: no cover
         finally:
             self.hooks.exit_fn(code)
 

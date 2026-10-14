@@ -37,6 +37,7 @@ dev = [
     "hypothesis==6.168.5",
     "pytest==9.0.3",
     "pytest-cov==7.0.0",
+    "ruff==0.17.0",
 ]
 
 [build-system]
@@ -57,3 +58,34 @@ addopts = "--cov=interlock --cov-report=term-missing --cov-fail-under=90"
 [tool.coverage.run]
 source = ["interlock"]
 omit = ["*/schema/*"]
+
+[tool.ruff]
+target-version = "py312"
+# Sources were already written past the 88 default. 120 keeps E501 on.
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "I", "UP", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+# Pytest asserts are the test. They are not a check that disappears under -O.
+"tests/**/*.py" = ["S101"]
+# These files start a local tool (git, nvidia-smi, typeperf) with shell
+# false and an argv built in the file. The tests name those same argv.
+"src/interlock/adapters/openvino.py" = ["S603", "S607"]
+"src/interlock/harness/e4b.py" = ["S603", "S607"]
+"src/interlock/harness/environment.py" = ["S603", "S607"]
+"src/interlock/harness/fill.py" = ["S603", "S607"]
+"src/interlock/harness/lock.py" = ["S603", "S607"]
+"src/interlock/harness/storage.py" = ["S603", "S607"]
+"src/interlock/harness/watch.py" = ["S603", "S607"]
+"src/interlock/importers/assemble.py" = ["S603", "S607"]
+"tests/test_fill_card_live.py" = ["S603", "S607"]
+"tests/test_harness.py" = ["S603", "S607"]
+"tests/test_importers.py" = ["S603", "S607"]
+"tests/test_old_name.py" = ["S603", "S607"]
+"tests/test_ollama_supervisor.py" = ["S603", "S607"]
+"tests/test_ollama_token_count.py" = ["S603", "S607"]
+"tests/test_openvino_adapter.py" = ["S603", "S607"]
+"tests/test_phi_storage.py" = ["S603", "S607"]
+"tests/test_run_path.py" = ["S603", "S607"]
