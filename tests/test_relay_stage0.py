@@ -105,7 +105,8 @@ def test_h3_an_interrupted_run_leaves_a_closed_parsable_trace(tmp_path: Path, mo
             tracer.start("generate", "/api/generate", model="m", device="5090")  # in flight at the stop
             tracer.mark("stop_file")
             raise KeyboardInterrupt
-    lines = [json.loads(x) for x in next((tmp_path / "logs").glob("stop.*.jsonl")).read_text(encoding="utf-8").splitlines()]
+    text = next((tmp_path / "logs").glob("stop.*.jsonl")).read_text(encoding="utf-8")
+    lines = [json.loads(x) for x in text.splitlines()]
     if mode == "events":
         assert [x["status"] for x in lines if "call_id" in x] == ["ok", "abandoned"]
     else:
