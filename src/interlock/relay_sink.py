@@ -95,7 +95,8 @@ class RelaySink:
         self._relay.llm.call_end(
             handle,
             {"status": record.status},
-            metadata={"call_id": record.call_id, "status": record.status, "ms": record.ms,
+            # extra carries what is only known at the end, such as an OpenVINO timeout's worker_still_running.
+            metadata={**record.extra, "call_id": record.call_id, "status": record.status, "ms": record.ms,
                       "prompt_tokens": record.prompt_tokens, "completion_tokens": record.completion_tokens},
             timestamp=_when(record.end_ns),
         )
