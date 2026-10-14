@@ -13,9 +13,11 @@ That is a summary, not a log.
 
 Calls are classified from the request itself, so counts and unloads made on
 worker threads need no context. A call is attributed to the slot whose window
-it starts in, whatever its thread: a companion session is started and stopped
-inside its slot, so its calls belong to that slot by construction, under their
-own kind (``companion``). Every timestamp comes from one clock: an epoch
+it starts in, whatever its thread. A companion session starts before its slot
+opens, so that load is already running when the measured call goes out (its
+start is counted in ``_run``, under its own kind, ``companion``), and stops
+inside the slot, so its unload is the slot's last call and never a span
+outside one (amendment v3.2). Every timestamp comes from one clock: an epoch
 offset taken once when the run opens, plus ``perf_counter_ns``. Prompts and
 responses are never recorded, only their byte lengths.
 """

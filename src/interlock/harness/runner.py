@@ -666,6 +666,7 @@ def run_interleaved(
         used = removed if gone is None else gone
         guard.sample_ram()  # the peak is current at every flush
         rows = _rows(partial=True, gone=used)
+        _debug_only(tracer, rows)
         if rows:
             write_receipt(root, run_id, rows)
         marker.touch(_iso(wall()))
@@ -1137,9 +1138,7 @@ def run_interleaved(
             removed.update(gone)
             cache_report["failures"].update(failures)
         rows = _rows(partial=False, gone=removed)
-        if tracer is not None and tracer.mode != "off":
-            for row in rows:  # a traced run is a debugging run: its rows never route (amendment v3.2)
-                row["descriptive"] = True
+        _debug_only(tracer, rows)
         if rows:
             write_run(root, run_id, rows)
         imported = True
@@ -2015,6 +2014,14 @@ def _check_run_id(run_id: str) -> None:
         raise RunnerError("run_id must be a single name")
 
 
+def _debug_only(tracer, rows: list[dict]) -> None:
+    """A traced run is a debugging run: its rows never route (amendment v3.2). Partial flushes included."""
+
+    if tracer is not None and tracer.mode != "off":
+        for row in rows:
+            row["descriptive"] = True
+
+
 def _unload(adapters: dict, arms: dict) -> None:
     seen = set()
     for arm in arms.values():
@@ -2245,6 +2252,12 @@ def run_spec(
     receipt = root / "receipts" / f"{name}.jsonl"
     if receipt.exists():
         raise GuardError(f"REFUSED: receipts/{name}.jsonl already exists; pass --run-id for another name")
+    for suffix in ("atof", "events"):
+        # A traced attempt refused at the card guard leaves its trace log with no receipt. A later run under this
+        # name would be taken for a traced one and kept out of the table (amendment v3.2, Argon's review).
+        if (root / "logs" / f"{name}.{suffix}.jsonl").exists():
+            raise GuardError(f"REFUSED: logs/{name}.{suffix}.jsonl already exists from an earlier traced attempt; "
+                             "pass --run-id for another name")
     wall = wall or time.time
     if supervisor is not None:
         if grant and not getattr(supervisor, "grant", None):

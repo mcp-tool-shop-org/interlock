@@ -24,6 +24,7 @@ import pytest
 from interlock.adapters.base import StepResult
 from interlock.adapters.ollama import OllamaAdapter
 from interlock.calltrace import Tracer, instrument, release, traced_transport
+from interlock.guards import GuardError
 from interlock.harness import runner as runner_module
 from interlock.harness.receipts import import_receipt, write_run
 from interlock.harness.runner import run_spec
@@ -337,3 +338,19 @@ def test_a_traced_runs_rows_never_route_and_an_untraced_run_still_does(tmp_path)
                     watch=WatchHooks(ram_sampler=None, start_thread=False, sleep=lambda s: None))
     assert "descriptive" not in rows[0]
     assert [row["id"] for row in load_jsonl(plain / "table" / "routing.jsonl")] == ["T/A/off"]
+
+
+def test_a_trace_log_left_by_a_refused_traced_attempt_refuses_the_name_to_a_later_run(tmp_path):
+    """Argon's review: a traced run refused at the card guard leaves logs/<id>.atof.jsonl with no receipt. An untraced
+    run under the same name would then be marked descriptive and kept out of the table, so the name is refused."""
+
+    repo = tmp_path / "repo"
+    spec_path = _bind(repo, _plain_spec([_plain_arm("A", "CPU")], rest_s=0))
+    (repo / "logs").mkdir()
+    (repo / "logs" / "x.atof.jsonl").write_text("", encoding="utf-8")
+    fake = Fake({"A": [StepResult(ok=True, latency_ms=10) for _ in range(3)]})
+    with pytest.raises(GuardError, match="logs/x.atof.jsonl already exists"):
+        run_spec(spec_path, root=repo, run_id="x", date="2026-10-14", adapters={"fake": fake}, trace="off",
+                 watch=WatchHooks(ram_sampler=None, start_thread=False, sleep=lambda s: None))
+    assert not (repo / "receipts").exists()
+
