@@ -34,32 +34,24 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 2,
-      "changed": 24,
+      "added": 0,
+      "changed": 6,
       "moved": 0,
-      "parts": 4,
+      "parts": 3,
       "removed": 0
     },
     "items": [
       {
-        "kind": "door",
-        "sentence": "CI now also runs tests/fuzz_receipts.py.",
-        "subjects": [
-          ".github/workflows/ci.yml",
-          "tests/fuzz_receipts.py"
-        ]
-      },
-      {
         "kind": "counts",
-        "sentence": "2 files added and 24 changed content, across 4 parts.",
+        "sentence": "Nothing structural changed since 2026-10-14; 6 files changed content.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "e4aba2d86f190fa2c9c97c469a0242b3e98d1fd9",
-      "generatedAt": "2026-10-14T00:21:11.490Z"
+      "commit": "1b79b6fdc2ef93d9ebeebd3b7b6d03757afebd31",
+      "generatedAt": "2026-10-14T04:07:42.403Z"
     },
-    "unchanged": false
+    "unchanged": true
   },
   "changesTogether": [
     {
@@ -144,7 +136,7 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 9 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 1,
-  "commit": "1b79b6fdc2ef93d9ebeebd3b7b6d03757afebd31",
+  "commit": "a532013a20d82b7d9374b9649407ed3378c71bcd",
   "defaultBranch": "main",
   "derived": "10 parts, mostly Python (88 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
   "doors": [
@@ -308,7 +300,7 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-14T04:07:42.403Z",
+  "generatedAt": "2026-10-14T04:38:24.699Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "3 writes and 4 reads use paths built at run time and are not named here.",

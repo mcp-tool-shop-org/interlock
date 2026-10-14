@@ -93,6 +93,16 @@ def test_check_is_green_on_an_empty_tree_and_red_on_a_bad_receipt(tmp_path: Path
     assert "bad.json" in problems[0]
 
 
+def test_a_receipt_that_is_not_utf8_is_a_problem(tmp_path: Path):
+    receipts = tmp_path / "receipts"
+    receipts.mkdir()
+    (receipts / "row.json").write_bytes(b"\xff\xfe{")
+    problems = check_tree(tmp_path)
+    assert len(problems) == 1
+    assert "row.json" in problems[0]
+    assert "utf-8" in problems[0]
+
+
 def test_check_reads_a_jsonl_table(tmp_path: Path):
     table = tmp_path / "table"
     table.mkdir()

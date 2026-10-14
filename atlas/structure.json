@@ -21,7 +21,7 @@
           "path": ".github/workflows/pages.yml"
         },
         {
-          "hash": "a132f23fb7c195438d5048f025c30e4f9ac39cba94d1b8b2fb4504da62c32391",
+          "hash": "f217b4beb61429b621ed0acd7b84c54febb24fea00ad40cb0c4118c9c0b9e19e",
           "path": ".github/workflows/release.yml"
         },
         {
@@ -6756,9 +6756,14 @@
           ],
           "failurePaths": [
             {
-              "in": "validate_spec",
+              "in": "load_spec",
+              "kind": "except",
+              "line": 37
+            },
+            {
+              "in": "load_spec",
               "kind": "raise",
-              "line": 41
+              "line": 38
             },
             {
               "in": "validate_spec",
@@ -6768,7 +6773,7 @@
             {
               "in": "validate_spec",
               "kind": "raise",
-              "line": 46
+              "line": 47
             },
             {
               "in": "validate_spec",
@@ -6783,32 +6788,32 @@
             {
               "in": "validate_spec",
               "kind": "raise",
-              "line": 54
+              "line": 55
             },
             {
               "in": "validate_spec",
               "kind": "raise",
-              "line": 66
+              "line": 57
             },
             {
               "in": "validate_spec",
               "kind": "raise",
-              "line": 71
+              "line": 69
+            },
+            {
+              "in": "validate_spec",
+              "kind": "raise",
+              "line": 74
             },
             {
               "in": "_decision_metric",
               "kind": "raise",
-              "line": 100
+              "line": 103
             },
             {
               "in": "_prefix_caching",
               "kind": "raise",
-              "line": 106
-            },
-            {
-              "in": "_interleaved",
-              "kind": "raise",
-              "line": 116
+              "line": 109
             },
             {
               "in": "_interleaved",
@@ -6823,27 +6828,27 @@
             {
               "in": "_interleaved",
               "kind": "raise",
-              "line": 126
+              "line": 125
             },
             {
               "in": "_interleaved",
               "kind": "raise",
-              "line": 128
+              "line": 129
             },
             {
               "in": "_interleaved",
               "kind": "raise",
-              "line": 132
+              "line": 131
             },
             {
               "in": "_interleaved",
               "kind": "raise",
-              "line": 134
+              "line": 135
             },
             {
               "in": "_interleaved",
               "kind": "raise",
-              "line": 136
+              "line": 137
             },
             {
               "in": "_interleaved",
@@ -6863,12 +6868,12 @@
             {
               "in": "_interleaved",
               "kind": "raise",
-              "line": 149
+              "line": 148
             },
             {
               "in": "_interleaved",
               "kind": "raise",
-              "line": 154
+              "line": 152
             },
             {
               "in": "_interleaved",
@@ -6883,17 +6888,17 @@
             {
               "in": "_interleaved",
               "kind": "raise",
-              "line": 162
+              "line": 163
             },
             {
               "in": "_interleaved",
               "kind": "raise",
-              "line": 168
+              "line": 165
             },
             {
-              "in": "_warmups",
+              "in": "_interleaved",
               "kind": "raise",
-              "line": 178
+              "line": 171
             },
             {
               "in": "_warmups",
@@ -6913,12 +6918,12 @@
             {
               "in": "_warmups",
               "kind": "raise",
-              "line": 189
+              "line": 190
             },
             {
-              "in": "_arm_storage",
+              "in": "_warmups",
               "kind": "raise",
-              "line": 197
+              "line": 192
             },
             {
               "in": "_arm_storage",
@@ -6928,17 +6933,17 @@
             {
               "in": "_arm_storage",
               "kind": "raise",
-              "line": 202
+              "line": 203
             },
             {
               "in": "_arm_storage",
               "kind": "raise",
-              "line": 207
+              "line": 205
             },
             {
               "in": "_arm_storage",
               "kind": "raise",
-              "line": 209
+              "line": 210
             },
             {
               "in": "_arm_storage",
@@ -6948,17 +6953,17 @@
             {
               "in": "_arm_storage",
               "kind": "raise",
-              "line": 214
+              "line": 215
             },
             {
               "in": "_arm_storage",
               "kind": "raise",
-              "line": 216
+              "line": 217
             },
             {
-              "in": "_blocks",
+              "in": "_arm_storage",
               "kind": "raise",
-              "line": 234
+              "line": 219
             },
             {
               "in": "_blocks",
@@ -6968,12 +6973,12 @@
             {
               "in": "_blocks",
               "kind": "raise",
-              "line": 242
+              "line": 240
             },
             {
               "in": "_blocks",
               "kind": "raise",
-              "line": 244
+              "line": 245
             },
             {
               "in": "_blocks",
@@ -6988,22 +6993,22 @@
             {
               "in": "_blocks",
               "kind": "raise",
-              "line": 252
+              "line": 253
             },
             {
               "in": "_blocks",
               "kind": "raise",
-              "line": 258
+              "line": 255
             },
             {
               "in": "_blocks",
               "kind": "raise",
-              "line": 263
+              "line": 261
             },
             {
               "in": "_blocks",
               "kind": "raise",
-              "line": 265
+              "line": 266
             },
             {
               "in": "_blocks",
@@ -7023,7 +7028,7 @@
             {
               "in": "_blocks",
               "kind": "raise",
-              "line": 276
+              "line": 277
             },
             {
               "in": "_blocks",
@@ -7031,14 +7036,14 @@
               "line": 279
             },
             {
-              "in": "_fill_card",
+              "in": "_blocks",
               "kind": "raise",
-              "line": 284
+              "line": 282
             },
             {
               "in": "_fill_card",
               "kind": "raise",
-              "line": 286
+              "line": 287
             },
             {
               "in": "_fill_card",
@@ -7048,32 +7053,32 @@
             {
               "in": "_fill_card",
               "kind": "raise",
-              "line": 291
+              "line": 292
             },
             {
               "in": "_fill_card",
               "kind": "raise",
-              "line": 293
+              "line": 294
             },
             {
               "in": "_fill_card",
               "kind": "raise",
-              "line": 297
+              "line": 296
             },
             {
               "in": "_fill_card",
               "kind": "raise",
-              "line": 299
+              "line": 300
             },
             {
               "in": "_fill_card",
               "kind": "raise",
-              "line": 301
+              "line": 302
             },
             {
               "in": "_fill_card",
               "kind": "raise",
-              "line": 305
+              "line": 304
             },
             {
               "in": "_fill_card",
@@ -7083,47 +7088,47 @@
             {
               "in": "_fill_card",
               "kind": "raise",
-              "line": 312
+              "line": 311
             },
             {
               "in": "_fill_card",
               "kind": "raise",
-              "line": 314
+              "line": 315
             },
             {
               "in": "_fill_card",
               "kind": "raise",
-              "line": 316
+              "line": 317
+            },
+            {
+              "in": "_fill_card",
+              "kind": "raise",
+              "line": 319
             },
             {
               "in": "_confirm_num_predict",
               "kind": "raise",
-              "line": 330
+              "line": 333
             },
             {
               "in": "_pairs",
               "kind": "raise",
-              "line": 336
+              "line": 339
             },
             {
               "in": "_pairs",
               "kind": "raise",
-              "line": 341
+              "line": 344
             },
             {
               "in": "_pairs",
               "kind": "raise",
-              "line": 343
+              "line": 346
             },
             {
               "in": "_pairs",
               "kind": "raise",
-              "line": 348
-            },
-            {
-              "in": "_pairs",
-              "kind": "raise",
-              "line": 352
+              "line": 351
             },
             {
               "in": "_pairs",
@@ -7133,42 +7138,42 @@
             {
               "in": "_pairs",
               "kind": "raise",
-              "line": 357
+              "line": 358
+            },
+            {
+              "in": "_pairs",
+              "kind": "raise",
+              "line": 360
             },
             {
               "in": "_close",
               "kind": "raise",
-              "line": 362
+              "line": 365
             },
             {
               "in": "_e4b",
               "kind": "raise",
-              "line": 373
+              "line": 376
             },
             {
               "in": "_e4b",
               "kind": "raise",
-              "line": 375
+              "line": 378
             },
             {
               "in": "_e4b",
               "kind": "raise",
-              "line": 377
+              "line": 380
             },
             {
               "in": "_e4b",
               "kind": "raise",
-              "line": 379
+              "line": 382
             },
             {
               "in": "_e4b",
               "kind": "raise",
-              "line": 381
-            },
-            {
-              "in": "_e4b",
-              "kind": "raise",
-              "line": 383
+              "line": 384
             },
             {
               "in": "_e4b",
@@ -7178,17 +7183,17 @@
             {
               "in": "_e4b",
               "kind": "raise",
-              "line": 388
+              "line": 389
             },
             {
               "in": "_e4b",
               "kind": "raise",
-              "line": 390
+              "line": 391
             },
             {
               "in": "_e4b",
               "kind": "raise",
-              "line": 394
+              "line": 393
             },
             {
               "in": "_e4b",
@@ -7198,27 +7203,27 @@
             {
               "in": "_e4b",
               "kind": "raise",
-              "line": 415
+              "line": 400
             },
             {
               "in": "_e4b",
               "kind": "raise",
-              "line": 420
+              "line": 418
+            },
+            {
+              "in": "_e4b",
+              "kind": "raise",
+              "line": 423
             },
             {
               "in": "_choice_rule",
               "kind": "raise",
-              "line": 430
+              "line": 433
             },
             {
               "in": "_choice_rule",
               "kind": "raise",
-              "line": 434
-            },
-            {
-              "in": "_choice_rule",
-              "kind": "raise",
-              "line": 438
+              "line": 437
             },
             {
               "in": "_choice_rule",
@@ -7228,7 +7233,7 @@
             {
               "in": "_choice_rule",
               "kind": "raise",
-              "line": 443
+              "line": 444
             },
             {
               "in": "_choice_rule",
@@ -7238,7 +7243,7 @@
             {
               "in": "_choice_rule",
               "kind": "raise",
-              "line": 448
+              "line": 449
             },
             {
               "in": "_choice_rule",
@@ -7248,12 +7253,12 @@
             {
               "in": "_choice_rule",
               "kind": "raise",
-              "line": 453
+              "line": 454
             },
             {
               "in": "_choice_rule",
               "kind": "raise",
-              "line": 455
+              "line": 456
             },
             {
               "in": "_choice_rule",
@@ -7261,17 +7266,22 @@
               "line": 458
             },
             {
-              "in": "_offrig",
+              "in": "_choice_rule",
               "kind": "raise",
-              "line": 464
+              "line": 461
             },
             {
               "in": "_offrig",
               "kind": "raise",
-              "line": 466
+              "line": 467
+            },
+            {
+              "in": "_offrig",
+              "kind": "raise",
+              "line": 469
             }
           ],
-          "hash": "a13536a9001808e1fee900d6d082db4952e9431d789b174f6f565df8591d7dea",
+          "hash": "fedeb94b7040d04d4d33155b0651e14f1cd8b2319179c0c4df4bba9492b9e348",
           "importsFiles": [
             "src/interlock/harness/e5.py",
             "src/interlock/tasks.py"
@@ -7281,7 +7291,7 @@
             {
               "calls": [
                 {
-                  "line": 31,
+                  "line": 32,
                   "name": "read_text",
                   "target": null
                 }
@@ -9185,100 +9195,100 @@
             {
               "in": "check_tree",
               "kind": "except",
-              "line": 124
+              "line": 125
             },
             {
               "in": "check_tree",
               "kind": "except",
-              "line": 130
+              "line": 131
             },
             {
               "in": "_rows_in",
               "kind": "raise",
-              "line": 154
+              "line": 155
             },
             {
               "in": "load_jsonl",
               "kind": "except",
-              "line": 166
+              "line": 167
             },
             {
               "in": "load_jsonl",
               "kind": "raise",
-              "line": 167
+              "line": 168
             },
             {
               "in": "_check_device_lost",
               "kind": "raise",
-              "line": 219
+              "line": 220
             },
             {
               "in": "_check_device_lost",
               "kind": "raise",
-              "line": 221
+              "line": 222
             },
             {
               "in": "_reject_home_paths",
               "kind": "raise",
-              "line": 234
+              "line": 235
             },
             {
               "in": "_reject_home_paths",
               "kind": "raise",
-              "line": 236
+              "line": 237
             },
             {
               "in": "_reject_home_paths",
               "kind": "raise",
-              "line": 239
+              "line": 240
             },
             {
               "in": "_reject_home_paths",
               "kind": "raise",
-              "line": 241
+              "line": 242
             },
             {
               "in": "_check_interval",
               "kind": "raise",
-              "line": 302
+              "line": 303
             },
             {
               "in": "_check_family",
               "kind": "except",
-              "line": 309
-            },
-            {
-              "in": "_check_family",
-              "kind": "raise",
               "line": 310
             },
             {
               "in": "_check_family",
               "kind": "raise",
-              "line": 314
+              "line": 311
             },
             {
               "in": "_check_family",
               "kind": "raise",
-              "line": 317
+              "line": 315
+            },
+            {
+              "in": "_check_family",
+              "kind": "raise",
+              "line": 318
             },
             {
               "in": "_check_residency",
               "kind": "raise",
-              "line": 328
+              "line": 329
             },
             {
               "in": "_check_residency",
               "kind": "raise",
-              "line": 331
+              "line": 332
             },
             {
               "in": "_check_residency",
               "kind": "raise",
-              "line": 333
+              "line": 334
             }
           ],
-          "hash": "7e05fbc25839777ccd058ce8e54635308211005567c788db8cedd79bd95029bc",
+          "hash": "8a9b3bf9771b71b7af213e0924e9b9b44b4e0680863dd840dc715c48dd4f341d",
           "importsFiles": [
             "src/interlock/families.py"
           ],
@@ -9287,7 +9297,7 @@
             {
               "calls": [
                 {
-                  "line": 308,
+                  "line": 309,
                   "name": "family_of",
                   "target": {
                     "file": "src/interlock/families.py"
@@ -9303,19 +9313,19 @@
             {
               "calls": [
                 {
-                  "line": 159,
+                  "line": 160,
                   "name": "is_file",
                   "target": null,
                   "via": "load_jsonl"
                 },
                 {
-                  "line": 161,
+                  "line": 162,
                   "name": "read_text",
                   "target": null,
                   "via": "load_jsonl"
                 },
                 {
-                  "line": 308,
+                  "line": 309,
                   "name": "family_of",
                   "target": {
                     "file": "src/interlock/families.py"
@@ -9331,12 +9341,12 @@
             {
               "calls": [
                 {
-                  "line": 159,
+                  "line": 160,
                   "name": "is_file",
                   "target": null
                 },
                 {
-                  "line": 161,
+                  "line": 162,
                   "name": "read_text",
                   "target": null
                 }
@@ -9349,7 +9359,7 @@
             {
               "calls": [
                 {
-                  "line": 308,
+                  "line": 309,
                   "name": "family_of",
                   "target": {
                     "file": "src/interlock/families.py"
@@ -9921,7 +9931,7 @@
           "exports": [
             "main"
           ],
-          "hash": "04a84334437e10f276a461df0aef3be95554ef685a6b1a5ef19359efc7ebe322",
+          "hash": "99bb3a57d37fcd4903dd94aee7d0389236317c28aa5a9475b270ec7585baf09c",
           "importsFiles": [
             "src/interlock/harness/spec.py",
             "src/interlock/receipt.py"
@@ -10460,6 +10470,9 @@
             "test_a_run_records_the_captured_environment_on_the_row",
             "test_a_seed_without_a_target_is_passed_through",
             "test_a_slot_records_cpu_load_and_frequency",
+            "test_a_spec_that_is_not_json_is_a_spec_error",
+            "test_a_spec_that_is_not_utf8_is_a_spec_error",
+            "test_a_spec_that_is_not_yaml_is_a_spec_error",
             "test_a_target_without_a_tokenizer_is_refused_before_a_step",
             "test_a_transport_timeout_on_unload_is_the_resident_note",
             "test_a_warm_call_above_3x_cold_is_a_hang",
@@ -10502,7 +10515,7 @@
             "test_the_rejected_row_validates_and_the_table_sees_pending_replication",
             "test_the_run_path_refuses_an_edited_spec_before_any_adapter_call"
           ],
-          "hash": "5384f9a3634d994baad99091537c12b7a7c7f2f1aac956bc910aa5c65f71202e",
+          "hash": "b3789d54c30557b64c0e76945f33736a3afc3eca3d13c3804f401f5c4beaf953",
           "importOrder": [
             "src/interlock/adapters/base.py",
             "src/interlock/adapters/offrig_calibrate.py",
@@ -10939,6 +10952,7 @@
             "test_a_complete_row_validates",
             "test_a_failed_parity_guard_keeps_its_timing",
             "test_a_list_of_rows_and_a_non_object_are_both_handled",
+            "test_a_receipt_that_is_not_utf8_is_a_problem",
             "test_an_expanded_userprofile_path_is_already_refused",
             "test_check_is_green_on_an_empty_tree_and_red_on_a_bad_receipt",
             "test_check_reads_a_jsonl_table",
@@ -10955,7 +10969,7 @@
             "test_privacy_check_refuses_unc_paths",
             "test_schema_refuses_gpu_1_and_a_broken_interval"
           ],
-          "hash": "73ea8ad9de57127b3bcaaff4bba5088b4454a1a13dcbd7efca6f4dd68016ee39",
+          "hash": "244f72be96aecdb44f1afffc42640e87eff48e631a104c4aed21c2b49bb2f1a3",
           "importsFiles": [
             "src/interlock/receipt.py",
             "tests/support.py"
@@ -11914,7 +11928,7 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "1b79b6fdc2ef93d9ebeebd3b7b6d03757afebd31",
+    "commit": "a532013a20d82b7d9374b9649407ed3378c71bcd",
     "tracked": 265
   },
   "landings": [

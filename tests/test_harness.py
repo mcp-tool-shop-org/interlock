@@ -1709,6 +1709,27 @@ def test_spec_rejects_a_contract_that_is_not_pre_registered(tmp_path: Path):
         load_spec(empty)
 
 
+def test_a_spec_that_is_not_json_is_a_spec_error(tmp_path: Path):
+    path = tmp_path / "spec.json"
+    path.write_text("{", encoding="utf-8")
+    with pytest.raises(SpecError, match="spec.json"):
+        load_spec(path)
+
+
+def test_a_spec_that_is_not_yaml_is_a_spec_error(tmp_path: Path):
+    path = tmp_path / "spec.yaml"
+    path.write_text("[\n", encoding="utf-8")
+    with pytest.raises(SpecError, match="spec.yaml"):
+        load_spec(path)
+
+
+def test_a_spec_that_is_not_utf8_is_a_spec_error(tmp_path: Path):
+    path = tmp_path / "spec.yaml"
+    path.write_bytes(b"\xff\xfe{")
+    with pytest.raises(SpecError, match="spec.yaml"):
+        load_spec(path)
+
+
 def test_dry_run_plans_calibrate_and_names_the_cpu_window(tmp_path: Path):
     repo = tmp_path / "repo"
     spec_path = repo / "experiments" / "cal" / "spec.yaml"

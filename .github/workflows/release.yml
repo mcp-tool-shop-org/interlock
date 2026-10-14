@@ -114,4 +114,5 @@ jobs:
       - name: Attach the wheel and the sdist
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: gh release upload "${{ github.ref_name }}" dist/*.whl dist/*.tar.gz

@@ -111,6 +111,7 @@ def validate_row(row: dict, *, host_port: bool = False) -> None:
 def check_tree(root: Path, *, host_port: bool = False) -> list[str]:
     """Return human-readable errors. An empty tree returns an empty list.
 
+    A receipt that is not UTF-8, or is not JSON, is a problem. It is not a traceback.
     ``host_port`` also refuses a bare single-label host and port. That check
     is off by default: ``myrig:11434`` is a known limit.
     """
@@ -121,7 +122,7 @@ def check_tree(root: Path, *, host_port: bool = False) -> list[str]:
             rows = load_jsonl(path) if path.suffix == ".jsonl" else _rows_in(
                 json.loads(path.read_text(encoding="utf-8")), path
             )
-        except (json.JSONDecodeError, ReceiptError) as exc:
+        except (json.JSONDecodeError, UnicodeDecodeError, ReceiptError) as exc:
             problems.append(f"{path}: {exc}")
             continue
         for index, row in enumerate(rows):

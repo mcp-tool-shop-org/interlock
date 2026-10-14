@@ -6,9 +6,11 @@ goes to ``table/routing.jsonl`` (the line ``interlock check`` reads through
 path; a ``*.run.json`` marker is not a receipt). The other half goes to a
 spec file, ``.json`` or ``.yaml``, and ``load_spec`` reads it.
 
-A refusal is the expected outcome. Only an exception outside that path fails
-the run. This module is named ``fuzz_*`` so pytest does not collect it, and
-it imports atheris only when run as a program.
+A refusal is the expected outcome: ``check_tree`` returns its problems, and
+``load_spec`` raises ``SpecError``. ``ReceiptError`` is the only other
+exception that path may raise. Anything else fails the run. This module is
+named ``fuzz_*`` so pytest does not collect it, and it imports atheris only
+when run as a program.
 """
 
 from __future__ import annotations
@@ -22,19 +24,16 @@ def main() -> None:
     import atheris
 
     with atheris.instrument_imports():
-        import json
         import tempfile
         from pathlib import Path
-
-        import yaml
 
         from interlock.harness.spec import SpecError, load_spec
         from interlock.receipt import ReceiptError, check_tree
 
-    def refuse(read, kinds: tuple[type[BaseException], ...]) -> None:
+    def refuse(read, kind: type[BaseException]) -> None:
         try:
             read()
-        except kinds:
+        except kind:
             return
 
     def test_one_input(data: bytes) -> None:
@@ -50,16 +49,10 @@ def main() -> None:
             (root / "table").mkdir()
             (root / "table" / "routing.jsonl").write_bytes(receipt)
             (root / "receipts" / "row.json").write_bytes(receipt)
-            refuse(
-                lambda: check_tree(root),
-                (ReceiptError, json.JSONDecodeError, UnicodeDecodeError),
-            )
+            refuse(lambda: check_tree(root), ReceiptError)
             spec_path = root / f"spec{suffix}"
             spec_path.write_bytes(spec_bytes)
-            refuse(
-                lambda: load_spec(spec_path),
-                (SpecError, json.JSONDecodeError, yaml.YAMLError, UnicodeDecodeError),
-            )
+            refuse(lambda: load_spec(spec_path), SpecError)
 
     atheris.Setup(sys.argv, atheris.instrument_func(test_one_input))
     atheris.Fuzz()
