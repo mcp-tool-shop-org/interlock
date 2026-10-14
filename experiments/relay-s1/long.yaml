@@ -29,7 +29,7 @@ needs:
   cpu_window: false
 dataset:
   name: relay-s1-long-prompt
-  seed: "The switchyard counts the same cars on every pass. "
+  seed: "The switchyard counts the same cars on every pass. AMU_CANARY_PROMPT_7c1e "
   target_tokens: 32768
   rule: >
     Repeat the seed to 32,768 tokens by the served model's count. Each call starts with its own number
@@ -40,6 +40,7 @@ metrics:
   - prompt_tok_s
   - dedicated_mib
 stop_rules:
+  - The seed carries the canary AMU_CANARY_PROMPT_7c1e. It must not appear in any trace (H3).
   - A failed step stops the sequence. A failed step is inconclusive, not a pass.
   - Order is A-B-A per round. A is untraced, B is the same arm with tracing on. Cold is once per arm and stays out
     of the comparison.

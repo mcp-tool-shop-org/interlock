@@ -2,19 +2,21 @@
 
     uv run --extra relay python scripts/relay_s1.py --grant <id> --prefix relay-s1-<date> [--steps ...]
 
-Steps, in order, each refusing before any model call when the preflight fails:
+Before every step the driver unloads the card, waits for it to settle at the idle baseline, and runs the full
+preflight. Any refusal stops the run before a model call. Each step runs in its own process, with a VRAM watch
+that writes the step's stop file over 30,500 MiB (interleaved runs have no VRAM ceiling of their own).
 
 - ``decode``, ``long``, ``unload``, ``companion``: ``interlock run experiments/relay-s1/<step>.yaml --trace relay``,
-  in this process, under a counter of the HTTP requests the Ollama adapter sends (below the hook: H1's ground truth).
-  Supervisor health checks aren't counted, by the design's definition. Each step writes ``logs/<id>.http.json``.
-- ``stop``: the decode spec in a child process, stopped through ``receipts/<id>.stop`` after a delay. The run's
-  watcher ends that process with ``os._exit``, so it can't run in this one. Exit 77 is the expected end.
+  under a counter of the HTTP requests the Ollama adapter sends (below the hook: H1's ground truth). Supervisor
+  health checks aren't counted, by the design's definition. Each step writes ``logs/<id>.http.json``.
+- ``stop``: the decode spec, stopped through ``receipts/<id>.stop`` once its trace holds 10 model calls. It passes
+  only on the operator-stop exit, 77.
 - ``import``: the process-level import check. There are 15 triples of child processes, in the order no import,
   idle import, no import. Each child makes 1 warm-up and 3 measured calls with the decode spec's untraced arm, and
   the idle-import child imports ``nemo_relay`` first. The output is ``logs/<prefix>-import.json``.
 
-Afterwards ``interlock check`` runs, and ``logs/<prefix>.driver.json`` records the preflight, every step's exit,
-the check, and the host, user and home strings that the analysis must not find in a trace. The analysis is
+At the end the card is unloaded, ``interlock check`` runs, and ``logs/<prefix>.driver.json`` records the preflight,
+every step, the check, and the host, user and home strings the analysis must not find in a trace. The analysis is
 ``experiments/interlock-relay/stage1/analyze.py`` in mcp-tool-shop-org/rnd, frozen before the run.
 """
 
@@ -40,7 +42,9 @@ RELAY_VERSION = "0.10.1"
 OLLAMA_VERSION = "0.35.1"
 IDLE_VRAM_MIB = 2400
 IMPORT_TRIPLES = 15
-STOP_AFTER_S = 60.0
+STOP_AFTER_SPANS = 10
+VRAM_CEILING_MIB = 30500
+STEP_TIMEOUT_S = 3600
 EXIT_OPERATOR_STOP = 77
 
 
@@ -106,6 +110,15 @@ class Seams:
         try:
             conn.request("GET", path)
             return json.loads(conn.getresponse().read().decode("utf-8"))
+        finally:
+            conn.close()
+
+    def unload(self, model: str) -> None:
+        conn = http.client.HTTPConnection("127.0.0.1", 11434, timeout=60)
+        try:
+            body = json.dumps({"model": model, "prompt": "", "stream": False, "keep_alive": 0})
+            conn.request("POST", "/api/generate", body=body, headers={"Content-Type": "application/json"})
+            conn.getresponse().read()
         finally:
             conn.close()
 
@@ -178,13 +191,17 @@ def preflight(root: Path, grant: str | None, seams: Seams, *, first: bool = True
 # -- the steps --------------------------------------------------------------------------------------------------------
 
 
-def run_step(step: str, prefix: str, grant: str, root: Path, main=None) -> dict:
-    """One traced interlock run in this process, under the request counter."""
+def child_run(step: str, prefix: str, grant: str, root: Path, main=None) -> int:
+    """In the step's own process: one traced interlock run under the request counter, then the count is written.
+
+    Each step is its own process so the driver survives the run watcher's os._exit (the stop step, a VRAM breach)
+    and can unload and check the card between steps (Argon stage 1 review, B2)."""
 
     if main is None:
         from interlock.cli import main
+    spec = "decode" if step == "stop" else step
     run_id = f"{prefix}-{step}"
-    argv = ["run", str(SPEC_DIR / f"{step}.yaml"), "--root", str(root), "--grant", grant, "--trace", "relay",
+    argv = ["run", str(SPEC_DIR / f"{spec}.yaml"), "--root", str(root), "--grant", grant, "--trace", "relay",
             "--run-id", run_id]
     with count_adapter_requests() as counts:
         code = main(argv)
@@ -192,23 +209,132 @@ def run_step(step: str, prefix: str, grant: str, root: Path, main=None) -> dict:
     record = {"run_id": run_id, "exit": code, "adapter_requests": sum(counts.values()), "by_path": counts}
     (root / "logs" / f"{run_id}.http.json").write_text(json.dumps(record, indent=1, sort_keys=True) + "\n",
                                                        encoding="utf-8")
-    return record
+    return code
 
 
-def run_stop(prefix: str, grant: str, root: Path, *, after_s: float = STOP_AFTER_S, popen=subprocess.Popen,
-             sleep=time.sleep) -> dict:
-    """The decode spec in a child process, stopped through its stop file."""
+class VramWatch:
+    """Reads the card once a second while a step runs. Over the ceiling, it writes the step's stop file once, so the
+    run's own watcher ends it cleanly. Interleaved runs have no VRAM ceiling of their own."""
+
+    def __init__(self, seams: Seams, stop_file: Path | None, *, ceiling_mib: int = VRAM_CEILING_MIB,
+                 every_s: float = 1.0):
+        self.seams, self.stop_file, self.ceiling, self.every = seams, stop_file, ceiling_mib, every_s
+        self.peak = 0
+        self.breached = False
+        self._done = threading.Event()
+        self._thread = threading.Thread(target=self._loop, name="relay-s1-vram", daemon=True)
+
+    def _loop(self) -> None:
+        while not self._done.is_set():
+            self.read_once()
+            self._done.wait(self.every)
+
+    def read_once(self) -> None:
+        try:
+            used = int(self.seams.gpu()["used_mib"])
+        except Exception:  # a failed read is skipped; the next one counts
+            return
+        self.peak = max(self.peak, used)
+        if used > self.ceiling and not self.breached:
+            self.breached = True
+            if self.stop_file is not None:
+                self.stop_file.parent.mkdir(exist_ok=True)
+                self.stop_file.write_text(f"VRAM {used} MiB over {self.ceiling}\n", encoding="utf-8")
+
+    def __enter__(self) -> VramWatch:
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self._done.set()
+        self._thread.join(timeout=5)
+
+
+def _spawn(step: str, prefix: str, grant: str, root: Path, popen):
+    argv = [sys.executable, str(Path(__file__).resolve()), "--child-run", step, "--prefix", prefix, "--grant", grant,
+            "--root", str(root)]
+    return popen(argv, cwd=root)
+
+
+def run_step(step: str, prefix: str, grant: str, root: Path, *, seams: Seams, popen=subprocess.Popen,
+             watch=VramWatch) -> dict:
+    """One traced run in its own process, watched for VRAM."""
+
+    run_id = f"{prefix}-{step}"
+    proc = _spawn(step, prefix, grant, root, popen)
+    with watch(seams, root / "receipts" / f"{run_id}.stop") as card:
+        code = proc.wait(timeout=STEP_TIMEOUT_S)
+    return {"run_id": run_id, "exit": code, "vram_peak_mib": card.peak, "vram_breach": card.breached}
+
+
+def spans_started(trace: Path) -> int:
+    """How many model-call spans the trace has opened so far."""
+
+    try:
+        lines = trace.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return 0
+    count = 0
+    for line in lines:
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue  # a line still being written
+        count += event.get("category") == "llm" and event.get("scope_category") == "start"
+    return count
+
+
+def run_stop(prefix: str, grant: str, root: Path, *, seams: Seams, popen=subprocess.Popen, sleep=time.sleep,
+             spans: int = STOP_AFTER_SPANS, timeout_s: float = 300.0, watch=VramWatch) -> dict:
+    """The decode spec in its own process, stopped through its stop file once the trace holds ``spans`` model calls.
+
+    Waiting on the trace, not a clock, means the stop lands mid-run however fast the card is (Argon, B3). The step
+    passes only on the operator-stop exit, 77."""
 
     run_id = f"{prefix}-stop"
-    argv = [sys.executable, "-m", "interlock", "run", str(SPEC_DIR / "decode.yaml"), "--root", str(root), "--grant",
-            grant, "--trace", "relay", "--run-id", run_id]
-    proc = popen(argv, cwd=root)
-    sleep(after_s)
     stop = root / "receipts" / f"{run_id}.stop"
-    stop.parent.mkdir(exist_ok=True)
-    stop.write_text("interlock-relay stage 1: the stop-file run\n", encoding="utf-8")
-    code = proc.wait(timeout=600)
-    return {"run_id": run_id, "exit": code, "expected_exit": EXIT_OPERATOR_STOP, "stopped": code == EXIT_OPERATOR_STOP}
+    trace = root / "logs" / f"{run_id}.atof.jsonl"
+    proc = _spawn("stop", prefix, grant, root, popen)
+    with watch(seams, stop) as card:
+        waited = 0.0
+        while spans_started(trace) < spans and waited < timeout_s and proc.poll() is None:
+            sleep(0.5)
+            waited += 0.5
+        written = proc.poll() is None
+        seen = spans_started(trace)
+        if written:
+            stop.parent.mkdir(exist_ok=True)
+            stop.write_text("interlock-relay stage 1: the stop-file run\n", encoding="utf-8")
+        code = proc.wait(timeout=STEP_TIMEOUT_S)
+    return {"run_id": run_id, "exit": code, "expected_exit": EXIT_OPERATOR_STOP, "stop_written": written,
+            "spans_before_stop": seen, "stopped": written and code == EXIT_OPERATOR_STOP, "vram_peak_mib": card.peak}
+
+
+def unload_all(seams: Seams) -> list[str]:
+    """Unload every model on the card (keep_alive 0). The stop step's os._exit and the import children leave the
+    model loaded."""
+
+    names = [m.get("name") or m.get("model") for m in (seams.ollama("/api/ps") or {}).get("models") or []]
+    for name in names:
+        if name:
+            seams.unload(name)
+    return [n for n in names if n]
+
+
+def wait_idle(seams: Seams, *, sleep=time.sleep, timeout_s: float = 90.0) -> float:
+    """Wait for an empty card at the idle baseline. A card that doesn't settle refuses the next step."""
+
+    waited = 0.0
+    while True:
+        loaded = (seams.ollama("/api/ps") or {}).get("models") or []
+        used = seams.gpu()["used_mib"]
+        if not loaded and used <= IDLE_VRAM_MIB:
+            return waited
+        if waited >= timeout_s:
+            raise PreflightError(f"REFUSED: the card did not settle in {timeout_s:.0f}s ({len(loaded)} loaded, "
+                                 f"{used} MiB)")
+        sleep(1.0)
+        waited += 1.0
 
 
 CHILD = r'''
@@ -275,38 +401,55 @@ def run_import(prefix: str, root: Path, *, triples: int = IMPORT_TRIPLES, child=
 # -- the whole run ----------------------------------------------------------------------------------------------------
 
 
-def drive(root: Path, grant: str, prefix: str, steps: tuple[str, ...], *, seams: Seams | None = None, main=None,
-          stop=run_stop, imports=run_import) -> dict:
+def drive(root: Path, grant: str, prefix: str, steps: tuple[str, ...], *, seams: Seams | None = None,
+          step=run_step, stop=run_stop, imports=run_import, check=None, sleep=time.sleep) -> dict:
     seams = seams or Seams()
-    if main is None:
-        from interlock.cli import main
+    if check is None:
+        def check():
+            from interlock.cli import main
+
+            return main(["check", "--root", str(root)]) == 0
     out: dict = {"prefix": prefix, "steps": {}, "needles": {
         "host": socket.gethostname(), "user": os.environ.get("USERNAME") or os.environ.get("USER") or "",
         "home": str(Path.home())}}
     out["preflight"] = preflight(root, grant, seams)
     try:
-        for step in steps:
-            if step not in STEPS:
-                raise PreflightError(f"REFUSED: unknown step {step}")
-            if step != STEPS[0]:
+        for index, name in enumerate(steps):
+            if name not in STEPS:
+                raise PreflightError(f"REFUSED: unknown step {name}")
+            if index:
+                unload_all(seams)
+                wait_idle(seams, sleep=sleep)
                 preflight(root, grant, seams, first=False)  # the card is idle again; nothing else changed
-            if step == "stop":
-                out["steps"][step] = stop(prefix, grant, root)
-            elif step == "import":
+            if name == "stop":
+                out["steps"][name] = result = stop(prefix, grant, root, seams=seams)
+                if not result["stopped"]:
+                    raise PreflightError(f"REFUSED: the stop run ended {result['exit']}, not by its stop file (77)")
+            elif name == "import":
                 def recheck():
-                    age = seams.heartbeat_age_s()
                     from interlock.guards import HEARTBEAT_MAX_AGE_S
 
+                    age = seams.heartbeat_age_s()
                     if age > HEARTBEAT_MAX_AGE_S:
                         raise PreflightError(f"REFUSED: the watchdog heartbeat is {age:.0f}s old")
 
-                out["steps"][step] = imports(prefix, root, between=recheck)
+                with VramWatch(seams, None) as card:
+                    out["steps"][name] = imports(prefix, root, between=recheck)
+                out["steps"][name]["vram_peak_mib"] = card.peak
+                if card.breached:
+                    raise PreflightError(f"REFUSED: VRAM passed {VRAM_CEILING_MIB} MiB in the import check")
             else:
-                out["steps"][step] = run_step(step, prefix, grant, root, main=main)
-                if out["steps"][step]["exit"] != 0:
-                    raise PreflightError(f"REFUSED: step {step} exited {out['steps'][step]['exit']}; the run stops")
+                out["steps"][name] = result = step(name, prefix, grant, root, seams=seams)
+                if result.get("vram_breach"):
+                    raise PreflightError(f"REFUSED: VRAM passed {VRAM_CEILING_MIB} MiB in {name}; the run stopped")
+                if result["exit"] != 0:
+                    raise PreflightError(f"REFUSED: step {name} exited {result['exit']}; the run stops")
     finally:
-        out["check_passed"] = main(["check", "--root", str(root)]) == 0
+        try:
+            out["unloaded_at_end"] = unload_all(seams)
+        except Exception as exc:  # the record is still written
+            out["unloaded_at_end"] = f"failed: {exc}"
+        out["check_passed"] = check()
         (root / "logs").mkdir(exist_ok=True)
         (root / "logs" / f"{prefix}.driver.json").write_text(json.dumps(out, indent=1, sort_keys=True) + "\n",
                                                              encoding="utf-8")
@@ -319,7 +462,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--prefix", required=True)
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--steps", default=",".join(STEPS))
+    parser.add_argument("--child-run", choices=("decode", "long", "unload", "companion", "stop"),
+                        help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
+    if args.child_run:
+        return child_run(args.child_run, args.prefix, args.grant, args.root.resolve())
     try:
         drive(args.root.resolve(), args.grant, args.prefix, tuple(s for s in args.steps.split(",") if s))
     except PreflightError as exc:

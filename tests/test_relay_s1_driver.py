@@ -27,6 +27,7 @@ class Seams(relay_s1.Seams):
         }
         self.state.update(changes)
         self.status_args = []
+        self.unloaded = []
 
     def environ(self):
         return self.state["environ"]
@@ -50,6 +51,11 @@ class Seams(relay_s1.Seams):
 
     def gpu(self):
         return self.state["gpu"]
+
+    def unload(self, model):
+        self.unloaded.append(model)
+        self.state["/api/ps"] = {"models": []}
+        self.state["gpu"] = {"used_mib": 2008, "compute_apps": 0}
 
     def listeners(self, port):
         return self.state["listeners"]
@@ -111,31 +117,102 @@ def test_the_counter_sees_only_requests_sent_from_the_adapter(tmp_path: Path, mo
     assert http.client.HTTPConnection.request.__name__ == "<lambda>"  # restored after the block
 
 
-def test_a_step_runs_the_spec_traced_and_records_the_count(tmp_path: Path):
+def test_the_child_run_runs_the_spec_traced_and_records_the_count(tmp_path: Path):
     seen = []
 
     def main(argv):
         seen.append(argv)
         return 0
 
-    record = relay_s1.run_step("decode", "p", "g-1", tmp_path, main=main)
+    assert relay_s1.child_run("decode", "p", "g-1", tmp_path, main=main) == 0
     assert seen == [["run", str(Path("experiments/relay-s1/decode.yaml")), "--root", str(tmp_path), "--grant", "g-1",
                      "--trace", "relay", "--run-id", "p-decode"]]
-    assert record["exit"] == 0
-    assert json.loads((tmp_path / "logs" / "p-decode.http.json").read_text(encoding="utf-8"))["run_id"] == "p-decode"
+    record = json.loads((tmp_path / "logs" / "p-decode.http.json").read_text(encoding="utf-8"))
+    assert record["run_id"] == "p-decode" and record["adapter_requests"] == 0
+    relay_s1.child_run("stop", "p", "g", tmp_path, main=main)
+    assert seen[-1][1] == str(Path("experiments/relay-s1/decode.yaml")) and seen[-1][-1] == "p-stop"
 
 
-def test_the_stop_step_writes_the_stop_file_and_expects_exit_77(tmp_path: Path):
-    class Proc:
-        def wait(self, timeout):
-            assert (tmp_path / "receipts" / "p-stop.stop").is_file()
-            return 77
+class Proc:
+    def __init__(self, code=0, *, until_stop=None):
+        self.code, self.until_stop = code, until_stop
 
+    def poll(self):
+        if self.until_stop is not None and not self.until_stop.is_file():
+            return None
+        return self.code
+
+    def wait(self, timeout):
+        return self.code
+
+
+class NoWatch:
+    def __init__(self, seams, stop_file):
+        self.peak, self.breached = 0, False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return None
+
+
+def test_a_step_runs_in_its_own_process_under_the_vram_watch(tmp_path: Path):
     started = []
-    record = relay_s1.run_stop("p", "g", tmp_path, after_s=5, popen=lambda argv, cwd: started.append(argv) or Proc(),
-                               sleep=lambda s: None)
-    assert record["stopped"] is True
-    assert started[0][1:3] == ["-m", "interlock"] and "--trace" in started[0]
+    record = relay_s1.run_step("long", "p", "g", tmp_path, seams=Seams(),
+                               popen=lambda argv, cwd: started.append(argv) or Proc(0), watch=NoWatch)
+    assert record == {"run_id": "p-long", "exit": 0, "vram_peak_mib": 0, "vram_breach": False}
+    assert started[0][2:4] == ["--child-run", "long"] and started[0][1].endswith("relay_s1.py")
+
+
+def _spans(path: Path, n: int) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [json.dumps({"category": "llm", "scope_category": "start", "uuid": str(i)}) for i in range(n)]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def test_the_stop_step_waits_for_spans_then_stops_and_expects_77(tmp_path: Path):
+    stop = tmp_path / "receipts" / "p-stop.stop"
+    trace = tmp_path / "logs" / "p-stop.atof.jsonl"
+    ticks = []
+
+    def sleep(seconds):
+        ticks.append(seconds)
+        _spans(trace, 4 * len(ticks))  # the run traces 4 calls per tick
+
+    record = relay_s1.run_stop("p", "g", tmp_path, seams=Seams(), popen=lambda argv, cwd: Proc(77, until_stop=stop),
+                               sleep=sleep, watch=NoWatch)
+    assert record["stopped"] is True and record["stop_written"] is True
+    assert record["spans_before_stop"] >= 10 and stop.is_file()
+
+
+def test_a_stop_run_that_finishes_first_does_not_pass(tmp_path: Path):
+    record = relay_s1.run_stop("p", "g", tmp_path, seams=Seams(), popen=lambda argv, cwd: Proc(0),
+                               sleep=lambda s: None, watch=NoWatch)
+    assert record["stopped"] is False and record["stop_written"] is False
+    assert not (tmp_path / "receipts" / "p-stop.stop").exists()
+
+
+def test_the_vram_watch_writes_the_stop_file_once_over_the_ceiling(tmp_path: Path):
+    stop = tmp_path / "receipts" / "x.stop"
+    seams = Seams(gpu={"used_mib": 31_000, "compute_apps": 1})
+    watch = relay_s1.VramWatch(seams, stop)
+    watch.read_once()
+    first = stop.read_text(encoding="utf-8")
+    watch.read_once()
+    assert watch.breached and watch.peak == 31_000 and "31000" in first
+    calm = relay_s1.VramWatch(Seams(), tmp_path / "receipts" / "y.stop")
+    calm.read_once()
+    assert not calm.breached and not (tmp_path / "receipts" / "y.stop").exists()
+
+
+def test_unload_all_and_wait_idle(tmp_path: Path):
+    seams = Seams(**{"/api/ps": {"models": [{"name": "qwen3:8b"}]}, "gpu": {"used_mib": 15000, "compute_apps": 1}})
+    assert relay_s1.unload_all(seams) == ["qwen3:8b"] and seams.unloaded == ["qwen3:8b"]
+    assert relay_s1.wait_idle(seams, sleep=lambda s: None) == 0.0
+    stuck = Seams(**{"/api/ps": {"models": [{"name": "m"}]}})
+    with pytest.raises(relay_s1.PreflightError, match="did not settle"):
+        relay_s1.wait_idle(stuck, sleep=lambda s: None, timeout_s=3)
 
 
 def test_the_import_check_runs_fifteen_triples_in_order(tmp_path: Path):
@@ -153,23 +230,55 @@ def test_the_import_check_runs_fifteen_triples_in_order(tmp_path: Path):
     assert set(record["triples"][0]) == {"no_import_before", "idle_import", "no_import_after"}
 
 
-def test_a_failed_step_stops_the_run_and_the_record_is_still_written(tmp_path: Path):
-    calls = []
+def _drive(tmp_path, steps, *, seams=None, step=None, stop=None):
+    checks = []
+    out = relay_s1.drive(
+        tmp_path, "g", "p", steps, seams=seams or Seams(),
+        step=step or (lambda name, prefix, grant, root, seams: {"run_id": f"p-{name}", "exit": 0}),
+        stop=stop or (lambda prefix, grant, root, seams: {"stopped": True, "exit": 77}),
+        imports=lambda prefix, root, between: {"triples": 15},
+        check=lambda: checks.append(1) or True, sleep=lambda s: None)
+    return out, checks
 
-    def main(argv):
-        calls.append(argv[0])
-        return 1 if argv[0] == "run" else 0
+
+def test_between_steps_the_card_is_unloaded_settled_and_preflighted(tmp_path: Path):
+    seams = Seams()
+    out, checks = _drive(tmp_path, ("decode", "stop", "import"), seams=seams)
+    assert list(out["steps"]) == ["decode", "stop", "import"]
+    assert len(seams.status_args) == 3  # the first preflight, then one before each later step
+    assert checks == [1]
+
+
+def test_a_stop_step_that_did_not_stop_fails_the_run(tmp_path: Path):
+    with pytest.raises(relay_s1.PreflightError, match="not by its stop file"):
+        _drive(tmp_path, ("stop", "import"), stop=lambda prefix, grant, root, seams: {"stopped": False, "exit": 0})
+    driver = json.loads((tmp_path / "logs" / "p.driver.json").read_text(encoding="utf-8"))
+    assert "import" not in driver["steps"]
+
+
+def test_a_vram_breach_fails_the_run(tmp_path: Path):
+    with pytest.raises(relay_s1.PreflightError, match="VRAM passed"):
+        _drive(tmp_path, ("companion",),
+               step=lambda name, prefix, grant, root, seams: {"exit": 77, "vram_breach": True})
+
+
+def test_a_failed_step_stops_the_run_and_the_record_is_still_written(tmp_path: Path):
+    ran = []
+
+    def step(name, prefix, grant, root, seams):
+        ran.append(name)
+        return {"run_id": f"p-{name}", "exit": 1}
 
     with pytest.raises(relay_s1.PreflightError, match="decode exited 1"):
-        relay_s1.drive(tmp_path, "g", "p", ("decode", "long"), seams=Seams(), main=main)
-    assert calls == ["run", "check"]  # long never ran; the check ran in the finally
+        _drive(tmp_path, ("decode", "long"), step=step)
+    assert ran == ["decode"]
     driver = json.loads((tmp_path / "logs" / "p.driver.json").read_text(encoding="utf-8"))
     assert driver["check_passed"] is True and "decode" in driver["steps"] and "long" not in driver["steps"]
     assert set(driver["needles"]) == {"host", "user", "home"}
 
 
 def test_a_refused_preflight_runs_nothing(tmp_path: Path):
-    calls = []
+    ran = []
     with pytest.raises(relay_s1.PreflightError):
-        relay_s1.drive(tmp_path, "g", "p", ("decode",), seams=Seams(listeners=0), main=lambda a: calls.append(a) or 0)
-    assert calls == []
+        _drive(tmp_path, ("decode",), seams=Seams(listeners=0), step=lambda *a, **k: ran.append(1))
+    assert ran == []

@@ -111,6 +111,7 @@ arms:
     num_ctx: 4096
     batch: null
     prompt: "The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. AMU_CANARY_PROMPT_7c1e"
+    trace: false
     measure: decode_tok_s
 pairs:
   - id: companion-traced
