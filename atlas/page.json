@@ -34,51 +34,30 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 1,
-      "changed": 54,
+      "added": 2,
+      "changed": 24,
       "moved": 0,
-      "parts": 5,
+      "parts": 4,
       "removed": 0
     },
     "items": [
       {
-        "kind": "landing",
-        "sentence": "src/interlock/adapters/openvino.py is now read by pyproject.toml.",
+        "kind": "door",
+        "sentence": "CI now also runs tests/fuzz_receipts.py.",
         "subjects": [
-          "src/interlock/adapters/openvino.py",
-          "pyproject.toml"
+          ".github/workflows/ci.yml",
+          "tests/fuzz_receipts.py"
         ]
-      },
-      {
-        "kind": "landing",
-        "sentence": "src/interlock/harness/e4b.py is now read by pyproject.toml.",
-        "subjects": [
-          "src/interlock/harness/e4b.py",
-          "pyproject.toml"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": "src/interlock/harness/environment.py is now read by pyproject.toml.",
-        "subjects": [
-          "src/interlock/harness/environment.py",
-          "pyproject.toml"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": "And 14 more new writers and readers of places.",
-        "subjects": []
       },
       {
         "kind": "counts",
-        "sentence": "1 file added and 54 changed content, across 5 parts.",
+        "sentence": "2 files added and 24 changed content, across 4 parts.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "2e4b1b53e46246469a46f10136ce19570307f932",
-      "generatedAt": "2026-10-13T22:47:49.564Z"
+      "commit": "e4aba2d86f190fa2c9c97c469a0242b3e98d1fd9",
+      "generatedAt": "2026-10-14T00:21:11.490Z"
     },
     "unchanged": false
   },
@@ -165,9 +144,9 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 9 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 1,
-  "commit": "e4aba2d86f190fa2c9c97c469a0242b3e98d1fd9",
+  "commit": "1b79b6fdc2ef93d9ebeebd3b7b6d03757afebd31",
   "defaultBranch": "main",
-  "derived": "10 parts, mostly Python (87 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
+  "derived": "10 parts, mostly Python (88 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
   "doors": [
     {
       "checks": [],
@@ -182,7 +161,7 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 36
+          "files": 37
         },
         {
           "boundary": "scripts",
@@ -196,9 +175,10 @@
         }
       ],
       "runs": [
+        "tests/fuzz_receipts.py",
         "tests/"
       ],
-      "runsCount": 1,
+      "runsCount": 2,
       "runsMore": 0,
       "sends": [
         "uploads coverage to Codecov"
@@ -232,7 +212,8 @@
       "runsCount": 0,
       "runsMore": 0,
       "sends": [
-        "publishes to PyPI"
+        "publishes to PyPI",
+        "uploads dist/*.tar.gz and dist/*.whl to the release"
       ],
       "stages": [],
       "triggers": [
@@ -327,7 +308,7 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-14T00:21:11.490Z",
+  "generatedAt": "2026-10-14T04:07:42.403Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "3 writes and 4 reads use paths built at run time and are not named here.",
@@ -362,10 +343,10 @@
   "startReason": "This path follows interlock (a command people run) from its entry, since CI runs only tests.",
   "summary": "interlock routes each job to a model, engine and device from a receipt-backed table.",
   "summaryFrom": "person",
-  "testFiles": 59,
+  "testFiles": 60,
   "testedBy": {
     "scripts": 1,
-    "src": 33
+    "src": 34
   },
   "unnamedWrites": 3,
   "unread": [],
