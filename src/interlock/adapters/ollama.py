@@ -207,8 +207,14 @@ def default_transport(
     body: dict | None,
     timeout: float | None = None,
     flight: _Flight | None = None,
+    *,
+    on_send=None,
 ) -> dict:
     """POST or GET over ``http.client``, armed before the response is read.
+
+    ``on_send``, when given, is called with the number of body bytes about to
+    go out, so a tracer can record the request size without serialising the
+    body again (amendment v3.2).
 
     The closer is armed before ``getresponse``. During a non-streaming
     generate that is the whole load: the server sends no bytes until it is
@@ -224,6 +230,8 @@ def default_transport(
     if parts.query:
         path = f"{path}?{parts.query}"
     data = None if body is None else json.dumps(body).encode("utf-8")
+    if on_send is not None:
+        on_send(0 if data is None else len(data))
     headers = {"Content-Type": "application/json"} if data is not None else {}
     conn = http.client.HTTPConnection(parts.hostname, parts.port or 80, timeout=timeout)
     ticket = None
@@ -247,6 +255,9 @@ def default_transport(
         except OSError:
             pass
     return payload
+
+
+default_transport.reports_request_bytes = True  # the tracer passes on_send only to a transport that says so
 
 
 def _wait_for_reply(conn: http.client.HTTPConnection, ticket: _Ticket, timeout: float | None) -> None:
@@ -293,10 +304,13 @@ class OllamaAdapter:
         self._default_transport = transport is None
         self._flight = _Flight()
         if transport is None:
-            def bound(method: str, url: str, body: dict | None, timeout: float | None = None) -> dict:
+            def bound(
+                method: str, url: str, body: dict | None, timeout: float | None = None, *, on_send=None
+            ) -> dict:
                 chosen = self.timeout if timeout is None else timeout
-                return default_transport(method, url, body, timeout=chosen, flight=self._flight)
+                return default_transport(method, url, body, timeout=chosen, flight=self._flight, on_send=on_send)
 
+            bound.reports_request_bytes = True
             self.transport = bound
         else:
             self.transport = transport

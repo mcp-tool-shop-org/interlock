@@ -199,7 +199,10 @@ def test_a_timeout_with_no_message_is_still_a_timeout(tmp_path: Path):
     assert tracer.counts_for("_run")["tags"]["timeouts"] == 1
 
 
-def test_the_request_size_is_measured_only_for_relay(tmp_path: Path):
+def test_the_request_size_comes_from_the_transport_and_is_known_by_the_end(tmp_path: Path):
+    """A transport that reports its bytes (``reports_request_bytes``) sizes the request once, as it sends; any
+    other transport leaves the size unknown (None). Both sinks carry it on the call's end (amendment v3.2)."""
+
     seen = []
 
     class Sink:
@@ -209,10 +212,10 @@ def test_the_request_size_is_measured_only_for_relay(tmp_path: Path):
             pass
 
         def start(self, record):
-            seen.append(record.request_bytes)
+            pass
 
         def end(self, record):
-            pass
+            seen.append(record.request_bytes)
 
         def mark(self, *args):
             pass
@@ -223,12 +226,22 @@ def test_the_request_size_is_measured_only_for_relay(tmp_path: Path):
         def close(self, end_ns=None):
             pass
 
+    def reporting(method, url, body, *, on_send=None):
+        on_send(0 if body is None else len(json.dumps(body).encode("utf-8")))
+        return {}
+
+    reporting.reports_request_bytes = True
     body = {"model": "m", "prompt": "x" * 100}
     for mode in ("events", "relay"):
         tracer = Tracer(root=tmp_path, run_id=mode, mode=mode, relay_factory=Sink)
         with tracer:
+            traced_transport(reporting, tracer)("POST", URL + "/api/generate", body)
+            traced_transport(reporting, tracer)("GET", URL + "/api/ps", None)
             traced_transport(lambda *a, **k: {}, tracer)("POST", URL + "/api/generate", body)
-    assert seen == [len(json.dumps(body))]
+    expected = [len(json.dumps(body).encode("utf-8")), 0, None]
+    assert seen == expected
+    lines = (tmp_path / "logs" / "events.events.jsonl").read_text(encoding="utf-8").splitlines()
+    assert [json.loads(x)["request_bytes"] for x in lines] == expected
 
 
 def test_an_openvino_worker_fault_is_an_exception_not_ok(tmp_path: Path):

@@ -459,7 +459,7 @@ def run_interleaved(
     hooks = watch or WatchHooks()
     per_arm_trace = any("trace" in arm for arm in spec.get("arms") or [])
     if per_arm_trace and tracer is not None:
-        tracer.set_emitting(False)  # only a traced arm's slots reach the trace; nothing between slots does
+        tracer.set_per_arm(True)  # only a traced arm's slots reach the trace; nothing between slots does
     barrier_ms = spec.get("trace_barrier_ms") or 0
     salts: dict[str, int] = {}
     tracker = CompileTracker(hooks.clock)
@@ -1040,6 +1040,19 @@ def run_interleaved(
                                 {"slot_start": cpu_start, "slot_end": cpu_end},
                                 _finish_slot_probe(probe, adapter),
                             )
+                            # The companion stops inside its slot, in both arms alike, so its unload is the slot's
+                            # last call and never a span outside one (amendment v3.2).
+                            if started and companion is not None:
+                                started = False
+                                _session(
+                                    adapters,
+                                    companion,
+                                    "stop",
+                                    spec,
+                                    spec_rel,
+                                    cache_dirs.get(companion["id"]),
+                                    prompt_cache,
+                                )
                             if tracer is not None:
                                 slot_calls = tracer.end_slot()
                                 sample["call_ids"] = slot_calls["call_ids"]
@@ -1107,11 +1120,10 @@ def run_interleaved(
                             prompt_cache,
                         )
                     # A failed or refused slot still ends here, so recovery calls between slots are not
-                    # attributed to it (Argon I1). The success path has already taken its call ids.
+                    # attributed to it (Argon I1). The success path has already taken its call ids. end_slot is
+                    # also what turns per-arm emission off (amendment v3.2).
                     if tracer is not None and slot_calls is None:
                         tracer.end_slot()
-                    if tracer is not None and per_arm_trace:
-                        tracer.set_emitting(False)
                     # Stage 1's barrier, after every slot in both arms: the trace flushed, a collection, a fixed rest.
                     if tracer is not None and barrier_ms:
                         tracer.flush()
@@ -1125,6 +1137,9 @@ def run_interleaved(
             removed.update(gone)
             cache_report["failures"].update(failures)
         rows = _rows(partial=False, gone=removed)
+        if tracer is not None and tracer.mode != "off":
+            for row in rows:  # a traced run is a debugging run: its rows never route (amendment v3.2)
+                row["descriptive"] = True
         if rows:
             write_run(root, run_id, rows)
         imported = True
@@ -2289,16 +2304,19 @@ def run_spec(
             )
         if adapters is None:
             adapters = real_adapters(spec)
-        if _uses_5090(spec):
-            probe = _card_probe(adapters, spec)
-            path = heartbeat_path(heartbeat)
-            _card_guards(probe, path, wall())
         from interlock.calltrace import Tracer, instrument, release
 
-        tracer = Tracer(root=root, run_id=name, mode=trace)
+        # The card guard runs inside the tracer's window, so its /api/ps is counted like every other request the
+        # adapter sends (H1; amendment v3.2). Per-arm tracing starts with emission off, so it is not emitted.
+        per_arm = any("trace" in arm for arm in spec["arms"])
+        tracer = Tracer(root=root, run_id=name, mode=trace, per_arm=per_arm)
         with tracer:
             instrument(adapters, tracer)
             try:
+                if _uses_5090(spec):
+                    probe = _card_probe(adapters, spec)
+                    path = heartbeat_path(heartbeat)
+                    _card_guards(probe, path, wall())
                 return run_interleaved(
                     adapters,
                     grant=grant,

@@ -85,7 +85,7 @@ class CallRecord:
     status: str = "open"
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
-    request_bytes: int = 0
+    request_bytes: int | None = None  # the bytes the transport sent; None when the transport doesn't say
     extra: dict = field(default_factory=dict)
     emitted: bool = False
 
@@ -119,6 +119,7 @@ class _EventSink:
             "device": record.device,
             "ms": record.ms,
             "status": record.status,
+            "request_bytes": record.request_bytes,
             "prompt_tokens": record.prompt_tokens,
             "completion_tokens": record.completion_tokens,
             **record.extra,
@@ -149,7 +150,7 @@ class _EventSink:
 class Tracer:
     """One run's call counter, and its ordered log when tracing is on."""
 
-    def __init__(self, *, root: Path, run_id: str, mode: str = "off", relay_factory=None):
+    def __init__(self, *, root: Path, run_id: str, mode: str = "off", relay_factory=None, per_arm: bool = False):
         if mode not in MODES:
             raise TraceError(f"unknown trace mode {mode}")
         self.root = Path(root)
@@ -167,7 +168,10 @@ class Tracer:
         # close can't land between a call's count and its sink event (Argon round 2, M-New-1).
         self._closed = False
         # Stage 1's off-on-off triples switch the sink's events per slot. The counter stays on (design v3.1).
-        self._emit = True
+        # Under per-arm tracing, emission is off outside slots: begin_slot and set_emitting turn it on for a traced
+        # arm's slot, and end_slot turns it off (amendment v3.2). A run-wide trace emits everything.
+        self._per_arm = bool(per_arm)
+        self._emit = not self._per_arm
         self._slot_overhead_ns = 0
         self._offset_ns = 0
         self.trace_file: str | None = None
@@ -260,6 +264,14 @@ class Tracer:
         with self._lock:
             self._emit = bool(on)
 
+    def set_per_arm(self, on: bool) -> None:
+        """Scope the sink's events to traced slots: calls outside a slot are counted and not emitted."""
+
+        with self._lock:
+            self._per_arm = bool(on)
+            if self._per_arm and not self._slot:
+                self._emit = False
+
     def begin_slot(self, **slot) -> None:
         with self._lock:
             self._slot = dict(slot)
@@ -268,7 +280,10 @@ class Tracer:
 
     def end_slot(self) -> dict:
         """The slot's calls, and the client time the hooks spent on them (the tracer's own bookkeeping and its
-        sink, in microseconds): stage 1's client-time gate compares this between traced and untraced slots."""
+        sink, in microseconds): stage 1's client-time gate compares this between traced and untraced slots.
+
+        Under per-arm tracing this is the one place emission goes off, so nothing after the slot (a companion's
+        stop, a recovery unload) can leave a span outside it (amendment v3.2)."""
 
         with self._lock:
             calls = list(self._slot_calls)
@@ -276,6 +291,8 @@ class Tracer:
             self._slot = {}
             self._slot_calls = []
             self._slot_overhead_ns = 0
+            if self._per_arm:
+                self._emit = False
         return {"call_ids": calls, "hook_us": overhead_us}
 
     def counts_for(self, arm_id: str) -> dict:
@@ -287,7 +304,7 @@ class Tracer:
     # -- calls ------------------------------------------------------------------
 
     def start(
-        self, kind: str, endpoint: str, *, model: str | None, device: str | None, request_bytes: int = 0
+        self, kind: str, endpoint: str, *, model: str | None, device: str | None, request_bytes: int | None = None
     ) -> CallRecord:
         record = CallRecord(
             call_id=next(self._ids),
@@ -381,9 +398,15 @@ class _TracedTransport:
         tracer = self._tracer
         kind = classify(method, url, body)
         model = body.get("model") if isinstance(body, dict) else None
-        # Only Relay's request record uses the size. Serialising a long prompt again costs measured time.
-        size = len(json.dumps(body)) if body is not None and tracer.mode == "relay" and tracer.emitting else 0
-        record = tracer.start(kind, urlsplit(url).path, model=model, device=self._device, request_bytes=size)
+        record = tracer.start(kind, urlsplit(url).path, model=model, device=self._device)
+        if getattr(self.__wrapped__, "reports_request_bytes", False):
+            # The transport reports the bytes it sends, so the body is never serialised a second time here
+            # (amendment v3.2). A transport that doesn't report leaves the size unknown.
+
+            def note_sent(count: int) -> None:
+                record.request_bytes = count
+
+            kwargs = {**kwargs, "on_send": note_sent}
         status, payload = "exception", None
         sent = time.perf_counter_ns()
         returned = sent

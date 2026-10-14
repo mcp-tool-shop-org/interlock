@@ -212,9 +212,36 @@ def for_table(row: dict) -> dict:
     return cleaned
 
 
+def _is_traced_row(row: dict) -> bool:
+    """A row from a traced run: it carries the trace pointer, or its slots say which of them were traced."""
+
+    artifacts = row.get("artifacts")
+    if not isinstance(artifacts, dict):
+        return False
+    if "trace" in artifacts:
+        return True
+    slots = artifacts.get("slots")
+    return isinstance(slots, list) and any(isinstance(slot, dict) and "traced" in slot for slot in slots)
+
+
+def _has_trace_log(root: Path, run_id: str) -> bool:
+    logs = root / "logs"
+    return (logs / f"{run_id}.atof.jsonl").is_file() or (logs / f"{run_id}.events.jsonl").is_file()
+
+
+def mark_debug_rows(root: Path, run_id: str, rows: list[dict]) -> None:
+    """A traced run is a debugging run (design amendment v3.2): every one of its rows is descriptive, so none of
+    them routes. The run is traced when any row says so, or when its trace log is beside the receipt."""
+
+    if any(_is_traced_row(row) for row in rows) or _has_trace_log(root, run_id):
+        for row in rows:
+            row["descriptive"] = True
+
+
 def write_receipt(root: Path, run_id: str, rows: list[dict]) -> Path:
     """Write ``receipts/<run_id>.jsonl`` without touching the table."""
 
+    mark_debug_rows(root, run_id, rows)
     for row in rows:
         validate_row(row)
     receipts = root / "receipts"
@@ -236,8 +263,9 @@ def import_receipt(root: Path, run_id: str) -> list[dict]:
 
     Rows marked ``aborted: true`` never route: they stay in the receipt as
     the record, and each aborted run gets one line in ``table/gaps.md``. Rows
-    marked ``descriptive: true`` (a drift block's repeats) stay in the receipt
-    and never reach the table.
+    marked ``descriptive: true`` (a drift block's repeats, or every row of a
+    traced run) stay in the receipt and never reach the table; an aborted
+    traced run is not a gap either.
     """
 
     from interlock.harness.lifecycle import is_quarantined
@@ -246,6 +274,7 @@ def import_receipt(root: Path, run_id: str) -> list[dict]:
         return []
     path = root / "receipts" / f"{run_id}.jsonl"
     loaded = load_jsonl(path)
+    mark_debug_rows(root, run_id, loaded)
     aborted = [row for row in loaded if row.get("aborted") is True]
     descriptive = [row for row in loaded if row.get("descriptive") is True and row.get("aborted") is not True]
     routable = [row for row in loaded if row.get("aborted") is not True and row.get("descriptive") is not True]
@@ -253,17 +282,19 @@ def import_receipt(root: Path, run_id: str) -> list[dict]:
     rows = [for_table(row) for row in rows]
     _dump(path, rows + descriptive + aborted)
     _append_table(root, rows)
-    if aborted:
-        append_aborted_runs(root, aborted)
+    gaps = [row for row in aborted if row.get("descriptive") is not True]
+    if gaps:
+        append_aborted_runs(root, gaps)
     return rows
 
 
 def write_run(root: Path, run_id: str, rows: list[dict]) -> Path:
     """Write ``receipts/<run_id>.jsonl`` and append the rows to the table.
 
-    A ``descriptive`` row is written to the receipt and left out of the table.
+    A ``descriptive`` row, and every row of a traced run, is written to the receipt and left out of the table.
     """
 
+    mark_debug_rows(root, run_id, rows)
     stamped = apply_parity(rows, references=_table_rows(root))
     path = write_receipt(root, run_id, [for_table(row) for row in stamped])
     _append_table(root, [row for row in load_jsonl(path) if row.get("descriptive") is not True])
@@ -372,6 +403,9 @@ def _cosine(left: list[float], right: list[float]) -> float | None:
 
 
 def _append_table(root: Path, rows: list[dict]) -> None:
+    # The one way into the table: a descriptive, aborted or traced row never takes it (amendment v3.2).
+    rows = [row for row in rows if row.get("descriptive") is not True and row.get("aborted") is not True
+            and not _is_traced_row(row)]
     table = root / "table" / "routing.jsonl"
     if not (table.is_file() or (root / "table").is_dir()):
         return

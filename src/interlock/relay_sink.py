@@ -28,6 +28,14 @@ def _when(t_ns: int) -> datetime:
 
 
 def _length_only(payload, _context=None) -> dict:
+    """A payload as its byte length only. A record already of that shape passes through: the request record is
+    built as ``{"bytes": n}`` before the sanitizer sees it, and re-measuring it recorded the length of that dict
+    (13 or 15 in stage 1) instead of ``n`` (amendment v3.2)."""
+
+    if isinstance(payload, dict) and set(payload) == {"bytes"} and (
+        payload["bytes"] is None or (isinstance(payload["bytes"], int) and not isinstance(payload["bytes"], bool))
+    ):
+        return payload
     return {"bytes": len(json.dumps(payload, default=str))}
 
 
@@ -139,7 +147,8 @@ class RelaySink:
                 {"status": record.status},
                 # extra carries what is only known at the end, such as an OpenVINO timeout's worker_still_running.
                 metadata={**record.extra, "call_id": record.call_id, "status": record.status, "ms": record.ms,
-                          "prompt_tokens": record.prompt_tokens, "completion_tokens": record.completion_tokens},
+                          "request_bytes": record.request_bytes, "prompt_tokens": record.prompt_tokens,
+                          "completion_tokens": record.completion_tokens},
                 timestamp=_when(record.end_ns),
             )
 
