@@ -1,0 +1,87 @@
+# Standards compliance
+#
+# PIN_PER_STEP: 2. The model and its digest, the device, the prompt, num_predict, the order, the pairs and the
+#   barrier are in this file. The trace mode is the run's --trace flag; this spec refuses --trace off.
+# ANDON_AUTHORITY: 2. A failed step stops the sequence. The run's watcher stops it on the stop file, RAM or a hang.
+# NAMED_COMPENSATORS: 2. Unload is keep_alive 0 at the end of the run. The trace sits in the git-ignored logs/ and
+#   is removed by hand after audit. No publish, no rental, no spend.
+# DECOMPOSE_BY_SECRETS: 2. This file is the pre-registration. The harness runs it.
+# UNCERTAINTY_GATED_HUMANS: 2. The Publisher grants the 5090 after Argon's review and the Director's go.
+# EXTERNAL_VERIFIER: n/a here. Argon (Gemini, by hand) reviews the stage 1 harness and analysis before any run.
+#
+# interlock-relay, stage 1 (design v3.1 in mcp-tool-shop-org/rnd, experiments/interlock-relay). R&D, 2026-10-14.
+id: RELAY-S1-LONG
+procedure: interleaved
+order: aba
+compile_cache: reuse
+question: >
+  Does tracing change interlock's long-prompt (prefill-heavy) measurements of qwen3:8b on the 5090?
+decision: >
+  H2 in the interlock-relay design: tracing on changes no receipt metric beyond half its noise band (two one-sided tests on the per-triple difference), the tail gate holds, and the hook time a traced call adds is under 0.5 ms at the median and 2 ms at the 99th percentile. The analysis is frozen in rnd before the run.
+band: 0.10
+warmups: 2
+repeats: 30
+rest_s: 0
+trace_barrier_ms: 250
+needs:
+  grant: true
+  npu_session: false
+  cpu_window: false
+dataset:
+  name: relay-s1-long-prompt
+  seed: "The switchyard counts the same cars on every pass. AMU_CANARY_PROMPT_7c1e "
+  target_tokens: 32768
+  rule: >
+    Repeat the seed to 32,768 tokens by the served model's count. Each call starts with its own number
+    (prompt_salt per_call), so the server's prompt cache never skips the prefill.
+metrics:
+  - decode_tok_s
+  - latency_ms
+  - prompt_tok_s
+  - dedicated_mib
+stop_rules:
+  - The seed carries the canary AMU_CANARY_PROMPT_7c1e. It must not appear in any trace (H3).
+  - A failed step stops the sequence. A failed step is inconclusive, not a pass.
+  - Order is A-B-A per round. A is untraced, B is the same arm with tracing on. Cold is once per arm and stays out
+    of the comparison.
+  - After every slot, in both arms, the harness flushes the trace, collects garbage and rests 250 ms.
+  - The run refuses --trace off. The comparison is analysed by experiments/interlock-relay/stage1/analyze.py in
+    rnd, frozen before the run.
+arms:
+  - id: long-off
+    task: generate
+    device: "5090"
+    engine: ollama
+    model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "0.35.1"
+    thinking_level: "off"
+    num_predict: 16
+    num_ctx: 40960
+    batch: null
+    prompt_salt: per_call
+    trace: false
+    measure: decode_tok_s
+  - id: long-on
+    task: generate
+    device: "5090"
+    engine: ollama
+    model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "0.35.1"
+    thinking_level: "off"
+    num_predict: 16
+    num_ctx: 40960
+    batch: null
+    prompt_salt: per_call
+    trace: true
+    measure: decode_tok_s
+pairs:
+  - id: long
+    alone: long-off
+    paired: long-on
+    contrast: trace

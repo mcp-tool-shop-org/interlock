@@ -94,6 +94,15 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--dry-run", action="store_true")
     run.add_argument("--pilot", action="store_true")
     run.add_argument(
+        "--trace",
+        choices=("off", "events", "relay"),
+        default="off",
+        help=(
+            "log every model call in order under logs/: events (stdlib) or relay "
+            "(NeMo Relay ATOF, needs interlock[relay])"
+        ),
+    )
+    run.add_argument(
         "--pairs",
         default=None,
         help="comma-separated E4b pair ids (a subset of the spec). The receipt records them",
@@ -348,6 +357,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
                 heartbeat=heartbeat_path(None),
             ),
             pilot=args.pilot,
+            trace=args.trace,
             quarantine=getattr(args, "quarantine", None),
             pairs=pairs,
             models=models,

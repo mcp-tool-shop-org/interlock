@@ -81,7 +81,7 @@ from interlock.ollama_supervisor import (
     restart_policy_lines,
     retry_budget,
 )
-from interlock.receipt import validate_row
+from interlock.receipt import CAPABILITY_OUTCOMES, validate_row
 
 try:  # the CPU-window evidence of ruling #36's addendum; never a step failure
     import psutil
@@ -357,6 +357,7 @@ def run_interleaved(
     watch: WatchHooks | None = None,
     marker: RunMarker | None = None,
     supervisor=None,
+    tracer=None,
 ) -> list[dict]:
     """Run a committed spec.
 
@@ -456,6 +457,11 @@ def run_interleaved(
     wall = wall or time.time
     started_at = wall()
     hooks = watch or WatchHooks()
+    per_arm_trace = any("trace" in arm for arm in spec.get("arms") or [])
+    if per_arm_trace and tracer is not None:
+        tracer.set_per_arm(True)  # only a traced arm's slots reach the trace; nothing between slots does
+    barrier_ms = spec.get("trace_barrier_ms") or 0
+    salts: dict[str, int] = {}
     tracker = CompileTracker(hooks.clock)
     state_lock = threading.RLock()  # the main loop's mutations and the watcher's flush
     halted_by_watch = False
@@ -640,6 +646,11 @@ def run_interleaved(
         window = {"start": _iso(started_at), "end": _iso(wall())}
         restarts = marker.restart_records()
         for row in rows:
+            # A capability row (hang, device lost, compile refused) carries no artifacts by the receipt rule:
+            # it is not a speed. Its calls stay in the ordered trace.
+            if tracer is not None and row.get("outcome") not in CAPABILITY_OUTCOMES:
+                arm_of_row = row["id"].rsplit("/", 2)[-2]
+                row.setdefault("artifacts", {}).update(tracer.artifacts(arm_of_row))
             row["settings"]["run_window"] = window
             row["settings"]["start_state"] = start_state
             row["settings"]["ram_guard"] = guard.ram_guard()
@@ -655,6 +666,7 @@ def run_interleaved(
         used = removed if gone is None else gone
         guard.sample_ram()  # the peak is current at every flush
         rows = _rows(partial=True, gone=used)
+        _debug_only(tracer, rows)
         if rows:
             write_receipt(root, run_id, rows)
         marker.touch(_iso(wall()))
@@ -690,6 +702,14 @@ def run_interleaved(
         finally:
             if held:
                 state_lock.release()
+            # The watcher exits the process next (os._exit), so the run's tracer never reaches its own close.
+            # Close it here: the call in flight is closed as abandoned and the trace is flushed whole.
+            if tracer is not None:
+                try:
+                    tracer.mark("halt", error=error, operator=operator)
+                    tracer.close()
+                except Exception as exc:  # the process must still end
+                    print(f"interlock: the trace could not be closed: {exc}", file=sys.stderr)
 
     def _on_compile_timeout(info: dict) -> None:
         arm = arms[current.step_id] if current is not None else None
@@ -907,19 +927,29 @@ def run_interleaved(
                 if probe is not None:
                     adapter._slot_probe = probe
                     probe.open()
+                if tracer is not None:
+                    pair_tag = f":{slot.pair}" if slot.pair else ""
+                    tracer.begin_slot(arm=arm["id"], index=f"{slot.phase}:{slot.round_index}:{slot.role}{pair_tag}")
+                    if per_arm_trace:
+                        tracer.set_emitting(arm.get("trace") is True)
+                slot_calls = None
                 try:
                     kind = "ok"
                     error = ""
                     try:
                         result = adapter.run(
-                            _request(
+                            _salted(
                                 arm,
-                                spec,
-                                spec_rel,
-                                cache_dirs.get(arm["id"]),
-                                adapters[arm["engine"]],
-                                prompt_cache,
-                                bound_s=bound,
+                                salts,
+                                _request(
+                                    arm,
+                                    spec,
+                                    spec_rel,
+                                    cache_dirs.get(arm["id"]),
+                                    adapters[arm["engine"]],
+                                    prompt_cache,
+                                    bound_s=bound,
+                                ),
                             )
                         )
                     except AdapterError as exc:
@@ -1011,6 +1041,27 @@ def run_interleaved(
                                 {"slot_start": cpu_start, "slot_end": cpu_end},
                                 _finish_slot_probe(probe, adapter),
                             )
+                            # The companion stops inside its slot, in both arms alike, so its unload is the slot's
+                            # last call and never a span outside one (amendment v3.2).
+                            if started and companion is not None:
+                                started = False
+                                _session(
+                                    adapters,
+                                    companion,
+                                    "stop",
+                                    spec,
+                                    spec_rel,
+                                    cache_dirs.get(companion["id"]),
+                                    prompt_cache,
+                                )
+                            if tracer is not None:
+                                slot_calls = tracer.end_slot()
+                                sample["call_ids"] = slot_calls["call_ids"]
+                                sample["hook_us"] = slot_calls["hook_us"]
+                                if per_arm_trace:
+                                    sample["traced"] = arm.get("trace") is True
+                            if arm.get("prompt_salt") == "per_call":
+                                sample["prompt_salt"] = salts[arm["id"]]
                             if epoch is not None:
                                 try:
                                     sample = supervisor.keep_sample(epoch, sample)
@@ -1069,6 +1120,16 @@ def run_interleaved(
                             cache_dirs.get(companion["id"]),
                             prompt_cache,
                         )
+                    # A failed or refused slot still ends here, so recovery calls between slots are not
+                    # attributed to it (Argon I1). The success path has already taken its call ids. end_slot is
+                    # also what turns per-arm emission off (amendment v3.2).
+                    if tracer is not None and slot_calls is None:
+                        tracer.end_slot()
+                    # Stage 1's barrier, after every slot in both arms: the trace flushed, a collection, a fixed rest.
+                    if tracer is not None and barrier_ms:
+                        tracer.flush()
+                        gc.collect()
+                        hooks.sleep(barrier_ms / 1000)
                 if pending is not None:
                     _resume_after_repair(slot, block_id, arm, pending[0], pending[1])
         finally:
@@ -1077,6 +1138,7 @@ def run_interleaved(
             removed.update(gone)
             cache_report["failures"].update(failures)
         rows = _rows(partial=False, gone=removed)
+        _debug_only(tracer, rows)
         if rows:
             write_run(root, run_id, rows)
         imported = True
@@ -1429,6 +1491,27 @@ def _request(
     )
 
 
+def _salted(arm: dict, salts: dict[str, int], request: StepRequest) -> StepRequest:
+    """``prompt_salt: per_call``: each call's prompt starts with its own number, so the server's prompt cache
+    can't reuse the previous call's prefill. The number is kept on the sample."""
+
+    if arm.get("prompt_salt") != "per_call":
+        return request
+    # One counter for the run, not per arm: the two arms of a trace contrast send the same prompt otherwise.
+    salts["_run"] = salts.get("_run", 0) + 1
+    salts[arm["id"]] = salts["_run"]
+    settings = dict(request.settings)
+    settings["prompt"] = f"[{salts['_run']}] " + str(settings.get("prompt") or "")
+    return StepRequest(
+        step_id=request.step_id,
+        task=request.task,
+        model=request.model,
+        device=request.device,
+        engine=request.engine,
+        settings=settings,
+    )
+
+
 def _record(
     slot: Slot,
     result,
@@ -1517,6 +1600,11 @@ def _artifacts(records: list[dict], arm_id: str) -> dict | None:
         }
         if row.get("bound_s") is not None:
             item["bound_s"] = row["bound_s"]
+        if row.get("call_ids"):
+            item["call_ids"] = row["call_ids"]
+        for key in ("hook_us", "traced", "prompt_salt"):  # interlock-relay stage 1
+            if row.get(key) is not None:
+                item[key] = row[key]
         if row.get("cpu") is not None:
             item["cpu"] = row["cpu"]
         if row.get("sample"):
@@ -1926,6 +2014,14 @@ def _check_run_id(run_id: str) -> None:
         raise RunnerError("run_id must be a single name")
 
 
+def _debug_only(tracer, rows: list[dict]) -> None:
+    """A traced run is a debugging run: its rows never route (amendment v3.2). Partial flushes included."""
+
+    if tracer is not None and tracer.mode != "off":
+        for row in rows:
+            row["descriptive"] = True
+
+
 def _unload(adapters: dict, arms: dict) -> None:
     seen = set()
     for arm in arms.values():
@@ -2095,6 +2191,7 @@ def run_spec(
     quarantine: Path | None = None,
     pairs: list[str] | None = None,
     models: list[str] | None = None,
+    trace: str = "off",
 ) -> list[dict]:
     """Run a committed spec. Every refusal lands before device contact.
 
@@ -2118,6 +2215,15 @@ def run_spec(
         if spec.get("procedure") != "fill-card":
             raise RunnerError("--models is for a fill-card spec")
         _chosen, recorded_models = resolve_models(spec, models)
+    if trace == "off" and any("trace" in arm for arm in spec.get("arms") or [] if isinstance(arm, dict)):
+        # A spec that switches tracing per arm would run both arms untraced: the comparison would be empty.
+        raise RunnerError("REFUSED: this spec traces some arms and not others; run it with --trace relay or events")
+    if trace != "off" and spec.get("id") == "E4b":
+        # E4b's model calls go through its own injected seams, not the hook points. A trace that would silently
+        # record nothing is refused instead (interlock-relay amendment A3).
+        raise RunnerError(
+            f"REFUSED: --trace {trace} is not wired for E4b; run this spec with --trace off"
+        )
     if spec.get("id") == "E4b":
         from interlock.harness.e4b import run_from_cli
 
@@ -2146,6 +2252,12 @@ def run_spec(
     receipt = root / "receipts" / f"{name}.jsonl"
     if receipt.exists():
         raise GuardError(f"REFUSED: receipts/{name}.jsonl already exists; pass --run-id for another name")
+    for suffix in ("atof", "events"):
+        # A traced attempt refused at the card guard leaves its trace log with no receipt. A later run under this
+        # name would be taken for a traced one and kept out of the table (amendment v3.2, Argon's review).
+        if (root / "logs" / f"{name}.{suffix}.jsonl").exists():
+            raise GuardError(f"REFUSED: logs/{name}.{suffix}.jsonl already exists from an earlier traced attempt; "
+                             "pass --run-id for another name")
     wall = wall or time.time
     if supervisor is not None:
         if grant and not getattr(supervisor, "grant", None):
@@ -2174,48 +2286,69 @@ def run_spec(
                 chosen = quiet_fill_seams()
             else:
                 chosen = real_fill_seams(adapters["ollama"])
-            return run_fill_card(
-                spec,
-                adapters=adapters,
-                seams=chosen,
-                grant=grant,
-                root=root,
-                spec_rel=spec_rel,
-                run_id=name,
-                date=stamp,
-                heartbeat=heartbeat_path(heartbeat),
-                wall=wall,
-                marker=marker,
-                notes=notes,
-                supervisor=supervisor,
-                models=recorded_models,
-            )
+            from interlock.calltrace import Tracer, instrument, release
+
+            tracer = Tracer(root=root, run_id=name, mode=trace)
+            with tracer:
+                instrument(adapters, tracer)
+                try:
+                    return run_fill_card(
+                        spec,
+                        adapters=adapters,
+                        seams=chosen,
+                        grant=grant,
+                        root=root,
+                        spec_rel=spec_rel,
+                        run_id=name,
+                        date=stamp,
+                        heartbeat=heartbeat_path(heartbeat),
+                        wall=wall,
+                        marker=marker,
+                        notes=notes,
+                        supervisor=supervisor,
+                        models=recorded_models,
+                        tracer=tracer,
+                    )
+                finally:
+                    release(adapters)
         if spec["procedure"] != "interleaved":
             raise GuardError(
                 f"REFUSED: a {spec['procedure']!r} spec has no run path; this command runs interleaved specs"
             )
         if adapters is None:
             adapters = real_adapters(spec)
-        if _uses_5090(spec):
-            probe = _card_probe(adapters, spec)
-            path = heartbeat_path(heartbeat)
-            _card_guards(probe, path, wall())
-        return run_interleaved(
-            adapters,
-            grant=grant,
-            npu_session=npu_session,
-            cpu_window=cpu_window,
-            root=root,
-            repo=root,
-            spec_path=spec_path,
-            run_id=name,
-            date=stamp,
-            notes=notes,
-            wall=wall,
-            watch=watch,
-            marker=marker,
-            supervisor=supervisor,
-        )
+        from interlock.calltrace import Tracer, instrument, release
+
+        # The card guard runs inside the tracer's window, so its /api/ps is counted like every other request the
+        # adapter sends (H1; amendment v3.2). Per-arm tracing starts with emission off, so it is not emitted.
+        per_arm = any("trace" in arm for arm in spec["arms"])
+        tracer = Tracer(root=root, run_id=name, mode=trace, per_arm=per_arm)
+        with tracer:
+            instrument(adapters, tracer)
+            try:
+                if _uses_5090(spec):
+                    probe = _card_probe(adapters, spec)
+                    path = heartbeat_path(heartbeat)
+                    _card_guards(probe, path, wall())
+                return run_interleaved(
+                    adapters,
+                    grant=grant,
+                    npu_session=npu_session,
+                    cpu_window=cpu_window,
+                    root=root,
+                    repo=root,
+                    spec_path=spec_path,
+                    run_id=name,
+                    date=stamp,
+                    notes=notes,
+                    wall=wall,
+                    watch=watch,
+                    marker=marker,
+                    supervisor=supervisor,
+                    tracer=tracer,
+                )
+            finally:
+                release(adapters)
     finally:
         if not marker.entered:
             marker.discard()

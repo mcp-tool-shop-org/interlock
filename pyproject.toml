@@ -28,6 +28,10 @@ intel = [
     "openvino-genai==2026.4.1.0",
     "transformers==5.10.1",
 ]
+# NVIDIA NeMo Relay for `--trace relay` (the interlock-relay experiment, stage 0). Nothing imports it otherwise.
+relay = [
+    "nemo-relay==0.10.1",
+]
 
 [project.scripts]
 interlock = "interlock.cli:main"
@@ -59,6 +63,7 @@ default-groups = ["dev"]
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "--cov=interlock --cov-report=term-missing --cov-fail-under=90"
+markers = ["relay: needs the relay extra (nemo-relay); skipped without it"]
 
 [tool.coverage.run]
 source = ["interlock"]
