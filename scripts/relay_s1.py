@@ -155,6 +155,11 @@ class Seams:
 
         return len(listening_pids(port))
 
+    def interpreter(self) -> Path:
+        """The Python every step runs on: ``_spawn`` starts each child with this one."""
+
+        return Path(sys.executable)
+
     def heartbeat_age_s(self) -> float:
         from interlock.guards import heartbeat_age_s
         from interlock.harness.runner import heartbeat_path
@@ -178,6 +183,11 @@ def preflight(root: Path, grant: str | None, seams: Seams, *, first: bool = True
             raise PreflightError(f"REFUSED: {message}")
 
     need(bool(grant), "no grant: the Publisher grants the 5090 for this run")
+    # interlock refuses a device run from an in-repo interpreter; refuse here, before any step, instead.
+    python = seams.interpreter().resolve()
+    need(not python.is_relative_to(root.resolve()),
+         f"the interpreter {python} is inside the checkout; set UV_PROJECT_ENVIRONMENT to the pinned environment")
+    facts["python"] = str(python)
     age = seams.heartbeat_age_s()
     need(age <= HEARTBEAT_MAX_AGE_S, f"the watchdog heartbeat is {age:.0f}s old")
     facts["heartbeat_age_s"] = round(age, 1)

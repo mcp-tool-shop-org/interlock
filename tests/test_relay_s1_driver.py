@@ -24,6 +24,7 @@ class Seams(relay_s1.Seams):
             "environ": {}, "nemo-relay": "0.10.1", "config_paths": [], "status": "", "ignored": 0, "sha": "abc",
             "/api/version": {"version": "0.35.1"}, "/api/ps": {"models": []}, "listeners": 1,
             "gpu": {"used_mib": 2008, "workloads": []}, "heartbeat": 5.0, "cpu": 6.0,
+            "python": Path(__file__).resolve().parents[2] / "envs" / "interlock" / "python",
         }
         self.state.update(changes)
         self.status_args = []
@@ -63,14 +64,18 @@ class Seams(relay_s1.Seams):
     def heartbeat_age_s(self):
         return self.state["heartbeat"]
 
+    def interpreter(self):
+        return self.state["python"]
+
     def cpu_percent(self, seconds=5.0):
         return self.state["cpu"]
 
 
 def test_a_healthy_preflight_returns_what_it_read(tmp_path: Path):
-    facts = relay_s1.preflight(tmp_path, "g-1", Seams())
-    assert facts == {"heartbeat_age_s": 5.0, "nemo_relay": "0.10.1", "git_sha": "abc", "ollama_version": "0.35.1",
-                     "idle_vram_mib": 2008, "cpu_pct": 6.0}
+    seams = Seams()
+    facts = relay_s1.preflight(tmp_path, "g-1", seams)
+    assert facts == {"python": str(seams.state["python"].resolve()), "heartbeat_age_s": 5.0, "nemo_relay": "0.10.1",
+                     "git_sha": "abc", "ollama_version": "0.35.1", "idle_vram_mib": 2008, "cpu_pct": 6.0}
 
 
 @pytest.mark.parametrize(
@@ -414,4 +419,13 @@ def test_the_live_gpu_reader_names_only_compute_workloads(monkeypatch):
 
     monkeypatch.setattr(relay_s1.subprocess, "run", run)
     assert relay_s1.Seams().gpu() == {"used_mib": 2751, "workloads": ["python.exe"]}
+
+
+def test_an_interpreter_inside_the_checkout_refuses_before_any_step(tmp_path: Path):
+    seams = Seams(python=tmp_path / ".venv" / "Scripts" / "python.exe")
+    with pytest.raises(relay_s1.PreflightError, match="inside the checkout; set UV_PROJECT_ENVIRONMENT"):
+        relay_s1.preflight(tmp_path, "g", seams)
+    with pytest.raises(relay_s1.PreflightError, match="inside the checkout"):
+        relay_s1.drive(tmp_path, "g", "p", ("decode",), seams=seams, step=lambda *a, **k: pytest.fail("a step ran"),
+                       check=lambda: True, sleep=lambda s: None)
 
