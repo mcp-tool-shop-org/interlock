@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import re
 
-from interlock.importers.common import UNRECORDED, ImportError_, blank_latency, blank_settings, source_provenance
 from interlock.families import stamp_family
+from interlock.importers.common import UNRECORDED, ImportError_, blank_latency, blank_settings, source_provenance
 from interlock.receipt import validate_row
 
 SNAPSHOT_VERSION = 1

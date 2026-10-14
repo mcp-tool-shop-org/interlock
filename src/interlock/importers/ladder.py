@@ -7,6 +7,7 @@ when the run is in the pinned tree. A content hash is always recorded.
 
 from __future__ import annotations
 
+from interlock.families import stamp_family
 from interlock.importers.calibration import quote_rule_of
 from interlock.importers.common import (
     UNRECORDED,
@@ -18,7 +19,6 @@ from interlock.importers.common import (
     sha256_bytes,
     source_provenance,
 )
-from interlock.families import stamp_family
 from interlock.receipt import validate_row
 from interlock.tasks import MATH_LADDER_TASK
 

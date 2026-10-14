@@ -5,10 +5,7 @@ Adapters, clocks and receipts are fakes; no test touches a device or the wall cl
 
 from __future__ import annotations
 
-import datetime
 import json
-import os
-from pathlib import Path
 
 import pytest
 
@@ -23,7 +20,7 @@ from tests.test_harness import ScriptedRaise, _emb_arm, _invoke, _result
 from tests.test_harness import _bind as _bind_harness
 from tests.test_harness import _spec as _harness_spec
 from tests.test_openvino_adapter import FakeCompiled, FakeCore, local_model, make_adapter, req
-from tests.test_run_path import Fake, FakeTime, _arm, _bind, _spec
+from tests.test_run_path import Fake, _arm, _bind, _spec
 
 # A real NPU compiler refusal (issue #36): the error leads with a stack of
 # "Exception from" lines and the compiler's own message comes last.

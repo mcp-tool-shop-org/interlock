@@ -138,14 +138,16 @@ def main(argv: list[str] | None = None) -> int:
     route.add_argument("--task", required=True, choices=sorted(TASKS))
     route.add_argument(
         "--model",
-        help="substring of the model repo or tag; hyphens and colons are ignored. A short substring can match an unintended repo. The matched model is printed",
+        help="substring of the model repo or tag; hyphens and colons are ignored. A short substring can match an "
+            "unintended repo. The matched model is printed",
     )
     route.add_argument("--max-latency-ms", type=float)
     route.add_argument("--max-ttft-ms", type=float)
     route.add_argument("--ctx", type=int)
     route.add_argument(
         "--thinking",
-        help="thinking family: off matches only off; on matches any recorded level; low, medium and high match exactly when named",
+        help="thinking family: off matches only off; on matches any recorded level; low, medium and high match exactly "
+            "when named",
     )
     route.add_argument("--busy", action="append", default=None, metavar="DEVICE")
     route.add_argument("--quote-rule", type=int)

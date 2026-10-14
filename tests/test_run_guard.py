@@ -39,8 +39,12 @@ from interlock.harness.watch import (
     WatchHooks,
 )
 from interlock.receipt import ReceiptError, check_tree, load_jsonl, receipt_paths, validate_row
-from tests.test_harness import _bind, _emb_arm, _result, _spec as _harness_spec
-from tests.test_run_path import Fake, FakeTime, _arm as _plain_arm, _bind as _bind_plain, _spec as _plain_spec
+from tests.test_harness import _bind, _emb_arm, _result
+from tests.test_harness import _spec as _harness_spec
+from tests.test_run_path import Fake
+from tests.test_run_path import _arm as _plain_arm
+from tests.test_run_path import _bind as _bind_plain
+from tests.test_run_path import _spec as _plain_spec
 
 GIB = 2**30
 
@@ -241,8 +245,8 @@ def test_the_compile_tracker_brackets_a_compile_and_clears_on_error():
 
 
 def test_the_openvino_adapter_signals_each_compile_site(tmp_path, monkeypatch):
-    from tests.test_openvino_adapter import local_model, make_adapter, req
     import interlock.adapters.openvino as ovm
+    from tests.test_openvino_adapter import local_model, make_adapter, req
 
     adapter = make_adapter()
     tracker = CompileTracker()
@@ -277,7 +281,8 @@ def test_the_watch_fires_once_and_survives_a_failing_recorder(capsys):
 
     watch = RunWatch(
         tracker,
-        WatchHooks(clock=clock, ram_sampler=lambda: 10.0, rss_sampler=lambda: 0, exit_fn=codes.append, start_thread=False),
+        WatchHooks(clock=clock, ram_sampler=lambda: 10.0, rss_sampler=lambda: 0, exit_fn=codes.append,
+            start_thread=False),
         ceiling_s=900,
         on_compile_timeout=broken,
         on_ram_stop=lambda reason: None,
@@ -398,7 +403,7 @@ NOW = 1_800_000_000.0
 def _iso(epoch):
     import datetime
 
-    return datetime.datetime.fromtimestamp(epoch, tz=datetime.timezone.utc).isoformat(timespec="seconds")
+    return datetime.datetime.fromtimestamp(epoch, tz=datetime.UTC).isoformat(timespec="seconds")
 
 
 def _marker(repo: Path, run_id, *, ended_min_ago, duration_min=None, closed=False, devices=("CPU",)):
@@ -449,7 +454,8 @@ def test_the_marker_is_written_before_any_adapter_call_and_updated_at_every_flus
         def unload(self, model, device=None):
             return None
 
-    rows = _invoke(repo, spec_path, Watching(), WatchHooks(ram_sampler=None, start_thread=False), wall=lambda: float(next(ticks)))
+    rows = _invoke(repo, spec_path, Watching(), WatchHooks(ram_sampler=None, start_thread=False),
+        wall=lambda: float(next(ticks)))
     first = snapshots[0]
     assert first["run_id"] == "run-1"
     assert first["spec"] == "experiments/t/spec.yaml"
@@ -481,7 +487,8 @@ def test_the_marker_is_closed_when_the_run_fails_in_order(tmp_path):
 
 def test_run_spec_writes_the_marker_before_the_card_probe_(tmp_path):
     repo = tmp_path / "repo"
-    spec_path = _bind_plain(repo, _plain_spec([_plain_arm("A", "5090")], needs={"grant": True, "npu_session": False, "cpu_window": False}))
+    spec_path = _bind_plain(repo, _plain_spec([_plain_arm("A", "5090")], needs={"grant": True, "npu_session": False,
+        "cpu_window": False}))
     seen = []
 
     class Probing(Fake):
@@ -512,7 +519,8 @@ def _result_plain():
 
 def test_a_refusal_before_the_run_starts_leaves_no_marker(tmp_path):
     repo = tmp_path / "repo"
-    spec_path = _bind_plain(repo, _plain_spec([_plain_arm("A", "5090")], needs={"grant": True, "npu_session": False, "cpu_window": False}))
+    spec_path = _bind_plain(repo, _plain_spec([_plain_arm("A", "5090")], needs={"grant": True, "npu_session": False,
+        "cpu_window": False}))
     fake = Fake(loaded=["something-on-the-card"])
     heartbeat = repo / "hb"
     heartbeat.write_text("pulse", encoding="utf-8")
@@ -639,7 +647,8 @@ def test_a_fresh_cache_that_cannot_be_cleared_refuses_before_any_device_contact(
     stale = repo / "compile-cache" / "run-1" / "cpu"
     stale.mkdir(parents=True)
     (stale / "old.blob").write_bytes(b"warm")
-    monkeypatch.setattr(runner_module.shutil, "rmtree", lambda path, onexc=None, **kw: onexc(_deny, str(Path(path) / "old.blob"), PermissionError(13, "Access is denied")))
+    monkeypatch.setattr(runner_module.shutil, "rmtree", lambda path, onexc=None, **kw: onexc(_deny,
+        str(Path(path) / "old.blob"), PermissionError(13, "Access is denied")))
 
     class Untouched:
         def run(self, request):

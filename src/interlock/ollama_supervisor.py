@@ -665,10 +665,12 @@ def restart_policy_lines(config: SupervisorConfig | None = None) -> list[str]:
         "ollama restart: only 127.0.0.1:11434 is restarted; 11490 is reported and never stopped",
         "ollama restart: the grant, the heartbeat, and /api/ps are re-checked before anything is stopped",
         "ollama restart: the recorded start line is replayed, and the log is appended",
-        "ollama restart: the CUDA library sha, the backend line written after the spawn, and the full OLLAMA_* set must match",
+        "ollama restart: the CUDA library sha, the backend line written after the spawn, and the full OLLAMA_* set "
+            "must match",
         "ollama restart: the first measured step after a restart stays out of the warm percentiles",
         "ollama restart: the tray app is not stopped unless it owns the port",
-        f"ollama restart: wait up to {chosen.restart_deadline_s:g} s to become healthy, then the card must be back at baseline",
+        f"ollama restart: wait up to {chosen.restart_deadline_s:g} s to become healthy, then the card must be back at "
+            f"baseline",
         "ollama restart: interlock does not sign in",
     ]
 
@@ -935,7 +937,7 @@ def http_get(url: str, path: str, timeout: float, *, connection=None):
         if callable(closer):
             try:
                 closer()
-            except Exception:
+            except Exception:  # noqa: S110  # a failed close still returns the response
                 pass
     if not isinstance(raw, (bytes, bytearray)):
         return status, None, "the version response was not json"

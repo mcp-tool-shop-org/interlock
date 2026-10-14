@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
+from test_e4b import E4B, PAIRS, ROOT, _clean, _rows, _seams, _Server, _spec
 
 from interlock.cli import main
 from interlock.harness.e4b import run_block, run_from_cli, run_pilot
@@ -17,7 +18,6 @@ from interlock.harness.lifecycle import (
 )
 from interlock.harness.receipts import import_receipt
 from interlock.receipt import receipt_paths
-from test_e4b import E4B, ROOT, _Server, _clean, _rows, _seams, _spec, PAIRS
 
 
 def _call(counter):

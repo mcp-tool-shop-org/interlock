@@ -312,7 +312,8 @@ def _recording_transport(timeouts: list):
         options = body.get("options") if isinstance(body, dict) else None
         if isinstance(options, dict) and ("num_predict" not in options or options.get("num_predict") in (0, None)):
             return {"done": True, "eval_count": 64}
-        if isinstance(options, dict) and options.get("num_ctx") == 2048 and len(str(body.get("prompt", "")).split()) > 2048:
+        if isinstance(options, dict) and options.get("num_ctx") == 2048 and len(str(body.get("prompt",
+            "")).split()) > 2048:
             return {"error": "the prompt exceeds the context length"}
         return {"done": True, "prompt_eval_count": 1}
 

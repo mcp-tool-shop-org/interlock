@@ -11,10 +11,10 @@ import os
 import threading
 from pathlib import Path
 
+from interlock.families import stamp_family
 from interlock.harness import environment as env_capture
 from interlock.harness.environment import UNRECORDED
 from interlock.harness.timing import Summary
-from interlock.families import stamp_family
 from interlock.importers.gaps import append_aborted_runs
 from interlock.receipt import CAPABILITY_OUTCOMES, load_jsonl, validate_row
 
@@ -191,8 +191,9 @@ def for_table(row: dict) -> dict:
     """The table copy of a receipt row.
 
     A capability row (``device_lost``, ``hang``, ``native_binary_rejected``,
-    ``compile_rejected``, ``compile_timeout``) cannot carry a speed. Timing and artifacts are stripped, and the note says
-    the device cannot do the setting. A refused native binary keeps its
+    ``compile_rejected``, ``compile_timeout``) cannot carry a speed. Timing and
+    artifacts are stripped, and the note says the device cannot do the setting.
+    A refused native binary keeps its
     compile time: the compile is evidence, the execute never happened.
     """
 
@@ -228,8 +229,9 @@ def import_receipt(root: Path, run_id: str) -> list[dict]:
 
     ``device_lost``, ``hang``, ``native_binary_rejected`` and
     ``compile_rejected`` land as "this device can't do this setting", with the
-    timing removed (a native-binary rejection keeps its compile time). A failed parity guard is recorded with its timing and
-    is not a speed figure. CPU batch-1 references already in the table count,
+    timing removed (a native-binary rejection keeps its compile time). A failed
+    parity guard is recorded with its timing and is not a speed figure. CPU
+    batch-1 references already in the table count,
     so a later receipt can be judged against them.
 
     Rows marked ``aborted: true`` never route: they stay in the receipt as
@@ -360,7 +362,7 @@ def _cosine(left: list[float], right: list[float]) -> float | None:
     if len(left) != len(right):
         return None
     dot = left_norm = right_norm = 0.0
-    for one, other in zip(left, right):
+    for one, other in zip(left, right, strict=True):
         dot += one * other
         left_norm += one * one
         right_norm += other * other

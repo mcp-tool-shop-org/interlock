@@ -16,7 +16,7 @@ from interlock.harness.e5 import PREDICTED_OVER, SHARED_GATE_FROM_MIB, Observati
 from interlock.harness.fill import _predict_mib
 from interlock.harness.runner import RunnerError, dry_run, parse_models, resolve_models, run_spec
 from interlock.harness.spec import load_spec
-from tests.test_fill_card_live import _Transport, _ctxs, _fresh, _model, _run, _seams, _spec, _bind
+from tests.test_fill_card_live import _bind, _ctxs, _fresh, _model, _run, _seams, _spec, _Transport
 from tests.test_harness import E4, _resident
 
 ROOT = Path(__file__).resolve().parents[1]

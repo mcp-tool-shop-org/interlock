@@ -115,7 +115,8 @@ def test_route_json_validates_and_a_floor_refuses(tmp_path: Path, capsys):
     assert document["runners_up"][0]["constraint"] == "decode_tok_s"
 
     assert main(
-        ["route", "--root", str(tmp_path), "--task", "generate", "--as-of", "2026-10-11", "--json", "--min-tok-s", "100"]
+        ["route", "--root", str(tmp_path), "--task", "generate", "--as-of", "2026-10-11", "--json", "--min-tok-s",
+            "100"]
     ) == 1
     captured = capsys.readouterr()
     assert captured.err == ""

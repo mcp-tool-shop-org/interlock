@@ -1,20 +1,16 @@
 import sys
+import types
 
-from interlock.harness.e4b import capture_run
+import pytest
+
+from interlock.harness.e4b import E4bError, capture_run, read_git
+from interlock.harness.ollama_serve import ServeError, pin_install
 
 
 def test_the_live_runner_returns_the_child_stdout():
     # test_fake_hides_platform: the fakes returned stdout, the live default (bare subprocess.run) returned None.
     completed = capture_run([sys.executable, "-c", "print('pin-report')"])
     assert completed.stdout.strip() == "pin-report"
-
-
-import types
-
-import pytest
-
-from interlock.harness.e4b import E4bError, read_git
-from interlock.harness.ollama_serve import ServeError, pin_install
 
 SHA = "0123456789abcdef0123456789abcdef01234567"
 

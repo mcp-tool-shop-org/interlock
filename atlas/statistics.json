@@ -182,19 +182,24 @@
         "path": ".gitattributes"
       },
       {
-        "commits": 5,
-        "lines": 174,
+        "commits": 6,
+        "lines": 177,
         "path": ".github/workflows/ci.yml"
       },
       {
-        "commits": 1,
-        "lines": 50,
+        "commits": 2,
+        "lines": 56,
         "path": ".github/workflows/pages.yml"
       },
       {
-        "commits": 1,
-        "lines": 79,
+        "commits": 2,
+        "lines": 82,
         "path": ".github/workflows/release.yml"
+      },
+      {
+        "commits": 1,
+        "lines": 44,
+        "path": ".github/workflows/scorecard.yml"
       },
       {
         "commits": 10,
@@ -207,8 +212,8 @@
         "path": ".python-version"
       },
       {
-        "commits": 30,
-        "lines": 101,
+        "commits": 31,
+        "lines": 103,
         "path": "CHANGELOG.md"
       },
       {
@@ -217,43 +222,43 @@
         "path": "LICENSE"
       },
       {
-        "commits": 1,
-        "lines": 186,
+        "commits": 2,
+        "lines": 187,
         "path": "README.es.md"
       },
       {
-        "commits": 1,
-        "lines": 186,
+        "commits": 2,
+        "lines": 187,
         "path": "README.fr.md"
       },
       {
-        "commits": 1,
-        "lines": 186,
+        "commits": 2,
+        "lines": 187,
         "path": "README.hi.md"
       },
       {
-        "commits": 1,
-        "lines": 186,
+        "commits": 2,
+        "lines": 187,
         "path": "README.it.md"
       },
       {
-        "commits": 1,
-        "lines": 186,
+        "commits": 2,
+        "lines": 187,
         "path": "README.ja.md"
       },
       {
-        "commits": 17,
-        "lines": 353,
+        "commits": 18,
+        "lines": 354,
         "path": "README.md"
       },
       {
-        "commits": 1,
-        "lines": 186,
+        "commits": 2,
+        "lines": 187,
         "path": "README.pt-BR.md"
       },
       {
-        "commits": 1,
-        "lines": 186,
+        "commits": 2,
+        "lines": 187,
         "path": "README.zh.md"
       },
       {
@@ -357,8 +362,8 @@
         "path": "assets/logo/switchyard_64.png"
       },
       {
-        "commits": 35,
-        "lines": 762,
+        "commits": 36,
+        "lines": 790,
         "path": "atlas/README.md"
       },
       {
@@ -367,18 +372,18 @@
         "path": "atlas/boundaries.yaml"
       },
       {
-        "commits": 35,
-        "lines": 2372,
+        "commits": 36,
+        "lines": 2526,
         "path": "atlas/page.json"
       },
       {
-        "commits": 35,
-        "lines": 6151,
+        "commits": 36,
+        "lines": 6380,
         "path": "atlas/statistics.json"
       },
       {
-        "commits": 35,
-        "lines": 32639,
+        "commits": 36,
+        "lines": 33418,
         "path": "atlas/structure.json"
       },
       {
@@ -1937,51 +1942,51 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-10-13T22:47:49.564Z",
+  "generatedAt": "2026-10-14T00:21:11.490Z",
   "generatedFrom": {
-    "commit": "2e4b1b53e46246469a46f10136ce19570307f932"
+    "commit": "e4aba2d86f190fa2c9c97c469a0242b3e98d1fd9"
   },
   "pairs": [
     {
       "a": "atlas/README.md",
       "b": "atlas/page.json",
-      "either": 32,
-      "shared": 32,
+      "either": 33,
+      "shared": 33,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/statistics.json",
-      "either": 32,
-      "shared": 32,
+      "either": 33,
+      "shared": 33,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/structure.json",
-      "either": 32,
-      "shared": 32,
+      "either": 33,
+      "shared": 33,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/statistics.json",
-      "either": 32,
-      "shared": 32,
+      "either": 33,
+      "shared": 33,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/structure.json",
-      "either": 32,
-      "shared": 32,
+      "either": 33,
+      "shared": 33,
       "strength": 1
     },
     {
       "a": "atlas/statistics.json",
       "b": "atlas/structure.json",
-      "either": 32,
-      "shared": 32,
+      "either": 33,
+      "shared": 33,
       "strength": 1
     },
     {
@@ -2135,16 +2140,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-10-13T15:14:14-07:00",
-    "inScopeFiles": 267,
+    "headDate": "2026-10-13T16:01:12-07:00",
+    "inScopeFiles": 268,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 106,
+    "qualifyingCommits": 107,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-04-16T22:14:14.000Z",
+    "since": "2026-04-16T23:01:12.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",

@@ -19,38 +19,37 @@ import yaml
 from interlock.adapters.base import AdapterError
 from interlock.adapters.ollama import OllamaAdapter
 from interlock.adapters.ollama_cases import require_recorded_behaviour
-from interlock.harness.spec import SpecError, validate_spec
 from interlock.guards import GuardError, require_card_empty, require_grant, require_heartbeat
+from interlock.harness.e5 import SHARED_GATE_FROM_MIB
 from interlock.harness.fill import (
     ABORT_ERROR,
-    install_relative,
     ADAPTER_DEDICATED,
     ADAPTER_SHARED,
     DRIVER_ARGV,
     MEMORY_ARGV,
     NVIDIA_SMI_ARGV,
+    UNSETTLED,
     CardSampler,
     FillPreflightError,
     FillSeams,
+    _attach_pre_calls,
     adapter_usage,
     driver_cuda,
     facts_from_log,
     first_line,
     ggml_cuda_sha256,
+    install_relative,
     match_adapter_instance,
-    parse_counter_text,
     parse_mib,
-    UNSETTLED,
-    _attach_pre_calls,
     quiet_fill_seams,
     real_fill_seams,
     run_fill_card,
-    wait_until_stable,
     runner_pid,
+    wait_until_stable,
     window_delta,
 )
-from interlock.harness.e5 import SHARED_GATE_FROM_MIB
 from interlock.harness.runner import RunnerError, dry_run, run_spec
+from interlock.harness.spec import SpecError, validate_spec
 from interlock.receipt import check_tree, load_jsonl
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -134,7 +133,45 @@ def _fresh(tmp_path: Path) -> Path:
 
 
 class _Transport:
-    def __init__(self, seams, *, show_error=None, explode=False, spill_shared=False, spill_prompt=False, missing_shared=False, missing_prompt=False, abort_at=None, stick=False, linear=None, cold_disagrees=False, omit_tags=False, tag_bytes=None, busy_mib=20000, hide_baseline=False, settle_high=0, self_sample=True, split_vram=False, hold_abort=False, slow_unload=0, hang_unload=False, trained=4096, unresident_at=None, idle_mib=1500, peaks=None, fallback_peak=None, gate_peak_at=None, dedicated_script=None, dedicated_tracks_resident=False, resident_level=28000, idle_level=100, stuck_after_unload=False, dedicated_lag=2, late_cross=None, late_cross_ctx=None):
+    def __init__(
+        self,
+        seams,
+        *,
+        show_error=None,
+        explode=False,
+        spill_shared=False,
+        spill_prompt=False,
+        missing_shared=False,
+        missing_prompt=False,
+        abort_at=None,
+        stick=False,
+        linear=None,
+        cold_disagrees=False,
+        omit_tags=False,
+        tag_bytes=None,
+        busy_mib=20000,
+        hide_baseline=False,
+        settle_high=0,
+        self_sample=True,
+        split_vram=False,
+        hold_abort=False,
+        slow_unload=0,
+        hang_unload=False,
+        trained=4096,
+        unresident_at=None,
+        idle_mib=1500,
+        peaks=None,
+        fallback_peak=None,
+        gate_peak_at=None,
+        dedicated_script=None,
+        dedicated_tracks_resident=False,
+        resident_level=28000,
+        idle_level=100,
+        stuck_after_unload=False,
+        dedicated_lag=2,
+        late_cross=None,
+        late_cross_ctx=None,
+    ):
         self.seams = seams
         self.show_error = show_error
         self.explode = explode
@@ -411,7 +448,8 @@ def _seams(transport: _Transport) -> FillSeams:
     return seams
 
 
-def _run(tmp_path, transport, *, models=None, max_ctx=8192, grant="g", seams=None, folder="repo", unload_timeout=None, confirm_num_predict=1):
+def _run(tmp_path, transport, *, models=None, max_ctx=8192, grant="g", seams=None, folder="repo", unload_timeout=None,
+    confirm_num_predict=1):
     repo = tmp_path / folder
     spec_path = _bind(repo, _spec(models or [_model()], max_ctx=max_ctx, confirm_num_predict=confirm_num_predict))
     adapter_kwargs = {}
@@ -500,7 +538,8 @@ def test_a_clean_search_records_the_confirmed_window(tmp_path: Path):
     assert confirms and confirms[-1]["options"]["num_ctx"] == 4096
     assert confirms[-1]["shift"] is False and confirms[-1]["truncate"] is False
     assert confirms[-1]["options"]["num_predict"] == 1
-    assert any(body.get("raw") is True and body["options"]["num_predict"] == 1 for _m, _u, body in transport.calls if isinstance(body, dict))
+    assert any(body.get("raw") is True and body["options"]["num_predict"] == 1 for _m, _u,
+        body in transport.calls if isinstance(body, dict))
     assert seams.slept == []
     assert not (repo / "table").exists()
     assert check_tree(repo) == []
@@ -1273,7 +1312,6 @@ def test_shared_growth_steps_the_candidate_back(tmp_path: Path):
     assert rows[0]["settings"]["max_resident_ctx"] == 6144
     assert rows[0]["settings"]["shared_mib"] == 1000
     calls = rows[0]["settings"]["search_calls"]
-    spilled = [call for call in calls if call[0] == "confirm" and call[1] == 8192]
     assert ["confirm", 6144, 20000, 1000, 100, "confirmed"] in calls
     assert calls[-1] == ["confirm", 8192, SHARED_GATE_FROM_MIB, 1257, 100, "spill"]
 
@@ -1420,7 +1458,10 @@ def test_dry_run_names_the_confirmation_count(monkeypatch):
     assert "CUDA_Host model, compute, and output sizes come from the first-load lines" in text
     assert "a missing CUDA_Host line refuses after the first load" in text
     assert "the shared gate is the delta from the baseline taken before the window" not in text
-    assert "preflight samples nvidia-smi, both counters, the server log, the ggml-cuda sha, git, and driver CUDA before any load" in text
+    assert (
+        "preflight samples nvidia-smi, both counters, the server log, the ggml-cuda sha, git, and driver CUDA "
+        "before any load"
+    ) in text
     assert "driver CUDA accepts CUDA Version and CUDA UMD Version" in text
     assert "a missing log or dll refuses at preflight" in text
     assert "the log is INTERLOCK_OLLAMA_LOG, else the 11434 listener parent's redirect" in text
@@ -1447,10 +1488,19 @@ def test_dry_run_names_the_confirmation_count(monkeypatch):
     assert "the resident floor applies only where no count comes before the call" in text
     assert "the wait follows any count, whoever unloads the runner (keep_alive 0 included)" in text
     assert "the resident floor applies only where no count unload comes before the call" not in text
-    assert "a confirm whose count unloads waits for the idle baseline immediately before the measured request" not in text
-    assert "that settled reading is the pre-call reading, and the reading before the count is the pre-count reading" in text
+    assert (
+        "a confirm whose count unloads waits for the idle baseline immediately before the measured request"
+        not in text
+    )
+    assert (
+        "that settled reading is the pre-call reading, and the reading before the count is the pre-count reading"
+        in text
+    )
     assert "a call at the same num_ctx as the resident runner keeps the resident floor" not in text
-    assert "a num_ctx change unloads first and settles to the idle baseline, then the call loads at the new num_ctx" in text
+    assert (
+        "a num_ctx change unloads first and settles to the idle baseline, then the call loads at the new num_ctx"
+        in text
+    )
     assert "between models and after an unload that level is the idle baseline" in text
     assert "a card that does not settle makes the model inconclusive and is not a margin ceiling" in text
     smoke = dry_run(ROOT / "experiments" / "e5-smoke" / "spec.yaml", ROOT)
@@ -1459,9 +1509,15 @@ def test_dry_run_names_the_confirmation_count(monkeypatch):
     assert "the resident floor applies only where no count comes before the call" in smoke
     assert "the wait follows any count, whoever unloads the runner (keep_alive 0 included)" in smoke
     assert "the resident floor applies only where no count unload comes before the call" not in smoke
-    assert "a confirm whose count unloads waits for the idle baseline immediately before the measured request" not in smoke
+    assert (
+        "a confirm whose count unloads waits for the idle baseline immediately before the measured request"
+        not in smoke
+    )
     assert "a call at the same num_ctx as the resident runner keeps the resident floor" not in smoke
-    assert "a num_ctx change unloads first and settles to the idle baseline, then the call loads at the new num_ctx" in smoke
+    assert (
+        "a num_ctx change unloads first and settles to the idle baseline, then the call loads at the new num_ctx"
+        in smoke
+    )
     assert "a measured abort on the confirm walk is margin" in smoke
     assert "a second window with no bound stops the row" in text
     assert "the next load waits until the abort has finished" in text
@@ -1615,8 +1671,10 @@ def test_the_server_log_fills_the_four_fields(tmp_path: Path):
     dll.write_bytes(b"cuda-bytes")
     library = "C:/ollama/lib/ollama/cuda_v13/ggml-cuda.dll"
     log = (
-        'msg="server config" env="map[OLLAMA_FLASH_ATTENTION:false OLLAMA_KV_CACHE_TYPE:f16 OLLAMA_CONTEXT_LENGTH:2048]"\n'
-        'msg="server config" env="map[OLLAMA_FLASH_ATTENTION:true OLLAMA_KV_CACHE_TYPE:q8_0 OLLAMA_CONTEXT_LENGTH:8192]"\n'
+        'msg="server config" env="map[OLLAMA_FLASH_ATTENTION:false OLLAMA_KV_CACHE_TYPE:f16 '
+            'OLLAMA_CONTEXT_LENGTH:2048]"\n'
+        'msg="server config" env="map[OLLAMA_FLASH_ATTENTION:true OLLAMA_KV_CACHE_TYPE:q8_0 '
+            'OLLAMA_CONTEXT_LENGTH:8192]"\n'
         "load_backend: loaded CPU backend from C:/ollama/lib/ollama/cpu/ggml-cpu.dll\n"
         f"load_backend: loaded CUDA backend from {library}\n"
     )
@@ -1993,7 +2051,8 @@ def test_preflight_refuses_a_wrong_tolerance_before_any_sample(tmp_path: Path):
         seen.append(tuple(argv))
         raise AssertionError(argv)
 
-    seams = real_fill_seams(object(), run=run, read_counter=lambda counter: (_ for _ in ()).throw(AssertionError(counter)))
+    seams = real_fill_seams(object(), run=run,
+        read_counter=lambda counter: (_ for _ in ()).throw(AssertionError(counter)))
     spec = _spec([_model()])
     spec["adapter_match_tolerance_mib"] = 256
     with pytest.raises(FillPreflightError, match="matching allowance"):

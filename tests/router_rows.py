@@ -2,7 +2,6 @@
 
 from datetime import date
 
-
 AS_OF = date(2026, 10, 11)
 
 

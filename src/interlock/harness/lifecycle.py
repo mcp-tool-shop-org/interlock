@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -23,7 +23,7 @@ _SHA_SUFFIX = re.compile(r"^[0-9A-Za-z]+(?:-\d+)?$")
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def quarantine_root_for(root: Path, setting: Path | None) -> Path:

@@ -32,8 +32,8 @@ from __future__ import annotations
 
 import json
 import math
-import re
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -165,7 +165,7 @@ def sample_gpu(*, nvml=None, smi=None) -> tuple[float | None, float | None]:
         try:
             clock, power = nvml()
             return clock, power
-        except Exception:
+        except Exception:  # noqa: S110  # NVML failure falls through to nvidia-smi
             pass
     if smi is None:
         return None, None
@@ -357,7 +357,8 @@ def refusal_reason(
     return None
 
 
-def slot_refusal(arm: dict, result: dict, *, companion_arm: dict | None, companion: dict | None, tolerance, steady_ok, num_predict) -> str | None:
+def slot_refusal(arm: dict, result: dict, *, companion_arm: dict | None, companion: dict | None, tolerance, steady_ok,
+    num_predict) -> str | None:
     """Measured call first, then the companion under the same rules."""
 
     reason = refusal_reason(
@@ -421,7 +422,8 @@ def call_time_spent(result: dict | None, *, kind: str, reason: str | None = None
         "eval_s": seconds(("eval_s", "elapsed_s"), "eval_duration"),
         "total_s": seconds(("total_s",), "total_duration"),
         "eval_count": eval_count if isinstance(eval_count, int) and not isinstance(eval_count, bool) else None,
-        "prompt_eval_count": prompt_count if isinstance(prompt_count, int) and not isinstance(prompt_count, bool) else None,
+        "prompt_eval_count": prompt_count if isinstance(prompt_count, int) and not isinstance(prompt_count,
+            bool) else None,
     }
     if reason:
         spent["reason"] = reason
@@ -650,7 +652,8 @@ def prove_owned_server(spec: dict, *, segment: str, ps: dict) -> None:
     entry = _ps_entry(ps, model)
     size = None if entry is None else entry.get("size")
     vram = None if entry is None else entry.get("size_vram")
-    if isinstance(size, bool) or isinstance(vram, bool) or not isinstance(size, int) or not isinstance(vram, int) or vram != size:
+    if isinstance(size, bool) or isinstance(vram, bool) or not isinstance(size, int) or not isinstance(vram,
+        int) or vram != size:
         raise E4bError("REFUSED: the first load is not fully resident; size_vram must equal size")
     if _digest_hex(entry.get("digest")) != _digest_hex(pin):
         raise E4bError("REFUSED: the model digest does not match the spec pin")
@@ -767,7 +770,8 @@ def schedule_e4b(spec: dict, repeats: int) -> list[dict]:
     return items
 
 
-def run_burn(*, target_utility: float, duration_s: float, sample_utility, sample_performance, sleep, start_threads) -> dict:
+def run_burn(*, target_utility: float, duration_s: float, sample_utility, sample_performance, sleep,
+    start_threads) -> dict:
     """Busy threads matched to a utility target. No GPU work is available here.
 
     The threads stop when this returns, and when it raises.
@@ -883,7 +887,8 @@ def dry_text(spec: dict, blob: str, *, pilot: bool, pairs: list[str] | None = No
         "session end is keep_alive 0 unload",
         "warm-up: NPU and iGPU one unmeasured call; 5090 768 tokens at least 3 s until steady",
         "until-steady: 10 samples at 200 ms, 2 attempts, else clock_not_steady",
-        "5090 companion is sustained before the Intel warm-up: 768 tokens, at least 3 s, steady, next decode underway, else clock_not_steady",
+        "5090 companion is sustained before the Intel warm-up: 768 tokens, at least 3 s, steady, next decode underway, "
+            "else clock_not_steady",
         "refusals re-run once in place; two refusals in a pair are inconclusive",
         "Hodges-Lehmann, exact Wilcoxon at least 90%, TOST +/-0.10",
         "extension to 15 when the 10-triplet interval straddles",
@@ -1247,11 +1252,13 @@ def perform_slot(
                 events += 1
                 reasons.append(reason)
                 final = _slot_row(
-                    arm, role, pair, repeat, measured, reason, events, reasons, cpu_start, cpu_end, utility, root, run_id, warm, attempt_time, judged
+                    arm, role, pair, repeat, measured, reason, events, reasons, cpu_start, cpu_end, utility, root,
+                        run_id, warm, attempt_time, judged
                 )
                 continue
             final = _slot_row(
-                arm, role, pair, repeat, measured, None, events, reasons, cpu_start, cpu_end, utility, root, run_id, warm, attempt_time, judged
+                arm, role, pair, repeat, measured, None, events, reasons, cpu_start, cpu_end, utility, root, run_id,
+                    warm, attempt_time, judged
             )
             break
         except Exception as exc:
@@ -1266,7 +1273,8 @@ def perform_slot(
             if measured is None:
                 measured = {"value": None, "clocks_mhz": None, "power_w": None, "eval_count": 0}
             final = _slot_row(
-                arm, role, pair, repeat, measured, "short_decode", events, reasons, cpu_start, cpu_end, utility, root, run_id, warm, attempt_time
+                arm, role, pair, repeat, measured, "short_decode", events, reasons, cpu_start, cpu_end, utility, root,
+                    run_id, warm, attempt_time
             )
             continue
     if final is None:
@@ -1295,7 +1303,8 @@ def _phase_times(warm, measured) -> list[dict]:
     return rows
 
 
-def _slot_row(arm, role, pair, repeat, measured, reason, events, reasons, cpu_start, cpu_end, utility, root, run_id, warm, attempt_time=None, companion_call=None) -> dict:
+def _slot_row(arm, role, pair, repeat, measured, reason, events, reasons, cpu_start, cpu_end, utility, root, run_id,
+    warm, attempt_time=None, companion_call=None) -> dict:
     clocks = measured.get("clocks_mhz") if isinstance(measured.get("clocks_mhz"), list) else []
     power = measured.get("power_w") if isinstance(measured.get("power_w"), list) else []
     series_rel = None
@@ -1345,7 +1354,8 @@ def _triplet(seams, item, arms, prompt, measurement, root, run_id, *, attempts: 
     added = 0
     for role, arm_id in roles:
         if added >= 2:
-            slots.append({"arm": arm_id, "role": role, "pair": item["pair"], "repeat": item["repeat"], "skipped": True, "value": None, "refusal_events": 0})
+            slots.append({"arm": arm_id, "role": role, "pair": item["pair"], "repeat": item["repeat"], "skipped": True,
+                "value": None, "refusal_events": 0})
             continue
         slot = perform_slot(
             seams,
@@ -1585,7 +1595,8 @@ def _execute_block_loop(spec: dict, seams, *, root: Path, run_id: str, pairs: li
             record["verdict"] = "inconclusive"
             record["refusal_events"] = state["events"]
         else:
-            record = _analyze(state["effects"], band=band, resamples=resamples, allow_extension=len(state["effects"]) == 10)
+            record = _analyze(state["effects"], band=band, resamples=resamples,
+                allow_extension=len(state["effects"]) == 10)
             if record["verdict"] == "extend" and extra > 0:
                 more = _extend_pair(
                     seams, pair, arms, prompt, measurement, root, run_id, start_repeat=repeats, extra=extra
@@ -1663,7 +1674,8 @@ def _git_at_start(seams, repo: Path, git: dict | None) -> dict:
     return {"git_sha": None, "clean_tree": None}
 
 
-def _header(spec, seams, repo, running, caches, prompt, *, aborted: bool, git: dict | None = None, pairs: list[str] | None = None) -> dict:
+def _header(spec, seams, repo, running, caches, prompt, *, aborted: bool, git: dict | None = None,
+    pairs: list[str] | None = None) -> dict:
     from interlock.ollama_supervisor import server_config_env
 
     recorded = git if git is not None else {"git_sha": None, "clean_tree": None}
@@ -1818,7 +1830,8 @@ def run_block(
     finally:
         # The receipt lands before cleanup. Cleanup cannot raise past it.
         if started and running is not None:
-            header = _header(spec, seams, repo, running, caches, prompt, aborted=aborted, git=recorded, pairs=recorded_pairs)
+            header = _header(spec, seams, repo, running, caches, prompt, aborted=aborted, git=recorded,
+                pairs=recorded_pairs)
             header["run_id"] = run_id
             if cleanup_errors:
                 header["cleanup_errors"] = cleanup_errors
@@ -1903,11 +1916,13 @@ def run_pilot(
                     missing += 1
                     spent_rows.append({"call": index, "missing": True, "phases": [_repeat_spent(exc, "warm")]})
                     continue
-                if not warm["attempts"] or float(warm["attempts"][-1].get("elapsed_s") or 0) + 1e-9 < float(measurement["warmup_min_s"]):
+                if not warm["attempts"] or float(warm["attempts"][-1].get("elapsed_s") or 0) + 1e-9 < float(measurement[
+                    "warmup_min_s"]):
                     warm_short += 1
                 try:
                     measured = dict(
-                        seams.call(arm, num_predict=arm.get("num_predict"), measured=True, kind="measure", prompt=prompt)
+                        seams.call(arm, num_predict=arm.get("num_predict"), measured=True, kind="measure",
+                            prompt=prompt)
                     )
                 except Exception as exc:
                     if not _is_repeat_limit(exc):
@@ -2139,7 +2154,8 @@ def normalize_ollama(payload: dict) -> dict:
         "eval_count": eval_count if isinstance(eval_count, int) and not isinstance(eval_count, bool) else None,
         "elapsed_s": elapsed,
         "truncated_tokens": None,
-        "prompt_eval_count": payload.get("prompt_eval_count") if isinstance(payload.get("prompt_eval_count"), int) and not isinstance(payload.get("prompt_eval_count"), bool) else None,
+        "prompt_eval_count": payload.get("prompt_eval_count") if isinstance(payload.get("prompt_eval_count"),
+            int) and not isinstance(payload.get("prompt_eval_count"), bool) else None,
     }
     normalized["time_spent"] = call_time_spent(payload, kind="generate")
     return normalized
@@ -2197,7 +2213,8 @@ def generate_loop(arm: dict, post, stop: threading.Event) -> dict:
     return last
 
 
-def _run_5090_companion(seams, arm: dict, prompt: str, measurement: dict, stop: threading.Event, box: dict, record_latest) -> None:
+def _run_5090_companion(seams, arm: dict, prompt: str, measurement: dict, stop: threading.Event, box: dict,
+    record_latest) -> None:
     """Warm under the 5090 rule, then keep generating. Underway fires as the next decode is entered."""
 
     begun = time.perf_counter()
@@ -2250,7 +2267,8 @@ def _run_5090_companion(seams, arm: dict, prompt: str, measurement: dict, stop: 
     generate_loop(arm, post, stop)
 
 
-def spawn_ollama(argv: list[str], environment: dict, log_path: Path, *, popen=subprocess.Popen, system: str | None = None):
+def spawn_ollama(argv: list[str], environment: dict, log_path: Path, *, popen=subprocess.Popen,
+    system: str | None = None):
     """The harness's own unelevated child. Logging goes to ``log_path``."""
 
     system = os.name if system is None else system
@@ -2288,9 +2306,11 @@ def urllib_exchange(method: str, url: str, body: dict | None = None) -> dict:
     timeout = _http_timeout(url)
     data = None if body is None else json.dumps(body).encode("utf-8")
     headers = {"Content-Type": "application/json"} if data is not None else {}
-    request = urllib.request.Request(url, data=data, method=method, headers=headers)
+    request = urllib.request.Request(  # noqa: S310  # the live caller builds http://127.0.0.1
+        url, data=data, method=method, headers=headers
+    )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310  # loopback http only
             payload = json.loads(response.read().decode("utf-8"))
     except TimeoutError as exc:
         path = urlsplit(url).path or url
@@ -2407,7 +2427,9 @@ class IntelLane:
         }
 
 
-def build_live_seams(root: Path, run_id: str, spec: dict, *, pilot: bool, run=None, popen=None, transport=None, opener=None, sample=None, cpu=None, intel=None, sampler=threaded_sample, vram=None, git_run=None, bind=None, card_mib=None):
+def build_live_seams(root: Path, run_id: str, spec: dict, *, pilot: bool, run=None, popen=None, transport=None,
+    opener=None, sample=None, cpu=None, intel=None, sampler=threaded_sample, vram=None, git_run=None, bind=None,
+        card_mib=None):
     """Wire the run-owned server. Every external call is injectable; the defaults are the live ones."""
 
     from interlock.harness.ollama_serve import Server

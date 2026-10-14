@@ -156,7 +156,7 @@ def bootstrap_median(values: list[float], *, resamples: int = 50000, seed: int =
         raise StatsError("the bootstrap needs at least one resample")
     if not values:
         raise StatsError("the bootstrap needs at least one effect")
-    rng = random.Random(seed)
+    rng = random.Random(seed)  # noqa: S311  # seeded bootstrap footnote, not a key
     count = len(values)
     found = []
     for _ in range(resamples):

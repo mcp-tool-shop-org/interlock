@@ -35,28 +35,50 @@
   "changes": {
     "fileCounts": {
       "added": 1,
-      "changed": 27,
+      "changed": 54,
       "moved": 0,
-      "parts": 6,
+      "parts": 5,
       "removed": 0
     },
     "items": [
       {
-        "kind": "door",
-        "sentence": "OpenSSF Scorecard (.github/workflows/scorecard.yml) is a new door. It starts on a `branch_protection_rule` event; on a schedule (`43 15 * * 1`), Monday at 15:43 UTC; or by hand. It runs no file this map can see.",
+        "kind": "landing",
+        "sentence": "src/interlock/adapters/openvino.py is now read by pyproject.toml.",
         "subjects": [
-          ".github/workflows/scorecard.yml"
+          "src/interlock/adapters/openvino.py",
+          "pyproject.toml"
         ]
       },
       {
+        "kind": "landing",
+        "sentence": "src/interlock/harness/e4b.py is now read by pyproject.toml.",
+        "subjects": [
+          "src/interlock/harness/e4b.py",
+          "pyproject.toml"
+        ]
+      },
+      {
+        "kind": "landing",
+        "sentence": "src/interlock/harness/environment.py is now read by pyproject.toml.",
+        "subjects": [
+          "src/interlock/harness/environment.py",
+          "pyproject.toml"
+        ]
+      },
+      {
+        "kind": "landing",
+        "sentence": "And 14 more new writers and readers of places.",
+        "subjects": []
+      },
+      {
         "kind": "counts",
-        "sentence": "1 file added and 27 changed content, across 6 parts.",
+        "sentence": "1 file added and 54 changed content, across 5 parts.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "e8628cab287088a160660d64d63444c98908f96d",
-      "generatedAt": "2026-10-13T18:18:15.631Z"
+      "commit": "2e4b1b53e46246469a46f10136ce19570307f932",
+      "generatedAt": "2026-10-13T22:47:49.564Z"
     },
     "unchanged": false
   },
@@ -143,7 +165,7 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 9 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 1,
-  "commit": "2e4b1b53e46246469a46f10136ce19570307f932",
+  "commit": "e4aba2d86f190fa2c9c97c469a0242b3e98d1fd9",
   "defaultBranch": "main",
   "derived": "10 parts, mostly Python (87 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
   "doors": [
@@ -305,7 +327,7 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-13T22:47:49.564Z",
+  "generatedAt": "2026-10-14T00:21:11.490Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "3 writes and 4 reads use paths built at run time and are not named here.",

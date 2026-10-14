@@ -19,8 +19,8 @@ from interlock.harness.e5 import (
     Observation,
     SearchResult,
     baseline_is_spilling,
-    is_spill,
     floor_confirm_shared,
+    is_spill,
     search,
     shared_deltas,
 )
@@ -670,7 +670,8 @@ def test_the_baseline_helpers_skip_a_reading_that_is_not_the_floor_confirm():
         ("confirm", 6144, 1, 531, 40.0, "confirmed"),
     ]
     assert floor_confirm_shared(numbered) == (2048, 505, 40.0)
-    deltas = shared_deltas([("confirm", 4096), ("load", 2048, 1, True, 1, "resident"), ("load", 2048, 1, 507, 1, "resident")], 505)
+    deltas = shared_deltas([("confirm", 4096), ("load", 2048, 1, True, 1, "resident"), ("load", 2048, 1, 507, 1,
+        "resident")], 505)
     assert deltas[0]["delta_mib"] is None
     assert deltas[1]["delta_mib"] is None
     assert deltas[2]["delta_mib"] == 2

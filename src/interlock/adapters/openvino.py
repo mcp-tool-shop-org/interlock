@@ -74,6 +74,15 @@ import time
 import warnings
 from pathlib import Path
 
+from interlock.adapters.base import (
+    AdapterError,
+    CompileRejected,
+    NativeBinaryRejected,
+    StepRequest,
+    StepResult,
+    compile_rejected_error,
+)
+from interlock.devices import DeviceRefused, resolve_device
 from interlock.harness.storage import (
     HOT_ROOT,
     StorageError,
@@ -84,15 +93,6 @@ from interlock.harness.storage import (
     fresh_copy_dir,
     hot_snapshot,
 )
-from interlock.adapters.base import (
-    AdapterError,
-    CompileRejected,
-    NativeBinaryRejected,
-    StepRequest,
-    StepResult,
-    compile_rejected_error,
-)
-from interlock.devices import DeviceRefused, resolve_device
 
 try:  # CI has no intel extra; importing this module must still succeed.
     import openvino as ov
@@ -175,7 +175,8 @@ def quant_of(model: str, setting: object) -> str:
     return "unrecorded"
 
 
-def pad_truncate(ids: list[int], length: int, pad_id: int, *, allow_truncate: bool = True) -> tuple[list[int], list[int], int]:
+def pad_truncate(ids: list[int], length: int, pad_id: int, *, allow_truncate: bool = True) -> tuple[list[int],
+    list[int], int]:
     """Right-pad/truncate to ``length``. Returns (ids, mask, dropped)."""
     dropped = max(0, len(ids) - length)
     if dropped and not allow_truncate:
@@ -229,7 +230,7 @@ def pool(matrix, mask, how: str) -> list[float]:
     if total <= 0:
         raise AdapterError("the attention mask is all zeros")
     acc = [0.0] * len(rows[0])
-    for row, keep in zip(rows, mask):
+    for row, keep in zip(rows, mask):  # noqa: B905  # a short mask drops rows; strict would raise
         if keep:
             for j, x in enumerate(row):
                 acc[j] += x
@@ -411,7 +412,8 @@ class OpenvinoAdapter:
             return artifact
         raise AdapterError(f"no embedder artifact found for {model}: {last}")
 
-    def _load_compiled(self, file: Path, ov_id: str, static: tuple[int, int] | None, config: dict) -> tuple[object, float]:
+    def _load_compiled(self, file: Path, ov_id: str, static: tuple[int, int] | None, config: dict) -> tuple[object,
+        float]:
         core = self._core()
         graph = core.read_model(str(file))
         if static is not None:
@@ -427,7 +429,8 @@ class OpenvinoAdapter:
             compiled = core.compile_model(graph, ov_id, config or {})
         return compiled, self.clock() - t0
 
-    def _embedder(self, model: str, revision: str | None, ov_id: str, static: tuple[int, int] | None, compile_config: dict) -> dict:
+    def _embedder(self, model: str, revision: str | None, ov_id: str, static: tuple[int, int] | None,
+        compile_config: dict) -> dict:
         key = (model, revision, ov_id, static, tuple(sorted(compile_config.items())))
         entry = self._compiled.get(key)
         if entry is None:
@@ -523,7 +526,7 @@ def _directory_tokenizer_loader(model: str, revision: str | None):
 
 
 @contextlib.contextmanager
-def _offline_when_hot(s: "_Settings"):
+def _offline_when_hot(s: _Settings):
     """A hot arm must not reach the hub. The directory load is the rule; this is the backstop."""
 
     if s.get("hf_cache") != "hot":
@@ -939,7 +942,8 @@ def _prepare_dir(self, request: StepRequest, s: _Settings) -> tuple[Path, Path]:
     hf_cache = s.get("hf_cache") or "archive"
     if hf_cache == "hot":
         if local.is_dir() or not revision:
-            raise AdapterError("hot cache resolves a repo@revision and does not fall back to a local path or the archive")
+            raise AdapterError(
+                "hot cache resolves a repo@revision and does not fall back to a local path or the archive")
         try:
             snapshot = hot_snapshot(self._hot_root, repo, revision)
         except StorageError as exc:
@@ -1046,7 +1050,7 @@ def _pipeline_key(
     return key if prefix_caching == "default" else key + (prefix_caching,)
 
 
-def _prefix_mode(s: "_Settings") -> str:
+def _prefix_mode(s: _Settings) -> str:
     """``prefix_caching`` for a generate step: on, off, or default (the library's own)."""
 
     mode = str(s.get("prefix_caching", "default")).lower()
@@ -1256,7 +1260,11 @@ def _stop_session(self, request: StepRequest) -> None:
     sess["stop"].set()
     sess["worker"].join(timeout=10.0)
     if sess["worker"].is_alive():
-        warnings.warn("an OpenVINO session thread did not stop within 10 s; it exits with the process", RuntimeWarning)
+        warnings.warn(
+            "an OpenVINO session thread did not stop within 10 s; it exits with the process",
+            RuntimeWarning,
+            stacklevel=2,
+        )
     self._session = None
     fault = sess["box"]["fault"]
     if isinstance(fault, AdapterError):

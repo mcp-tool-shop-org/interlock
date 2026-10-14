@@ -27,6 +27,8 @@ import threading
 import time
 from urllib.parse import urlsplit
 
+from interlock.adapters.base import AdapterError, StepRequest, StepResult
+
 # The token count asks for one completion token. Ollama reads num_predict 0 as no limit.
 COUNT_NUM_PREDICT = 1
 
@@ -34,8 +36,6 @@ _CANCEL_POLL_S = 0.2
 UNLOAD_TIMEOUT_S = 60.0
 UNLOAD_TIMEOUT_NOTE = "the unload timed out; the model may still be resident"
 COUNT_TIMEOUT_NOTE = "the token count timed out; the arm was refused"
-
-from interlock.adapters.base import AdapterError, StepRequest, StepResult
 
 URL_5090 = "http://127.0.0.1:11434"
 URL_CPU = "http://127.0.0.1:11490"
@@ -238,7 +238,7 @@ def default_transport(
     except AdapterError:
         raise
     except (OSError, http.client.HTTPException, json.JSONDecodeError):
-        raise AdapterError("the request was closed")
+        raise AdapterError("the request was closed")  # noqa: B904  # from would change the chain
     finally:
         if ticket is not None and flight is not None:
             flight.disarm(ticket)
@@ -267,7 +267,7 @@ def _wait_for_reply(conn: http.client.HTTPConnection, ticket: _Ticket, timeout: 
         try:
             readable, _, _ = select.select([sock], [], [], slice_s)
         except (OSError, ValueError):
-            raise AdapterError("the request was closed")
+            raise AdapterError("the request was closed")  # noqa: B904  # from would change the chain
         if readable:
             return
 
@@ -479,7 +479,8 @@ class OllamaAdapter:
             prompt_tok_s=_rate(payload.get("prompt_eval_count"), prompt_ns),
             output=payload.get("response"),
             resolved=resolved or None,
-            prompt_eval_duration_ns=prompt_ns if isinstance(prompt_ns, int) and not isinstance(prompt_ns, bool) else None,
+            prompt_eval_duration_ns=prompt_ns if isinstance(prompt_ns, int) and not isinstance(prompt_ns,
+                bool) else None,
         )
 
     def unload(self, model: str, device: str | None = None) -> None:

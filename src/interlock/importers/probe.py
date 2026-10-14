@@ -9,8 +9,8 @@ why E1 exists.
 
 from __future__ import annotations
 
-from interlock.importers.common import UNRECORDED, blank_latency, blank_settings, sha256_bytes, source_provenance
 from interlock.families import stamp_family
+from interlock.importers.common import UNRECORDED, blank_latency, blank_settings, sha256_bytes, source_provenance
 from interlock.receipt import validate_row
 
 
@@ -21,7 +21,8 @@ def probe_rows(document: dict, *, source_path: str, commit_sha: str, file_date: 
     rows: list[dict] = []
     skipped: list[str] = []
     cases = document.get("cases") or document.get("rows") or []
-    contended = "contended" in str(document.get("note") or "").lower() or "before treating" in str(document.get("note") or "").lower()
+    contended = "contended" in str(document.get("note") or "").lower() or "before treating" in str(document.get(
+        "note") or "").lower()
     for index, case in enumerate(cases):
         if case.get("error"):
             skipped.append(f"{source_path}#{index}: error row, not a routing row")
