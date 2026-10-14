@@ -1,0 +1,120 @@
+# Standards compliance
+#
+# PIN_PER_STEP: 2. The model and its digest, the device, the prompt, num_predict, the order, the pairs and the
+#   barrier are in this file. The trace mode is the run's --trace flag; this spec refuses --trace off.
+# ANDON_AUTHORITY: 2. A failed step stops the sequence. The run's watcher stops it on the stop file, RAM or a hang.
+# NAMED_COMPENSATORS: 2. Unload is keep_alive 0 at the end of the run. The trace sits in the git-ignored logs/ and
+#   is removed by hand after audit. No publish, no rental, no spend.
+# DECOMPOSE_BY_SECRETS: 2. This file is the pre-registration. The harness runs it.
+# UNCERTAINTY_GATED_HUMANS: 2. The Publisher grants the 5090 after Argon's review and the Director's go.
+# EXTERNAL_VERIFIER: n/a here. Argon (Gemini, by hand) reviews the stage 1 harness and analysis before any run.
+#
+# interlock-relay, stage 1 (design v3.1 in mcp-tool-shop-org/rnd, experiments/interlock-relay). R&D, 2026-10-14.
+id: RELAY-S1-COMPANION
+procedure: interleaved
+order: aba
+compile_cache: reuse
+question: >
+  Is a companion load on the 5090 traced completely, in traced and untraced slots?
+decision: >
+  H1 and H3 on the live server: the companion's calls are counted once and traced once in traced slots. Not an H2 comparison.
+band: 0.10
+warmups: 0
+repeats: 3
+rest_s: 0
+trace_barrier_ms: 250
+needs:
+  grant: true
+  npu_session: false
+  cpu_window: false
+dataset:
+  name: relay-s1-fixed-prompt
+  rule: >
+    The decode spec's prompt for both models.
+metrics:
+  - decode_tok_s
+  - latency_ms
+  - prompt_tok_s
+  - dedicated_mib
+stop_rules:
+  - A failed step stops the sequence. A failed step is inconclusive, not a pass.
+  - Order is A-B-A per round. A is untraced, B is the same arm with tracing on. Cold is once per arm and stays out
+    of the comparison.
+  - After every slot, in both arms, the harness flushes the trace, collects garbage and rests 250 ms.
+  - The run refuses --trace off. The comparison is analysed by experiments/interlock-relay/stage1/analyze.py in
+    rnd, frozen before the run.
+arms:
+  - id: solo
+    task: generate
+    device: "5090"
+    engine: ollama
+    model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "0.35.1"
+    thinking_level: "off"
+    num_predict: 32
+    num_ctx: null
+    batch: null
+    prompt: "The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass."
+    trace: false
+    measure: decode_tok_s
+  - id: with-companion-on
+    task: generate
+    device: "5090"
+    engine: ollama
+    model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "0.35.1"
+    thinking_level: "off"
+    num_predict: 32
+    num_ctx: null
+    batch: null
+    prompt: "The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass."
+    trace: true
+    measure: decode_tok_s
+    companion: companion
+    companion_device: "5090"
+  - id: with-companion-off
+    task: generate
+    device: "5090"
+    engine: ollama
+    model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "0.35.1"
+    thinking_level: "off"
+    num_predict: 32
+    num_ctx: null
+    batch: null
+    prompt: "The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass."
+    trace: false
+    measure: decode_tok_s
+    companion: companion
+    companion_device: "5090"
+  - id: companion
+    task: generate
+    device: "5090"
+    engine: ollama
+    model: llama3.1:8b
+    revision_or_digest: 46e0c10c039e019119339687c3c1757cc81b9da49709a3b3924863ba87ca666e
+    quant: unrecorded
+    licence: unrecorded
+    engine_version: "0.35.1"
+    thinking_level: "off"
+    num_predict: 32
+    num_ctx: 4096
+    batch: null
+    prompt: "The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass. The switchyard counts the same cars on every pass."
+    measure: decode_tok_s
+pairs:
+  - id: companion-traced
+    alone: solo
+    paired: with-companion-on
+  - id: companion-untraced
+    alone: solo
+    paired: with-companion-off
