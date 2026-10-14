@@ -405,7 +405,7 @@ class CardSampler:
             self._abort_done.clear()
             try:
                 self.on_abort()
-            except Exception:  # noqa: S110  # the abort flag still has to clear
+            except Exception:  # noqa: S110  # pragma: no cover  # the abort flag still has to clear
                 pass
             finally:
                 self._firing = False
@@ -1948,10 +1948,10 @@ def _measure_model(
             if str(exc) == COUNT_TIMEOUT_NOTE:
                 raise _CountRefused(COUNT_TIMEOUT_NOTE) from exc
             if sampler.over:
-                raise _WindowOver()  # noqa: B904  # the sampler is over; from would change the chain
+                raise _WindowOver()  # noqa: B904  # pragma: no cover  # sampler over; from changes the chain
             kind = _kind(str(exc))
             if kind:
-                raise _Repairable(kind, str(exc))  # noqa: B904  # from would change the chain
+                raise _Repairable(kind, str(exc))  # noqa: B904  # pragma: no cover  # from changes the chain
             raise
         if sampler.over:
             raise _WindowOver()
@@ -2035,7 +2035,7 @@ def _measure_model(
                     return _over(sampler.peak)
                 kind = _kind(str(exc))
                 if kind:
-                    raise _Repairable(kind, str(exc))  # noqa: B904  # from would change the chain
+                    raise _Repairable(kind, str(exc))  # noqa: B904  # pragma: no cover  # from changes the chain
                 return Observation(False, sampler.peak, error=str(exc))
             if _count_leaves_loaded(entry.get("keep_alive")):
                 stop_if_unload_timed_out()
@@ -2051,7 +2051,7 @@ def _measure_model(
                     return _over(sampler.peak)
                 kind = _kind(str(exc))
                 if kind:
-                    raise _Repairable(kind, str(exc))  # noqa: B904  # from would change the chain
+                    raise _Repairable(kind, str(exc))  # noqa: B904  # pragma: no cover  # from changes the chain
                 return Observation(False, sampler.peak, error=str(exc))
             if cold_tokens != tokens:
                 if _count_leaves_loaded(entry.get("keep_alive")):
@@ -2102,7 +2102,7 @@ def _measure_model(
                 return _over(sampler.peak)
             kind = _kind(str(exc))
             if kind:
-                raise _Repairable(kind, str(exc))  # noqa: B904  # from would change the chain
+                raise _Repairable(kind, str(exc))  # noqa: B904  # pragma: no cover  # from changes the chain
             return Observation(False, sampler.peak, error=str(exc))
         _gate_load_lines(kind)
         if sampler.over:

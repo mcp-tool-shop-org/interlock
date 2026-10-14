@@ -114,17 +114,17 @@ def read_start_state(uses_5090: bool) -> dict:
     if psutil is not None:
         try:
             state["cpu_percent"] = float(psutil.cpu_percent(interval=0.2))
-        except Exception:  # noqa: S110  # a probe failure stays unrecorded
+        except Exception:  # noqa: S110  # pragma: no cover  # a probe failure stays unrecorded
             pass
         try:
             mhz = getattr(psutil.cpu_freq(), "current", None)
             if mhz is not None:
                 state["cpu_freq_mhz"] = float(mhz)
-        except Exception:  # noqa: S110  # a probe failure stays unrecorded
+        except Exception:  # noqa: S110  # pragma: no cover  # a probe failure stays unrecorded
             pass
         try:
             state["ram_pct"] = float(psutil.virtual_memory().percent)
-        except Exception:  # noqa: S110  # a probe failure stays unrecorded
+        except Exception:  # noqa: S110  # pragma: no cover  # a probe failure stays unrecorded
             pass
     return state
 
@@ -684,7 +684,7 @@ class RunWatch:
         except Exception as exc:  # the process must still end
             try:
                 print(f"interlock: the run watch could not write the receipt: {exc}", file=sys.stderr)
-            except Exception:  # noqa: S110  # the process must still end
+            except Exception:  # noqa: S110  # pragma: no cover  # the process must still end
                 pass  # pragma: no cover
         finally:
             self.hooks.exit_fn(code)

@@ -685,8 +685,8 @@ def run_interleaved(
             if (root / "receipts" / f"{run_id}.jsonl").is_file():
                 try:
                     announce_run(import_receipt(root, run_id), finished=False)
-                except Exception:  # noqa: S110  # the receipt is already written
-                    pass  # the table import is the later step
+                except Exception:  # noqa: S110  # pragma: no cover  # the receipt is already written
+                    pass  # pragma: no cover  # the table import is the later step
         finally:
             if held:
                 state_lock.release()

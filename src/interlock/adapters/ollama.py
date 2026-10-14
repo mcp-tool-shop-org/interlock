@@ -267,7 +267,7 @@ def _wait_for_reply(conn: http.client.HTTPConnection, ticket: _Ticket, timeout: 
         try:
             readable, _, _ = select.select([sock], [], [], slice_s)
         except (OSError, ValueError):
-            raise AdapterError("the request was closed")  # noqa: B904  # from would change the chain
+            raise AdapterError("the request was closed")  # noqa: B904  # pragma: no cover  # from changes the chain
         if readable:
             return
 

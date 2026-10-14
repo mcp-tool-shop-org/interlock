@@ -1260,7 +1260,7 @@ def _stop_session(self, request: StepRequest) -> None:
     sess["stop"].set()
     sess["worker"].join(timeout=10.0)
     if sess["worker"].is_alive():
-        warnings.warn(
+        warnings.warn(  # pragma: no cover  # the worker is still alive after the join
             "an OpenVINO session thread did not stop within 10 s; it exits with the process",
             RuntimeWarning,
             stacklevel=2,

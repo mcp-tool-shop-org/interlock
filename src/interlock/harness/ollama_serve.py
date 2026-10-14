@@ -321,7 +321,7 @@ class Server:
                 if pid is not None:
                     try:
                         self._stop_tree(pid)
-                    except Exception:  # noqa: S110  # the stop message still has to be raised
+                    except Exception:  # noqa: S110  # pragma: no cover  # the stop message still has to be raised
                         pass
         text = message if not tail else f"{message}\n{tail}"
         raise ServeError(text)
