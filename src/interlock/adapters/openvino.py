@@ -575,7 +575,36 @@ def _bound(self, s: _Settings) -> float:
     return s.call_timeout_s if s.call_timeout_s is not None else self.call_timeout_s
 
 
-def _timed_call(fn, timeout_s: float):
+# The run's call tracer (interlock.calltrace), set by the runner. None is off.
+_TRACER = None
+
+
+def set_tracer(tracer) -> None:
+    global _TRACER
+    _TRACER = tracer
+
+
+def _timed_call(fn, timeout_s: float, *, kind: str = "generate", model: str | None = None, device: str | None = None):
+    """``_bounded_call``, counted and, when tracing, logged. The span opens and
+    closes on this calling thread: a hang closes as ``timeout`` with the worker
+    still running, and no tracer call is ever made inside the worker."""
+
+    tracer = _TRACER
+    if tracer is None:
+        return _bounded_call(fn, timeout_s)
+    record = tracer.start(kind, f"openvino/{kind}", model=model, device=device)
+    status = "exception"
+    try:
+        result = _bounded_call(fn, timeout_s)
+        status = "timeout" if result[0] == "hang" else "ok"
+        if status == "timeout":
+            record.extra["worker_still_running"] = True
+        return result
+    finally:
+        tracer.end(record, status)
+
+
+def _bounded_call(fn, timeout_s: float):
     """Run one measured call with a hard bound. A hang returns ("hang", None);
     the worker is a daemon and cannot outlive the process.
 
@@ -718,6 +747,9 @@ def _run_embed(self, request: StepRequest, s: _Settings, resolved: dict) -> Step
                 entry, ids, mask, tt, batch_rows if static is None else static[0], request.task
             ),
             bound,
+            kind="embed",
+            model=request.model,
+            device=ov_id,
         )
     except Exception as exc:
         if _is_device_lost(exc):
@@ -840,7 +872,10 @@ def _run_generate(self, request: StepRequest, s: _Settings, resolved: dict) -> S
     t0 = self.clock()
     try:
         bound = _bound(self, s)
-        status, out = _timed_call(lambda: pipe.generate([str(s.get("prompt") or "hello")], config), bound)
+        status, out = _timed_call(
+            lambda: pipe.generate([str(s.get("prompt") or "hello")], config), bound,
+            kind="generate", model=request.model, device=ov_id,
+        )
     except Exception as exc:
         if _is_device_lost(exc):
             self._lost_devices.add(ov_id)
@@ -1198,7 +1233,10 @@ def _start_session(self, request: StepRequest) -> None:
                 while not stop.is_set():
                     t0 = self.clock()
                     bound = _bound(self, s)
-                    status, _ = _timed_call(lambda: pipe.generate(str(s.get("prompt") or "hello"), config), bound)
+                    status, _ = _timed_call(
+                        lambda: pipe.generate(str(s.get("prompt") or "hello"), config), bound,
+                        kind="companion", model=request.model, device=ov_id,
+                    )
                     if status == "hang":
                         box["fault"] = AdapterError(f"hang: companion call exceeded {bound:g} s")
                         return
@@ -1223,7 +1261,8 @@ def _start_session(self, request: StepRequest) -> None:
                     t0 = self.clock()
                     bound = _bound(self, s)
                     status, _ = _timed_call(
-                        lambda: self._infer_embed(entry, ids, mask, tt, rows, request.task), bound
+                        lambda: self._infer_embed(entry, ids, mask, tt, rows, request.task), bound,
+                        kind="companion", model=request.model, device=ov_id,
                     )
                     if status == "hang":
                         box["fault"] = AdapterError(f"hang: companion call exceeded {bound:g} s")

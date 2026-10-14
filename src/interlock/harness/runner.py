@@ -357,6 +357,7 @@ def run_interleaved(
     watch: WatchHooks | None = None,
     marker: RunMarker | None = None,
     supervisor=None,
+    tracer=None,
 ) -> list[dict]:
     """Run a committed spec.
 
@@ -640,6 +641,9 @@ def run_interleaved(
         window = {"start": _iso(started_at), "end": _iso(wall())}
         restarts = marker.restart_records()
         for row in rows:
+            if tracer is not None:
+                arm_of_row = row["id"].rsplit("/", 2)[-2]
+                row.setdefault("artifacts", {}).update(tracer.artifacts(arm_of_row))
             row["settings"]["run_window"] = window
             row["settings"]["start_state"] = start_state
             row["settings"]["ram_guard"] = guard.ram_guard()
@@ -907,6 +911,9 @@ def run_interleaved(
                 if probe is not None:
                     adapter._slot_probe = probe
                     probe.open()
+                if tracer is not None:
+                    tracer.begin_slot(arm=arm["id"], index=f"{slot.phase}:{slot.round_index}:{slot.role}")
+                slot_calls = None
                 try:
                     kind = "ok"
                     error = ""
@@ -1011,6 +1018,9 @@ def run_interleaved(
                                 {"slot_start": cpu_start, "slot_end": cpu_end},
                                 _finish_slot_probe(probe, adapter),
                             )
+                            if tracer is not None:
+                                slot_calls = tracer.end_slot()
+                                sample["call_ids"] = slot_calls["call_ids"]
                             if epoch is not None:
                                 try:
                                     sample = supervisor.keep_sample(epoch, sample)
@@ -1517,6 +1527,8 @@ def _artifacts(records: list[dict], arm_id: str) -> dict | None:
         }
         if row.get("bound_s") is not None:
             item["bound_s"] = row["bound_s"]
+        if row.get("call_ids"):
+            item["call_ids"] = row["call_ids"]
         if row.get("cpu") is not None:
             item["cpu"] = row["cpu"]
         if row.get("sample"):
@@ -2095,6 +2107,7 @@ def run_spec(
     quarantine: Path | None = None,
     pairs: list[str] | None = None,
     models: list[str] | None = None,
+    trace: str = "off",
 ) -> list[dict]:
     """Run a committed spec. Every refusal lands before device contact.
 
@@ -2200,22 +2213,31 @@ def run_spec(
             probe = _card_probe(adapters, spec)
             path = heartbeat_path(heartbeat)
             _card_guards(probe, path, wall())
-        return run_interleaved(
-            adapters,
-            grant=grant,
-            npu_session=npu_session,
-            cpu_window=cpu_window,
-            root=root,
-            repo=root,
-            spec_path=spec_path,
-            run_id=name,
-            date=stamp,
-            notes=notes,
-            wall=wall,
-            watch=watch,
-            marker=marker,
-            supervisor=supervisor,
-        )
+        from interlock.calltrace import Tracer, instrument, release
+
+        tracer = Tracer(root=root, run_id=name, mode=trace)
+        with tracer:
+            instrument(adapters, tracer)
+            try:
+                return run_interleaved(
+                    adapters,
+                    grant=grant,
+                    npu_session=npu_session,
+                    cpu_window=cpu_window,
+                    root=root,
+                    repo=root,
+                    spec_path=spec_path,
+                    run_id=name,
+                    date=stamp,
+                    notes=notes,
+                    wall=wall,
+                    watch=watch,
+                    marker=marker,
+                    supervisor=supervisor,
+                    tracer=tracer,
+                )
+            finally:
+                release(adapters)
     finally:
         if not marker.entered:
             marker.discard()
