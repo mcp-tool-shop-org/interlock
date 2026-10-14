@@ -135,7 +135,7 @@
       "confidence": "low",
       "highWater": null,
       "name": "src",
-      "qualifyingSourceCommits": 11,
+      "qualifyingSourceCommits": 12,
       "rebaseline": null
     },
     {
@@ -198,7 +198,7 @@
       },
       {
         "commits": 3,
-        "lines": 121,
+        "lines": 122,
         "path": ".github/workflows/release.yml"
       },
       {
@@ -373,7 +373,7 @@
       },
       {
         "commits": 38,
-        "lines": 820,
+        "lines": 819,
         "path": "atlas/README.md"
       },
       {
@@ -383,17 +383,17 @@
       },
       {
         "commits": 38,
-        "lines": 2627,
+        "lines": 2629,
         "path": "atlas/page.json"
       },
       {
         "commits": 38,
-        "lines": 6789,
+        "lines": 6837,
         "path": "atlas/statistics.json"
       },
       {
         "commits": 38,
-        "lines": 36290,
+        "lines": 36536,
         "path": "atlas/structure.json"
       },
       {
@@ -1377,8 +1377,8 @@
         "path": "src/interlock/harness/runner.py"
       },
       {
-        "commits": 4,
-        "lines": 21,
+        "commits": 5,
+        "lines": 36,
         "path": "src/interlock/harness/spec.py"
       },
       {
@@ -1430,6 +1430,11 @@
         "commits": 2,
         "lines": 152,
         "path": "src/interlock/ollama_supervisor.py"
+      },
+      {
+        "commits": 1,
+        "lines": 3,
+        "path": "src/interlock/receipt.py"
       },
       {
         "commits": 1,
@@ -1848,7 +1853,7 @@
       },
       {
         "commits": 1,
-        "lines": 69,
+        "lines": 62,
         "path": "tests/fuzz_receipts.py"
       },
       {
@@ -1942,8 +1947,8 @@
         "path": "tests/test_guards.py"
       },
       {
-        "commits": 23,
-        "lines": 2965,
+        "commits": 24,
+        "lines": 2986,
         "path": "tests/test_harness.py"
       },
       {
@@ -1982,8 +1987,8 @@
         "path": "tests/test_phi_storage.py"
       },
       {
-        "commits": 7,
-        "lines": 322,
+        "commits": 8,
+        "lines": 332,
         "path": "tests/test_receipt.py"
       },
       {
@@ -2042,9 +2047,9 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-10-14T04:38:24.699Z",
+  "generatedAt": "2026-10-14T05:02:40.059Z",
   "generatedFrom": {
-    "commit": "a532013a20d82b7d9374b9649407ed3378c71bcd"
+    "commit": "0deac11d46af4fa1c35d96c42591e7d3e3423c31"
   },
   "pairs": [
     {
@@ -2240,7 +2245,7 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-10-14T00:08:33-04:00",
+    "headDate": "2026-10-13T21:46:34-07:00",
     "inScopeFiles": 270,
     "pinnedStart": null,
     "priorFloor": "fallen",
@@ -2249,7 +2254,7 @@
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-04-17T04:08:33.000Z",
+    "since": "2026-04-17T04:46:34.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",

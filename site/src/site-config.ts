@@ -15,7 +15,7 @@ export const config: SiteConfig = {
     headline: 'interlock',
     headlineAccent: 'local AI device router.',
     description:
-      'A research instrument, not a release. It suggests a model, an engine and a device from measured receipts, and it never serves traffic. Nothing is on PyPI yet.',
+      'A research instrument. It suggests a model, an engine and a device from measured receipts, and it never serves traffic.',
     primaryCta: {
       href: 'https://github.com/mcp-tool-shop-org/interlock',
       label: 'View on GitHub',

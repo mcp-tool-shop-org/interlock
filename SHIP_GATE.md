@@ -33,8 +33,8 @@
 
 ## C. Operator Docs
 
-- [x] `[all]` README is current: what it does, install from a clone, usage, Python 3.12, Ubuntu CI, Windows for a live run (2026-10-12)
-- [x] `[all]` CHANGELOG.md (Keep a Changelog format) — Unreleased and 0.1.0 (2026-10-12)
+- [x] `[all]` README is current: what it does, install from a clone and the PyPI commands marked from v0.1.0, usage, Python 3.12, Ubuntu CI, Windows for a live run (2026-10-14)
+- [x] `[all]` CHANGELOG.md (Keep a Changelog format) — Unreleased and [0.1.0] - 2026-10-14 (checked 2026-10-14)
 - [x] `[all]` LICENSE file present and repo states support status — MIT, supported 0.1.x, prototype (2026-10-12)
 - [x] `[cli]` `--help` output accurate for all commands and flags — checked against `interlock --help`, `route --help`, `run --help`, and `runs --help` on 2026-10-12
 - [ ] `[cli|mcp|desktop]` SKIP: no silent, normal, verbose, or debug logging levels. Receipt privacy is `interlock check`, not a log redactor. This treatment does not add a logging switch.
@@ -47,11 +47,11 @@
 - [x] `[all]` Version in manifest matches git tag — `shipcheck manifest` passed 2026-10-12: no semver tag exists, and 0.1.0 stays. Unfinished work stays 0.x (2026-09-09). This treatment does not tag. (D2)
 - [x] `[all]` Dependency scanning runs in CI — `uv run --with pip-audit==2.10.1 pip-audit` in ci.yml (D3)
 - [x] `[all]` No known high/critical vulnerabilities — `pip-audit` 2.10.1 on the project environment found none on 2026-10-12 (the local distribution is not on PyPI, so it is skipped). The site tree has 10 moderate advisories in Starlight's expressive-code and postcss chain, and no high or critical. (D4)
-- [ ] `[all]` SKIP: the org rule says not to add dependabot.yml unless a brief asks. The update bot is optional. Alerts stay the security outcome.
-- [ ] `[npm]` SKIP: not an npm package. PyPI trusted publishing is already in release.yml, and this treatment does not publish.
+- [x] `[all]` Dependabot opens a grouped pull request monthly for the uv lock, the docs-site npm lock, and GitHub Actions, at most three open per ecosystem (2026-10-14)
+- [ ] `[npm]` SKIP: not an npm package. Python publishing is trusted publishing in release.yml, and it runs only when a GitHub release is published. This pull request does not publish.
 - [ ] `[npm]` SKIP: not an npm package
-- [x] `[pypi]` `requires-python` is `>=3.12,<3.13` — `shipcheck manifest` engines passed 2026-10-12 (D6)
-- [x] `[pypi]` Lockfile committed (`uv.lock`) — `shipcheck manifest` lockfile passed 2026-10-12. Wheel and sdist are built by `verify.sh` (`uv build`) and are not published. (D7)
+- [x] `[pypi]` `requires-python` is `>=3.12,<3.13` for `mcptoolshop-interlock` — `shipcheck manifest` engines passed 2026-10-12 (D6)
+- [x] `[pypi]` Lockfile committed (`uv.lock`). `verify.sh` builds the wheel and the sdist with `uv build`. `release.yml` publishes both, with a SLSA provenance file, when a GitHub release is published. This pull request does not publish. (D7)
 - [ ] `[vsix]` SKIP: not a VS Code extension
 - [ ] `[desktop]` SKIP: not a desktop app
 
@@ -80,5 +80,5 @@ If a section doesn't apply, mark `SKIP:` with justification — don't leave it u
 
 **Skipping:**
 ```
-- [ ] `[pypi]` SKIP: not a Python project
+- [ ] `[npm]` SKIP: not an npm package
 ```
