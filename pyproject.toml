@@ -63,6 +63,7 @@ default-groups = ["dev"]
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "--cov=interlock --cov-report=term-missing --cov-fail-under=90"
+markers = ["relay: needs the relay extra (nemo-relay); skipped without it"]
 
 [tool.coverage.run]
 source = ["interlock"]
