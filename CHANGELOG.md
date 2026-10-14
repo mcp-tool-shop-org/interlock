@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The README and its translations show a PyPI badge for `mcptoolshop-interlock`, now that 0.1.0 is published.
+
 ## [0.1.0] - 2026-10-14
 
 Prototype advisory router for one rig. It suggests a model, an engine and a device from measured receipts, and it does not serve traffic. It is a prototype, not a beta. The first release on PyPI, as `mcptoolshop-interlock`, with SLSA provenance on the GitHub release assets.
