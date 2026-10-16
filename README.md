@@ -189,5 +189,7 @@ uv run pytest
 
 Bugs go to GitHub Issues. A security report follows [SECURITY.md](SECURITY.md) and is not a public issue. Changes come in as pull requests against `main`. The bar, and the commands to run first, are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
+Parts of this repository were Written with Grok (xAI). Grok, Kimi and Claude are credited in [CONTRIBUTORS.md](CONTRIBUTORS.md).
+
 Built by <a href="https://mcp-tool-shop.github.io/">MCP Tool Shop</a>
 
