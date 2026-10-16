@@ -12,7 +12,7 @@ Parts of this repository were **Written with Grok** (xAI), through Grok's coding
 - the Phase 0 scaffold and lockdown, the Phase 1 routing table, and the Phase 2 harness with its faked adapters;
 - the run supervisor: hang and device-loss handling, Ollama restarts, unload and idle waits;
 - the E1–E5 experiment work on the importer, the fill-card search, E4b and the E5 spill gates;
-- the advisory router v0, the rename from switchyard, and the 0.1.0 release preparation.
+- the advisory router v0, the rename to interlock, and the 0.1.0 release preparation.
 
 ## Kimi
 
