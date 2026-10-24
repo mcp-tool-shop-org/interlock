@@ -60,8 +60,22 @@
     "device": {
       "anyOf": [
         {"enum": ["NPU", "CPU", "iGPU", "5090"]},
-        {"type": "string", "pattern": "^runpod:[A-Za-z0-9][A-Za-z0-9 ._+()-]{0,80}$"}
+        {"type": "string", "pattern": "^runpod:[A-Za-z0-9][A-Za-z0-9 ._+()-]{0,80}$"},
+        {"enum": ["colab:A100-40", "colab:A100-80", "colab:L4", "colab:T4", "colab:G4"]}
       ]
+    },
+    "remote_device": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["provider", "card", "vram_mib", "driver_version", "cuda_version", "pool"],
+      "properties": {
+        "provider": {"enum": ["colab"]},
+        "card": {"enum": ["A100-40", "A100-80", "L4", "T4", "G4"]},
+        "vram_mib": {"type": "integer", "minimum": 1},
+        "driver_version": {"type": "string", "minLength": 1},
+        "cuda_version": {"type": "string", "minLength": 1},
+        "pool": {"type": "string", "minLength": 1}
+      }
     },
     "settings": {
       "type": "object",
@@ -112,7 +126,20 @@
     "repeats": {"type": "integer", "minimum": 1},
     "provisional": {"type": "boolean"},
     "provenance": {"$ref": "#/$defs/provenance"},
-    "outcome": {"type": "string", "enum": ["device_lost", "hang", "native_binary_rejected", "compile_rejected", "compile_timeout"]},
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "device_lost",
+        "hang",
+        "native_binary_rejected",
+        "compile_rejected",
+        "compile_timeout",
+        "oom",
+        "load_refused",
+        "timeout",
+        "ctx_exceeded"
+      ]
+    },
     "parity_valid": {"type": "boolean"},
     "partial": {"type": "boolean"},
     "aborted": {"type": "boolean"},
