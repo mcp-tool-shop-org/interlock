@@ -48,6 +48,7 @@ _ACCOUNT_PREFIX = re.compile(
     r"^(?:account|acct|user|uid|owner|email|github|hf|huggingface)[:_-]",
     re.IGNORECASE,
 )
+_NUMERIC_VERSION = re.compile(r"^[0-9]+(?:\.[0-9]+)+$")
 
 
 
@@ -217,21 +218,31 @@ def _vendor(architecture: str) -> str | None:
     return match.group(1).lower()
 
 
+def reject_unhashed_account_text(value: object, field_name: str, *, allow_hashed: bool = False) -> str:
+    """Refuse plaintext account identifiers, repo handles, emails, or home paths on a remote_device field."""
+
+    if not isinstance(value, str) or not value.strip():
+        raise DeviceRefused(f"{field_name} must be a non-empty string")
+    token = value.strip()
+    if allow_hashed and _HASHED_ID.fullmatch(token):
+        return token
+    if "@" in token or "/" in token or "\\" in token or _ACCOUNT_PREFIX.search(token):
+        raise DeviceRefused(
+            f"{field_name} {token!r} looks like an unhashed account id or path; "
+            "hash with sha256:<64-hex> or omit"
+        )
+    return token
+
+
 def validate_remote_pool(pool: object) -> str:
     """Validate that ``pool`` is a zone or pool identifier, never an unhashed account id."""
 
     if not isinstance(pool, str) or not pool.strip():
         raise DeviceRefused("remote_device.pool must be a non-empty zone string")
-    token = pool.strip()
+    token = reject_unhashed_account_text(pool, "remote_device.pool", allow_hashed=True)
     if _HASHED_ID.fullmatch(token):
         return token
-    if (
-        "@" in token
-        or "/" in token
-        or "\\" in token
-        or _ACCOUNT_PREFIX.search(token)
-        or not _ZONE_POOL.fullmatch(token)
-    ):
+    if not _ZONE_POOL.fullmatch(token):
         raise DeviceRefused(
             f"remote_device.pool {token!r} looks like an unhashed account id or path; "
             "pool must be a zone (e.g. us-central1-a) or sha256:<64-hex>"
@@ -249,6 +260,13 @@ class RemoteDeviceIdentity:
     pool: str
 
     def __post_init__(self) -> None:
+        reject_unhashed_account_text(self.provider, "remote_device.provider")
+        reject_unhashed_account_text(self.card, "remote_device.card")
+        if isinstance(self.vram_mib, str):
+            reject_unhashed_account_text(self.vram_mib, "remote_device.vram_mib")
+        reject_unhashed_account_text(self.driver_version, "remote_device.driver_version")
+        reject_unhashed_account_text(self.cuda_version, "remote_device.cuda_version")
+        validate_remote_pool(self.pool)
         if self.provider not in REMOTE_PROVIDERS:
             raise DeviceRefused(
                 f"unsupported remote provider {self.provider!r}; expected one of {REMOTE_PROVIDERS}"
@@ -259,11 +277,14 @@ class RemoteDeviceIdentity:
             )
         if isinstance(self.vram_mib, bool) or not isinstance(self.vram_mib, int) or self.vram_mib <= 0:
             raise DeviceRefused("remote_device.vram_mib must be a positive integer")
-        if not isinstance(self.driver_version, str) or not self.driver_version.strip():
-            raise DeviceRefused("remote_device.driver_version must be a non-empty string")
-        if not isinstance(self.cuda_version, str) or not self.cuda_version.strip():
-            raise DeviceRefused("remote_device.cuda_version must be a non-empty string")
-        validate_remote_pool(self.pool)
+        if not _NUMERIC_VERSION.fullmatch(self.driver_version):
+            raise DeviceRefused(
+                f"remote_device.driver_version {self.driver_version!r} must be a numeric version string"
+            )
+        if not _NUMERIC_VERSION.fullmatch(self.cuda_version):
+            raise DeviceRefused(
+                f"remote_device.cuda_version {self.cuda_version!r} must be a numeric version string"
+            )
 
     @property
     def logical_device(self) -> str:
@@ -293,12 +314,12 @@ class RemoteDeviceIdentity:
                 raise DeviceRefused(f"remote_device refuses unhashed account id field: {', '.join(extra)}")
             raise DeviceRefused(f"remote_device has unexpected fields: {', '.join(extra)}")
         return cls(
-            provider=str(raw["provider"]),
-            card=str(raw["card"]),
+            provider=raw["provider"],  # type: ignore[arg-type]
+            card=raw["card"],  # type: ignore[arg-type]
             vram_mib=raw["vram_mib"],  # type: ignore[arg-type]
-            driver_version=str(raw["driver_version"]),
-            cuda_version=str(raw["cuda_version"]),
-            pool=str(raw["pool"]),
+            driver_version=raw["driver_version"],  # type: ignore[arg-type]
+            cuda_version=raw["cuda_version"],  # type: ignore[arg-type]
+            pool=raw["pool"],  # type: ignore[arg-type]
         )
 
 

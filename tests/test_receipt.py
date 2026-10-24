@@ -312,6 +312,11 @@ def test_remote_colab_rows_and_failure_outcomes_validate():
 
 
 def test_remote_row_refuses_missing_identity_mismatched_card_rig_mixing_or_unhashed_account():
+    hashed_setting = _remote_row(
+        settings={**row()["settings"], "account_id": "sha256:" + ("b" * 64), "tags": [{"note": "ok"}]}
+    )
+    validate_row(hashed_setting)
+
     missing = _remote_row()
     del missing["remote_device"]
     with pytest.raises(ReceiptError, match="remote_device"):
@@ -343,7 +348,7 @@ def test_remote_row_refuses_missing_identity_mismatched_card_rig_mixing_or_unhas
             "pool": "us-central1-a",
         },
     )
-    with pytest.raises(ReceiptError, match="never pooled|rig"):
+    with pytest.raises(ReceiptError, match="never pooled"):
         validate_row(mixed_rig)
 
     unhashed_pool = _remote_row(
@@ -365,8 +370,35 @@ def test_remote_row_refuses_missing_identity_mismatched_card_rig_mixing_or_unhas
     with pytest.raises(ReceiptError, match="unhashed account id"):
         validate_row(unhashed_setting)
 
-    hashed_setting = _remote_row(
-        settings={**row()["settings"], "account_id": "sha256:" + ("b" * 64), "tags": [{"note": "ok"}]}
-    )
-    validate_row(hashed_setting)
+
+def test_validate_row_refuses_unhashed_account_in_any_remote_device_field_or_gguf_repo():
+    for field_name in ("provider", "card", "vram_mib", "driver_version", "cuda_version", "pool"):
+        for planted in (
+            "researcher@example.com",
+            "org/model-repo",
+            "user:alice",
+            "github:octocat",
+            "/" + "home/" + "researcher",
+            "C:" + "\\Users\\" + "researcher",
+        ):
+            bad_remote = {
+                "provider": "colab",
+                "card": "A100-40",
+                "vram_mib": 40960,
+                "driver_version": "550.54.15",
+                "cuda_version": "12.4",
+                "pool": "us-central1-a",
+            }
+            bad_remote[field_name] = planted
+            candidate = _remote_row(remote_device=bad_remote)
+            with pytest.raises(ReceiptError, match="unhashed account id"):
+                validate_row(candidate)
+
+    for gguf_key in ("ggufRepo", "gguf_repo", "gguf_source"):
+        unhashed_gguf = _remote_row(settings={**row()["settings"], gguf_key: "owner/role-set-gguf"})
+        with pytest.raises(ReceiptError, match="unhashed account id"):
+            validate_row(unhashed_gguf)
+        hashed_gguf = _remote_row(settings={**row()["settings"], gguf_key: "sha256:" + ("c" * 64)})
+        validate_row(hashed_gguf)
+
 

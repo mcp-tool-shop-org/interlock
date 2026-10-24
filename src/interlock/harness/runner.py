@@ -172,7 +172,7 @@ def dry_run(
     models: list[str] | None = None,
 ) -> str:
     spec = load_spec(spec_path)
-    if models is not None and spec.get("procedure") != "fill-card":
+    if models is not None and spec.get("procedure") != "fill-card" and spec.get("platform") != "linux-cuda":
         raise RunnerError("--models is for a fill-card spec")
     recorded_models = None
     if models is not None:
@@ -229,6 +229,21 @@ def dry_run(
         lines.append("cold is measured once per arm and kept out of the warm percentiles")
         lines.append(f"band: {spec['band']}")
         lines.extend(_storage_lines(spec))
+    elif spec.get("platform") == "linux-cuda":
+        lines.append(f"platform: {spec['platform']}")
+        lines.append(f"abort_fraction: {spec['abort_fraction']}")
+        lines.append(f"models: {len(spec['models'])}")
+        if recorded_models is not None:
+            lines.append("models measured: " + ", ".join(recorded_models))
+        if spec["procedure"] == "fill-card":
+            lines.append(f"grain: {spec['grain']}")
+            lines.append(f"spill_prompt_ratio: {spec['spill_prompt_ratio']}")
+        elif spec["procedure"] == "generate-ladder":
+            lines.append("prompt_lengths: " + ", ".join(str(x) for x in spec["prompt_lengths"]))
+            lines.append("concurrencies: " + ", ".join(str(x) for x in spec["concurrencies"]))
+        elif spec["procedure"] == "batch-ladder":
+            lines.append("tasks: " + ", ".join(str(x) for x in spec["tasks"]))
+            lines.append("batch_sizes: " + ", ".join(str(x) for x in spec["batch_sizes"]))
     elif spec["procedure"] == "fill-card":
         lines.append(f"abort_mib: {spec['abort_mib']}")
         lines.append(f"ceiling_mib: {spec['ceiling_mib']}")
@@ -2164,9 +2179,15 @@ def _row_path(row: dict, path: str):
 
 
 def _spec_devices(spec: dict) -> set[str]:
-    devices = {arm["device"] for arm in spec["arms"]}
-    devices.update(arm["companion_device"] for arm in spec["arms"] if arm.get("companion_device"))
-    return devices
+    if "arms" in spec:
+        devices = {arm["device"] for arm in spec["arms"]}
+        devices.update(arm["companion_device"] for arm in spec["arms"] if arm.get("companion_device"))
+        return devices
+    return {
+        entry["device"]
+        for entry in (spec.get("models") or [])
+        if isinstance(entry, dict) and entry.get("device")
+    }
 
 
 def run_spec(
@@ -2210,11 +2231,12 @@ def run_spec(
 
     _refuse_repo_interpreter(root, Path(python_path or sys.executable))
     spec = load_spec(spec_path)
+    chosen_models = None
     recorded_models = None
     if models is not None:
-        if spec.get("procedure") != "fill-card":
+        if spec.get("procedure") != "fill-card" and spec.get("platform") != "linux-cuda":
             raise RunnerError("--models is for a fill-card spec")
-        _chosen, recorded_models = resolve_models(spec, models)
+        chosen_models, recorded_models = resolve_models(spec, models)
     if trace == "off" and any("trace" in arm for arm in spec.get("arms") or [] if isinstance(arm, dict)):
         # A spec that switches tracing per arm would run both arms untraced: the comparison would be empty.
         raise RunnerError("REFUSED: this spec traces some arms and not others; run it with --trace relay or events")
@@ -2265,7 +2287,11 @@ def run_spec(
         if getattr(supervisor, "heartbeat", None) is None and heartbeat is not None:
             supervisor.heartbeat = heartbeat
     spec_rel = spec_path.resolve().relative_to(root.resolve()).as_posix()
-    devices = {"5090"} if spec["procedure"] == "fill-card" else _spec_devices(spec)
+    devices = (
+        _spec_devices(spec)
+        if spec.get("platform") == "linux-cuda"
+        else ({"5090"} if spec["procedure"] == "fill-card" else _spec_devices(spec))
+    )
     marker = RunMarker(
         root,
         name,
@@ -2276,6 +2302,55 @@ def run_spec(
     )
     marker.write()
     try:
+        if spec.get("platform") == "linux-cuda":
+            from interlock.harness.linux_cuda import LinuxOllamaServer, probe_linux_gpu, run_linux_spec
+
+            linux_spec = dict(spec)
+            if chosen_models is not None:
+                linux_spec["models"] = chosen_models
+            seam_map = seams if isinstance(seams, dict) else {}
+            remote_dev = seam_map.get("remote_device")
+            vram_sampler = seam_map.get("sample_vram_mib")
+            if remote_dev is None or vram_sampler is None:
+                probed_dev, probed_sampler = probe_linux_gpu(
+                    nvml_module=seam_map.get("nvml"),
+                    runner=seam_map.get("runner"),
+                    pool=seam_map.get("pool"),
+                )
+                remote_dev = remote_dev or probed_dev
+                vram_sampler = vram_sampler or probed_sampler
+            server = seam_map.get("server")
+            owns_srv = False
+            if server is None and any(
+                k in seam_map for k in ("popen", "http_get", "http_post", "host", "log_path")
+            ):
+                server = LinuxOllamaServer(
+                    host=seam_map.get("host", "127.0.0.1:11441"),
+                    log_path=seam_map.get("log_path", root / "logs" / f"{name}.ollama.log"),
+                    popen=seam_map.get("popen"),
+                    http_get=seam_map.get("http_get"),
+                    http_post=seam_map.get("http_post"),
+                )
+                server.start()
+                owns_srv = True
+            marker.entered = True
+            try:
+                rows = run_linux_spec(
+                    linux_spec,
+                    spec_path=spec_path,
+                    spec_rel=spec_rel,
+                    run_id=name,
+                    date=stamp,
+                    remote_device=remote_dev,
+                    sample_vram_mib=vram_sampler,
+                    server=server,
+                )
+                write_receipt(root, name, rows)
+                marker.close(_iso(wall()))
+                return rows
+            finally:
+                if owns_srv and server is not None:
+                    server.stop()
         if spec["procedure"] == "fill-card":
             injected = adapters is not None
             if adapters is None:

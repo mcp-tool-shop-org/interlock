@@ -16,6 +16,7 @@ import yaml
 from interlock.devices import REMOTE_DEVICES
 from interlock.harness.e5 import ADAPTER_MATCH_TOLERANCE_MIB, PROMPT_RATIO, SHARED_GATE_FROM_MIB, SHARED_GROWTH_MIB
 from interlock.harness.linux_cuda import (
+    FAILURE_CLASSES,
     GENERATE_CONCURRENCIES,
     GENERATE_PROMPT_LENGTHS,
     THROUGHPUT_BATCH_SIZES,
@@ -357,6 +358,14 @@ def _require_linux_abort_fraction(data: dict) -> None:
 
 
 def _require_remote_models(data: dict) -> None:
+    replication = data.get("replication")
+    if replication is not None:
+        if (
+            not isinstance(replication, dict)
+            or not isinstance(replication.get("vms_per_card"), int)
+            or replication["vms_per_card"] < 1
+        ):
+            raise SpecError("linux-cuda spec replication must name vms_per_card >= 1")
     models = data.get("models")
     if not isinstance(models, list) or not models:
         raise SpecError("linux-cuda spec names the model roster")
@@ -366,6 +375,11 @@ def _require_remote_models(data: dict) -> None:
                 raise SpecError(f"a roster entry is missing {key}")
         if model["device"] not in REMOTE_DEVICES or model["engine"] != "ollama":
             raise SpecError("linux-cuda specs measure remote colab:<card> Ollama models")
+        if model["model"] == "gemma4:31b":
+            raise SpecError("linux-cuda specs must store the Gemma 4 31B role-set repo as a sha256:<64-hex> hash")
+        expected_outcome = model.get("expected_outcome")
+        if expected_outcome is not None and expected_outcome not in FAILURE_CLASSES:
+            raise SpecError(f"unsupported expected_outcome {expected_outcome!r}")
 
 
 def _linux_fill_card(data: dict) -> None:

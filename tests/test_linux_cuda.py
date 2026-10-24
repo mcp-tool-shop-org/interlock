@@ -7,11 +7,11 @@ No live GPU, no Windows performance counters, and no Colab session.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
 
-from interlock.devices import RemoteDeviceIdentity
 from interlock.harness.spec import SpecError, load_spec, validate_spec
 from interlock.receipt import validate_row
 
@@ -25,7 +25,9 @@ NVIDIA_SMI_HEADER_CUDA_12_4 = (
 )
 
 
-def _remote_ident(card: str = "L4", vram_mib: int = 23034) -> RemoteDeviceIdentity:
+def _remote_ident(card: str = "L4", vram_mib: int = 23034) -> Any:
+    from interlock.devices import RemoteDeviceIdentity
+
     return RemoteDeviceIdentity(
         provider="colab",
         card=card,
@@ -62,7 +64,7 @@ def test_linux_cuda_probe_parses_nvidia_smi_and_nvml_without_windows_counters():
     assert map_card_name("NVIDIA A100-SXM4-40GB", 40960) == "A100-40"
     assert map_card_name("NVIDIA A100-SXM4-80GB", 81920) == "A100-80"
     assert map_card_name("Tesla T4", 15360) == "T4"
-    assert map_card_name("NVIDIA RTX PRO 6000 Blackwell", 24576) == "G4"
+    assert map_card_name("NVIDIA RTX PRO 6000 Blackwell", 98304) == "G4"
 
     class FakeMem:
         used = 2048 * 1024 * 1024
@@ -482,4 +484,362 @@ def test_committed_c2_specs_validate_and_carry_standards_headers():
         validate_spec({**batch_linux, "tasks": ["embed"]})
     with pytest.raises(SpecError, match="batch_sizes"):
         validate_spec({**batch_linux, "batch_sizes": [1]})
+
+
+def test_map_card_name_checks_vram_ranges_and_engine_version_is_never_hardcoded():
+    from interlock.harness.linux_cuda import (
+        UNRECORDED,
+        LinuxCudaError,
+        build_linux_failure_row,
+        map_card_name,
+        run_linux_fill_card,
+    )
+    from interlock.importers.remote import import_remote_window
+
+    assert map_card_name("NVIDIA RTX PRO 6000 Blackwell", 98304) == "G4"
+    with pytest.raises(LinuxCudaError, match="VRAM"):
+        map_card_name("NVIDIA RTX PRO 6000 Blackwell", 24576)
+    with pytest.raises(LinuxCudaError, match="VRAM"):
+        map_card_name("A100-80", 40960)
+    with pytest.raises(LinuxCudaError, match="VRAM"):
+        map_card_name("T4", 40960)
+
+    ident = _remote_ident("T4", 15360)
+    failure_row = build_linux_failure_row(
+        spec_id="C2-FILL-CARD",
+        spec_rel="experiments/c2-fill-card/spec.yaml",
+        run_id="c2-t4-default-ver",
+        date="2026-10-24",
+        task="generate",
+        model="qwen3:8b",
+        revision_or_digest="500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+        remote_device=ident,
+        failure_class="oom",
+        reason="CUDA out of memory",
+        num_ctx=4096,
+    )
+    assert failure_row["engine"]["version"] == UNRECORDED
+
+    fill_row = run_linux_fill_card(
+        spec_id="C2-FILL-CARD",
+        spec_rel="experiments/c2-fill-card/spec.yaml",
+        run_id="c2-t4-fill-ver",
+        date="2026-10-24",
+        remote_device=ident,
+        model="qwen3:8b",
+        revision_or_digest="500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+        trained_ctx=4096,
+        abort_fraction=0.90,
+        grain=2048,
+        measure_window=lambda _ctx: {
+            "size": 5000,
+            "size_vram": 5000,
+            "peak_mib": 8000,
+            "ttft_ms": 90.0,
+            "decode_tok_s": 42.0,
+            "prompt_tok_s": 700.0,
+        },
+    )
+    assert fill_row["engine"]["version"] == UNRECORDED
+
+    imported = import_remote_window(
+        b'{"run_id":"r1","date":"2026-10-24","remote_device":{"provider":"colab","card":"T4","vram_mib":15360,'
+        b'"driver_version":"550.54.15","cuda_version":"12.4","pool":"us-central1-a"},'
+        b'"records":[{"task":"generate","model":"qwen3:8b","revision_or_digest":"500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",'
+        b'"num_ctx":2048,"failure_class":"oom","failure_reason":"CUDA OOM"}]}',
+        source_path="receipts/r1.json",
+    )
+    assert imported[0]["engine"]["version"] == UNRECORDED
+
+
+def test_linux_fill_card_bisects_2048_grid_and_throughput_ladder_records_oom_on_offload_or_abort():
+    from interlock.harness.linux_cuda import run_linux_fill_card, run_linux_throughput_ladder
+
+    ident = _remote_ident("A100-40", 40960)
+    # Windows <= 24576 stay under abort_mib (36864 MiB); windows >= 26624 reach abort_mib.
+    # A doubling search hits 16384 (pass) then 32768 (fail) and must bisect the 2048 grid to find 24576.
+    visited: list[int] = []
+
+    def measure_window_bisect(num_ctx: int):
+        visited.append(num_ctx)
+        return {
+            "size": 18000,
+            "size_vram": 18000,
+            "peak_mib": 22000 + (num_ctx // 2048) * 1150 if num_ctx <= 24576 else 38000,
+            "ttft_ms": 150.0,
+            "decode_tok_s": 62.0,
+            "prompt_tok_s": 900.0,
+        }
+
+    row = run_linux_fill_card(
+        spec_id="C2-FILL-CARD",
+        spec_rel="experiments/c2-fill-card/spec.yaml",
+        run_id="c2-a100-bisect",
+        date="2026-10-24",
+        remote_device=ident,
+        model="qwen3:14b",
+        revision_or_digest="bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8",
+        trained_ctx=32768,
+        abort_fraction=0.90,
+        grain=2048,
+        measure_window=measure_window_bisect,
+    )
+    validate_row(row)
+    assert row["settings"]["max_resident_ctx"] == 24576
+    assert 24576 in visited
+
+    # Throughput ladder must record oom failure rows when size_vram < size or peak_mib >= abort_mib.
+    l4 = _remote_ident("L4", 23034)
+    models = {
+        "embed": ("BAAI/bge-base-en-v1.5", "a5beb1e3e68b9ab74eb54cfd186867f64f240e1a"),
+        "rerank": ("BAAI/bge-reranker-v2-m3", "5617a9f61b028005a4858fdac845db406aefb181"),
+        "nli": ("cross-encoder/nli-deberta-v3-base", "6c749ce3425cd33b46d187e45b92bbf96ee12ec7"),
+    }
+
+    def measure_batch_spill(task: str, batch: int):
+        if task == "embed" and batch == 32:
+            return {
+                "throughput": 120.0,
+                "warm_p50_ms": 80.0,
+                "warm_p95_ms": 90.0,
+                "peak_mib": 12000,
+                "size": 2000,
+                "size_vram": 1000,  # partial offload!
+            }
+        if task == "rerank" and batch == 32:
+            return {
+                "throughput": 80.0,
+                "warm_p50_ms": 110.0,
+                "warm_p95_ms": 120.0,
+                "peak_mib": 21500,  # >= abort_mib (20730 MiB)!
+                "size": 2000,
+                "size_vram": 2000,
+            }
+        return {
+            "throughput": 40.0 * batch,
+            "warm_p50_ms": 10.0 * batch,
+            "warm_p95_ms": 12.0 * batch,
+            "peak_mib": 2500 + batch * 40,
+            "size": 2000,
+            "size_vram": 2000,
+        }
+
+    tput_rows = run_linux_throughput_ladder(
+        spec_id="C2-THROUGHPUT",
+        spec_rel="experiments/c2-throughput/spec.yaml",
+        run_id="c2-l4-tput-oom",
+        date="2026-10-24",
+        remote_device=l4,
+        models_by_task=models,
+        measure_batch=measure_batch_spill,
+    )
+    oom_rows = [r for r in tput_rows if r.get("outcome") == "oom"]
+    assert len(oom_rows) == 2
+    assert {r["task"] for r in oom_rows} == {"embed", "rerank"}
+
+
+def test_interlock_run_dry_run_and_offline_execution_produce_validated_linux_cuda_receipt(tmp_path: Path, capsys):
+    import json
+    import shutil
+    import subprocess
+
+    from interlock.cli import main
+    from interlock.harness.runner import dry_run, run_spec
+
+    spec_rels = (
+        "experiments/c2-fill-card/spec.yaml",
+        "experiments/c2-generate/spec.yaml",
+        "experiments/c2-throughput/spec.yaml",
+    )
+    for spec_rel in spec_rels:
+        dest = tmp_path / spec_rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / spec_rel, dest)
+
+    for cmd in (
+        ["git", "init"],
+        ["git", "config", "user.email", "dev@example.com"],
+        ["git", "config", "user.name", "dev"],
+        ["git", "add", "."],
+        ["git", "commit", "-m", "spec"],
+    ):
+        subprocess.run(cmd, cwd=tmp_path, check=True, capture_output=True)  # noqa: S603, S607
+
+    for spec_rel in spec_rels:
+        plan_text = dry_run(tmp_path / spec_rel, tmp_path)
+        assert "platform: linux-cuda" in plan_text
+        assert "abort_fraction: 0.9" in plan_text
+        assert main(["run", str(tmp_path / spec_rel), "--root", str(tmp_path), "--dry-run"]) == 0
+        cli_out = capsys.readouterr().out
+        assert "platform: linux-cuda" in cli_out
+
+    spec_copy = tmp_path / "experiments" / "c2-fill-card" / "spec.yaml"
+
+    class FakeMem:
+        used = 10240 * 1024 * 1024
+        total = 23034 * 1024 * 1024
+
+    class FakeNvml:
+        def nvmlInit(self):
+            return None
+
+        def nvmlShutdown(self):
+            return None
+
+        def nvmlDeviceGetHandleByIndex(self, _index):
+            return "h0"
+
+        def nvmlDeviceGetName(self, _handle):
+            return "NVIDIA L4"
+
+        def nvmlDeviceGetMemoryInfo(self, _handle):
+            return FakeMem()
+
+        def nvmlSystemGetDriverVersion(self):
+            return "550.54.15"
+
+        def nvmlSystemGetCudaDriverVersion_v2(self):
+            return 12040
+
+    class FakeProc:
+        pid = 9191
+
+        def poll(self):
+            return None
+
+        def terminate(self):
+            return None
+
+        def wait(self, timeout=None):
+            return 0
+
+    def fake_http_get(url: str) -> dict[str, Any]:
+        if url.endswith("/api/version"):
+            return {"version": "0.6.2"}
+        if url.endswith("/api/ps"):
+            return {"models": [{"name": "qwen3:8b", "size": 5200000000, "size_vram": 5200000000}]}
+        return {}
+
+    def fake_http_post(url: str, payload: dict[str, Any]) -> dict[str, Any]:
+        if payload.get("keep_alive") == 0:
+            return {"done": True}
+        opts = payload.get("options") or {}
+        ctx = int(opts.get("num_ctx") or 2048)
+        if ctx > 8192:
+            return {"error": f"request ({ctx} tokens) exceeds the available context size (8192 tokens)"}
+        return {
+            "load_duration": 20_000_000,
+            "prompt_eval_count": int(ctx * 0.9),
+            "prompt_eval_duration": 100_000_000,
+            "eval_count": 16,
+            "eval_duration": 250_000_000,
+        }
+
+    rows = run_spec(
+        spec_copy,
+        root=tmp_path,
+        run_id="c2-l4-e2e",
+        date="2026-10-24",
+        python_path=str( tmp_path.parent / "external-python" ),
+        models=["qwen3:8b"],
+        seams={
+            "nvml": FakeNvml(),
+            "pool": "us-central1-a",
+            "popen": lambda *_a, **_kw: FakeProc(),
+            "http_get": fake_http_get,
+            "http_post": fake_http_post,
+        },
+    )
+    assert len(rows) >= 1
+    receipt_file = tmp_path / "receipts" / "c2-l4-e2e.jsonl"
+    assert receipt_file.is_file()
+    written_rows = [json.loads(line) for line in receipt_file.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert len(written_rows) == len(rows)
+    for r in written_rows:
+        validate_row(r)
+        assert r["device"] == "colab:L4"
+        assert r["engine"]["version"] == "0.6.2"
+
+    # Also exercise generate-ladder and batch-ladder offline execution via run_spec + nvidia-smi fallback:
+    def fake_smi_runner(argv: list[str]) -> str:
+        if "--query-gpu=name,memory.used,memory.total,driver_version" in argv:
+            return "NVIDIA L4, 8192, 23034, 550.54.15\n"
+        return (
+            "+-----------------------------------------------------------------------------------------+\n"
+            "| NVIDIA-SMI 550.54.15              Driver Version: 550.54.15      CUDA Version: 12.4     |\n"
+        )
+
+    gen_rows = run_spec(
+        tmp_path / "experiments" / "c2-generate" / "spec.yaml",
+        root=tmp_path,
+        run_id="c2-l4-gen-e2e",
+        date="2026-10-24",
+        python_path=str(tmp_path.parent / "external-python"),
+        models=["qwen3:8b"],
+        seams={
+            "runner": fake_smi_runner,
+            "pool": "us-central1-a",
+            "popen": lambda *_a, **_kw: FakeProc(),
+            "http_get": fake_http_get,
+            "http_post": fake_http_post,
+        },
+    )
+    assert len(gen_rows) == 21
+
+    tput_rows = run_spec(
+        tmp_path / "experiments" / "c2-throughput" / "spec.yaml",
+        root=tmp_path,
+        run_id="c2-l4-tput-e2e",
+        date="2026-10-24",
+        python_path=str(tmp_path.parent / "external-python"),
+        models=["BAAI/bge-base-en-v1.5", "BAAI/bge-reranker-v2-m3", "cross-encoder/nli-deberta-v3-base"],
+        seams={
+            "nvml": FakeNvml(),
+            "pool": "us-central1-a",
+            "popen": lambda *_a, **_kw: FakeProc(),
+            "http_get": fake_http_get,
+            "http_post": lambda _url, _payload: {"total_duration": 25_000_000},
+        },
+    )
+    assert len(tput_rows) == 9
+
+
+def test_c2_specs_cover_sweep_plan_matrix_quants_and_hashed_gemma_repo():
+    fill_spec = load_spec(ROOT / "experiments" / "c2-fill-card" / "spec.yaml")
+    gen_spec = load_spec(ROOT / "experiments" / "c2-generate" / "spec.yaml")
+    tput_spec = load_spec(ROOT / "experiments" / "c2-throughput" / "spec.yaml")
+
+    expected_cards = {"colab:A100-40", "colab:A100-80", "colab:G4", "colab:L4", "colab:T4"}
+    for spec in (fill_spec, gen_spec, tput_spec):
+        cards = {entry["device"] for entry in spec["models"]}
+        assert cards == expected_cards
+        assert spec["replication"]["vms_per_card"] == 3
+
+    for spec in (fill_spec, gen_spec):
+        models = {entry["model"] for entry in spec["models"]}
+        # Plaintext gemma4:31b is replaced by its sha256:<64-hex> hashed repo id per C2-SWEEP-PLAN.md.
+        assert "gemma4:31b" not in models
+        assert any(m.startswith("sha256:") and len(m) == len("sha256:") + 64 for m in models)
+        assert "qwen3:8b" in models
+        assert "phi3.5:3.8b" in models
+        assert "muse-glimmer:30b" in models
+        quants = {entry["quant"] for entry in spec["models"]}
+        assert {"Q4_K_M", "Q6_K", "Q8_0", "BF16"}.issubset(quants)
+        # Pre-registered refusal cells (e.g. 31B Q8_0 on T4) stay in the roster as refusal cells, never dropped.
+        assert any(
+            entry["device"] == "colab:T4" and entry.get("expected_outcome") == "load_refused"
+            for entry in spec["models"]
+        )
+
+    tput_models = {entry["model"] for entry in tput_spec["models"]}
+    assert {
+        "nomic-ai/nomic-embed-text-v1.5",
+        "BAAI/bge-base-en-v1.5",
+        "BAAI/bge-reranker-v2-m3",
+        "Qwen/Qwen3-Embedding-0.6B",
+        "cross-encoder/nli-deberta-v3-base",
+    }.issubset(tput_models)
+    for entry in tput_spec["models"]:
+        assert entry["revision_or_digest"] != "unrecorded"
+
 

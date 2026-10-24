@@ -91,6 +91,8 @@ def validator() -> Draft202012Validator:
 
 
 def validate_row(row: dict, *, host_port: bool = False) -> None:
+    if isinstance(row, dict) and ("remote_device" in row or str(row.get("device", "")).startswith("colab:")):
+        _check_remote_device(row)
     errors = sorted(validator().iter_errors(row), key=lambda item: list(item.path))
     if errors:
         raise ReceiptError(_format_error(errors[0]))
@@ -341,7 +343,10 @@ def _format_error(error: ValidationError) -> str:
     return f"{location}: {error.message}"
 
 
-_ACCOUNT_KEY = re.compile(r"^(?:account|account_id|user|user_id|owner|owner_id)$", re.IGNORECASE)
+_ACCOUNT_KEY = re.compile(
+    r"^(?:account|account_id|user|user_id|owner|owner_id|ggufrepo|gguf_repo|gguf_source)$",
+    re.IGNORECASE,
+)
 _HASHED_ACCOUNT = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 

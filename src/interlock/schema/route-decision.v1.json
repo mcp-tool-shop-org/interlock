@@ -99,6 +99,8 @@
       "items": {"type": "string", "minLength": 1}
     },
     "budget": {"enum": ["unchecked", "within", "not_applicable"]},
+    "remote": {"type": "boolean"},
+    "remote_device": {"type": "object"},
     "offrig_plan": {"type": "object"},
     "worst_case_usd": {"type": "number"}
   }

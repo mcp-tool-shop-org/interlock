@@ -259,3 +259,24 @@ def test_table_cli_lists_colab_card_and_wildcard_and_route_cli_gates_allow_remot
     assert refused_doc["code"] == "no_candidate"
     assert "22400 MiB" in refused_doc["hint"]
 
+
+def test_route_help_and_docs_list_all_excluded_outcomes_and_remote_flags(capsys):
+    from interlock.router import policy
+
+    with pytest.raises(SystemExit) as caught:
+        main(["route", "--help"])
+    assert caught.value.code == 0
+    help_text = capsys.readouterr().out
+    readme_text = (ROOT / "README.md").read_text(encoding="utf-8")
+    policy_doc = policy.__doc__ or ""
+
+    for code in ("oom", "load_refused", "timeout", "ctx_exceeded"):
+        assert code in help_text
+        assert code in policy_doc
+        assert code in readme_text
+
+    for flag in ("--allow-remote", "--device"):
+        assert flag in help_text
+        assert flag in readme_text
+
+

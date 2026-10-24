@@ -1,7 +1,8 @@
 # Standards compliance
 #
 # PIN_PER_STEP: 2. Tasks (embed, rerank, nli), batch sizes (1, 8, 32),
-#   abort_fraction (0.90), and the Colab card targets are pre-registered here.
+#   abort_fraction (0.90), the 3-VM per card replication, and the Colab card
+#   targets (A100-40, A100-80, G4, L4, T4) are pre-registered here.
 # ANDON_AUTHORITY: 2. Batch shapes that fail with oom, load_refused, timeout,
 #   or ctx_exceeded are recorded as failure rows, never skipped.
 # NAMED_COMPENSATORS: 2. Unload is keep_alive 0 on the run-owned Ollama server
@@ -15,7 +16,8 @@ procedure: batch-ladder
 platform: linux-cuda
 question: >
   What is the items/s throughput and warm latency of embed, rerank, and NLI
-  across batch sizes 1, 8, and 32 on each remote Colab card?
+  across batch sizes 1, 8, and 32 on each remote Colab card (A100-40, A100-80,
+  G4, L4, T4)?
 decision: >
   Each (task, batch) shape records items/s throughput and warm p50/p95 latency,
   or a failure row (oom, load_refused, timeout, ctx_exceeded) with its measured
@@ -29,6 +31,14 @@ batch_sizes:
   - 1
   - 8
   - 32
+replication:
+  vms_per_card: 3
+  windows_per_vm_rep: 2
+  windows_per_card: 6
+  note: >
+    Each card is run on 3 separate VMs (fresh sessions, different pools where
+    Colab gives them), split into 2 windows of ~2.4 h per VM-rep (6 windows per
+    card, 30 windows total).
 needs:
   grant: false
   npu_session: false
@@ -49,24 +59,183 @@ stop_rules:
   - Residency and peak VRAM come from NVML or nvidia-smi; no Windows counters are used.
   - Failed batch shapes are recorded as failure rows (oom, load_refused, timeout, ctx_exceeded), never skipped.
 models:
-  - model: BAAI/bge-base-en-v1.5
-    revision_or_digest: unrecorded
-    quant: unrecorded
-    licence: unrecorded
+  # colab:T4 (16 GB)
+  - task: embed
+    model: nomic-ai/nomic-embed-text-v1.5
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: fp16
+    licence: apache-2.0
     engine: ollama
-    engine_version: "0.35.1"
-    device: "colab:L4"
-  - model: BAAI/bge-reranker-v2-m3
-    revision_or_digest: unrecorded
-    quant: unrecorded
-    licence: unrecorded
+    device: "colab:T4"
+  - task: embed
+    model: BAAI/bge-base-en-v1.5
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: fp16
+    licence: mit
     engine: ollama
-    engine_version: "0.35.1"
-    device: "colab:L4"
-  - model: cross-encoder/nli-deberta-v3-base
+    device: "colab:T4"
+  - task: embed
+    model: Qwen/Qwen3-Embedding-0.6B
+    revision_or_digest: 82a0035040926a5c0dcf251209218e096c5eeb1c
+    quant: fp16
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:T4"
+  - task: rerank
+    model: BAAI/bge-reranker-v2-m3
+    revision_or_digest: 5617a9f61b028005a4858fdac845db406aefb181
+    quant: fp16
+    licence: mit
+    engine: ollama
+    device: "colab:T4"
+  - task: nli
+    model: cross-encoder/nli-deberta-v3-base
     revision_or_digest: 6c749ce3425cd33b46d187e45b92bbf96ee12ec7
-    quant: unrecorded
-    licence: unrecorded
+    quant: fp16
+    licence: apache-2.0
     engine: ollama
-    engine_version: "0.35.1"
+    device: "colab:T4"
+  # colab:L4 (24 GB)
+  - task: embed
+    model: nomic-ai/nomic-embed-text-v1.5
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: fp16
+    licence: apache-2.0
+    engine: ollama
     device: "colab:L4"
+  - task: embed
+    model: BAAI/bge-base-en-v1.5
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: fp16
+    licence: mit
+    engine: ollama
+    device: "colab:L4"
+  - task: embed
+    model: Qwen/Qwen3-Embedding-0.6B
+    revision_or_digest: 82a0035040926a5c0dcf251209218e096c5eeb1c
+    quant: fp16
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:L4"
+  - task: rerank
+    model: BAAI/bge-reranker-v2-m3
+    revision_or_digest: 5617a9f61b028005a4858fdac845db406aefb181
+    quant: fp16
+    licence: mit
+    engine: ollama
+    device: "colab:L4"
+  - task: nli
+    model: cross-encoder/nli-deberta-v3-base
+    revision_or_digest: 6c749ce3425cd33b46d187e45b92bbf96ee12ec7
+    quant: fp16
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:L4"
+  # colab:A100-40 (40 GB)
+  - task: embed
+    model: nomic-ai/nomic-embed-text-v1.5
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: fp16
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:A100-40"
+  - task: embed
+    model: BAAI/bge-base-en-v1.5
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: fp16
+    licence: mit
+    engine: ollama
+    device: "colab:A100-40"
+  - task: embed
+    model: Qwen/Qwen3-Embedding-0.6B
+    revision_or_digest: 82a0035040926a5c0dcf251209218e096c5eeb1c
+    quant: fp16
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:A100-40"
+  - task: rerank
+    model: BAAI/bge-reranker-v2-m3
+    revision_or_digest: 5617a9f61b028005a4858fdac845db406aefb181
+    quant: fp16
+    licence: mit
+    engine: ollama
+    device: "colab:A100-40"
+  - task: nli
+    model: cross-encoder/nli-deberta-v3-base
+    revision_or_digest: 6c749ce3425cd33b46d187e45b92bbf96ee12ec7
+    quant: fp16
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:A100-40"
+  # colab:A100-80 (80 GB)
+  - task: embed
+    model: nomic-ai/nomic-embed-text-v1.5
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: fp16
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:A100-80"
+  - task: embed
+    model: BAAI/bge-base-en-v1.5
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: fp16
+    licence: mit
+    engine: ollama
+    device: "colab:A100-80"
+  - task: embed
+    model: Qwen/Qwen3-Embedding-0.6B
+    revision_or_digest: 82a0035040926a5c0dcf251209218e096c5eeb1c
+    quant: fp16
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:A100-80"
+  - task: rerank
+    model: BAAI/bge-reranker-v2-m3
+    revision_or_digest: 5617a9f61b028005a4858fdac845db406aefb181
+    quant: fp16
+    licence: mit
+    engine: ollama
+    device: "colab:A100-80"
+  - task: nli
+    model: cross-encoder/nli-deberta-v3-base
+    revision_or_digest: 6c749ce3425cd33b46d187e45b92bbf96ee12ec7
+    quant: fp16
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:A100-80"
+  # colab:G4 (96 GB)
+  - task: embed
+    model: nomic-ai/nomic-embed-text-v1.5
+    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
+    quant: fp16
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:G4"
+  - task: embed
+    model: BAAI/bge-base-en-v1.5
+    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
+    quant: fp16
+    licence: mit
+    engine: ollama
+    device: "colab:G4"
+  - task: embed
+    model: Qwen/Qwen3-Embedding-0.6B
+    revision_or_digest: 82a0035040926a5c0dcf251209218e096c5eeb1c
+    quant: fp16
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:G4"
+  - task: rerank
+    model: BAAI/bge-reranker-v2-m3
+    revision_or_digest: 5617a9f61b028005a4858fdac845db406aefb181
+    quant: fp16
+    licence: mit
+    engine: ollama
+    device: "colab:G4"
+  - task: nli
+    model: cross-encoder/nli-deberta-v3-base
+    revision_or_digest: 6c749ce3425cd33b46d187e45b92bbf96ee12ec7
+    quant: fp16
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:G4"

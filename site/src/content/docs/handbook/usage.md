@@ -71,9 +71,10 @@ Rebuilds `table/` from the committed receipts.
 
 ```bash
 interlock import
+interlock import --remote-window receipts/c2-l4-window-01.json
 ```
 
-`--offers` points at an offers file. The default rebuild does not need it. Import does not read `aborted/`.
+`--offers` points at an offers file, and `--remote-window <path>` (repeatable) imports a remote Colab window receipt JSON into `table/routing.jsonl` while preserving every repeat slot in `artifacts.slots`. The default rebuild does not need either flag. Import does not read `aborted/`.
 
 ## interlock run
 

@@ -28,10 +28,11 @@ A row dated more than 30 days before ``as_of`` is stale. A row with
 They stay eligible.
 
 Capability rows (``native_binary_rejected``, ``compile_rejected``,
-``compile_timeout``, ``hang``, ``device_lost``) are excluded, with those
-codes, and never ranked. A row with ``parity_valid`` false is excluded the
-same way, code ``parity_invalid``. When a row is both, the capability code
-is the one shown. Missing ``parity_valid`` stays eligible.
+``compile_timeout``, ``hang``, ``device_lost``, ``oom``, ``load_refused``,
+``timeout``, ``ctx_exceeded``) are excluded, with those codes, and never
+ranked. A row with ``parity_valid`` false is excluded the same way, code
+``parity_invalid``. When a row is both, the capability code is the one shown.
+Missing ``parity_valid`` stays eligible.
 
 ``thinking`` matches a family. ``off`` matches only ``off``. ``on`` matches
 any recorded thinking level. ``low``, ``medium`` and ``high`` match exactly
@@ -42,7 +43,9 @@ TTFT (``--max-ttft-ms``) is refused unless every row that would be compared
 records the same known ``settings.prefix_caching`` (``on``, ``off``, or
 ``default``). Unset means unknown, not "all the same".
 
-A remote row is a ``runpod:`` device. Its ``settings.offrig_plan`` must
+A remote row is a ``runpod:`` or ``colab:`` device. Remote ``colab:`` rows stay
+out of the pool unless the request opts in (``--allow-remote`` or
+``--device colab:<card>``). A ``runpod:`` row's ``settings.offrig_plan`` must
 include ``profile`` and ``max_hours``. ``--budget-left-usd`` drops a remote
 row whose ``settings.worst_case_usd`` is missing or greater than the flag,
 and that row is a runner-up with the reason. With no flag the suggestion is
@@ -113,10 +116,11 @@ class Refusal:
 def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
     """Return the choice, or a refusal that names the constraint and the gap."""
 
+    visible_rows = [row for row in rows if _remote_eligible(row, request)]
     excluded: list[dict] = []
     failure_reasons: list[str] = []
     pool: list[Mapping] = []
-    for row in rows:
+    for row in visible_rows:
         outcome = row.get("outcome")
         if outcome in EXCLUDED_OUTCOMES and _task_model(row, request):
             excluded.append({"id": str(row["id"]), "code": str(outcome)})
@@ -133,7 +137,7 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
             pool.append(row)
     excluded.sort(key=lambda item: item["id"])
 
-    steps: list[tuple[str, object]] = [("task", None), ("model", None), ("remote", None)]
+    steps: list[tuple[str, object]] = [("task", None), ("model", None)]
     if request.device is not None:
         steps.append(("device", request.device))
     if request.thinking is not None:
@@ -214,7 +218,7 @@ def _document(
     if "5090" not in request.busy and not _any_5090(pool, request):
         notes.append("no 5090 row")
     remote = _is_remote(winner)
-    plan = _plan_args(winner) if remote else None
+    plan = _plan_args(winner) if _is_runpod(winner) else None
     if remote and request.budget_left_usd is None:
         notes.append("budget unchecked")
     budget = "not_applicable"
@@ -247,6 +251,11 @@ def _document(
         "notes": notes,
         "budget": budget,
     }
+    if remote:
+        document["remote"] = True
+        remote_ident = winner.get("remote_device")
+        if isinstance(remote_ident, Mapping):
+            document["remote_device"] = dict(remote_ident)
     if plan is not None:
         document["offrig_plan"] = plan
         worst = _worst_case(winner)
@@ -298,8 +307,6 @@ def _runners(pool: Sequence[Mapping], winner: Mapping, ranked: list[Mapping], re
 
 
 def _why(row: Mapping, winner: Mapping, request: Request) -> tuple[str, str]:
-    if not _remote_eligible(row, request):
-        return "remote", f"remote device {row.get('device')} requires --allow-remote"
     if request.device is not None and not matches_device_filter(row.get("device"), request.device):
         return "device", f"device {row.get('device')} does not match {request.device}"
     if request.thinking is not None and not _thinking_matches(_thinking(row), request.thinking):
@@ -317,7 +324,7 @@ def _why(row: Mapping, winner: Mapping, request: Request) -> tuple[str, str]:
         return "num_predict", f"num_predict {_num_predict(row)} does not match {request.num_predict}"
     if row.get("device") in request.busy:
         return "busy", f"{row.get('device')} is busy"
-    if _is_remote(row) and _plan_args(row) is None:
+    if _is_runpod(row) and _plan_args(row) is None:
         return "remote_plan", "remote row has no offrig_plan profile and max_hours"
     if request.budget_left_usd is not None and _is_remote(row) and not _within_budget(row, request.budget_left_usd):
         return "budget", _budget_reason(row, request.budget_left_usd)
@@ -498,8 +505,6 @@ def _keeps(row: Mapping, request: Request, constraint: str, limit: object) -> bo
         return row.get("task") == request.task
     if constraint == "model":
         return _model_matches(row, request.model)
-    if constraint == "remote":
-        return _remote_eligible(row, request)
     if constraint == "device":
         return matches_device_filter(row.get("device"), str(limit))
     if constraint == "thinking":
@@ -513,7 +518,7 @@ def _keeps(row: Mapping, request: Request, constraint: str, limit: object) -> bo
     if constraint == "busy":
         return row.get("device") not in request.busy
     if constraint == "remote_plan":
-        return not _is_remote(row) or _plan_args(row) is not None
+        return not _is_runpod(row) or _plan_args(row) is not None
     if constraint == "budget":
         if not _is_remote(row):
             return True
@@ -782,8 +787,12 @@ def _meets_ctx(row: Mapping, needed: int) -> bool:
     return False
 
 
-def _is_remote(row: Mapping) -> bool:
+def _is_runpod(row: Mapping) -> bool:
     return str(row.get("device", "")).startswith("runpod:")
+
+
+def _is_remote(row: Mapping) -> bool:
+    return _is_runpod(row) or is_colab_device(row.get("device"))
 
 
 def _remote_eligible(row: Mapping, request: Request) -> bool:

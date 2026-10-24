@@ -72,8 +72,8 @@
         "provider": {"enum": ["colab"]},
         "card": {"enum": ["A100-40", "A100-80", "L4", "T4", "G4"]},
         "vram_mib": {"type": "integer", "minimum": 1},
-        "driver_version": {"type": "string", "minLength": 1},
-        "cuda_version": {"type": "string", "minLength": 1},
+        "driver_version": {"type": "string", "pattern": "^[0-9]+(\\.[0-9]+)+$"},
+        "cuda_version": {"type": "string", "pattern": "^[0-9]+(\\.[0-9]+)+$"},
         "pool": {"type": "string", "minLength": 1}
       }
     },

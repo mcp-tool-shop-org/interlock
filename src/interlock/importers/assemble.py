@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from collections.abc import Sequence
 from pathlib import Path
 
 from interlock.importers.aspire_judges import b_rows
@@ -66,6 +67,7 @@ def import_receipts(
     npu_repo: Path | None = None,
     aspire_repo: Path | None = None,
     offers_path: Path | None = None,
+    remote_windows: Sequence[Path] | None = None,
     rnd_pin: str = RND_COMMIT,
     npu_pin: str = NPU_BUILDOUT_COMMIT,
     aspire_pin: str = ASPIRE_COMMIT,
@@ -96,6 +98,13 @@ def import_receipts(
     if offers_path is not None:
         content = offers_path.read_bytes()
         rows.extend(offer_rows(_json(content), source_path=_offer_source(offers_path), content=content))
+    if remote_windows:
+        from interlock.importers.remote import import_remote_window
+
+        for window_path in remote_windows:
+            wpath = Path(window_path)
+            content = wpath.read_bytes()
+            rows.extend(import_remote_window(content, source_path=_offer_source(wpath)))
     if local_root is not None:
         rows.extend(e1_rerun2_rows(Path(local_root)))
     _unique(rows)

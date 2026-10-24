@@ -311,6 +311,65 @@ def test_remote_device_refuses_unhashed_account_in_pool():
             )
 
 
+@pytest.mark.parametrize(
+    "field_name",
+    ["provider", "card", "vram_mib", "driver_version", "cuda_version", "pool"],
+)
+@pytest.mark.parametrize(
+    "account_input",
+    [
+        "researcher@example.com",
+        "org/model-repo",
+        "github-owner/gguf-weights",
+        "github:octocat",
+        "user:alice",
+        "account:bob",
+        "hf:org_handle",
+        "/" + "home/" + "researcher",
+        "C:" + "\\Users\\" + "researcher",
+    ],
+)
+def test_remote_device_refuses_unhashed_account_across_all_six_fields(field_name, account_input):
+    from interlock.devices import RemoteDeviceIdentity
+
+    payload = {
+        "provider": "colab",
+        "card": "L4",
+        "vram_mib": 23034,
+        "driver_version": "550.54.15",
+        "cuda_version": "12.4",
+        "pool": "us-central1-a",
+    }
+    payload[field_name] = account_input
+    with pytest.raises(DeviceRefused, match="unhashed account id"):
+        RemoteDeviceIdentity.from_dict(payload)
+
+
+def test_remote_device_requires_numeric_driver_and_cuda_versions():
+    from interlock.devices import RemoteDeviceIdentity
+
+    for bad_version in ("r550-beta", "latest", "550", "12", "v12.4", "12.4.1-rc1"):
+        with pytest.raises(DeviceRefused, match="numeric version"):
+            RemoteDeviceIdentity(
+                provider="colab",
+                card="L4",
+                vram_mib=23034,
+                driver_version=bad_version,
+                cuda_version="12.4",
+                pool="us-central1-a",
+            )
+        with pytest.raises(DeviceRefused, match="numeric version"):
+            RemoteDeviceIdentity(
+                provider="colab",
+                card="L4",
+                vram_mib=23034,
+                driver_version="550.54.15",
+                cuda_version=bad_version,
+                pool="us-central1-a",
+            )
+
+
+
 def test_remote_and_rig_rows_stay_in_separate_pools():
     from interlock.devices import (
         RIG_DEVICES,

@@ -32,13 +32,18 @@ constraints:
                      exceeds it is dropped and shown in the runners-up. With
                      no flag, a remote suggestion is marked budget unchecked.
                      interlock does not read offrig.
+  --allow-remote     allow remote colab:<card> rows into the candidate pool.
+                     Default off.
+  --device FILTER    exact device (colab:L4, 5090) or provider wildcard
+                     (colab:*). A colab: filter implies remote eligibility.
 
 A row with no repeat spread is not ranked on that metric. The margin is the
 gap between conservative bounds, never a median. Capability rows
 (native_binary_rejected, compile_rejected, compile_timeout, hang,
-device_lost) and a row with parity_valid false (parity_invalid) are listed
-under excluded and are not candidates. No row meets the constraints: exit 1
-and a structured error. It does not fall back.
+device_lost, oom, load_refused, timeout, ctx_exceeded) and a row with
+parity_valid false (parity_invalid) are listed under excluded and are not
+candidates. No row meets the constraints: exit 1 and a structured error. It
+does not fall back.
 """
 
 
@@ -81,6 +86,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     importer.add_argument("--root", type=Path, default=Path("."))
     importer.add_argument("--offers", type=Path, default=None)
+    importer.add_argument(
+        "--remote-window",
+        action="append",
+        type=Path,
+        default=None,
+        help="remote window JSON file to import (repeatable)",
+    )
     importer.set_defaults(func=_cmd_import)
 
     run = sub.add_parser("run", help="run a committed experiment spec (the plan only with --dry-run)")
@@ -236,7 +248,11 @@ def _cmd_import(args: argparse.Namespace) -> int:
     from interlock.importers.pins import ASPIRE_COMMIT
 
     root = args.root.resolve()
-    rows, skipped = import_receipts(offers_path=args.offers, local_root=root)
+    rows, skipped = import_receipts(
+        offers_path=args.offers,
+        local_root=root,
+        remote_windows=args.remote_window,
+    )
     table = root / "table"
     table.mkdir(exist_ok=True)
     lines = [json.dumps(row, sort_keys=True) for row in rows]
@@ -325,6 +341,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
     from interlock.guards import GuardError
     from interlock.harness.e4b import E4bError, parse_pairs
     from interlock.harness.lifecycle import LifecycleError
+    from interlock.harness.linux_cuda import LinuxCudaError
     from interlock.harness.ollama_serve import ServeError
     from interlock.harness.runner import RunnerError, dry_run, heartbeat_path, parse_models, run_spec
     from interlock.harness.spec import SpecError, load_spec
@@ -369,7 +386,17 @@ def _cmd_run(args: argparse.Namespace) -> int:
             pairs=pairs,
             models=models,
         )
-    except (AdapterError, GuardError, RunnerError, SpecError, E4bError, LifecycleError, ServeError, OSError) as exc:
+    except (
+        AdapterError,
+        GuardError,
+        RunnerError,
+        SpecError,
+        E4bError,
+        LifecycleError,
+        LinuxCudaError,
+        ServeError,
+        OSError,
+    ) as exc:
         print(str(exc), file=sys.stderr)
         return 1
     return 0

@@ -827,3 +827,81 @@ def test_remote_window_receipt_imports_to_valid_remote_rows_and_keeps_pools_sepa
         split_pools([{"id": "x", "device": "unknown:gpu"}])
 
 
+def test_import_remote_window_records_all_repeat_slots_and_cli_imports_remote_window(tmp_path: Path, monkeypatch):
+    from interlock.cli import main
+    from interlock.importers.remote import import_remote_window
+    from interlock.router.policy import decode_bound, latency_bound_ms
+
+    payload = {
+        "run_id": "c2-a100-window-02",
+        "date": "2026-10-24",
+        "remote_device": {
+            "provider": "colab",
+            "card": "A100-40",
+            "vram_mib": 40960,
+            "driver_version": "550.54.15",
+            "cuda_version": "12.4",
+            "pool": "us-central1-a",
+        },
+        "records": [
+            {
+                "task": "generate",
+                "model": "qwen3:8b",
+                "revision_or_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+                "engine_version": "0.6.2",
+                "num_ctx": 4096,
+                "num_predict": 128,
+                "ttft_ms": 95.0,
+                "decode_tok_s": 88.0,
+                "latency_ms": 210.0,
+                "slots": [
+                    {"phase": "warmup", "throughput": 80.0, "latency_ms": 260.0, "ttft_ms": 120.0},
+                    {"phase": "repeat", "throughput": 92.0, "latency_ms": 195.0, "ttft_ms": 90.0},
+                    {"phase": "repeat", "throughput": 84.0, "latency_ms": 225.0, "ttft_ms": 102.0},
+                    {"phase": "repeat", "throughput": 88.0, "latency_ms": 210.0, "ttft_ms": 95.0},
+                ],
+            },
+            {
+                "task": "generate",
+                "model": "phi3.5:3.8b",
+                "revision_or_digest": "920a1f227c69d81a8cad0f8efc8ea1aa9f43eb52",
+                "engine_version": "0.6.2",
+                "num_ctx": 2048,
+                "num_predict": 128,
+                "ttft_ms": 40.0,
+                "decode_tok_s": 110.0,
+                "latency_ms": 90.0,
+            },
+        ],
+    }
+    raw = json.dumps(payload).encode("utf-8")
+    rows = import_remote_window(raw, source_path="receipts/c2-a100-window-02.json")
+    assert len(rows) == 2
+    # Record 0 has 3 repeat slots (+ 1 warmup slot); repeats is 3 and conservative bounds use all 3 repeat slots.
+    assert rows[0]["repeats"] == 3
+    repeat_slots_0 = [s for s in rows[0]["artifacts"]["slots"] if s["phase"] == "repeat"]
+    assert len(repeat_slots_0) == 3
+    assert decode_bound(rows[0]) == 84.0
+    assert latency_bound_ms(rows[0]) == 225.0
+    # Record 1 has no explicit slots list, so it has 1 repeat slot and repeats == 1 (never fake repeats: 3).
+    assert rows[1]["repeats"] == 1
+    assert len(rows[1]["artifacts"]["slots"]) == 1
+
+    # Also verify CLI `interlock import --remote-window <path>` passes remote_windows through:
+    table = tmp_path / "table"
+    table.mkdir()
+    (table / "candidates.json").write_text("[]", encoding="utf-8")
+    window_file = tmp_path / "c2-window.json"
+    window_file.write_bytes(raw)
+    captured_kwargs: dict = {}
+
+    def fake_import_receipts(**kwargs):
+        captured_kwargs.update(kwargs)
+        return rows, []
+
+    monkeypatch.setattr("interlock.importers.assemble.import_receipts", fake_import_receipts)
+    assert main(["import", "--root", str(tmp_path), "--remote-window", str(window_file)]) == 0
+    assert captured_kwargs.get("remote_windows") == [window_file]
+
+
+

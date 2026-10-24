@@ -50,11 +50,22 @@ def import_remote_window(
         raise ImportError_(f"{source_path}: {exc}") from exc
 
     provenance = source_provenance(source_path, commit_sha, raw)
+    doc_engine_version = str(doc.get("engine_version") or "").strip()
     rows: list[dict[str, Any]] = []
     for index, entry in enumerate(records):
         if not isinstance(entry, Mapping):
             raise ImportError_(f"{source_path}[{index}]: record must be a mapping")
-        rows.append(_record_to_row(entry, index=index, run_id=run_id, date=date, ident=ident, provenance=provenance))
+        rows.append(
+            _record_to_row(
+                entry,
+                index=index,
+                run_id=run_id,
+                date=date,
+                ident=ident,
+                provenance=provenance,
+                doc_engine_version=doc_engine_version,
+            )
+        )
     return rows
 
 
@@ -66,6 +77,7 @@ def _record_to_row(
     date: str,
     ident: RemoteDeviceIdentity,
     provenance: dict[str, Any],
+    doc_engine_version: str = "",
 ) -> dict[str, Any]:
     task = str(entry.get("task") or "generate")
     model_name = str(entry.get("model") or "").strip()
@@ -73,7 +85,7 @@ def _record_to_row(
     if not model_name:
         raise ImportError_(f"{run_id}[{index}]: record is missing model")
 
-    engine_version = str(entry.get("engine_version") or "0.35.1")
+    engine_version = str(entry.get("engine_version") or doc_engine_version or UNRECORDED)
     quant = str(entry.get("quant") or UNRECORDED)
     licence = str(entry.get("licence") or UNRECORDED)
     num_ctx = entry.get("num_ctx")
@@ -163,9 +175,37 @@ def _record_to_row(
         model_obj["size"] = int(size)
         model_obj["size_vram"] = int(size_vram)
 
-    slot: dict[str, Any] = {"phase": "repeat", "throughput": throughput, "latency_ms": latency_ms}
-    if ttft_ms is not None:
-        slot["ttft_ms"] = float(ttft_ms)
+    raw_slots = entry.get("slots")
+    if isinstance(raw_slots, list) and raw_slots:
+        slots: list[dict[str, Any]] = []
+        for s in raw_slots:
+            if not isinstance(s, Mapping):
+                raise ImportError_(f"{row_id}: slot must be a mapping")
+            phase = str(s.get("phase") or "repeat")
+            slot_tput = float(
+                s.get("throughput")
+                if s.get("throughput") is not None
+                else (s.get("decode_tok_s") if s.get("decode_tok_s") is not None else throughput)
+            )
+            slot_lat = float(s.get("latency_ms") if s.get("latency_ms") is not None else latency_ms)
+            slot_item: dict[str, Any] = {
+                "phase": phase,
+                "throughput": slot_tput,
+                "latency_ms": slot_lat,
+            }
+            slot_ttft = s.get("ttft_ms", ttft_ms)
+            if slot_ttft is not None:
+                slot_item["ttft_ms"] = float(slot_ttft)
+            slots.append(slot_item)
+        repeats = sum(1 for s in slots if s.get("phase") == "repeat")
+        if repeats < 1:
+            raise ImportError_(f"{row_id}: slots must include at least one repeat slot")
+    else:
+        slot: dict[str, Any] = {"phase": "repeat", "throughput": throughput, "latency_ms": latency_ms}
+        if ttft_ms is not None:
+            slot["ttft_ms"] = float(ttft_ms)
+        slots = [slot]
+        repeats = 1
 
     row = {
         "id": row_id,
@@ -182,9 +222,9 @@ def _record_to_row(
             throughput=throughput,
             throughput_unit=unit,
         ),
-        "artifacts": {"slots": [slot]},
+        "artifacts": {"slots": slots},
         "date": date,
-        "repeats": int(entry.get("repeats") or 3),
+        "repeats": repeats,
         "provisional": False,
         "provenance": dict(provenance),
     }
