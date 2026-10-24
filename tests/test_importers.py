@@ -718,9 +718,16 @@ def test_e1_rerun2_copies_47_rows_and_leaves_the_receipt_files_alone():
 
 
 def test_remote_window_receipt_imports_to_valid_remote_rows_and_keeps_pools_separate():
-    from interlock.devices import assert_single_pool, partition_rows_by_pool
-    from interlock.importers.remote import import_remote_window, split_pools
     from tests.support import row as make_rig_row
+
+    try:
+        from interlock.devices import assert_single_pool, partition_rows_by_pool
+        from interlock.importers.remote import import_remote_window, split_pools
+    except ImportError:
+        assert_single_pool = None
+        partition_rows_by_pool = None
+        import_remote_window = None
+        split_pools = None
 
     window_payload = {
         "run_id": "c2-l4-window-01",
@@ -763,6 +770,8 @@ def test_remote_window_receipt_imports_to_valid_remote_rows_and_keeps_pools_sepa
         ],
     }
     raw = json.dumps(window_payload).encode("utf-8")
+    assert import_remote_window is not None, "remote window receipt importer (import_remote_window) is missing"
+    assert split_pools is not None and assert_single_pool is not None and partition_rows_by_pool is not None
     imported = import_remote_window(raw, source_path="receipts/c2-l4-window-01.json")
     assert len(imported) == 2
     for item in imported:
@@ -829,8 +838,14 @@ def test_remote_window_receipt_imports_to_valid_remote_rows_and_keeps_pools_sepa
 
 def test_import_remote_window_records_all_repeat_slots_and_cli_imports_remote_window(tmp_path: Path, monkeypatch):
     from interlock.cli import main
-    from interlock.importers.remote import import_remote_window
     from interlock.router.policy import decode_bound, latency_bound_ms
+
+    try:
+        from interlock.importers.remote import import_remote_window
+    except ImportError:
+        import_remote_window = None
+
+    assert import_remote_window is not None, "remote window receipt importer (import_remote_window) is missing"
 
     payload = {
         "run_id": "c2-a100-window-02",

@@ -18,7 +18,7 @@
 
 # interlock: local AI device router
 
-> **Prototype, 0.1.x: a research instrument.** The CLI, the receipt format and the experiment specs can change without notice between 0.x releases. interlock is advisory only: it suggests a model, engine and device, and it never serves traffic. Every number in it was measured on one rig (Intel Core Ultra 9 285K with its NPU and iGPU, plus an RTX 5090). Treat its routes as that rig's evidence, not a general benchmark.
+> **Prototype, 0.3.x: a research instrument.** The CLI, the receipt format and the experiment specs can change without notice between 0.x releases. interlock is advisory only: it suggests a model, engine and device, and it never serves traffic. Every local number in it was measured on one rig (Intel Core Ultra 9 285K with its NPU and iGPU, plus an RTX 5090), and remote `colab:<card>` rows live in their own separate evidence pool with full card identity (`provider`, `card`, `vram_mib`, `driver_version`, `cuda_version`, `pool`). Treat its routes as measured evidence for that specific hardware pool, not a general benchmark.
 
 Railway interlocking stops a train being routed into a conflicting path. This tool does that for devices: it sends each job to a model, an engine and a device.
 

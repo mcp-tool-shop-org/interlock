@@ -358,6 +358,7 @@ def _check_remote_device(row: dict) -> None:
         is_rig_device,
     )
 
+    _reject_unhashed_account_fields(row, row["id"])
     device = row.get("device")
     remote_raw = row.get("remote_device")
     if is_rig_device(device):
@@ -377,7 +378,6 @@ def _check_remote_device(row: dict) -> None:
             raise ReceiptError(
                 f"{row['id']}: remote_device {identity.logical_device!r} does not match device {device!r}"
             )
-        _reject_unhashed_account_fields(row, row["id"])
 
 
 def _reject_unhashed_account_fields(value: object, row_id: str, where: str = "$") -> None:

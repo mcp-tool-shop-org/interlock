@@ -68,10 +68,16 @@ stop_rules:
   - No Windows performance counters are queried on Linux.
   - Any shape that fails at load or during confirmation is recorded as a failure row (oom, load_refused, timeout, ctx_exceeded), never skipped.
 models:
-  # colab:T4 (16 GB) - includes pre-registered refusal cells for 30B/31B quants that exceed 16 GB
+  # colab:T4 (16 GB) - Q4_K_M, Q6_K, Q8_0, BF16 per model; 30B/31B and 8B BF16 are pre-registered load_refused
   - model: qwen3:8b
     revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
     quant: Q4_K_M
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:T4"
+  - model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: Q6_K
     licence: apache-2.0
     engine: ollama
     device: "colab:T4"
@@ -81,9 +87,28 @@ models:
     licence: apache-2.0
     engine: ollama
     device: "colab:T4"
+  - model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: BF16
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:T4"
+    expected_outcome: load_refused
   - model: phi3.5:3.8b
     revision_or_digest: 61819fb370a3c1a96679d869a3f29a8f10494f2b9106a99f83f62c1e6e9b9b3a
     quant: Q4_K_M
+    licence: mit
+    engine: ollama
+    device: "colab:T4"
+  - model: phi3.5:3.8b
+    revision_or_digest: 61819fb370a3c1a96679d869a3f29a8f10494f2b9106a99f83f62c1e6e9b9b3a
+    quant: Q6_K
+    licence: mit
+    engine: ollama
+    device: "colab:T4"
+  - model: phi3.5:3.8b
+    revision_or_digest: 61819fb370a3c1a96679d869a3f29a8f10494f2b9106a99f83f62c1e6e9b9b3a
+    quant: Q8_0
     licence: mit
     engine: ollama
     device: "colab:T4"
@@ -95,14 +120,56 @@ models:
     device: "colab:T4"
   - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
     revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    quant: Q4_K_M
+    licence: gemma
+    engine: ollama
+    device: "colab:T4"
+    expected_outcome: load_refused
+  - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
+    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    quant: Q6_K
+    licence: gemma
+    engine: ollama
+    device: "colab:T4"
+    expected_outcome: load_refused
+  - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
+    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
     quant: Q8_0
+    licence: gemma
+    engine: ollama
+    device: "colab:T4"
+    expected_outcome: load_refused
+  - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
+    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    quant: BF16
     licence: gemma
     engine: ollama
     device: "colab:T4"
     expected_outcome: load_refused
   - model: muse-glimmer:30b
     revision_or_digest: 9a44c2e1b8f07d55e1c3420a8812d0f7e6a91c34b208f71e5d3a2c490b118ef2
+    quant: Q4_K_M
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:T4"
+    expected_outcome: load_refused
+  - model: muse-glimmer:30b
+    revision_or_digest: 9a44c2e1b8f07d55e1c3420a8812d0f7e6a91c34b208f71e5d3a2c490b118ef2
+    quant: Q6_K
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:T4"
+    expected_outcome: load_refused
+  - model: muse-glimmer:30b
+    revision_or_digest: 9a44c2e1b8f07d55e1c3420a8812d0f7e6a91c34b208f71e5d3a2c490b118ef2
     quant: Q8_0
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:T4"
+    expected_outcome: load_refused
+  - model: muse-glimmer:30b
+    revision_or_digest: 9a44c2e1b8f07d55e1c3420a8812d0f7e6a91c34b208f71e5d3a2c490b118ef2
+    quant: BF16
     licence: apache-2.0
     engine: ollama
     device: "colab:T4"
@@ -114,9 +181,45 @@ models:
     licence: apache-2.0
     engine: ollama
     device: "colab:L4"
+  - model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: Q6_K
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:L4"
+  - model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: Q8_0
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:L4"
+  - model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: BF16
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:L4"
+  - model: phi3.5:3.8b
+    revision_or_digest: 61819fb370a3c1a96679d869a3f29a8f10494f2b9106a99f83f62c1e6e9b9b3a
+    quant: Q4_K_M
+    licence: mit
+    engine: ollama
+    device: "colab:L4"
   - model: phi3.5:3.8b
     revision_or_digest: 61819fb370a3c1a96679d869a3f29a8f10494f2b9106a99f83f62c1e6e9b9b3a
     quant: Q6_K
+    licence: mit
+    engine: ollama
+    device: "colab:L4"
+  - model: phi3.5:3.8b
+    revision_or_digest: 61819fb370a3c1a96679d869a3f29a8f10494f2b9106a99f83f62c1e6e9b9b3a
+    quant: Q8_0
+    licence: mit
+    engine: ollama
+    device: "colab:L4"
+  - model: phi3.5:3.8b
+    revision_or_digest: 61819fb370a3c1a96679d869a3f29a8f10494f2b9106a99f83f62c1e6e9b9b3a
+    quant: BF16
     licence: mit
     engine: ollama
     device: "colab:L4"
@@ -126,6 +229,40 @@ models:
     licence: gemma
     engine: ollama
     device: "colab:L4"
+  - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
+    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    quant: Q6_K
+    licence: gemma
+    engine: ollama
+    device: "colab:L4"
+    expected_outcome: load_refused
+  - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
+    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    quant: Q8_0
+    licence: gemma
+    engine: ollama
+    device: "colab:L4"
+    expected_outcome: load_refused
+  - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
+    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    quant: BF16
+    licence: gemma
+    engine: ollama
+    device: "colab:L4"
+    expected_outcome: load_refused
+  - model: muse-glimmer:30b
+    revision_or_digest: 9a44c2e1b8f07d55e1c3420a8812d0f7e6a91c34b208f71e5d3a2c490b118ef2
+    quant: Q4_K_M
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:L4"
+  - model: muse-glimmer:30b
+    revision_or_digest: 9a44c2e1b8f07d55e1c3420a8812d0f7e6a91c34b208f71e5d3a2c490b118ef2
+    quant: Q6_K
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:L4"
+    expected_outcome: load_refused
   - model: muse-glimmer:30b
     revision_or_digest: 9a44c2e1b8f07d55e1c3420a8812d0f7e6a91c34b208f71e5d3a2c490b118ef2
     quant: Q8_0
@@ -133,7 +270,32 @@ models:
     engine: ollama
     device: "colab:L4"
     expected_outcome: load_refused
+  - model: muse-glimmer:30b
+    revision_or_digest: 9a44c2e1b8f07d55e1c3420a8812d0f7e6a91c34b208f71e5d3a2c490b118ef2
+    quant: BF16
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:L4"
+    expected_outcome: load_refused
   # colab:A100-40 (40 GB)
+  - model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: Q4_K_M
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:A100-40"
+  - model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: Q6_K
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:A100-40"
+  - model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: Q8_0
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:A100-40"
   - model: qwen3:8b
     revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
     quant: BF16
@@ -142,14 +304,57 @@ models:
     device: "colab:A100-40"
   - model: phi3.5:3.8b
     revision_or_digest: 61819fb370a3c1a96679d869a3f29a8f10494f2b9106a99f83f62c1e6e9b9b3a
+    quant: Q4_K_M
+    licence: mit
+    engine: ollama
+    device: "colab:A100-40"
+  - model: phi3.5:3.8b
+    revision_or_digest: 61819fb370a3c1a96679d869a3f29a8f10494f2b9106a99f83f62c1e6e9b9b3a
+    quant: Q6_K
+    licence: mit
+    engine: ollama
+    device: "colab:A100-40"
+  - model: phi3.5:3.8b
+    revision_or_digest: 61819fb370a3c1a96679d869a3f29a8f10494f2b9106a99f83f62c1e6e9b9b3a
     quant: Q8_0
     licence: mit
+    engine: ollama
+    device: "colab:A100-40"
+  - model: phi3.5:3.8b
+    revision_or_digest: 61819fb370a3c1a96679d869a3f29a8f10494f2b9106a99f83f62c1e6e9b9b3a
+    quant: BF16
+    licence: mit
+    engine: ollama
+    device: "colab:A100-40"
+  - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
+    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    quant: Q4_K_M
+    licence: gemma
     engine: ollama
     device: "colab:A100-40"
   - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
     revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
     quant: Q6_K
     licence: gemma
+    engine: ollama
+    device: "colab:A100-40"
+  - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
+    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    quant: Q8_0
+    licence: gemma
+    engine: ollama
+    device: "colab:A100-40"
+  - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
+    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    quant: BF16
+    licence: gemma
+    engine: ollama
+    device: "colab:A100-40"
+    expected_outcome: load_refused
+  - model: muse-glimmer:30b
+    revision_or_digest: 9a44c2e1b8f07d55e1c3420a8812d0f7e6a91c34b208f71e5d3a2c490b118ef2
+    quant: Q4_K_M
+    licence: apache-2.0
     engine: ollama
     device: "colab:A100-40"
   - model: muse-glimmer:30b
@@ -158,11 +363,60 @@ models:
     licence: apache-2.0
     engine: ollama
     device: "colab:A100-40"
+  - model: muse-glimmer:30b
+    revision_or_digest: 9a44c2e1b8f07d55e1c3420a8812d0f7e6a91c34b208f71e5d3a2c490b118ef2
+    quant: Q8_0
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:A100-40"
+  - model: muse-glimmer:30b
+    revision_or_digest: 9a44c2e1b8f07d55e1c3420a8812d0f7e6a91c34b208f71e5d3a2c490b118ef2
+    quant: BF16
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:A100-40"
+    expected_outcome: load_refused
   # colab:A100-80 (80 GB)
+  - model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: Q4_K_M
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:A100-80"
+  - model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: Q6_K
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:A100-80"
+  - model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: Q8_0
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:A100-80"
   - model: qwen3:8b
     revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
     quant: BF16
     licence: apache-2.0
+    engine: ollama
+    device: "colab:A100-80"
+  - model: phi3.5:3.8b
+    revision_or_digest: 61819fb370a3c1a96679d869a3f29a8f10494f2b9106a99f83f62c1e6e9b9b3a
+    quant: Q4_K_M
+    licence: mit
+    engine: ollama
+    device: "colab:A100-80"
+  - model: phi3.5:3.8b
+    revision_or_digest: 61819fb370a3c1a96679d869a3f29a8f10494f2b9106a99f83f62c1e6e9b9b3a
+    quant: Q6_K
+    licence: mit
+    engine: ollama
+    device: "colab:A100-80"
+  - model: phi3.5:3.8b
+    revision_or_digest: 61819fb370a3c1a96679d869a3f29a8f10494f2b9106a99f83f62c1e6e9b9b3a
+    quant: Q8_0
+    licence: mit
     engine: ollama
     device: "colab:A100-80"
   - model: phi3.5:3.8b
@@ -173,8 +427,44 @@ models:
     device: "colab:A100-80"
   - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
     revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    quant: Q4_K_M
+    licence: gemma
+    engine: ollama
+    device: "colab:A100-80"
+  - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
+    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    quant: Q6_K
+    licence: gemma
+    engine: ollama
+    device: "colab:A100-80"
+  - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
+    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
     quant: Q8_0
     licence: gemma
+    engine: ollama
+    device: "colab:A100-80"
+  - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
+    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    quant: BF16
+    licence: gemma
+    engine: ollama
+    device: "colab:A100-80"
+  - model: muse-glimmer:30b
+    revision_or_digest: 9a44c2e1b8f07d55e1c3420a8812d0f7e6a91c34b208f71e5d3a2c490b118ef2
+    quant: Q4_K_M
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:A100-80"
+  - model: muse-glimmer:30b
+    revision_or_digest: 9a44c2e1b8f07d55e1c3420a8812d0f7e6a91c34b208f71e5d3a2c490b118ef2
+    quant: Q6_K
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:A100-80"
+  - model: muse-glimmer:30b
+    revision_or_digest: 9a44c2e1b8f07d55e1c3420a8812d0f7e6a91c34b208f71e5d3a2c490b118ef2
+    quant: Q8_0
+    licence: apache-2.0
     engine: ollama
     device: "colab:A100-80"
   - model: muse-glimmer:30b
@@ -186,8 +476,44 @@ models:
   # colab:G4 (96 GB)
   - model: qwen3:8b
     revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: Q4_K_M
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:G4"
+  - model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: Q6_K
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:G4"
+  - model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: Q8_0
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:G4"
+  - model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
     quant: BF16
     licence: apache-2.0
+    engine: ollama
+    device: "colab:G4"
+  - model: phi3.5:3.8b
+    revision_or_digest: 61819fb370a3c1a96679d869a3f29a8f10494f2b9106a99f83f62c1e6e9b9b3a
+    quant: Q4_K_M
+    licence: mit
+    engine: ollama
+    device: "colab:G4"
+  - model: phi3.5:3.8b
+    revision_or_digest: 61819fb370a3c1a96679d869a3f29a8f10494f2b9106a99f83f62c1e6e9b9b3a
+    quant: Q6_K
+    licence: mit
+    engine: ollama
+    device: "colab:G4"
+  - model: phi3.5:3.8b
+    revision_or_digest: 61819fb370a3c1a96679d869a3f29a8f10494f2b9106a99f83f62c1e6e9b9b3a
+    quant: Q8_0
+    licence: mit
     engine: ollama
     device: "colab:G4"
   - model: phi3.5:3.8b
@@ -198,8 +524,44 @@ models:
     device: "colab:G4"
   - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
     revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    quant: Q4_K_M
+    licence: gemma
+    engine: ollama
+    device: "colab:G4"
+  - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
+    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    quant: Q6_K
+    licence: gemma
+    engine: ollama
+    device: "colab:G4"
+  - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
+    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    quant: Q8_0
+    licence: gemma
+    engine: ollama
+    device: "colab:G4"
+  - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
+    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
     quant: BF16
     licence: gemma
+    engine: ollama
+    device: "colab:G4"
+  - model: muse-glimmer:30b
+    revision_or_digest: 9a44c2e1b8f07d55e1c3420a8812d0f7e6a91c34b208f71e5d3a2c490b118ef2
+    quant: Q4_K_M
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:G4"
+  - model: muse-glimmer:30b
+    revision_or_digest: 9a44c2e1b8f07d55e1c3420a8812d0f7e6a91c34b208f71e5d3a2c490b118ef2
+    quant: Q6_K
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:G4"
+  - model: muse-glimmer:30b
+    revision_or_digest: 9a44c2e1b8f07d55e1c3420a8812d0f7e6a91c34b208f71e5d3a2c490b118ef2
+    quant: Q8_0
+    licence: apache-2.0
     engine: ollama
     device: "colab:G4"
   - model: muse-glimmer:30b

@@ -18,7 +18,7 @@
 
 # interlock: roteador local de dispositivos de IA
 
-> **Protótipo, 0.1.x: um instrumento de pesquisa.** A CLI, o formato de recibo e as especificações do experimento podem mudar sem aviso entre as versões 0.x. O interlock é apenas uma sugestão: ele sugere um modelo, um motor e um dispositivo, e nunca processa tráfego. Cada número nele foi medido em um único sistema (Intel Core Ultra 9 285K com sua NPU e iGPU, mais uma RTX 5090). Considere suas rotas como evidências desse sistema, e não como um benchmark geral.
+> **Protótipo, 0.3.x: um instrumento de pesquisa.** A CLI, o formato de recibo e as especificações do experimento podem mudar sem aviso entre as versões 0.x. O interlock é apenas uma sugestão: ele sugere um modelo, um motor e um dispositivo, e nunca processa tráfego. Cada número nele foi medido em um único sistema (Intel Core Ultra 9 285K com sua NPU e iGPU, mais uma RTX 5090). Considere suas rotas como evidências desse sistema, e não como um benchmark geral.
 
 O sistema de intertravamento ferroviário impede que um trem seja direcionado para um caminho conflitante. Esta ferramenta faz o mesmo para dispositivos: ela envia cada tarefa para um modelo, um motor e um dispositivo.
 

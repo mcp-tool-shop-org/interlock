@@ -312,10 +312,26 @@ def test_remote_colab_rows_and_failure_outcomes_validate():
 
 
 def test_remote_row_refuses_missing_identity_mismatched_card_rig_mixing_or_unhashed_account():
-    hashed_setting = _remote_row(
-        settings={**row()["settings"], "account_id": "sha256:" + ("b" * 64), "tags": [{"note": "ok"}]}
+    unhashed_rig_setting = row(
+        settings={**row()["settings"], "account_id": "raw_account_handle", "tags": [{"user_id": "u1"}]}
     )
-    validate_row(hashed_setting)
+    with pytest.raises(ReceiptError, match="unhashed account id"):
+        validate_row(unhashed_rig_setting)
+
+    mixed_rig = row(
+        device="5090",
+        engine={"name": "ollama", "version": "0.35.1"},
+        remote_device={
+            "provider": "colab",
+            "card": "A100-40",
+            "vram_mib": 40960,
+            "driver_version": "550.54.15",
+            "cuda_version": "12.4",
+            "pool": "us-central1-a",
+        },
+    )
+    with pytest.raises(ReceiptError, match="never pooled"):
+        validate_row(mixed_rig)
 
     missing = _remote_row()
     del missing["remote_device"]
@@ -336,21 +352,6 @@ def test_remote_row_refuses_missing_identity_mismatched_card_rig_mixing_or_unhas
     with pytest.raises(ReceiptError, match="does not match"):
         validate_row(mismatched)
 
-    mixed_rig = row(
-        device="5090",
-        engine={"name": "ollama", "version": "0.35.1"},
-        remote_device={
-            "provider": "colab",
-            "card": "A100-40",
-            "vram_mib": 40960,
-            "driver_version": "550.54.15",
-            "cuda_version": "12.4",
-            "pool": "us-central1-a",
-        },
-    )
-    with pytest.raises(ReceiptError, match="never pooled"):
-        validate_row(mixed_rig)
-
     unhashed_pool = _remote_row(
         remote_device={
             "provider": "colab",
@@ -369,6 +370,11 @@ def test_remote_row_refuses_missing_identity_mismatched_card_rig_mixing_or_unhas
     )
     with pytest.raises(ReceiptError, match="unhashed account id"):
         validate_row(unhashed_setting)
+
+    hashed_setting = _remote_row(
+        settings={**row()["settings"], "account_id": "sha256:" + ("b" * 64), "tags": [{"note": "ok"}]}
+    )
+    validate_row(hashed_setting)
 
 
 def test_validate_row_refuses_unhashed_account_in_any_remote_device_field_or_gguf_repo():

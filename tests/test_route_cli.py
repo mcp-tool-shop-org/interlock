@@ -280,3 +280,32 @@ def test_route_help_and_docs_list_all_excluded_outcomes_and_remote_flags(capsys)
         assert flag in readme_text
 
 
+def test_docs_version_strings_match_pyproject_version():
+    import tomllib
+
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    version = str(pyproject["project"]["version"])
+    major_minor = ".".join(version.split(".")[:2]) + ".x"
+    assert major_minor == "0.3.x"
+
+    readme_lines = (ROOT / "README.md").read_text(encoding="utf-8").splitlines()
+    assert f"Prototype, {major_minor}:" in readme_lines[20]
+    assert "colab:<card>" in readme_lines[20]
+
+    handbook_lines = (ROOT / "site" / "src" / "content" / "docs" / "handbook" / "index.md").read_text(
+        encoding="utf-8"
+    ).splitlines()
+    assert f"version {major_minor}." in handbook_lines[11]
+    assert "colab:<card>" in handbook_lines[11]
+
+    for rel_path in (
+        "SECURITY.md",
+        "site/src/content/docs/handbook/security.md",
+        "site/src/site-config.ts",
+    ):
+        content = (ROOT / rel_path).read_text(encoding="utf-8")
+        assert major_minor in content, f"{rel_path} is missing {major_minor}"
+        assert "0.1.x" not in content, f"{rel_path} still contains stale 0.1.x"
+
+
+

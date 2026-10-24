@@ -5,7 +5,7 @@ sidebar:
   order: 6
 ---
 
-interlock 0.1.x is a prototype. What it touches depends on the command. There is no telemetry.
+interlock 0.3.x is a prototype. What it touches depends on the command. There is no telemetry.
 
 ## By command
 
@@ -35,7 +35,7 @@ A remote price enters only as a dated snapshot file. interlock does not open off
 
 ## Supported versions and reporting
 
-Supported versions are 0.1.x. Report a vulnerability through a GitHub private advisory on [mcp-tool-shop-org/interlock](https://github.com/mcp-tool-shop-org/interlock/security/advisories/new). Do not open a public issue for a vulnerability. The maintainers read those advisories. This prototype does not publish a response-time promise.
+Supported versions are 0.3.x. Report a vulnerability through a GitHub private advisory on [mcp-tool-shop-org/interlock](https://github.com/mcp-tool-shop-org/interlock/security/advisories/new). Do not open a public issue for a vulnerability. The maintainers read those advisories. This prototype does not publish a response-time promise.
 
 Release assets carry a SLSA provenance file (`*.intoto.jsonl`) on the same GitHub release; verify with `slsa-verifier verify-artifact --provenance-path <name>.intoto.jsonl --source-uri github.com/mcp-tool-shop-org/interlock --source-tag <the-tag> <the-asset>`.
 

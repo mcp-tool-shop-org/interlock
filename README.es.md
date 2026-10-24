@@ -18,7 +18,7 @@
 
 # interlock: enrutador de dispositivos de IA local
 
-> **Prototipo, 0.1.x: un instrumento de investigación.** La CLI, el formato de los resultados y las especificaciones del experimento pueden cambiar sin previo aviso entre las versiones 0.x. Interlock es solo una herramienta de consulta: sugiere un modelo, un motor y un dispositivo, y nunca procesa tráfico. Cada número se midió en una sola configuración (Intel Core Ultra 9 285K con su NPU y iGPU, además de una RTX 5090). Considere sus rutas como evidencia de esa configuración, no como una referencia general.
+> **Prototipo, 0.3.x: un instrumento de investigación.** La CLI, el formato de los resultados y las especificaciones del experimento pueden cambiar sin previo aviso entre las versiones 0.x. Interlock es solo una herramienta de consulta: sugiere un modelo, un motor y un dispositivo, y nunca procesa tráfico. Cada número se midió en una sola configuración (Intel Core Ultra 9 285K con su NPU y iGPU, además de una RTX 5090). Considere sus rutas como evidencia de esa configuración, no como una referencia general.
 
 El enclavamiento ferroviario evita que un tren se dirija a una vía conflictiva. Esta herramienta hace lo mismo para los dispositivos: envía cada tarea a un modelo, un motor y un dispositivo.
 

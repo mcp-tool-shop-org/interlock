@@ -17,9 +17,11 @@ import math
 import os
 import re
 import subprocess
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Mapping
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -249,6 +251,9 @@ class LinuxOllamaServer:
         popen: Callable[..., Any] | None = None,
         http_get: Callable[[str], dict[str, Any]] | None = None,
         http_post: Callable[[str, dict[str, Any]], dict[str, Any]] | None = None,
+        ready_timeout_s: float = 30.0,
+        poll_interval_s: float = 0.25,
+        sleep: Callable[[float], None] | None = None,
     ) -> None:
         if ":" not in host:
             raise LinuxCudaError(f"host must include port: {host!r}")
@@ -262,10 +267,13 @@ class LinuxOllamaServer:
         self.base_url = f"http://{host}"
         self.log_path = log_path
         self.exe = exe
+        self.ready_timeout_s = ready_timeout_s
+        self.poll_interval_s = poll_interval_s
         self._custom_popen = popen is not None
         self._popen = popen or subprocess.Popen
         self._http_get = http_get or _default_http_get
         self._http_post = http_post or _default_http_post
+        self._sleep = sleep
         self._proc: Any = None
         self._log_handle: Any = None
         self.version: str = UNRECORDED
@@ -294,9 +302,28 @@ class LinuxOllamaServer:
                 stdout=self._log_handle,
                 stderr=subprocess.STDOUT,
             )
-        reply = self._http_get(f"{self.base_url}/api/version")
-        self.version = str(reply.get("version") or UNRECORDED)
-        return self
+        deadline = time.monotonic() + self.ready_timeout_s
+        last_exc: BaseException | None = None
+        while True:
+            if self._proc is not None and self._proc.poll() is not None:
+                raise LinuxCudaError(
+                    f"Ollama server exited before becoming ready (exit code {self._proc.poll()})"
+                )
+            try:
+                reply = self._http_get(f"{self.base_url}/api/version")
+                self.version = str(reply.get("version") or UNRECORDED)
+                return self
+            except (OSError, RuntimeError, ValueError) as exc:
+                last_exc = exc
+                if self._proc is not None and self._proc.poll() is not None:
+                    raise LinuxCudaError(
+                        f"Ollama server exited before becoming ready (exit code {self._proc.poll()}): {exc}"
+                    ) from exc
+                if time.monotonic() >= deadline:
+                    raise LinuxCudaError(
+                        f"Ollama server on {self.host} did not become ready within {self.ready_timeout_s}s: {last_exc}"
+                    ) from last_exc
+                (self._sleep or time.sleep)(self.poll_interval_s)
 
     def unload(self, model: str) -> None:
         self._http_post(f"{self.base_url}/api/generate", {"model": model, "keep_alive": 0})
@@ -369,7 +396,7 @@ def build_linux_failure_row(
     if abort_mib is not None:
         settings["abort_mib"] = abort_mib
     row: dict[str, Any] = {
-        "id": f"{spec_id}/{model}/{remote_device.card}{shape_tag}/{run_id}",
+        "id": f"{spec_id}/{model}/{quant}/{remote_device.card}{shape_tag}/{run_id}",
         "task": task,
         "model": {
             "repo_or_tag": model,
@@ -578,7 +605,7 @@ def run_linux_fill_card(
     )
     repeats = sum(1 for s in slots if isinstance(s, Mapping) and s.get("phase") == "repeat") or 1
     row: dict[str, Any] = {
-        "id": f"{spec_id}/{model}/{remote_device.card}-fill/{run_id}",
+        "id": f"{spec_id}/{model}/{quant}/{remote_device.card}-fill/{run_id}",
         "task": "generate",
         "model": {
             "repo_or_tag": model,
@@ -726,13 +753,9 @@ def run_linux_generate_ladder(
                     {"phase": "repeat", "throughput": decode_tok_s, "latency_ms": latency_ms, "ttft_ms": ttft_ms},
                 ]
             )
-            repeats = (
-                sum(1 for s in slots if isinstance(s, Mapping) and s.get("phase") == "repeat")
-                if isinstance(raw_slots, list)
-                else 3
-            )
+            repeats = sum(1 for s in slots if isinstance(s, Mapping) and s.get("phase") == "repeat") or 1
             row: dict[str, Any] = {
-                "id": f"{spec_id}/{model}/{remote_device.card}/p{prompt_len}-c{concurrency}/{run_id}",
+                "id": f"{spec_id}/{model}/{quant}/{remote_device.card}/p{prompt_len}-c{concurrency}/{run_id}",
                 "task": "generate",
                 "model": {
                     "repo_or_tag": model,
@@ -794,6 +817,9 @@ def run_linux_throughput_ladder(
     batch_sizes: tuple[int, ...] = THROUGHPUT_BATCH_SIZES,
     abort_fraction: float = 0.90,
     engine_version: str = UNRECORDED,
+    quant: str = UNRECORDED,
+    licence: str = UNRECORDED,
+    meta_by_task: Mapping[str, tuple[str, str]] | None = None,
 ) -> list[dict[str, Any]]:
     """Sweep embed, rerank, and NLI throughput across batch sizes 1, 8, and 32 on Linux CUDA."""
 
@@ -801,6 +827,7 @@ def run_linux_throughput_ladder(
     rows: list[dict[str, Any]] = []
     for task in tasks:
         model, digest = models_by_task[task]
+        task_quant, task_licence = meta_by_task.get(task, (quant, licence)) if meta_by_task else (quant, licence)
         for batch in batch_sizes:
             try:
                 measured = measure_batch(task, batch)
@@ -821,6 +848,8 @@ def run_linux_throughput_ladder(
                         peak_mib=exc.peak_mib,
                         abort_mib=abort_mib,
                         engine_version=engine_version,
+                        quant=task_quant,
+                        licence=task_licence,
                     )
                 )
                 continue
@@ -853,6 +882,8 @@ def run_linux_throughput_ladder(
                         peak_mib=peak_mib,
                         abort_mib=abort_mib,
                         engine_version=engine_version,
+                        quant=task_quant,
+                        licence=task_licence,
                     )
                 )
                 continue
@@ -866,19 +897,15 @@ def run_linux_throughput_ladder(
                     {"phase": "repeat", "throughput": tput, "latency_ms": p50},
                 ]
             )
-            repeats = (
-                sum(1 for s in slots if isinstance(s, Mapping) and s.get("phase") == "repeat")
-                if isinstance(raw_slots, list)
-                else 3
-            )
+            repeats = sum(1 for s in slots if isinstance(s, Mapping) and s.get("phase") == "repeat") or 1
             row: dict[str, Any] = {
-                "id": f"{spec_id}/{task}/{model}/{remote_device.card}/b{batch}/{run_id}",
+                "id": f"{spec_id}/{task}/{model}/{task_quant}/{remote_device.card}/b{batch}/{run_id}",
                 "task": task,
                 "model": {
                     "repo_or_tag": model,
                     "revision_or_digest": digest,
-                    "quant": UNRECORDED,
-                    "licence": UNRECORDED,
+                    "quant": task_quant,
+                    "licence": task_licence,
                     "size": size,
                     "size_vram": size_vram,
                 },
@@ -1047,35 +1074,65 @@ def measure_linux_ollama_generate(
     prompt_tokens: int,
     concurrency: int,
     num_predict: int = 128,
+    repeats: int = 3,
 ) -> dict[str, Any]:
     """Measure one ``(prompt_tokens, concurrency)`` cell on a running ``LinuxOllamaServer``."""
 
     used_before, _ = sample_vram_mib()
     peak_mib = used_before
-    try:
-        resp = server.post(
-            "/api/generate",
-            {
-                "model": model,
-                "prompt": "token " * max(1, min(256, prompt_tokens // 4)),
-                "stream": False,
-                "options": {"num_ctx": prompt_tokens, "num_predict": num_predict, "temperature": 0.0},
-            },
-        )
+    prompt_text = "token " * max(1, prompt_tokens)
+    payload = {
+        "model": model,
+        "prompt": prompt_text,
+        "stream": False,
+        "options": {"num_ctx": prompt_tokens, "num_predict": num_predict, "temperature": 0.0},
+    }
+    workers = max(1, concurrency)
+    passes = ("warmup", *("repeat" for _ in range(max(1, repeats))))
+    slots: list[dict[str, Any]] = []
+
+    def _call_once(_idx: int) -> dict[str, Any]:
+        resp = server.post("/api/generate", payload)
         if isinstance(resp, Mapping) and resp.get("error"):
             raise RuntimeError(str(resp["error"]))
-        used_after, _ = sample_vram_mib()
-        peak_mib = max(peak_mib, used_after)
+        return dict(resp) if isinstance(resp, Mapping) else {}
+
+    try:
+        for phase in passes:
+            if workers == 1:
+                pass_resps = [_call_once(0)]
+            else:
+                with ThreadPoolExecutor(max_workers=workers) as pool:
+                    pass_resps = list(pool.map(_call_once, range(workers)))
+            used_now, _ = sample_vram_mib()
+            peak_mib = max(peak_mib, used_now)
+            ttfts_ns = [max(1, int(r.get("prompt_eval_duration") or 10_000_000)) for r in pass_resps]
+            eval_counts = [max(1, int(r.get("eval_count") or num_predict)) for r in pass_resps]
+            eval_durations_ns = [max(1, int(r.get("eval_duration") or 50_000_000)) for r in pass_resps]
+            pass_ttft_ms = round((sum(ttfts_ns) / len(ttfts_ns)) / 1_000_000.0, 3)
+            wall_eval_ns = max(eval_durations_ns)
+            pass_decode_tok_s = round(sum(eval_counts) / (wall_eval_ns / 1_000_000_000.0), 3)
+            pass_total_ms = round(
+                max(p_ns + e_ns for p_ns, e_ns in zip(ttfts_ns, eval_durations_ns, strict=False)) / 1_000_000.0,
+                3,
+            )
+            slots.append(
+                {
+                    "phase": phase,
+                    "throughput": pass_decode_tok_s,
+                    "latency_ms": pass_total_ms,
+                    "ttft_ms": pass_ttft_ms,
+                }
+            )
         size, size_vram = _query_ps_entry(server, model)
     except BaseException as exc:
         raise classify_linux_error(exc, peak_mib=peak_mib) from exc
 
-    prompt_eval_ns = max(1, int(resp.get("prompt_eval_duration") or 10_000_000))
-    eval_count = max(1, int(resp.get("eval_count") or num_predict))
-    eval_ns = max(1, int(resp.get("eval_duration") or 50_000_000))
-    ttft_ms = round(prompt_eval_ns / 1_000_000.0, 3)
-    decode_tok_s = round((eval_count * concurrency) / (eval_ns / 1_000_000_000.0), 3)
-    total_ms = round((prompt_eval_ns + eval_ns) / 1_000_000.0, 3)
+    repeat_slots = [s for s in slots if s["phase"] == "repeat"]
+    mid = len(repeat_slots) // 2
+    ttft_ms = float(sorted(float(s["ttft_ms"]) for s in repeat_slots)[mid])
+    decode_tok_s = float(sorted(float(s["throughput"]) for s in repeat_slots)[mid])
+    total_ms = float(sorted(float(s["latency_ms"]) for s in repeat_slots)[mid])
     return {
         "ttft_ms": ttft_ms,
         "decode_tok_s": decode_tok_s,
@@ -1083,7 +1140,33 @@ def measure_linux_ollama_generate(
         "peak_mib": peak_mib,
         "size": size,
         "size_vram": size_vram,
+        "slots": slots,
     }
+
+
+def _batch_endpoint_and_payload(model: str, task: str, batch: int) -> tuple[str, dict[str, Any]]:
+    if task == "embed":
+        return "/api/embed", {"model": model, "input": [f"item-{idx}" for idx in range(batch)]}
+    if task == "rerank":
+        return (
+            "/api/rerank",
+            {
+                "model": model,
+                "query": "interlock rerank query",
+                "documents": [f"doc-{idx}" for idx in range(batch)],
+            },
+        )
+    if task == "nli":
+        return (
+            "/api/nli",
+            {
+                "model": model,
+                "pairs": [
+                    {"premise": f"premise-{idx}", "hypothesis": f"hypothesis-{idx}"} for idx in range(batch)
+                ],
+            },
+        )
+    raise LinuxCudaError(f"unsupported batch task: {task!r}")
 
 
 def measure_linux_ollama_batch(
@@ -1093,38 +1176,61 @@ def measure_linux_ollama_batch(
     model: str,
     task: str,
     batch: int,
+    repeats: int = 3,
 ) -> dict[str, Any]:
     """Measure one ``(task, batch)`` cell on a running ``LinuxOllamaServer``."""
 
+    endpoint, payload = _batch_endpoint_and_payload(model, task, batch)
     used_before, _ = sample_vram_mib()
     peak_mib = used_before
+    passes = ("warmup", *("repeat" for _ in range(max(1, repeats))))
+    slots: list[dict[str, Any]] = []
     try:
-        resp = server.post(
-            "/api/embed",
-            {
-                "model": model,
-                "input": [f"item-{idx}" for idx in range(batch)],
-            },
-        )
-        if isinstance(resp, Mapping) and resp.get("error"):
-            raise RuntimeError(str(resp["error"]))
-        used_after, _ = sample_vram_mib()
-        peak_mib = max(peak_mib, used_after)
+        for phase in passes:
+            resp = server.post(endpoint, payload)
+            if isinstance(resp, Mapping) and resp.get("error"):
+                raise RuntimeError(str(resp["error"]))
+            used_after, _ = sample_vram_mib()
+            peak_mib = max(peak_mib, used_after)
+            total_ns = max(1, int(resp.get("total_duration") or 10_000_000))
+            pass_lat_ms = round(total_ns / 1_000_000.0, 3)
+            pass_tput = round(batch / (total_ns / 1_000_000_000.0), 3)
+            slots.append({"phase": phase, "throughput": pass_tput, "latency_ms": pass_lat_ms})
         size, size_vram = _query_ps_entry(server, model)
     except BaseException as exc:
         raise classify_linux_error(exc, peak_mib=peak_mib) from exc
 
-    total_ns = max(1, int(resp.get("total_duration") or 10_000_000))
-    latency_ms = round(total_ns / 1_000_000.0, 3)
-    throughput = round(batch / (total_ns / 1_000_000_000.0), 3)
+    repeat_slots = [s for s in slots if s["phase"] == "repeat"]
+    latencies = sorted(float(s["latency_ms"]) for s in repeat_slots)
+    tputs = sorted(float(s["throughput"]) for s in repeat_slots)
+    mid = len(repeat_slots) // 2
     return {
-        "throughput": throughput,
-        "warm_p50_ms": latency_ms,
-        "warm_p95_ms": latency_ms,
+        "throughput": tputs[mid],
+        "warm_p50_ms": latencies[mid],
+        "warm_p95_ms": latencies[-1],
         "peak_mib": peak_mib,
         "size": size,
         "size_vram": size_vram,
+        "slots": slots,
     }
+
+
+def _ollama_model_tag(model_tag: str, quant: str, explicit_tag: Any = None) -> str:
+    if isinstance(explicit_tag, str) and explicit_tag.strip():
+        return explicit_tag.strip()
+    if quant and quant != UNRECORDED:
+        return f"{model_tag}-{quant.lower()}"
+    return model_tag
+
+
+def _relative_spec_posix(spec_path: Path, spec_rel: str | None) -> str:
+    if spec_rel:
+        return spec_rel
+    parts = spec_path.parts
+    if "experiments" in parts:
+        idx = parts.index("experiments")
+        return Path(*parts[idx:]).as_posix()
+    return spec_path.name if spec_path.is_absolute() else spec_path.as_posix()
 
 
 def run_linux_spec(
@@ -1153,9 +1259,10 @@ def run_linux_spec(
     try:
         engine_version = active_server.version or UNRECORDED
         spec_id = str(spec["id"])
-        resolved_spec_rel = spec_rel or spec_path.as_posix()
+        resolved_spec_rel = _relative_spec_posix(spec_path, spec_rel)
         mode = str(spec.get("mode") or spec.get("procedure"))
         abort_fraction = float(spec.get("abort_fraction", 0.90))
+        abort_mib = compute_abort_mib(remote_device.vram_mib, abort_fraction)
         models = list(spec.get("models") or [])
         rows: list[dict[str, Any]] = []
 
@@ -1171,6 +1278,34 @@ def run_linux_spec(
                 trained_ctx = int(entry.get("trained_ctx", 32768))
                 quant = str(entry.get("quant", UNRECORDED))
                 licence = str(entry.get("licence", UNRECORDED))
+                expected_outcome = entry.get("expected_outcome")
+                if isinstance(expected_outcome, str) and expected_outcome in FAILURE_CLASSES:
+                    dev_desc = f"{remote_device.logical_device} ({remote_device.vram_mib} MiB)"
+                    reason = str(
+                        entry.get("failure_reason")
+                        or f"pre-registered {expected_outcome}: {model_tag} ({quant}) exceeds {dev_desc}"
+                    )
+                    rows.append(
+                        build_linux_failure_row(
+                            spec_id=spec_id,
+                            spec_rel=resolved_spec_rel,
+                            run_id=run_id,
+                            date=date,
+                            task="generate",
+                            model=model_tag,
+                            revision_or_digest=digest,
+                            remote_device=remote_device,
+                            failure_class=expected_outcome,
+                            reason=reason,
+                            num_ctx=grain,
+                            abort_mib=abort_mib,
+                            engine_version=engine_version,
+                            quant=quant,
+                            licence=licence,
+                        )
+                    )
+                    continue
+                ollama_tag = _ollama_model_tag(model_tag, quant, entry.get("ollama_tag"))
                 rows.append(
                     run_linux_fill_card(
                         spec_id=spec_id,
@@ -1187,7 +1322,7 @@ def run_linux_spec(
                         engine_version=engine_version,
                         quant=quant,
                         licence=licence,
-                        measure_window=lambda ctx, m=model_tag: measure_linux_ollama_window(
+                        measure_window=lambda ctx, m=ollama_tag: measure_linux_ollama_window(
                             active_server, sample_vram_mib, model=m, num_ctx=ctx
                         ),
                     )
@@ -1206,6 +1341,39 @@ def run_linux_spec(
                 digest = str(entry.get("revision_or_digest", UNRECORDED))
                 quant = str(entry.get("quant", UNRECORDED))
                 licence = str(entry.get("licence", UNRECORDED))
+                expected_outcome = entry.get("expected_outcome")
+                if isinstance(expected_outcome, str) and expected_outcome in FAILURE_CLASSES:
+                    dev_desc = f"{remote_device.logical_device} ({remote_device.vram_mib} MiB)"
+                    reason = str(
+                        entry.get("failure_reason")
+                        or f"pre-registered {expected_outcome}: {model_tag} ({quant}) exceeds {dev_desc}"
+                    )
+                    for prompt_len in prompt_lengths:
+                        for concurrency in concurrencies:
+                            rows.append(
+                                build_linux_failure_row(
+                                    spec_id=spec_id,
+                                    spec_rel=resolved_spec_rel,
+                                    run_id=run_id,
+                                    date=date,
+                                    task="generate",
+                                    model=model_tag,
+                                    revision_or_digest=digest,
+                                    remote_device=remote_device,
+                                    failure_class=expected_outcome,
+                                    reason=reason,
+                                    num_ctx=prompt_len,
+                                    num_predict=num_predict,
+                                    prompt_tokens=prompt_len,
+                                    concurrency=concurrency,
+                                    abort_mib=abort_mib,
+                                    engine_version=engine_version,
+                                    quant=quant,
+                                    licence=licence,
+                                )
+                            )
+                    continue
+                ollama_tag = _ollama_model_tag(model_tag, quant, entry.get("ollama_tag"))
                 rows.extend(
                     run_linux_generate_ladder(
                         spec_id=spec_id,
@@ -1222,7 +1390,7 @@ def run_linux_spec(
                         engine_version=engine_version,
                         quant=quant,
                         licence=licence,
-                        measure_shape=lambda plen, conc, m=model_tag: measure_linux_ollama_generate(
+                        measure_shape=lambda plen, conc, m=ollama_tag: measure_linux_ollama_generate(
                             active_server,
                             sample_vram_mib,
                             model=m,
@@ -1250,6 +1418,8 @@ def run_linux_spec(
                 for entry in task_entries:
                     model_tag = str(entry.get("repo_or_tag") or entry.get("model"))
                     digest = str(entry.get("revision_or_digest", UNRECORDED))
+                    quant = str(entry.get("quant", UNRECORDED))
+                    licence = str(entry.get("licence", UNRECORDED))
                     rows.extend(
                         run_linux_throughput_ladder(
                             spec_id=spec_id,
@@ -1262,6 +1432,8 @@ def run_linux_spec(
                             batch_sizes=batch_sizes,
                             abort_fraction=abort_fraction,
                             engine_version=engine_version,
+                            quant=quant,
+                            licence=licence,
                             measure_batch=lambda t, b, m=model_tag: measure_linux_ollama_batch(
                                 active_server, sample_vram_mib, model=m, task=t, batch=b
                             ),

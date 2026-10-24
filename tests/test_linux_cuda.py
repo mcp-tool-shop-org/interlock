@@ -784,7 +784,8 @@ def test_interlock_run_dry_run_and_offline_execution_produce_validated_linux_cud
             "http_post": fake_http_post,
         },
     )
-    assert len(gen_rows) == 21
+    assert len(gen_rows) >= 21
+    assert len({r["id"] for r in gen_rows}) == len(gen_rows)
 
     tput_rows = run_spec(
         tmp_path / "experiments" / "c2-throughput" / "spec.yaml",
@@ -841,5 +842,443 @@ def test_c2_specs_cover_sweep_plan_matrix_quants_and_hashed_gemma_repo():
     }.issubset(tput_models)
     for entry in tput_spec["models"]:
         assert entry["revision_or_digest"] != "unrecorded"
+
+
+def test_c2_multi_quant_row_ids_never_collide_and_load_refused_cells_are_honoured():
+    from interlock.harness.linux_cuda import (
+        LinuxOllamaServer,
+        build_linux_failure_row,
+        run_linux_fill_card,
+        run_linux_generate_ladder,
+        run_linux_spec,
+    )
+
+    t4 = _remote_ident("T4", 15360)
+    fill_q4 = run_linux_fill_card(
+        spec_id="C2-FILL-CARD",
+        spec_rel="experiments/c2-fill-card/spec.yaml",
+        run_id="r1",
+        date="2026-10-24",
+        remote_device=t4,
+        model="qwen3:8b",
+        revision_or_digest="500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+        trained_ctx=4096,
+        abort_fraction=0.90,
+        grain=256,
+        quant="Q4_K_M",
+        licence="apache-2.0",
+        measure_window=lambda _ctx: {
+            "size": 5000,
+            "size_vram": 5000,
+            "peak_mib": 6000,
+            "prompt_tok_s": 500.0,
+            "decode_tok_s": 60.0,
+            "ttft_ms": 80.0,
+        },
+    )
+    fill_q8 = run_linux_fill_card(
+        spec_id="C2-FILL-CARD",
+        spec_rel="experiments/c2-fill-card/spec.yaml",
+        run_id="r1",
+        date="2026-10-24",
+        remote_device=t4,
+        model="qwen3:8b",
+        revision_or_digest="500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+        trained_ctx=4096,
+        abort_fraction=0.90,
+        grain=256,
+        quant="Q8_0",
+        licence="apache-2.0",
+        measure_window=lambda _ctx: {
+            "size": 8800,
+            "size_vram": 8800,
+            "peak_mib": 10000,
+            "prompt_tok_s": 400.0,
+            "decode_tok_s": 45.0,
+            "ttft_ms": 95.0,
+        },
+    )
+    assert fill_q4["id"] != fill_q8["id"]
+    assert "Q4_K_M" in fill_q4["id"]
+    assert "Q8_0" in fill_q8["id"]
+
+    gen_q4 = run_linux_generate_ladder(
+        spec_id="C2-GENERATE",
+        spec_rel="experiments/c2-generate/spec.yaml",
+        run_id="r1",
+        date="2026-10-24",
+        remote_device=t4,
+        model="qwen3:8b",
+        revision_or_digest="500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+        prompt_lengths=(512,),
+        concurrencies=(1,),
+        quant="Q4_K_M",
+        licence="apache-2.0",
+        measure_shape=lambda _p, _c: {
+            "ttft_ms": 50.0,
+            "decode_tok_s": 70.0,
+            "latency_ms": 120.0,
+            "peak_mib": 6000,
+            "size": 5000,
+            "size_vram": 5000,
+        },
+    )[0]
+    gen_q8 = run_linux_generate_ladder(
+        spec_id="C2-GENERATE",
+        spec_rel="experiments/c2-generate/spec.yaml",
+        run_id="r1",
+        date="2026-10-24",
+        remote_device=t4,
+        model="qwen3:8b",
+        revision_or_digest="500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+        prompt_lengths=(512,),
+        concurrencies=(1,),
+        quant="Q8_0",
+        licence="apache-2.0",
+        measure_shape=lambda _p, _c: {
+            "ttft_ms": 60.0,
+            "decode_tok_s": 55.0,
+            "latency_ms": 140.0,
+            "peak_mib": 9500,
+            "size": 8800,
+            "size_vram": 8800,
+        },
+    )[0]
+    assert gen_q4["id"] != gen_q8["id"]
+    assert "Q4_K_M" in gen_q4["id"]
+    assert "Q8_0" in gen_q8["id"]
+
+    fail_q4 = build_linux_failure_row(
+        spec_id="C2-FILL-CARD",
+        spec_rel="experiments/c2-fill-card/spec.yaml",
+        run_id="r1",
+        date="2026-10-24",
+        task="generate",
+        model="muse-glimmer:30b",
+        revision_or_digest="9a44c2e1b8f07d55e1c3420a8812d0f7e6a91c34b208f71e5d3a2c490b118ef2",
+        remote_device=t4,
+        failure_class="load_refused",
+        reason="needs 18000 MiB",
+        quant="Q4_K_M",
+        licence="apache-2.0",
+    )
+    fail_q8 = build_linux_failure_row(
+        spec_id="C2-FILL-CARD",
+        spec_rel="experiments/c2-fill-card/spec.yaml",
+        run_id="r1",
+        date="2026-10-24",
+        task="generate",
+        model="muse-glimmer:30b",
+        revision_or_digest="9a44c2e1b8f07d55e1c3420a8812d0f7e6a91c34b208f71e5d3a2c490b118ef2",
+        remote_device=t4,
+        failure_class="load_refused",
+        reason="needs 32000 MiB",
+        quant="Q8_0",
+        licence="apache-2.0",
+    )
+    assert fail_q4["id"] != fail_q8["id"]
+    assert "Q4_K_M" in fail_q4["id"]
+    assert "Q8_0" in fail_q8["id"]
+
+    # Verify c2-generate covers multiple quants per (card, model) cell per C2-SWEEP-PLAN.md §1:
+    gen_spec = load_spec(ROOT / "experiments" / "c2-generate" / "spec.yaml")
+    by_card_model: dict[tuple[str, str], set[str]] = {}
+    for entry in gen_spec["models"]:
+        by_card_model.setdefault((entry["device"], entry["model"]), set()).add(entry["quant"])
+    for (card, model_name), cell_quants in by_card_model.items():
+        assert len(cell_quants) >= 3, f"({card}, {model_name}) in c2-generate only has {cell_quants}"
+
+    # Verify run_linux_spec honours expected_outcome: load_refused without calling Ollama on refused cells,
+    # and passes distinct quant-tagged model names to Ollama for runnable quants:
+    queried_models: list[str] = []
+
+    def fake_get(url: str) -> dict[str, Any]:
+        if url.endswith("/api/version"):
+            return {"version": "0.6.2"}
+        if url.endswith("/api/ps"):
+            return {"models": [{"name": queried_models[-1], "size": 5000, "size_vram": 5000}]}
+        return {}
+
+    def fake_post(url: str, payload: dict[str, Any]) -> dict[str, Any]:
+        if payload.get("keep_alive") == 0:
+            return {"done": True}
+        queried_models.append(str(payload.get("model")))
+        return {
+            "prompt_eval_count": 512,
+            "prompt_eval_duration": 10_000_000,
+            "eval_count": 16,
+            "eval_duration": 50_000_000,
+        }
+
+    class DummyProc:
+        pid = 1234
+
+        def poll(self):
+            return None
+
+        def terminate(self):
+            return None
+
+        def wait(self, timeout=None):
+            return 0
+
+    srv = LinuxOllamaServer(
+        popen=lambda *_a, **_kw: DummyProc(),
+        http_get=fake_get,
+        http_post=fake_post,
+    )
+    srv.start()
+    fill_spec = load_spec(ROOT / "experiments" / "c2-fill-card" / "spec.yaml")
+    t4_rows = run_linux_spec(
+        fill_spec,
+        spec_path=ROOT / "experiments" / "c2-fill-card" / "spec.yaml",
+        spec_rel="experiments/c2-fill-card/spec.yaml",
+        run_id="t4-matrix",
+        date="2026-10-24",
+        remote_device=t4,
+        sample_vram_mib=lambda: (6000, 15360),
+        server=srv,
+    )
+    assert len({r["id"] for r in t4_rows}) == len(t4_rows)
+    refused_rows = [r for r in t4_rows if r.get("outcome") == "load_refused"]
+    assert len(refused_rows) >= 2
+    assert not any(m.startswith("sha256:") for m in queried_models)
+    assert "qwen3:8b-q4_k_m" in queried_models
+    assert "qwen3:8b-q8_0" in queried_models
+
+
+def test_linux_ollama_server_polls_until_ready_on_startup(tmp_path: Path, monkeypatch):
+    import time
+
+    from interlock.harness.linux_cuda import LinuxCudaError, LinuxOllamaServer
+
+    class DummyProc:
+        pid = 5555
+
+        def __init__(self, exit_code: int | None = None) -> None:
+            self._exit_code = exit_code
+
+        def poll(self):
+            return self._exit_code
+
+        def terminate(self):
+            return None
+
+        def wait(self, timeout=None):
+            return 0
+
+    attempts = 0
+
+    def flaky_http_get(url: str) -> dict[str, Any]:
+        nonlocal attempts
+        if url.endswith("/api/version"):
+            attempts += 1
+            if attempts < 3:
+                raise ConnectionRefusedError("server still starting")
+            return {"version": "0.6.2"}
+        return {}
+
+    sleeps: list[float] = []
+    monkeypatch.setattr(time, "sleep", lambda s: sleeps.append(s))
+    srv = LinuxOllamaServer(
+        log_path=tmp_path / "ollama.log",
+        popen=lambda *_a, **_kw: DummyProc(),
+        http_get=flaky_http_get,
+        http_post=lambda _u, _p: {},
+    )
+    with srv:
+        assert srv.version == "0.6.2"
+    assert attempts == 3
+    assert len(sleeps) == 2
+
+    # If the child process exits before /api/version responds, startup raises LinuxCudaError immediately:
+    dead_srv = LinuxOllamaServer(
+        log_path=tmp_path / "dead.log",
+        popen=lambda *_a, **_kw: DummyProc(exit_code=1),
+        http_get=lambda _u: (_ for _ in ()).throw(ConnectionRefusedError("down")),
+        http_post=lambda _u, _p: {},
+    )
+    with pytest.raises(LinuxCudaError, match="exited"):
+        dead_srv.start()
+
+
+def test_measure_linux_ollama_generate_runs_concurrent_requests_full_prompt_and_repeat_slots():
+    from interlock.harness.linux_cuda import (
+        LinuxOllamaServer,
+        measure_linux_ollama_generate,
+        run_linux_generate_ladder,
+    )
+
+    class DummyProc:
+        pid = 7777
+
+        def poll(self):
+            return None
+
+        def terminate(self):
+            return None
+
+        def wait(self, timeout=None):
+            return 0
+
+    prompts_seen: list[str] = []
+
+    def fake_get(url: str) -> dict[str, Any]:
+        if url.endswith("/api/version"):
+            return {"version": "0.6.2"}
+        if url.endswith("/api/ps"):
+            return {"models": [{"name": "qwen3:8b", "size": 5200, "size_vram": 5200}]}
+        return {}
+
+    def fake_post(_url: str, payload: dict[str, Any]) -> dict[str, Any]:
+        prompts_seen.append(str(payload.get("prompt") or ""))
+        return {
+            "prompt_eval_duration": 20_000_000,
+            "eval_count": 128,
+            "eval_duration": 1_000_000_000,
+        }
+
+    srv = LinuxOllamaServer(
+        popen=lambda *_a, **_kw: DummyProc(),
+        http_get=fake_get,
+        http_post=fake_post,
+    )
+    srv.start()
+    measured = measure_linux_ollama_generate(
+        srv,
+        lambda: (8000, 23034),
+        model="qwen3:8b",
+        prompt_tokens=2048,
+        concurrency=4,
+        num_predict=128,
+    )
+    # 1 warmup pass + 3 repeat passes, each dispatching 4 requests = 16 requests total
+    assert len(prompts_seen) == 16
+    assert len(prompts_seen[0].split()) >= 2048
+    slots = measured.get("slots")
+    assert isinstance(slots, list) and len(slots) == 4
+    repeat_slots = [s for s in slots if s["phase"] == "repeat"]
+    assert len(repeat_slots) == 3
+
+    l4 = _remote_ident("L4", 23034)
+    rows_with_slots = run_linux_generate_ladder(
+        spec_id="C2-GENERATE",
+        spec_rel="experiments/c2-generate/spec.yaml",
+        run_id="r-slots",
+        date="2026-10-24",
+        remote_device=l4,
+        model="qwen3:8b",
+        revision_or_digest="500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+        prompt_lengths=(2048,),
+        concurrencies=(4,),
+        quant="Q4_K_M",
+        licence="apache-2.0",
+        measure_shape=lambda _p, _c: measured,
+    )
+    assert rows_with_slots[0]["repeats"] == 3
+    assert len([s for s in rows_with_slots[0]["artifacts"]["slots"] if s["phase"] == "repeat"]) == 3
+
+    # When a callback omits "slots", only 1 repeat slot is synthesized so repeats must be 1, never 3:
+    rows_without_slots = run_linux_generate_ladder(
+        spec_id="C2-GENERATE",
+        spec_rel="experiments/c2-generate/spec.yaml",
+        run_id="r-noslots",
+        date="2026-10-24",
+        remote_device=l4,
+        model="qwen3:8b",
+        revision_or_digest="500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+        prompt_lengths=(2048,),
+        concurrencies=(1,),
+        quant="Q4_K_M",
+        licence="apache-2.0",
+        measure_shape=lambda _p, _c: {
+            "ttft_ms": 20.0,
+            "decode_tok_s": 128.0,
+            "latency_ms": 1020.0,
+            "peak_mib": 8000,
+            "size": 5200,
+            "size_vram": 5200,
+        },
+    )
+    assert rows_without_slots[0]["repeats"] == 1
+
+
+def test_measure_linux_ollama_batch_dispatches_per_task_and_throughput_ladder_preserves_quant_licence_and_repeats():
+    from interlock.harness.linux_cuda import (
+        LinuxOllamaServer,
+        measure_linux_ollama_batch,
+        run_linux_throughput_ladder,
+    )
+
+    class DummyProc:
+        pid = 8888
+
+        def poll(self):
+            return None
+
+        def terminate(self):
+            return None
+
+        def wait(self, timeout=None):
+            return 0
+
+    called_paths: list[str] = []
+
+    def fake_get(url: str) -> dict[str, Any]:
+        if url.endswith("/api/version"):
+            return {"version": "0.6.2"}
+        if url.endswith("/api/ps"):
+            return {"models": [{"name": "m", "size": 1200, "size_vram": 1200}]}
+        return {}
+
+    def fake_post(url: str, _payload: dict[str, Any]) -> dict[str, Any]:
+        called_paths.append(url.split("11441", 1)[-1])
+        return {"total_duration": 20_000_000}
+
+    srv = LinuxOllamaServer(
+        popen=lambda *_a, **_kw: DummyProc(),
+        http_get=fake_get,
+        http_post=fake_post,
+    )
+    srv.start()
+
+    for task, expected_path in (("rerank", "/api/rerank"), ("nli", "/api/nli"), ("embed", "/api/embed")):
+        called_paths.clear()
+        res = measure_linux_ollama_batch(
+            srv,
+            lambda: (2000, 23034),
+            model="m",
+            task=task,
+            batch=8,
+        )
+        assert called_paths[0] == expected_path
+        assert called_paths == [expected_path] * 4
+        assert len([s for s in res["slots"] if s["phase"] == "repeat"]) == 3
+
+    l4 = _remote_ident("L4", 23034)
+    tput_rows = run_linux_throughput_ladder(
+        spec_id="C2-THROUGHPUT",
+        spec_rel="experiments/c2-throughput/spec.yaml",
+        run_id="r-tput",
+        date="2026-10-24",
+        remote_device=l4,
+        models_by_task={"embed": ("BAAI/bge-base-en-v1.5", "a8f91b24e31d8c721094e3f6b5a08c19d74e2310")},
+        tasks=("embed",),
+        batch_sizes=(8,),
+        quant="FP16",
+        licence="mit",
+        measure_batch=lambda _t, _b: {
+            "throughput": 400.0,
+            "warm_p50_ms": 20.0,
+            "warm_p95_ms": 22.0,
+            "peak_mib": 2000,
+            "size": 1200,
+            "size_vram": 1200,
+        },
+    )
+    assert tput_rows[0]["model"]["quant"] == "FP16"
+    assert tput_rows[0]["model"]["licence"] == "mit"
+    assert tput_rows[0]["repeats"] == 1
+
 
 

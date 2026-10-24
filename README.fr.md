@@ -18,7 +18,7 @@
 
 # interlock : routeur local pour appareils d’IA
 
-> **Prototype, 0.1.x : un instrument de recherche.** L’interface de ligne de commande, le format de reçu et les spécifications de l’expérience peuvent changer sans préavis entre les versions 0.x. Interlock est uniquement à titre indicatif : il suggère un modèle, un moteur et un appareil, et il ne sert jamais à traiter les requêtes. Chaque nombre qui y figure a été mesuré sur une seule configuration (Intel Core Ultra 9 285K avec son NPU et son iGPU, ainsi qu’une RTX 5090). Considérez ses itinéraires comme les données de cette configuration, et non comme une référence générale.
+> **Prototype, 0.3.x : un instrument de recherche.** L’interface de ligne de commande, le format de reçu et les spécifications de l’expérience peuvent changer sans préavis entre les versions 0.x. Interlock est uniquement à titre indicatif : il suggère un modèle, un moteur et un appareil, et il ne sert jamais à traiter les requêtes. Chaque nombre qui y figure a été mesuré sur une seule configuration (Intel Core Ultra 9 285K avec son NPU et son iGPU, ainsi qu’une RTX 5090). Considérez ses itinéraires comme les données de cette configuration, et non comme une référence générale.
 
 L’enclenchement ferroviaire empêche qu’un train ne soit dirigé vers une voie incompatible. Cet outil fait de même pour les appareils : il envoie chaque tâche à un modèle, un moteur et un appareil.
 
