@@ -80,7 +80,11 @@
               "compile_timeout",
               "hang",
               "device_lost",
-              "parity_invalid"
+              "parity_invalid",
+              "oom",
+              "load_refused",
+              "timeout",
+              "ctx_exceeded"
             ]
           }
         }

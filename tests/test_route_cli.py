@@ -176,3 +176,86 @@ def test_an_unknown_task_is_a_usage_error():
     with pytest.raises(SystemExit) as caught:
         main(["route", "--task", "verify"])
     assert caught.value.code == 2
+
+
+def test_table_cli_lists_colab_card_and_wildcard_and_route_cli_gates_allow_remote(tmp_path: Path, capsys):
+    rig = row("local/5090", "5090", 40)
+    colab_l4 = row("c2/l4", "colab:L4", 65)
+    colab_l4["remote_device"] = {
+        "provider": "colab",
+        "card": "L4",
+        "vram_mib": 23034,
+        "driver_version": "550.54.15",
+        "cuda_version": "12.4",
+        "pool": "us-central1-a",
+    }
+    colab_t4_fail = row("c2/t4-fail", "colab:T4", 10)
+    colab_t4_fail["model"]["repo_or_tag"] = "gemma4:31b"
+    colab_t4_fail["outcome"] = "load_refused"
+    colab_t4_fail["notes"] = "load_refused: model requires 22400 MiB VRAM, colab:T4 has 15360 MiB"
+    colab_t4_fail["settings"]["failure_reason"] = "model requires 22400 MiB VRAM, colab:T4 has 15360 MiB"
+    colab_t4_fail["artifacts"] = {"slots": []}
+    colab_t4_fail["latency"] = {"throughput": None}
+    colab_t4_fail["remote_device"] = {
+        "provider": "colab",
+        "card": "T4",
+        "vram_mib": 15360,
+        "driver_version": "550.54.15",
+        "cuda_version": "12.4",
+        "pool": "us-central1-a",
+    }
+    write_table(tmp_path, [rig, colab_l4, colab_t4_fail])
+
+    assert main(["table", "--root", str(tmp_path), "--device", "colab:L4"]) == 0
+    out_l4 = capsys.readouterr().out
+    assert "c2/l4" in out_l4
+    assert "local/5090" not in out_l4
+
+    assert main(["table", "--root", str(tmp_path), "--device", "colab:*"]) == 0
+    out_wild = capsys.readouterr().out
+    assert "c2/l4" in out_wild and "c2/t4-fail" in out_wild
+    assert "local/5090" not in out_wild
+
+    assert main(["route", "--root", str(tmp_path), "--task", "generate", "--model", "Phi", "--json"]) == 0
+    default_doc = json.loads(capsys.readouterr().out)
+    assert default_doc["device"] == "5090"
+
+    assert (
+        main(
+            [
+                "route",
+                "--root",
+                str(tmp_path),
+                "--task",
+                "generate",
+                "--model",
+                "Phi",
+                "--allow-remote",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    remote_doc = json.loads(capsys.readouterr().out)
+    assert remote_doc["device"] == "colab:L4"
+
+    assert (
+        main(
+            [
+                "route",
+                "--root",
+                str(tmp_path),
+                "--task",
+                "generate",
+                "--model",
+                "gemma4:31b",
+                "--allow-remote",
+                "--json",
+            ]
+        )
+        == 1
+    )
+    refused_doc = json.loads(capsys.readouterr().out)
+    assert refused_doc["code"] == "no_candidate"
+    assert "22400 MiB" in refused_doc["hint"]
+

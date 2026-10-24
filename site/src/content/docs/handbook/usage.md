@@ -26,6 +26,8 @@ interlock route --task generate --model Phi --thinking off --ctx 1024 --busy 509
 | `--ctx` | Exact measured length when the row id has `lN`. A row with `num_ctx` and no `lN` tag qualifies when `num_ctx` is at least N. |
 | `--thinking` | `off` matches only off. `on` matches any recorded level, and the decision keeps that level. `low`, `medium`, and `high` match exactly when named. |
 | `--busy` | Repeatable. An input. interlock does not read a ledger, the watchdog, or a process list. |
+| `--allow-remote` | Allow remote `colab:<card>` rows to compete (default off). |
+| `--device` | Exact device or provider wildcard such as `colab:L4` or `colab:*`. |
 | `--budget-left-usd` | An input, like `--busy`. A remote row whose worst case exceeds it is a runner-up. With no flag, a remote suggestion is marked budget unchecked. |
 | `--as-of` | `YYYY-MM-DD`. Defaults to today. The policy does not read the clock. |
 | `--json` | Print a document valid against `src/interlock/schema/route-decision.v1.json`, or a structured error. |
@@ -36,16 +38,20 @@ Generate ranks by the lowest repeat-slot decode tok/s. Every other task ranks by
 
 A row older than 30 days is stale. A row marked provisional, or with fewer than two repeats, is provisional. Both stay eligible and are flagged.
 
-`native_binary_rejected`, `compile_rejected`, `compile_timeout`, `hang`, `device_lost`, and a row with `parity_valid` false are listed under excluded. They are not candidates. When no row meets the constraints the command exits 1 and names the constraint. It does not fall back.
+`native_binary_rejected`, `compile_rejected`, `compile_timeout`, `hang`, `device_lost`, `oom`, `load_refused`, `timeout`, `ctx_exceeded`, and a row with `parity_valid` false are listed under excluded. They are not candidates. When no row meets the constraints the command exits 1 and names the constraint and any measured failure reason. It does not fall back.
 
-A remote suggestion includes an `offrig_plan` object. interlock does not call `offrig_plan` or `offrig_launch`, and it does not spend. See `docs/offrig-integration.md`.
+Remote `colab:<card>` cards are opt-in: a default `interlock route` request never selects a remote card unless `--allow-remote` or `--device colab:<card>` is passed.
+
+A remote suggestion includes an `offrig_plan` object when present on the row. interlock does not call `offrig_plan` or `offrig_launch`, and it does not spend. See `docs/offrig-integration.md`.
 
 ## interlock table
 
-Prints routing rows, filtered by `--task` or `--device`.
+Prints routing rows, filtered by `--task` or `--device` (including exact remote cards such as `colab:L4` or wildcards such as `colab:*`).
 
 ```bash
 interlock table --task generate --device NPU
+interlock table --device colab:L4
+interlock table --device colab:*
 ```
 
 ## interlock check

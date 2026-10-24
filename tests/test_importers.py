@@ -715,3 +715,115 @@ def test_e1_rerun2_copies_47_rows_and_leaves_the_receipt_files_alone():
     assert all(row["settings"]["environment"]["openvino"] == "unrecorded" for row in rows)
     with pytest.raises(ImportError_, match="missing local receipt"):
         e1_rerun2_rows(root / "does-not-exist")
+
+
+def test_remote_window_receipt_imports_to_valid_remote_rows_and_keeps_pools_separate():
+    from interlock.devices import assert_single_pool, partition_rows_by_pool
+    from interlock.importers.remote import import_remote_window, split_pools
+    from tests.support import row as make_rig_row
+
+    window_payload = {
+        "run_id": "c2-l4-window-01",
+        "date": "2026-10-24",
+        "experiment_spec": "experiments/c2-generate/spec.yaml",
+        "remote_device": {
+            "provider": "colab",
+            "card": "L4",
+            "vram_mib": 23034,
+            "driver_version": "550.54.15",
+            "cuda_version": "12.4",
+            "pool": "us-central1-a",
+        },
+        "records": [
+            {
+                "task": "generate",
+                "model": "qwen3:14b",
+                "revision_or_digest": "bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8",
+                "engine_version": "0.35.1",
+                "num_ctx": 4096,
+                "num_predict": 128,
+                "prompt_tokens": 4096,
+                "concurrency": 1,
+                "ttft_ms": 125.0,
+                "decode_tok_s": 54.0,
+                "latency_ms": 310.0,
+                "peak_mib": 11800,
+                "size": 9000,
+                "size_vram": 9000,
+            },
+            {
+                "task": "generate",
+                "model": "gemma4:31b",
+                "revision_or_digest": "6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7",
+                "engine_version": "0.35.1",
+                "num_ctx": 8192,
+                "failure_class": "load_refused",
+                "failure_reason": "model requires 24800 MiB VRAM, colab:L4 has 23034 MiB",
+            },
+        ],
+    }
+    raw = json.dumps(window_payload).encode("utf-8")
+    imported = import_remote_window(raw, source_path="receipts/c2-l4-window-01.json")
+    assert len(imported) == 2
+    for item in imported:
+        validate_row(item)
+        assert item["device"] == "colab:L4"
+        assert item["remote_device"]["pool"] == "us-central1-a"
+    assert imported[0]["latency"]["throughput"] == 54.0
+    assert imported[1]["outcome"] == "load_refused"
+    assert "24800 MiB" in imported[1]["notes"]
+
+    rig = make_rig_row(id="rig/one", device="5090", engine={"name": "ollama", "version": "0.35.1"})
+    pools = split_pools([rig, *imported])
+    assert [r["id"] for r in pools["rig"]] == ["rig/one"]
+    assert len(pools["remote"]) == 2
+    assert assert_single_pool(pools["rig"]) == "rig"
+    assert assert_single_pool(pools["remote"]) == "remote"
+    assert partition_rows_by_pool([rig, *imported]) == pools
+
+    bad_window = {
+        **window_payload,
+        "remote_device": {**window_payload["remote_device"], "pool": "researcher@example.com"},
+    }
+    with pytest.raises(ImportError_, match="unhashed account id"):
+        import_remote_window(json.dumps(bad_window).encode("utf-8"), source_path="receipts/bad.json")
+    with pytest.raises(ImportError_, match="invalid UTF-8 JSON"):
+        import_remote_window(b"{not-json", source_path="receipts/bad.json")
+    with pytest.raises(ImportError_, match="JSON object"):
+        import_remote_window(b"[]", source_path="receipts/bad.json")
+    with pytest.raises(ImportError_, match="requires run_id"):
+        import_remote_window(b'{"run_id": ""}', source_path="receipts/bad.json")
+    with pytest.raises(ImportError_, match="record must be a mapping"):
+        import_remote_window(
+            json.dumps({**window_payload, "records": ["not-a-dict"]}).encode("utf-8"),
+            source_path="receipts/bad.json",
+        )
+    with pytest.raises(ImportError_, match="missing model"):
+        import_remote_window(
+            json.dumps({**window_payload, "records": [{"task": "generate"}]}).encode("utf-8"),
+            source_path="receipts/bad.json",
+        )
+    with pytest.raises(ImportError_, match="unsupported failure_class"):
+        import_remote_window(
+            json.dumps(
+                {
+                    **window_payload,
+                    "records": [{"model": "qwen3:8b", "failure_class": "bogus", "failure_reason": "r"}],
+                }
+            ).encode("utf-8"),
+            source_path="receipts/bad.json",
+        )
+    with pytest.raises(ImportError_, match="requires failure_reason"):
+        import_remote_window(
+            json.dumps(
+                {
+                    **window_payload,
+                    "records": [{"model": "qwen3:8b", "failure_class": "oom", "failure_reason": ""}],
+                }
+            ).encode("utf-8"),
+            source_path="receipts/bad.json",
+        )
+    with pytest.raises(ImportError_, match="unknown device pool"):
+        split_pools([{"id": "x", "device": "unknown:gpu"}])
+
+

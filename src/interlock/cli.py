@@ -162,6 +162,12 @@ def main(argv: list[str] | None = None) -> int:
     route.add_argument("--quote-rule", type=int)
     route.add_argument("--num-predict", type=int)
     route.add_argument("--budget-left-usd", type=float)
+    route.add_argument("--device", help="exact device or provider wildcard such as colab:L4 or colab:*")
+    route.add_argument(
+        "--allow-remote",
+        action="store_true",
+        help="allow remote colab:<card> rows to compete (default off)",
+    )
     route.add_argument("--as-of", help="YYYY-MM-DD. Defaults to today. The policy does not read the clock.")
     route.add_argument("--json", action="store_true", help="print a route-decision.v1 document, or a structured error")
     route.add_argument("--root", type=Path, default=Path("."))
@@ -208,6 +214,7 @@ def _cmd_check(args: argparse.Namespace) -> int:
 
 
 def _cmd_table(args: argparse.Namespace) -> int:
+    from interlock.devices import matches_device_filter
     from interlock.receipt import load_jsonl
 
     path = args.root.resolve() / "table" / "routing.jsonl"
@@ -215,7 +222,7 @@ def _cmd_table(args: argparse.Namespace) -> int:
     if args.task:
         rows = [row for row in rows if row["task"] == args.task]
     if args.device:
-        rows = [row for row in rows if row["device"] == args.device]
+        rows = [row for row in rows if matches_device_filter(row.get("device"), args.device)]
     for row in rows:
         model = row["model"]["repo_or_tag"]
         print(f"{row['id']}\t{row['task']}\t{row['device']}\t{model}")
@@ -412,6 +419,8 @@ def _cmd_route(args: argparse.Namespace) -> int:
         quote_rule=args.quote_rule,
         num_predict=args.num_predict,
         budget_left_usd=args.budget_left_usd,
+        allow_remote=bool(args.allow_remote),
+        device=args.device,
     )
     outcome = decide(rows, request)
     document = outcome.document
