@@ -1,0 +1,94 @@
+# Standards compliance
+#
+# PIN_PER_STEP: 2. Prompt lengths (512, 1024, 2048, 4096, 8192, 16384, 32768),
+#   concurrencies (1, 4, 8), num_predict (128), abort_fraction (0.90), and the
+#   Colab card targets are pre-registered in this file.
+# ANDON_AUTHORITY: 2. Shapes exceeding floor(0.90 * vram_mib), offloaded to host
+#   memory, refused at load, or timing out are recorded as failure rows.
+# NAMED_COMPENSATORS: 2. Unload is keep_alive 0 on the run's dedicated Ollama on
+#   127.0.0.1:11441, started and stopped by the harness.
+# DECOMPOSE_BY_SECRETS: 2. This file is the pre-registration. The harness runs it.
+# UNCERTAINTY_GATED_HUMANS: 2. Runs only inside an authorized C2 Colab sweep window.
+# EXTERNAL_VERIFIER: n/a. R&D reviews this spec before any remote window runs.
+
+id: C2-GENERATE
+procedure: generate-ladder
+platform: linux-cuda
+question: >
+  Across prompt lengths 512 to 32768 and concurrencies 1, 4, and 8 on each
+  Colab card, what are the resident TTFT and decode tok/s, and which shapes
+  fail with oom, load_refused, timeout, or ctx_exceeded?
+decision: >
+  Each (prompt_length, concurrency) cell produces a validated remote row on
+  colab:<card>, either with repeat-slot bounds or with a recorded failure
+  outcome and measured reason.
+abort_fraction: 0.90
+num_predict: 128
+prompt_lengths:
+  - 512
+  - 1024
+  - 2048
+  - 4096
+  - 8192
+  - 16384
+  - 32768
+concurrencies:
+  - 1
+  - 4
+  - 8
+needs:
+  grant: false
+  npu_session: false
+  cpu_window: false
+dataset:
+  name: c2-generate-prompt-ladder
+  seed: "The switchyard counts the same cars on every pass. "
+  rule: >
+    Repeat the seed until the tokenizer reaches each target prompt length in
+    prompt_lengths (512 through 32768), keeping the shortest prefix at that
+    token count.
+metrics:
+  - ttft_ms
+  - decode_tok_s
+  - latency_ms
+  - peak_mib
+stop_rules:
+  - Run-owned Ollama listens on 127.0.0.1:11441; never use shared port 11434 or 11490.
+  - Residency and peak VRAM come from /api/ps and NVML or nvidia-smi; no Windows counters are used.
+  - Every failed (prompt_length, concurrency) shape is recorded as a failure row (oom, load_refused, timeout, ctx_exceeded), never skipped.
+models:
+  - model: gemma4:31b
+    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    quant: unrecorded
+    licence: unrecorded
+    engine: ollama
+    engine_version: "0.35.1"
+    device: "colab:A100-80"
+  - model: qwen3:14b
+    revision_or_digest: bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8
+    quant: unrecorded
+    licence: unrecorded
+    engine: ollama
+    engine_version: "0.35.1"
+    device: "colab:A100-40"
+  - model: qwen3:14b
+    revision_or_digest: bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8
+    quant: unrecorded
+    licence: unrecorded
+    engine: ollama
+    engine_version: "0.35.1"
+    device: "colab:L4"
+  - model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: unrecorded
+    licence: unrecorded
+    engine: ollama
+    engine_version: "0.35.1"
+    device: "colab:T4"
+  - model: mistral-small:24b
+    revision_or_digest: 8039dd90c1138d772437a0779a33b7349efd5d9cca71edcd26e4dd463f90439d
+    quant: unrecorded
+    licence: unrecorded
+    engine: ollama
+    engine_version: "0.35.1"
+    device: "colab:G4"

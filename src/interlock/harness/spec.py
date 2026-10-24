@@ -13,10 +13,17 @@ from pathlib import Path
 
 import yaml
 
+from interlock.devices import REMOTE_DEVICES
 from interlock.harness.e5 import ADAPTER_MATCH_TOLERANCE_MIB, PROMPT_RATIO, SHARED_GATE_FROM_MIB, SHARED_GROWTH_MIB
+from interlock.harness.linux_cuda import (
+    GENERATE_CONCURRENCIES,
+    GENERATE_PROMPT_LENGTHS,
+    THROUGHPUT_BATCH_SIZES,
+    THROUGHPUT_TASKS,
+)
 from interlock.tasks import TASKS
 
-PROCEDURES = frozenset({"interleaved", "fill-card", "offrig-calibrate"})
+PROCEDURES = frozenset({"interleaved", "fill-card", "offrig-calibrate", "generate-ladder", "batch-ladder"})
 ABORT_MIB = 30500
 CEILING_MIB = 31200
 DEVICES = frozenset({"NPU", "CPU", "iGPU", "5090"})
@@ -60,6 +67,10 @@ def validate_spec(data: object) -> dict:
         _interleaved(data)
     elif procedure == "fill-card":
         _fill_card(data)
+    elif procedure == "generate-ladder":
+        _linux_generate_ladder(data)
+    elif procedure == "batch-ladder":
+        _linux_batch_ladder(data)
     else:
         _offrig(data)
     ceiling = data.get("call_ceiling_s")
@@ -291,6 +302,9 @@ def _blocks(data: dict, arm_ids: set) -> None:
 
 
 def _fill_card(data: dict) -> None:
+    if data.get("platform") == "linux-cuda":
+        _linux_fill_card(data)
+        return
     if data.get("abort_mib") != ABORT_MIB or data.get("ceiling_mib") != CEILING_MIB:
         raise SpecError(f"fill-card stops at {ABORT_MIB} MiB and never tests the {CEILING_MIB} MiB ceiling")
     if data.get("grain") != 2048:
@@ -326,6 +340,68 @@ def _fill_card(data: dict) -> None:
     if data["needs"]["grant"] is not True:
         raise SpecError("fill-card requires a grant")
     _confirm_num_predict(data)
+
+
+def _require_linux_abort_fraction(data: dict) -> None:
+    if data.get("platform") != "linux-cuda":
+        raise SpecError("remote ladder spec requires platform: linux-cuda")
+    if "spill_shared_mib" in data or "adapter_match_tolerance_mib" in data:
+        raise SpecError("linux-cuda specs must not configure Windows shared-memory counters")
+    abort_fraction = data.get("abort_fraction")
+    if (
+        isinstance(abort_fraction, bool)
+        or not isinstance(abort_fraction, (int, float))
+        or not 0.50 <= float(abort_fraction) < 1.0
+    ):
+        raise SpecError("linux-cuda spec requires abort_fraction in [0.50, 1.0)")
+
+
+def _require_remote_models(data: dict) -> None:
+    models = data.get("models")
+    if not isinstance(models, list) or not models:
+        raise SpecError("linux-cuda spec names the model roster")
+    for model in models:
+        for key in ("model", "revision_or_digest", "engine", "device"):
+            if not model.get(key):
+                raise SpecError(f"a roster entry is missing {key}")
+        if model["device"] not in REMOTE_DEVICES or model["engine"] != "ollama":
+            raise SpecError("linux-cuda specs measure remote colab:<card> Ollama models")
+
+
+def _linux_fill_card(data: dict) -> None:
+    _require_linux_abort_fraction(data)
+    if data.get("grain") != 2048:
+        raise SpecError("fill-card bisects on a 2048-token grid")
+    fraction = data.get("confirm_prompt_fraction")
+    if not isinstance(fraction, (int, float)) or isinstance(fraction, bool) or not 0 < float(fraction) < 1:
+        raise SpecError("confirm_prompt_fraction must be between 0 and 1")
+    if data.get("spill_prompt_ratio") != PROMPT_RATIO:
+        raise SpecError(f"spill_prompt_ratio is {PROMPT_RATIO}")
+    _require_remote_models(data)
+    _confirm_num_predict(data)
+
+
+def _linux_generate_ladder(data: dict) -> None:
+    _require_linux_abort_fraction(data)
+    lengths = data.get("prompt_lengths")
+    if not isinstance(lengths, list) or tuple(lengths) != GENERATE_PROMPT_LENGTHS:
+        raise SpecError(f"generate-ladder prompt_lengths must be {list(GENERATE_PROMPT_LENGTHS)}")
+    concurrencies = data.get("concurrencies")
+    if not isinstance(concurrencies, list) or tuple(concurrencies) != GENERATE_CONCURRENCIES:
+        raise SpecError(f"generate-ladder concurrencies must be {list(GENERATE_CONCURRENCIES)}")
+    _require_remote_models(data)
+
+
+def _linux_batch_ladder(data: dict) -> None:
+    _require_linux_abort_fraction(data)
+    tasks = data.get("tasks")
+    if not isinstance(tasks, list) or tuple(tasks) != THROUGHPUT_TASKS:
+        raise SpecError(f"batch-ladder tasks must be {list(THROUGHPUT_TASKS)}")
+    batches = data.get("batch_sizes")
+    if not isinstance(batches, list) or tuple(batches) != THROUGHPUT_BATCH_SIZES:
+        raise SpecError(f"batch-ladder batch_sizes must be {list(THROUGHPUT_BATCH_SIZES)}")
+    _require_remote_models(data)
+
 
 
 def _confirm_num_predict(data: dict) -> None:

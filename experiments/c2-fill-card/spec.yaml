@@ -1,0 +1,94 @@
+# Standards compliance
+#
+# PIN_PER_STEP: 2. The roster digests, the 2048-token grid, the 0.90 VRAM abort
+#   fraction, the 0.5 prompt-rate ratio, and the Colab card targets (A100-40,
+#   A100-80, L4, T4, G4) are pre-registered in this file.
+# ANDON_AUTHORITY: 2. The sampler aborts and unloads when VRAM reaches
+#   floor(0.90 * card_vram_mib). Failed shapes (oom, load_refused, timeout,
+#   ctx_exceeded) are recorded as capability rows, never skipped.
+# NAMED_COMPENSATORS: 2. Unload is keep_alive 0 on the run-owned Ollama instance
+#   at 127.0.0.1:11441. No Windows shared-memory counter is read on Linux.
+# DECOMPOSE_BY_SECRETS: 2. This file is the pre-registration. The harness runs it.
+# UNCERTAINTY_GATED_HUMANS: 2. Each Colab window is opened under a scheduled C2
+#   sweep window; this spec never starts a VM on its own.
+# EXTERNAL_VERIFIER: n/a. R&D reviews this spec before any remote window runs.
+
+id: C2-FILL-CARD
+procedure: fill-card
+platform: linux-cuda
+question: >
+  For each pre-registered model on a remote Colab card (A100-40, A100-80, L4,
+  T4, G4), what is the largest num_ctx that stays fully resident on the GPU
+  (size_vram == size) and strictly below floor(0.90 * vram_mib) at peak?
+decision: >
+  The row records max_resident_ctx and peak_mib from NVML or nvidia-smi. If a
+  model refuses at load or OOMs at the 2048 floor grain, the harness records a
+  failure row (load_refused, oom, timeout, or ctx_exceeded) with the measured
+  reason. Remote rows carry remote_device identity and are never pooled with
+  rig rows.
+abort_fraction: 0.90
+grain: 2048
+confirm_prompt_fraction: 0.9
+confirm_num_predict: 1
+sample_ms: 200
+spill_prompt_ratio: 0.5
+max_ctx: 131072
+shift: false
+truncate: false
+needs:
+  grant: false
+  npu_session: false
+  cpu_window: false
+dataset:
+  name: c2-fill-confirm-prompt
+  seed: "The switchyard fills the card with the same sentence. "
+  rule: >
+    Confirmation builds a prompt of 90 percent of the candidate window by
+    repeating the seed to that token count. shift and truncate are false.
+metrics:
+  - max_resident_ctx
+  - peak_mib
+  - ttft_ms
+  - decode_tok_s
+  - prompt_tok_s
+stop_rules:
+  - Abort and unload when NVML or nvidia-smi memory.used reaches floor(0.90 * vram_mib).
+  - Fully resident means Ollama /api/ps reports size_vram equal to size.
+  - No Windows performance counters are queried on Linux.
+  - Any shape that fails at load or during confirmation is recorded as a failure row (oom, load_refused, timeout, ctx_exceeded), never skipped.
+models:
+  - model: gemma4:31b
+    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    quant: unrecorded
+    licence: unrecorded
+    engine: ollama
+    engine_version: "0.35.1"
+    device: "colab:A100-80"
+  - model: gemma4:31b
+    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    quant: unrecorded
+    licence: unrecorded
+    engine: ollama
+    engine_version: "0.35.1"
+    device: "colab:A100-40"
+  - model: qwen3:14b
+    revision_or_digest: bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8
+    quant: unrecorded
+    licence: unrecorded
+    engine: ollama
+    engine_version: "0.35.1"
+    device: "colab:L4"
+  - model: qwen3:8b
+    revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+    quant: unrecorded
+    licence: unrecorded
+    engine: ollama
+    engine_version: "0.35.1"
+    device: "colab:T4"
+  - model: mistral-small:24b
+    revision_or_digest: 8039dd90c1138d772437a0779a33b7349efd5d9cca71edcd26e4dd463f90439d
+    quant: unrecorded
+    licence: unrecorded
+    engine: ollama
+    engine_version: "0.35.1"
+    device: "colab:G4"
