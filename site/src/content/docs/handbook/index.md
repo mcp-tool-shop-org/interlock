@@ -9,7 +9,7 @@ interlock is a local AI device router. You name a task and the constraints that 
 
 Railway interlocking stops a train being routed onto a conflicting path. This tool does that for devices. OpenVINO's AUTO and HETERO plugins can pick a device once you have already picked the model. Nothing in that stack picks the model. That gap is the product.
 
-This is a prototype, version 0.1.x. The CLI, the receipt format, and the experiment specs can change without notice between 0.x releases. interlock is advisory only: it suggests a route and it never serves traffic. Every number in the table was measured on one rig, an Intel Core Ultra 9 285K with its NPU and iGPU, plus an RTX 5090. Treat a route as that rig's evidence, not a general benchmark.
+This is a prototype, version 0.x. The CLI, the receipt format, and the experiment specs can change without notice between 0.x releases. interlock is advisory only: it suggests a route and it never serves traffic. Every number in the table was measured on one rig, an Intel Core Ultra 9 285K with its NPU and iGPU, plus an RTX 5090. Treat a route as that rig's evidence, not a general benchmark.
 
 ## Read next
 

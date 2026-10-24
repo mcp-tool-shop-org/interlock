@@ -1,6 +1,6 @@
 # Security
 
-interlock 0.1.x is a prototype. What it does depends on the command.
+interlock 0.x is a prototype. What it does depends on the command.
 
 ## interlock route
 
@@ -30,10 +30,10 @@ A bare single-label host and port, such as `myrig:11434`, is a known limit of th
 
 ## Supported versions
 
-0.1.x.
+Only the latest 0.x release receives security fixes.
 
 ## Reporting a vulnerability
 
-Use a GitHub private advisory on [mcp-tool-shop-org/interlock](https://github.com/mcp-tool-shop-org/interlock/security/advisories/new). Do not open a public issue for a vulnerability. The maintainers read those advisories. This 0.1.x prototype does not publish a response-time promise.
+Use a GitHub private advisory on [mcp-tool-shop-org/interlock](https://github.com/mcp-tool-shop-org/interlock/security/advisories/new). Do not open a public issue for a vulnerability. The maintainers read those advisories. This 0.x prototype does not publish a response-time promise.
 
 Release assets carry a SLSA provenance file (`*.intoto.jsonl`) on the same GitHub release; verify with `slsa-verifier verify-artifact --provenance-path <name>.intoto.jsonl --source-uri github.com/mcp-tool-shop-org/interlock --source-tag <the-tag> <the-asset>`.
