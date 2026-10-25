@@ -2627,4 +2627,48 @@ def test_linux_ollama_server_revalidates_host_at_start(tmp_path: Path):
     assert spawned == []
 
 
+def test_the_live_source_reads_send_a_user_agent_that_follows_the_package_version(monkeypatch):
+    import urllib.request
+
+    import interlock
+    from interlock.harness.linux_cuda import _default_live_fetch, c2_sources_user_agent
+
+    assert c2_sources_user_agent() == f"interlock-c2-sources/{interlock.__version__}"
+
+    seen: list[urllib.request.Request] = []
+
+    class _Resp:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_exc):
+            return False
+
+        def read(self):
+            return b"{}"
+
+    def fake_urlopen(req, timeout=None):
+        seen.append(req)
+        return _Resp()
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
+    for url in (
+        "https://registry.ollama.ai/v2/library/llama3/manifests/latest",
+        "https://huggingface.co/api/models/example/model",
+    ):
+        status, _body = _default_live_fetch(url)
+        assert status == 200
+
+    assert len(seen) == 2
+    for req in seen:
+        assert req.get_header("User-agent") == f"interlock-c2-sources/{interlock.__version__}"
+
+    # A different version changes the header, so no literal can be left behind by a bump.
+    monkeypatch.setattr("interlock.harness.linux_cuda.__version__", "9.9.9")
+    seen.clear()
+    _default_live_fetch("https://huggingface.co/api/models/example/model")
+    assert seen[0].get_header("User-agent") == "interlock-c2-sources/9.9.9"
 
