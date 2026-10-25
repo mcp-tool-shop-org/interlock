@@ -13,13 +13,16 @@ recorded as validated routing rows, never silently skipped.
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import json
 import math
 import os
 import re
+import socket
 import subprocess
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
@@ -268,17 +271,103 @@ def probe_nvml(*, nvml: Any, pool: str = "us-central1-a", index: int = 0) -> Lin
     )
 
 
-def _default_http_get(url: str) -> dict[str, Any]:
-    if not url.startswith(("http://127.0.0.1:", "http://localhost:")):
+def _localhost_resolves_only_to_loopback() -> bool:
+    try:
+        infos = socket.getaddrinfo("localhost", None)
+    except OSError:
+        return False
+    if not infos:
+        return False
+    for info in infos:
+        sockaddr = info[4]
+        raw_ip = str(sockaddr[0]).split("%", 1)[0]
+        try:
+            addr = ipaddress.ip_address(raw_ip)
+        except ValueError:
+            return False
+        if addr not in (ipaddress.IPv4Address("127.0.0.1"), ipaddress.IPv6Address("::1")):
+            return False
+    return True
+
+
+def validate_loopback_ollama_host(host: str) -> tuple[str, int]:
+    """Validate that ``host`` is ``127.0.0.1:<port>``, ``[::1]:<port>``, or loopback ``localhost:<port>``."""
+
+    if (
+        not isinstance(host, str)
+        or not host
+        or host != host.strip()
+        or any(ch in host for ch in ("/", "\\", "@", "?", "#", " ", "\t", "\r", "\n"))
+    ):
+        raise LinuxCudaError(f"refusing non-loopback Ollama host {host!r}")
+    if host.startswith("["):
+        if "]:" not in host:
+            raise LinuxCudaError(f"host must include port: {host!r}")
+        bracket_host, port_text = host.rsplit(":", 1)
+        if not (bracket_host.startswith("[") and bracket_host.endswith("]")):
+            raise LinuxCudaError(f"refusing non-loopback Ollama host {host!r}")
+        hostname = bracket_host[1:-1]
+        is_bracketed_v6 = True
+    else:
+        if ":" not in host:
+            raise LinuxCudaError(f"host must include port: {host!r}")
+        if host.count(":") != 1 or "[" in host or "]" in host:
+            raise LinuxCudaError(
+                f"refusing non-loopback Ollama host {host!r}; only 127.0.0.1, [::1], or loopback localhost is allowed"
+            )
+        hostname, port_text = host.rsplit(":", 1)
+        is_bracketed_v6 = False
+
+    if not port_text.isdigit():
+        raise LinuxCudaError(f"invalid port in Ollama host {host!r}")
+    port = int(port_text)
+    if port < 1 or port > 65535:
+        raise LinuxCudaError(f"invalid port in Ollama host {host!r}")
+    if port in FORBIDDEN_SHARED_PORTS:
+        raise LinuxCudaError(
+            f"refusing shared port {port}; Linux harness must launch its own Ollama on a dedicated port"
+        )
+
+    if is_bracketed_v6:
+        if hostname != "::1":
+            raise LinuxCudaError(
+                f"refusing non-loopback Ollama host {host!r}; only [::1] is allowed for IPv6 loopback"
+            )
+        return hostname, port
+
+    if hostname == "127.0.0.1":
+        return hostname, port
+    if hostname == "localhost":
+        if not _localhost_resolves_only_to_loopback():
+            raise LinuxCudaError(
+                f"refusing non-loopback Ollama host {host!r}; localhost did not resolve exclusively to loopback"
+            )
+        return hostname, port
+
+    raise LinuxCudaError(
+        f"refusing non-loopback Ollama host {host!r}; only 127.0.0.1, [::1], or loopback localhost is allowed"
+    )
+
+
+def _validate_loopback_ollama_url(url: str) -> None:
+    parsed = urllib.parse.urlsplit(url)
+    if parsed.scheme != "http" or parsed.username is not None or parsed.password is not None or not parsed.netloc:
         raise LinuxCudaError(f"refusing non-loopback Ollama URL {url!r}")
+    try:
+        validate_loopback_ollama_host(parsed.netloc)
+    except LinuxCudaError as exc:
+        raise LinuxCudaError(f"refusing non-loopback Ollama URL {url!r}: {exc}") from exc
+
+
+def _default_http_get(url: str) -> dict[str, Any]:
+    _validate_loopback_ollama_url(url)
     req = urllib.request.Request(url, method="GET")  # noqa: S310
     with urllib.request.urlopen(req, timeout=30.0) as resp:  # noqa: S310
         return json.loads(resp.read().decode("utf-8"))
 
 
 def _default_http_post(url: str, payload: dict[str, Any]) -> dict[str, Any]:
-    if not url.startswith(("http://127.0.0.1:", "http://localhost:")):
-        raise LinuxCudaError(f"refusing non-loopback Ollama URL {url!r}")
+    _validate_loopback_ollama_url(url)
     body = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(  # noqa: S310
         url,
@@ -316,14 +405,7 @@ class LinuxOllamaServer:
         poll_interval_s: float = 0.25,
         sleep: Callable[[float], None] | None = None,
     ) -> None:
-        if ":" not in host:
-            raise LinuxCudaError(f"host must include port: {host!r}")
-        _, port_text = host.rsplit(":", 1)
-        port = int(port_text)
-        if port in FORBIDDEN_SHARED_PORTS:
-            raise LinuxCudaError(
-                f"refusing shared port {port}; Linux harness must launch its own Ollama on a dedicated port"
-            )
+        validate_loopback_ollama_host(host)
         self.host = host
         self.base_url = f"http://{host}"
         self.log_path = log_path

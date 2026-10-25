@@ -2350,6 +2350,189 @@ def test_fix4_c2_sources_verify_live_checks_ollama_registry_and_huggingface(monk
         _default_live_fetch("https://registry.ollama.ai/v2/library/qwen3/manifests/8b")
 
 
+@pytest.mark.parametrize(
+    "bad_host",
+    [
+        "0.0.0.0:11441",
+        "192.168.1.20:11441",
+        "example.com:11441",
+        "[2001:db8::1]:11441",
+    ],
+)
+def test_linux_ollama_server_refuses_non_loopback_host_before_enter(tmp_path: Path, bad_host: str):
+    from interlock.harness.linux_cuda import LinuxCudaError, LinuxOllamaServer
+
+    spawned: list[list[str]] = []
+    with pytest.raises(LinuxCudaError, match="non-loopback"):
+        LinuxOllamaServer(
+            host=bad_host,
+            log_path=tmp_path / "ollama.log",
+            popen=lambda argv, **_kw: spawned.append(list(argv)),
+        )
+    assert spawned == []
+
+
+@pytest.mark.parametrize(
+    "bad_host",
+    [
+        "0.0.0.0:11441",
+        "192.168.1.20:11441",
+        "example.com:11441",
+        "[2001:db8::1]:11441",
+    ],
+)
+def test_run_spec_seams_host_refuses_non_loopback_host(tmp_path: Path, bad_host: str):
+    import shutil
+    import subprocess
+
+    from interlock.harness.linux_cuda import LinuxCudaError
+    from interlock.harness.runner import run_spec
+
+    spec_rel = "experiments/c2-fill-card/spec.yaml"
+    dest = tmp_path / spec_rel
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(ROOT / spec_rel, dest)
+    for cmd in (
+        ["git", "init"],
+        ["git", "config", "user.email", "dev@example.com"],
+        ["git", "config", "user.name", "dev"],
+        ["git", "add", "."],
+        ["git", "commit", "-m", "spec"],
+    ):
+        subprocess.run(cmd, cwd=tmp_path, check=True, capture_output=True)  # noqa: S603, S607
+
+    spawned: list[list[str]] = []
+    with pytest.raises(LinuxCudaError, match="non-loopback"):
+        run_spec(
+            dest,
+            root=tmp_path,
+            run_id="c2-bad-host",
+            date="2026-10-24",
+            python_path=str(tmp_path.parent / "external-python"),
+            models=["qwen3:8b"],
+            seams={
+                "remote_device": _remote_ident("L4", 23034),
+                "sample_vram_mib": lambda: (2000, 23034),
+                "host": bad_host,
+                "popen": lambda argv, **_kw: spawned.append(list(argv)),
+                "http_get": lambda _url: {"version": "0.6.2"},
+                "http_post": lambda _url, _payload: {"done": True},
+            },
+        )
+    assert spawned == []
+
+
+def test_linux_ollama_server_accepts_ipv4_and_ipv6_loopback_and_checks_localhost_resolution(
+    tmp_path: Path, monkeypatch
+):
+    import socket
+
+    import interlock.harness.linux_cuda as lc
+    from interlock.harness.linux_cuda import (
+        LinuxCudaError,
+        LinuxOllamaServer,
+        _default_http_get,
+        _default_http_post,
+    )
+
+    for allowed_host in ("127.0.0.1:11441", "[::1]:11441", "localhost:11441"):
+        srv = LinuxOllamaServer(
+            host=allowed_host,
+            log_path=tmp_path / "ollama.log",
+            popen=lambda *_a, **_kw: None,
+            http_get=lambda _u: {"version": "0.6.2"},
+            http_post=lambda _u, _p: {"done": True},
+        )
+        assert srv.host == allowed_host
+        assert srv.base_url == f"http://{allowed_host}"
+
+    for shared_port in (11434, 11490):
+        for loop_host in ("127.0.0.1", "[::1]", "localhost"):
+            with pytest.raises(LinuxCudaError, match="dedicated port"):
+                LinuxOllamaServer(host=f"{loop_host}:{shared_port}", log_path=tmp_path / "ollama.log")
+
+    for bad_syntax in (
+        "[::1]",
+        "::1:11441",
+        "[::1]extra:11441",
+        "[::1]:extra:11441",
+        "127.0.0.2:11441",
+        "127.0.0.1:11441@192.168.1.20:11441",
+        "127.0.0.1:abc",
+        "127.0.0.1:0",
+        "127.0.0.1:70000",
+        "",
+    ):
+        with pytest.raises(LinuxCudaError):
+            LinuxOllamaServer(host=bad_syntax, log_path=tmp_path / "ollama.log")
+
+    # localhost is refused when resolution includes any non-loopback address or fails:
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        lambda host, port, *_a, **_kw: [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 0)),
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.168.1.20", 0)),
+        ],
+    )
+    with pytest.raises(LinuxCudaError, match="non-loopback"):
+        LinuxOllamaServer(host="localhost:11441", log_path=tmp_path / "ollama.log")
+
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *_a, **_kw: [])
+    with pytest.raises(LinuxCudaError, match="non-loopback"):
+        LinuxOllamaServer(host="localhost:11441", log_path=tmp_path / "ollama.log")
+
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        lambda *_a, **_kw: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("not-an-ip", 0))],
+    )
+    with pytest.raises(LinuxCudaError, match="non-loopback"):
+        LinuxOllamaServer(host="localhost:11441", log_path=tmp_path / "ollama.log")
+
+    def raise_gai(*_a, **_kw):
+        raise socket.gaierror("resolution failed")
+
+    monkeypatch.setattr(socket, "getaddrinfo", raise_gai)
+    with pytest.raises(LinuxCudaError, match="non-loopback"):
+        LinuxOllamaServer(host="localhost:11441", log_path=tmp_path / "ollama.log")
+
+    # Restore loopback-only resolution (IPv4 + IPv6 loopback) and verify URL helpers:
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        lambda host, port, *_a, **_kw: [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 0)),
+            (socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("::1", 0, 0, 0)),
+        ],
+    )
+    assert LinuxOllamaServer(host="localhost:11441", log_path=tmp_path / "ollama.log").host == "localhost:11441"
+
+    class FakeJsonResp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_a):
+            return None
+
+        def read(self) -> bytes:
+            return b'{"version": "0.6.2"}'
+
+    monkeypatch.setattr(lc.urllib.request, "urlopen", lambda *_a, **_kw: FakeJsonResp())
+    assert _default_http_get("http://[::1]:11441/api/version") == {"version": "0.6.2"}
+    assert _default_http_post("http://[::1]:11441/api/generate", {"model": "m"}) == {"version": "0.6.2"}
+    for bad_url in (
+        "http://0.0.0.0:11441/api/version",
+        "http://192.168.1.20:11441/api/version",
+        "http://127.0.0.1:11441@10.0.0.5:8080/api/version",
+        "https://127.0.0.1:11441/api/version",
+    ):
+        with pytest.raises(LinuxCudaError, match="non-loopback"):
+            _default_http_get(bad_url)
+        with pytest.raises(LinuxCudaError, match="non-loopback"):
+            _default_http_post(bad_url, {})
+
+
 
 
 
