@@ -318,7 +318,7 @@ def validate_loopback_ollama_host(host: str) -> tuple[str, int]:
         hostname, port_text = host.rsplit(":", 1)
         is_bracketed_v6 = False
 
-    if not port_text.isdigit():
+    if not (port_text.isascii() and port_text.isdigit()):
         raise LinuxCudaError(f"invalid port in Ollama host {host!r}")
     port = int(port_text)
     if port < 1 or port > 65535:

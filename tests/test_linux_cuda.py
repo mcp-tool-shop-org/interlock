@@ -2533,15 +2533,73 @@ def test_linux_ollama_server_accepts_ipv4_and_ipv6_loopback_and_checks_localhost
             _default_http_post(bad_url, {})
 
 
+@pytest.mark.parametrize(
+    "bad_host",
+    [
+        "127.0.0.1:１１４４１",
+        "127.0.0.1:١١٤٤١",
+        "127.0.0.1:¹",
+    ],
+)
+def test_linux_ollama_server_refuses_non_ascii_port_before_enter(tmp_path: Path, bad_host: str):
+    from interlock.harness.linux_cuda import LinuxCudaError, LinuxOllamaServer
+
+    spawned: list[list[str]] = []
+    with pytest.raises(LinuxCudaError, match=r"^invalid port in Ollama host"):
+        LinuxOllamaServer(
+            host=bad_host,
+            log_path=tmp_path / "ollama.log",
+            popen=lambda argv, **_kw: spawned.append(list(argv)),
+        )
+    assert spawned == []
 
 
+@pytest.mark.parametrize(
+    "bad_host",
+    [
+        "127.0.0.1:１１４４１",
+        "127.0.0.1:١١٤٤١",
+        "127.0.0.1:¹",
+    ],
+)
+def test_run_spec_seams_host_refuses_non_ascii_port(tmp_path: Path, bad_host: str):
+    import shutil
+    import subprocess
 
+    from interlock.harness.linux_cuda import LinuxCudaError
+    from interlock.harness.runner import run_spec
 
+    spec_rel = "experiments/c2-fill-card/spec.yaml"
+    dest = tmp_path / spec_rel
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(ROOT / spec_rel, dest)
+    for cmd in (
+        ["git", "init"],
+        ["git", "config", "user.email", "dev@example.com"],
+        ["git", "config", "user.name", "dev"],
+        ["git", "add", "."],
+        ["git", "commit", "-m", "spec"],
+    ):
+        subprocess.run(cmd, cwd=tmp_path, check=True, capture_output=True)  # noqa: S603, S607
 
-
-
-
-
-
+    spawned: list[list[str]] = []
+    with pytest.raises(LinuxCudaError, match=r"^invalid port in Ollama host"):
+        run_spec(
+            dest,
+            root=tmp_path,
+            run_id="c2-bad-port",
+            date="2026-10-24",
+            python_path=str(tmp_path.parent / "external-python"),
+            models=["qwen3:8b"],
+            seams={
+                "remote_device": _remote_ident("L4", 23034),
+                "sample_vram_mib": lambda: (2000, 23034),
+                "host": bad_host,
+                "popen": lambda argv, **_kw: spawned.append(list(argv)),
+                "http_get": lambda _url: {"version": "0.6.2"},
+                "http_post": lambda _url, _payload: {"done": True},
+            },
+        )
+    assert spawned == []
 
 
