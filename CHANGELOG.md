@@ -18,6 +18,10 @@
 - With a source missing, the rebuild exits 1 naming each missing source, its pinned commit, and the flag and key that set it. `--remote-window` alone (the merge) needs no source.
 - The NPU pin's comment names the rnd tag `data/npu-buildout-275e511`.
 
+### Fixed
+
+- A VRAM sampler (or nvidia-smi) that fails after a cell's model call is now a `sampler_error` row, where it was written as `load_refused` (a claim that the card cannot load the quant). `sampler_error` is an untimed outcome that is not a capability outcome: it validates against the routing-row and route-decision schemas, is not a speed row, is listed under `excluded` by `interlock route` with the code `sampler_error` and no "measured failure reason", keeps its note unchanged in the table copy, and imports from a window receipt. A fill-card cell stops at it and does not bisect to a ceiling. A spec still cannot pre-register it.
+
 ## [1.0.1] - 2026-10-25
 
 ### Added

@@ -183,7 +183,11 @@ _TIMING = (
     "compile_warm_reload_ms",
 )
 _REMOTE_FAILURES = frozenset({"oom", "load_refused", "timeout", "ctx_exceeded"})
-_UNTIMED = frozenset({"device_lost", "hang", "compile_rejected", "compile_timeout"} | _REMOTE_FAILURES)
+# A cell that was not measured: untimed like a capability row, and never read as one (it is not in _REMOTE_FAILURES).
+_MEASUREMENT_FAILURES = frozenset({"sampler_error"})
+_UNTIMED = frozenset(
+    {"device_lost", "hang", "compile_rejected", "compile_timeout"} | _REMOTE_FAILURES | _MEASUREMENT_FAILURES
+)
 # The compile finished and the device refused the native binary at execute.
 # Such a row keeps the compile time and nothing else.
 _COMPILE_ONLY = frozenset({"native_binary_rejected"})
