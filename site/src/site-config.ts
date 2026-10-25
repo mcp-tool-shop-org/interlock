@@ -3,15 +3,15 @@ import type { SiteConfig } from '@mcptoolshop/site-theme';
 export const config: SiteConfig = {
   title: 'interlock',
   description:
-    'Local AI device router: a prototype that sends each job to a model, an engine and a device named by a measured receipt.',
+    'Local AI device router: it sends each job to a model, an engine and a device named by a measured receipt.',
   logoBadge: 'IL',
   brandName: 'interlock',
   repoUrl: 'https://github.com/mcp-tool-shop-org/interlock',
   footerText:
-    'MIT Licensed — built by <a href="https://mcp-tool-shop.github.io/" style="color:var(--color-muted);text-decoration:underline">MCP Tool Shop</a>',
+    'MIT Licensed — built by <a href="https://mcp-tool-shop.github.io/" style="color:var(--color-muted);text-decoration:underline">mcp-tool-shop</a>',
 
   hero: {
-    badge: 'Prototype 0.3.x',
+    badge: 'v1.0.0',
     headline: 'interlock',
     headlineAccent: 'local AI device router.',
     description:

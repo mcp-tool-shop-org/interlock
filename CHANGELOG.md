@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-## [0.3.0] - 2026-10-25
+## [1.0.0] - 2026-10-25
+
+The first release since 0.2.0. There was no separate 0.3.0 release; its changes ship in 1.0.0. From 1.0, versions follow semantic versioning.
 
 ### Fixed
 
@@ -10,7 +12,7 @@
 
 ### Docs
 
-- The README and handbook say what is new in 0.3.0. The handbook's experiments page has a C2 section for the remote Colab specs, and the threat model and security page cover the Linux CUDA path and the remote importer.
+- The README and handbook say what is new in 1.0.0, and drop the prototype and 0.x wording: from 1.0, a change that breaks the CLI, the receipt format or the spec format comes with a new major version, and the latest 1.x release receives security fixes. The landing badge says v1.0.0. The handbook's experiments page has a C2 section for the remote Colab specs, and the threat model and security page cover the Linux CUDA path and the remote importer.
 - `CONTRIBUTORS.md` credits the AI seats that wrote the code: Grok ("Written with Grok", xAI), Kimi and Claude. The README links it.
 
 ### Added

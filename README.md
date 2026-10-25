@@ -18,7 +18,7 @@
 
 # interlock: local AI device router
 
-> **Prototype, 0.3.x: a research instrument.** The CLI, the receipt format and the experiment specs can change without notice between 0.x releases. interlock is advisory only: it suggests a model, engine and device, and it never serves traffic. Every local number in it was measured on one rig (Intel Core Ultra 9 285K with its NPU and iGPU, plus an RTX 5090), and remote `colab:<card>` rows live in their own separate evidence pool with full card identity (`provider`, `card`, `vram_mib`, `driver_version`, `cuda_version`, `pool`). Treat its routes as measured evidence for that specific hardware pool, not a general benchmark.
+> **Version 1.0.0: a research instrument.** From 1.0, versions follow semantic versioning: a change that breaks the CLI, the receipt format or the experiment spec format comes with a new major version. interlock is advisory only: it suggests a model, engine and device, and it never serves traffic. Every local number in it was measured on one rig (Intel Core Ultra 9 285K with its NPU and iGPU, plus an RTX 5090), and remote `colab:<card>` rows live in their own separate evidence pool with full card identity (`provider`, `card`, `vram_mib`, `driver_version`, `cuda_version`, `pool`). Treat its routes as measured evidence for that specific hardware pool, not a general benchmark.
 
 Railway interlocking stops a train being routed into a conflicting path. This tool does that for devices: it sends each job to a model, an engine and a device.
 
@@ -33,7 +33,7 @@ uv sync
 uv run interlock --help
 ```
 
-From PyPI, from v0.1.0:
+From PyPI:
 
 ```
 pip install mcptoolshop-interlock
@@ -43,13 +43,15 @@ pip install mcptoolshop-interlock
 uv tool install mcptoolshop-interlock
 ```
 
-The distribution name is `mcptoolshop-interlock`. The import and the command are `interlock`. Python 3.12 only (`requires-python` is `>=3.12,<3.13`). CI runs the tests on Ubuntu. A live measurement run on the rig is written for the Windows rig this table was measured on. The Linux CUDA path (since 0.3.0) runs on a remote Colab VM.
+The distribution name is `mcptoolshop-interlock`. The import and the command are `interlock`. Python 3.12 only (`requires-python` is `>=3.12,<3.13`). CI runs the tests on Ubuntu. A live measurement run on the rig is written for the Windows rig this table was measured on. The Linux CUDA path (new in 1.0.0) runs on a remote Colab VM.
 
 What this program is allowed to touch is in the [threat model](#threat-model).
 
 The receipt schema, the routing table, and the harness came first. `interlock route` reads that table. It does not spend device time.
 
-## What's new in 0.3.0
+## What's new in 1.0.0
+
+1.0.0 follows 0.2.0. There was no separate 0.3.0 release; its changes ship in 1.0.0.
 
 - **Remote Colab cards as devices.** `colab:A100-40`, `colab:A100-80`, `colab:L4`, `colab:T4` and `colab:G4` rows carry the card's identity (`provider`, `card`, `vram_mib`, driver and CUDA versions, and a zone `pool`) and sit in their own pool, apart from the rig's rows. See [Devices](#devices).
 - **A Linux CUDA measuring path** for those cards (`interlock run` with a `platform: linux-cuda` spec), with three pre-registered specs: `experiments/c2-fill-card/`, `experiments/c2-generate/` and `experiments/c2-throughput/`. Failed shapes (`oom`, `load_refused`, `timeout`, `ctx_exceeded`) are kept as capability rows.
