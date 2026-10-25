@@ -16,7 +16,7 @@ import yaml
 
 from interlock.adapters.base import AdapterError, StepResult
 from interlock.cli import main
-from interlock.guards import GuardError
+from interlock.guards import NO_WATCHDOG, NO_WATCHDOG_NOTE, GuardError
 from interlock.harness.runner import (
     RunnerError,
     devices_not_started,
@@ -306,6 +306,83 @@ def test_a_5090_run_proceeds_after_both_card_checks(tmp_path: Path):
     assert fake.unloaded == [("qwen3:8b", "5090")]
 
 
+def test_an_unset_heartbeat_refuses_a_5090_run_before_the_probe_and_names_the_variable(
+    tmp_path: Path, monkeypatch
+):
+    monkeypatch.delenv("WATCHDOG_HEARTBEAT", raising=False)
+    monkeypatch.chdir(tmp_path)
+    repo = tmp_path / "repo"
+    spec_path = _bind(repo, _spec([_arm("A", "5090")], needs=NEED_GRANT))
+    fake = Fake()  # loaded=None: a probe would fail the test
+    with pytest.raises(GuardError, match="WATCHDOG_HEARTBEAT"):
+        run_spec(spec_path, root=repo, grant="g", adapters={"fake": fake})
+    assert fake.calls == []
+    assert fake.unloaded == []
+
+
+def test_an_unset_heartbeat_refuses_a_fill_card_run_and_names_the_variable(tmp_path: Path, monkeypatch):
+    monkeypatch.delenv("WATCHDOG_HEARTBEAT", raising=False)
+    monkeypatch.chdir(tmp_path)
+    repo = tmp_path / "repo"
+    target = repo / "experiments" / "e5" / "spec.yaml"
+    target.parent.mkdir(parents=True)
+    target.write_text(E5.read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
+    _commit(repo)
+    fake = Fake()
+    with pytest.raises(GuardError, match="WATCHDOG_HEARTBEAT"):
+        run_spec(target, root=repo, grant="g", adapters={"ollama": fake})
+    assert fake.calls == []
+    assert fake.unloaded == []
+
+
+def test_a_no_watchdog_5090_run_proceeds_and_the_receipt_records_it(tmp_path: Path, monkeypatch):
+    monkeypatch.delenv("WATCHDOG_HEARTBEAT", raising=False)
+    monkeypatch.chdir(tmp_path)
+    repo = tmp_path / "repo"
+    spec_path = _bind(repo, _spec([_arm("A", "5090")], needs=NEED_GRANT))
+    fake = Fake({"A": [_result(50), _result(51), _result(52)]}, loaded=[])
+    rows = run_spec(
+        spec_path,
+        root=repo,
+        grant="g",
+        adapters={"fake": fake},
+        heartbeat=NO_WATCHDOG,
+        date="2026-10-10",
+        run_id="no-watchdog",
+    )
+    assert len(rows) == 1
+    assert check_tree(repo) == []
+    assert fake.calls == ["A", "A", "A"]
+    receipt = load_jsonl(repo / "receipts" / "no-watchdog.jsonl")
+    assert NO_WATCHDOG_NOTE in receipt[0]["notes"]
+
+
+def test_a_run_with_a_heartbeat_does_not_record_the_opt_out(tmp_path: Path):
+    repo = tmp_path / "repo"
+    spec_path = _bind(repo, _spec([_arm("A", "5090")], needs=NEED_GRANT))
+    fake = Fake({"A": [_result(50), _result(51), _result(52)]}, loaded=[])
+    run_spec(
+        spec_path,
+        root=repo,
+        grant="g",
+        adapters={"fake": fake},
+        heartbeat=_fresh_heartbeat(tmp_path),
+        date="2026-10-10",
+        run_id="with-watchdog",
+    )
+    receipt = load_jsonl(repo / "receipts" / "with-watchdog.jsonl")
+    assert NO_WATCHDOG_NOTE not in str(receipt[0].get("notes"))
+
+
+def test_no_watchdog_still_refuses_a_loaded_card(tmp_path: Path):
+    repo = tmp_path / "repo"
+    spec_path = _bind(repo, _spec([_arm("A", "5090")], needs=NEED_GRANT))
+    fake = Fake(loaded=[{"name": "qwen3:8b"}])
+    with pytest.raises(GuardError, match="still on the card"):
+        run_spec(spec_path, root=repo, grant="g", adapters={"fake": fake}, heartbeat=NO_WATCHDOG)
+    assert fake.calls == []
+
+
 def test_a_hang_stops_the_run_and_keeps_a_partial_receipt(tmp_path: Path):
     repo = tmp_path / "repo"
     spec_path = _bind(repo, _spec([_arm("A", "CPU"), _arm("B", "CPU")]))
@@ -371,7 +448,8 @@ def test_heartbeat_path_prefers_the_env_override(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("WATCHDOG_HEARTBEAT", str(target))
     assert heartbeat_path() == target
     monkeypatch.delenv("WATCHDOG_HEARTBEAT")
-    assert heartbeat_path() == Path("E:/AI/training/_watchdog_HEARTBEAT")
+    monkeypatch.chdir(tmp_path)
+    assert heartbeat_path() is None  # no default path: unset is not "off", the guard refuses it
     assert heartbeat_path(target).name == "hb"
 
 

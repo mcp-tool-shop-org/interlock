@@ -74,7 +74,7 @@ from interlock.adapters.ollama import (
 )
 from interlock.cli import announce_run
 from interlock.families import stamp_family
-from interlock.guards import GuardError, require_card_empty, require_grant, require_heartbeat
+from interlock.guards import GuardError, WatchdogOptOut, require_card_empty, require_grant, require_heartbeat
 from interlock.harness.count_budget import roster_timeout
 from interlock.harness.e5 import (
     Observation,
@@ -1467,7 +1467,7 @@ def run_fill_card(
     spec_rel: str,
     run_id: str,
     date: str,
-    heartbeat: Path | None,
+    heartbeat: Path | WatchdogOptOut | None,
     wall,
     marker,
     notes: str = "",
@@ -1506,8 +1506,7 @@ def run_fill_card(
                     marker.note_restart_disabled(reason)
                 record_checked = True
             require_grant(grant, uses_5090=True)
-            if heartbeat is not None:
-                require_heartbeat(heartbeat, wall())
+            require_heartbeat(heartbeat, wall())
             adapter = _ollama(adapters)
             require_card_empty(adapter.loaded_models())
             if not getattr(seams, "preflight_done", False):

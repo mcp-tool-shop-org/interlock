@@ -20,6 +20,7 @@ from pathlib import Path
 
 from interlock.paths import PathsConfigError, configured
 
+
 class StorageError(Exception):
     """The weights could not be resolved or copied. The caller refuses the arm."""
 

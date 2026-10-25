@@ -24,7 +24,8 @@ def scratch_root() -> str:
     """The scratch directory offrig opens as its project: ``INTERLOCK_SCRATCH_ROOT``, else ``[paths] scratch_root`` in
     ``interlock.toml``, else ``interlock-scratch`` under the system temp directory."""
 
-    return configured("INTERLOCK_SCRATCH_ROOT", "scratch_root") or (Path(tempfile.gettempdir()) / "interlock-scratch").as_posix()
+    found = configured("INTERLOCK_SCRATCH_ROOT", "scratch_root")
+    return found or (Path(tempfile.gettempdir()) / "interlock-scratch").as_posix()
 
 
 def scratch_project(experiment_id: str) -> str:

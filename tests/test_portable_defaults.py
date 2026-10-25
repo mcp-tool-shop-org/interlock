@@ -7,6 +7,7 @@ cache location, or off). A guard scans `src/` for drive-letter, `/home/` and `/U
 from __future__ import annotations
 
 import re
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -39,7 +40,7 @@ def test_the_allow_list_starts_empty():
 
 @pytest.fixture(autouse=True)
 def _clean(monkeypatch, tmp_path):
-    for name in ("INTERLOCK_SCRATCH_ROOT", "WATCHDOG_HEARTBEAT", "INTERLOCK_WEIGHTS_HOT"):
+    for name in ("INTERLOCK_SCRATCH_ROOT", "WATCHDOG_HEARTBEAT", "INTERLOCK_WEIGHTS_HOT", "HF_HOME"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.chdir(tmp_path)
 
@@ -51,13 +52,12 @@ def _toml(tmp_path: Path, body: str) -> None:
 # ── scratch root (offrig calibrate --project) ────────────────────────────────────────────────────
 
 
-def test_the_scratch_default_is_portable():
+def test_the_scratch_default_is_under_the_system_temp_directory():
     from interlock.adapters.offrig_calibrate import scratch_project
 
-    project = scratch_project("cal")
-    assert not DRIVE.match(project.replace("\\", "/")[:3]) or Path(project).is_absolute()
-    assert "switchyard" not in project
-    assert project.endswith("/cal")
+    expected = (Path(tempfile.gettempdir()) / "interlock-scratch").as_posix()
+    assert scratch_project("cal") == f"{expected}/cal"
+    assert "switchyard" not in scratch_project("cal")
 
 
 def test_the_scratch_root_comes_from_env_then_the_config_file(monkeypatch, tmp_path):
@@ -69,10 +69,10 @@ def test_the_scratch_root_comes_from_env_then_the_config_file(monkeypatch, tmp_p
     assert scratch_project("cal") == "env-scratch/cal"
 
 
-# ── watchdog heartbeat (read only by the studio's VRAM watchdog guard) ───────────────────────────
+# ── watchdog heartbeat (read by the VRAM watchdog guard; unset refuses, --no-watchdog is explicit) ─
 
 
-def test_the_heartbeat_is_off_unless_configured():
+def test_an_unset_heartbeat_is_none_not_a_default_path():
     from interlock.harness.runner import heartbeat_path
 
     assert heartbeat_path() is None
@@ -88,13 +88,34 @@ def test_the_heartbeat_comes_from_the_argument_env_or_config_file(monkeypatch, t
     assert heartbeat_path(Path("arg-hb")) == Path("arg-hb")
 
 
-def test_a_run_with_no_heartbeat_skips_that_guard_and_keeps_the_empty_card_guard():
+def test_an_unset_heartbeat_refuses_and_names_the_variable():
+    from interlock.guards import GuardError, require_heartbeat
+
+    with pytest.raises(GuardError, match="WATCHDOG_HEARTBEAT") as caught:
+        require_heartbeat(None, 0.0)
+    assert "--no-watchdog" in str(caught.value)
+
+
+def test_the_card_guards_refuse_an_unset_heartbeat_before_the_card_probe():
     from interlock.guards import GuardError
     from interlock.harness.runner import _card_guards
 
-    _card_guards(lambda: [], None, 0.0)
-    with pytest.raises(GuardError):
-        _card_guards(lambda: ["some-model"], None, 0.0)
+    def probe():
+        raise AssertionError("the card was probed")
+
+    with pytest.raises(GuardError, match="WATCHDOG_HEARTBEAT"):
+        _card_guards(probe, None, 0.0)
+
+
+def test_only_the_no_watchdog_marker_skips_the_heartbeat_guard_and_the_card_guard_still_runs():
+    from interlock.guards import NO_WATCHDOG, GuardError, require_heartbeat
+    from interlock.harness.runner import _card_guards, heartbeat_path
+
+    assert require_heartbeat(NO_WATCHDOG, 0.0) == 0.0
+    assert heartbeat_path(NO_WATCHDOG) is NO_WATCHDOG
+    _card_guards(lambda: [], NO_WATCHDOG, 0.0)
+    with pytest.raises(GuardError, match="still on the card"):
+        _card_guards(lambda: ["some-model"], NO_WATCHDOG, 0.0)
 
 
 def test_a_configured_heartbeat_is_still_checked(tmp_path):
@@ -105,13 +126,39 @@ def test_a_configured_heartbeat_is_still_checked(tmp_path):
         _card_guards(lambda: [], tmp_path / "missing-heartbeat", 0.0)
 
 
+def _captured_run(monkeypatch, extra: list[str]):
+    from interlock.cli import main
+
+    seen: dict = {}
+
+    def fake_run_spec(*args, **kwargs):
+        seen.update(kwargs)
+        return []
+
+    monkeypatch.setattr("interlock.harness.runner.run_spec", fake_run_spec)
+    spec = ROOT / "experiments" / "e5" / "spec.yaml"
+    assert main(["run", str(spec), "--root", str(ROOT), "--grant", "g", *extra]) == 0
+    return seen
+
+
+def test_the_run_command_passes_no_watchdog_only_when_the_flag_is_given(monkeypatch):
+    from interlock.guards import NO_WATCHDOG
+
+    without = _captured_run(monkeypatch, [])
+    assert without["heartbeat"] is None  # unset stays unset, and the guard refuses it
+    assert without["supervisor"].heartbeat is None
+    given = _captured_run(monkeypatch, ["--no-watchdog"])
+    assert given["heartbeat"] is NO_WATCHDOG
+    assert given["supervisor"].heartbeat is NO_WATCHDOG
+
+
 # ── the hot weights cache (an arm with hf_cache: hot) ────────────────────────────────────────────
 
 
-def test_the_hot_cache_default_is_portable_and_the_unused_archive_root_is_gone():
+def test_the_hot_cache_default_is_under_the_user_hugging_face_cache_and_the_dead_constants_are_gone():
     from interlock.harness import storage
 
-    assert not DRIVE.match(str(storage.hot_root()))
+    assert storage.hot_root() == Path.home() / ".cache" / "huggingface" / "hot"
     assert not hasattr(storage, "ARCHIVE_ROOT")
     assert not hasattr(storage, "HOT_ROOT")
 

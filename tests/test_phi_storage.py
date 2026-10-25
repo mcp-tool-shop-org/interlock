@@ -481,7 +481,10 @@ def test_dry_run_names_the_phi_arm_options(tmp_path: Path):
         "warmups: until two consecutive calls agree within 0.05 on latency.throughput, "
         "at most 6; warm-up calls stay out of the percentiles"
     ) in text
-    assert "phi-35-mini-cpu-l1024: hf_cache hot (C:/AI-Models/hf-cache-hot); a missing copy is a refusal" in text
+    assert (
+        "phi-35-mini-cpu-l1024: hf_cache hot (INTERLOCK_WEIGHTS_HOT, [paths] weights_hot, or hot/ under HF_HOME); "
+        "a missing copy is a refusal"
+    ) in text
     assert "phi-35-mini-cpu-l1024: cold copy on the snapshot drive before the first load, deleted after unload" in text
     assert "phi-35-mini-cpu-l1024: ENABLE_MMAP false" in text
     assert "phi-archive: hf_cache archive" in text

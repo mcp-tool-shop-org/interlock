@@ -84,7 +84,6 @@ from interlock.adapters.base import (
 )
 from interlock.devices import DeviceRefused, resolve_device
 from interlock.harness.storage import (
-    hot_root as _hot_root,
     StorageError,
     copy_unbuffered,
     default_snapshot_download,
@@ -92,6 +91,9 @@ from interlock.harness.storage import (
     drive_letter,
     fresh_copy_dir,
     hot_snapshot,
+)
+from interlock.harness.storage import (
+    hot_root as _hot_root,
 )
 
 try:  # CI has no intel extra; importing this module must still succeed.

@@ -42,7 +42,14 @@ import time
 import traceback
 from pathlib import Path
 
-from interlock.guards import require_card_empty, require_grant, require_heartbeat, require_npu_session
+from interlock.guards import (
+    NO_WATCHDOG,
+    NO_WATCHDOG_NOTE,
+    require_card_empty,
+    require_grant,
+    require_heartbeat,
+    require_npu_session,
+)
 from interlock.harness.e4b_stats import bootstrap_median, decide, effect
 from interlock.harness.lifecycle import move_aside, refuse_strays, require_free, resolve_run_id, utc_now
 from interlock.harness.ollama_serve import (
@@ -669,8 +676,7 @@ def _require_ready(seams) -> None:
         path = heartbeat_path()
     wall = getattr(seams, "wall", None)
     now = wall() if callable(wall) else time.time()
-    if path is not None:
-        require_heartbeat(Path(path), now)
+    require_heartbeat(path if path is None or path is NO_WATCHDOG else Path(path), now)
     card = getattr(seams, "card_models", None)
     models = card() if callable(card) else ["unreadable"]
     if not isinstance(models, list):
@@ -1974,6 +1980,8 @@ def run_pilot(
         }
         if cleanup_errors:
             parked["cleanup_errors"] = cleanup_errors
+        if getattr(seams, "heartbeat", None) is NO_WATCHDOG:
+            parked["watchdog"] = NO_WATCHDOG_NOTE
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(json.dumps(parked, sort_keys=True, indent=2) + "\n", encoding="utf-8")
         _safe_caches(root, [f"compile-cache/{run_id}"])
@@ -2014,6 +2022,8 @@ def run_pilot(
         note["sample_interval_s"] = _mean(call_intervals)
     document.update(note)
     document.update(note_vram(getattr(seams, "vram", None)))
+    if getattr(seams, "heartbeat", None) is NO_WATCHDOG:
+        document["watchdog"] = NO_WATCHDOG_NOTE
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(document, sort_keys=True, indent=2) + "\n", encoding="utf-8")
     _safe_caches(root, [f"compile-cache/{run_id}"])
@@ -2034,8 +2044,13 @@ def run_from_cli(
     notes: str = "",
     quarantine: Path | None = None,
     pairs: list[str] | None = None,
+    heartbeat=None,
 ) -> list | dict:
-    """Flag checks, then the pilot or the block. Null tolerances refuse before any device."""
+    """Flag checks, then the pilot or the block. Null tolerances refuse before any device.
+
+    ``heartbeat`` is the watchdog heartbeat file, or the ``--no-watchdog`` marker; None means look it up
+    (``WATCHDOG_HEARTBEAT`` or ``[paths] heartbeat``) and refuse when it is not configured.
+    """
 
     from interlock.harness.lock import require_unmodified
 
@@ -2057,7 +2072,7 @@ def run_from_cli(
         setting=quarantine,
     )
     if seams is None:
-        seams = build_live_seams(root, name, spec, pilot=pilot)
+        seams = build_live_seams(root, name, spec, pilot=pilot, heartbeat=heartbeat)
     # One read, before any device. The pilot document and the block receipt keep it.
     recorded = seams.git(repo) if getattr(seams, "git", None) else None
     if pilot:
@@ -2430,7 +2445,7 @@ class IntelLane:
 
 def build_live_seams(root: Path, run_id: str, spec: dict, *, pilot: bool, run=None, popen=None, transport=None,
     opener=None, sample=None, cpu=None, intel=None, sampler=threaded_sample, vram=None, git_run=None, bind=None,
-        card_mib=None):
+        card_mib=None, heartbeat=None):
     """Wire the run-owned server. Every external call is injectable; the defaults are the live ones."""
 
     from interlock.harness.ollama_serve import Server
@@ -2606,7 +2621,7 @@ def build_live_seams(root: Path, run_id: str, spec: dict, *, pilot: bool, run=No
 
     seams.load_resident = load_resident
     seams.unload_resident = lambda: unload_owned(post, OWNED, model)
-    seams.heartbeat = heartbeat_path()
+    seams.heartbeat = heartbeat_path(heartbeat)
     seams.wall = time.time
     seams.card_models = lambda: card_models_at_ceiling(read_mib, ceiling=IDLE_CEILING_MIB)
     seams.count_tokens = lambda text: count_owned(post, OWNED, model, text)

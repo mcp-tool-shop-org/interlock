@@ -1391,7 +1391,7 @@ def test_offrig_calibrate_is_planned_and_not_launched():
     }
     argv = plan_argv(spec)
     assert argv[:3] == ["offrig", "verify", "calibrate"]
-    assert "E:/AI/switchyard-scratch/cal" in argv
+    assert scratch_project("cal") in argv
     assert "0" in argv
     assert "pod" not in " ".join(argv)
     with pytest.raises(AdapterError):
@@ -1763,7 +1763,7 @@ def test_dry_run_plans_calibrate_and_names_the_cpu_window(tmp_path: Path):
     _commit(repo)
     text = dry_run(spec_path, repo)
     assert "not launched" in text
-    assert "E:/AI/switchyard-scratch/cal" in text
+    assert scratch_project("cal") in text
     assert "--cpu-window" in text
     loaded = load_spec(spec_path)
     check_flags(loaded, "grant-t", "session-t", "window-t")

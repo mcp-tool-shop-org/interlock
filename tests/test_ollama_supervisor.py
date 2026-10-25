@@ -17,6 +17,7 @@ import yaml
 
 from interlock.adapters.base import AdapterError, StepResult
 from interlock.adapters.ollama import OllamaAdapter
+from interlock.guards import NO_WATCHDOG
 from interlock.harness.fill import FillSeams, quiet_fill_seams
 from interlock.harness.runner import RunnerError, dry_run, run_spec
 from interlock.harness.watch import WatchHooks
@@ -542,6 +543,23 @@ def test_a_restart_is_refused_when_the_grant_or_heartbeat_has_lapsed():
         stale.after_failure(URL_5090, model="qwen3:8b", kind="transport")
     assert stale_world.stopped == []
     assert stale.restarts == []
+
+
+def test_a_restart_with_no_heartbeat_configured_is_refused_and_no_watchdog_admits_it():
+    unset_world = World()
+    unset = _supervisor(unset_world)
+    unset.heartbeat = None
+    with pytest.raises(SupervisorStop, match="WATCHDOG_HEARTBEAT"):
+        unset.after_failure(URL_5090, model="qwen3:8b", kind="transport")
+    assert unset_world.stopped == []
+    assert unset.restarts == []
+
+    opted_world = World()
+    opted_world.ps = lambda url: None
+    opted = _supervisor(opted_world, heartbeat=NO_WATCHDOG)
+    assert opted.heartbeat is NO_WATCHDOG
+    decision = opted.after_failure(URL_5090, model="qwen3:8b", kind="transport")
+    assert decision.action == "restarted"
 
 
 def test_port_11490_is_never_stopped():

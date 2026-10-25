@@ -41,7 +41,11 @@ from interlock.adapters.registry import for_engine
 from interlock.cli import announce_run
 from interlock.devices import CARD_5090
 from interlock.guards import (
+    HEARTBEAT_ENV,
+    NO_WATCHDOG,
+    NO_WATCHDOG_NOTE,
     GuardError,
+    WatchdogOptOut,
     assess_step,
     require_card_empty,
     require_heartbeat,
@@ -2124,15 +2128,12 @@ def check_flags(spec: dict, grant: str | None, npu_session: str | None, cpu_wind
     if needs["cpu_window"]:
         assess_step(device="CPU", cpu_window=cpu_window, cpu_heavy=True)
 
-HEARTBEAT_ENV = "WATCHDOG_HEARTBEAT"
+def heartbeat_path(override: Path | WatchdogOptOut | None = None) -> Path | WatchdogOptOut | None:
+    """The VRAM watchdog heartbeat file, or None when none is configured. None is not "off": the guard refuses it.
 
-
-def heartbeat_path(override: Path | None = None) -> Path | None:
-    """The VRAM watchdog heartbeat file, or None when none is configured (the guard is then off).
-
-    The file is written by the studio's watchdog and read only by the heartbeat guard. The argument wins, then the
-    WATCHDOG_HEARTBEAT environment variable (the one chain_step.sh honours), then ``[paths] heartbeat`` in
-    ``interlock.toml``. There is no default path.
+    The file is written by the studio's watchdog and read only by the heartbeat guard. The argument wins (it may be
+    the ``--no-watchdog`` marker), then the WATCHDOG_HEARTBEAT environment variable (the one chain_step.sh honours),
+    then ``[paths] heartbeat`` in ``interlock.toml``. There is no default path.
     """
 
     if override is not None:
@@ -2187,11 +2188,10 @@ def _card_probe(adapters: dict, spec: dict):
     return probe
 
 
-def _card_guards(probe, path: Path | None, now: float) -> None:
-    """Heartbeat (when one is configured), then empty card. Both are read fresh on every call."""
+def _card_guards(probe, path: Path | WatchdogOptOut | None, now: float) -> None:
+    """Heartbeat, then empty card. Both are read fresh on every call. No heartbeat configured refuses."""
 
-    if path is not None:
-        require_heartbeat(path, now)
+    require_heartbeat(path, now)
     require_card_empty(probe())
 
 
@@ -2246,7 +2246,7 @@ def run_spec(
     date: str | None = None,
     notes: str = "",
     adapters: dict | None = None,
-    heartbeat: Path | None = None,
+    heartbeat: Path | WatchdogOptOut | None = None,
     wall=None,
     python_path: str | None = None,
     watch: WatchHooks | None = None,
@@ -2277,6 +2277,10 @@ def run_spec(
 
     _refuse_repo_interpreter(root, Path(python_path or sys.executable))
     spec = load_spec(spec_path)
+    if heartbeat is NO_WATCHDOG:
+        # The opt-out is the user's explicit choice and it travels with the run: it is written into the notes of
+        # the receipt (the pilot document carries it too), and never implied by an unset variable.
+        notes = f"{notes}. {NO_WATCHDOG_NOTE}" if notes else NO_WATCHDOG_NOTE
     chosen_models = None
     recorded_models = None
     if models is not None:
@@ -2313,6 +2317,7 @@ def run_spec(
             notes=notes,
             quarantine=quarantine,
             pairs=pairs,
+            heartbeat=heartbeat,
         )
     if pilot:
         from interlock.harness.e4b import E4bError

@@ -49,7 +49,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from interlock.guards import GuardError, require_grant, require_heartbeat
+from interlock.guards import NO_WATCHDOG, GuardError, WatchdogOptOut, require_grant, require_heartbeat
 
 URL_5090 = "http://127.0.0.1:11434"
 URL_CPU = "http://127.0.0.1:11490"
@@ -1000,7 +1000,7 @@ class OllamaSupervisor:
         config: SupervisorConfig | None = None,
         *,
         grant: str | None = None,
-        heartbeat: Path | str | None = None,
+        heartbeat: Path | str | WatchdogOptOut | None = None,
         start: ServeStart | None = None,
     ) -> None:
         self.seams = seams
@@ -1011,7 +1011,7 @@ class OllamaSupervisor:
         self._epoch = 0
         self._cold_after = False
         self.grant = grant
-        self.heartbeat = None if heartbeat is None else Path(heartbeat)
+        self.heartbeat = heartbeat if heartbeat is None or heartbeat is NO_WATCHDOG else Path(heartbeat)
         self.start = start
         self._env_checked = False
         self._restarts_disabled: str | None = None
@@ -1260,11 +1260,9 @@ class OllamaSupervisor:
             require_grant(self.grant, uses_5090=True)
         except GuardError as exc:
             raise SupervisorStop(str(exc)) from exc
-        if self.heartbeat is None:
-            raise SupervisorStop("REFUSED: watchdog heartbeat is missing")
         wall = self.seams.wall if callable(getattr(self.seams, "wall", None)) else time.time
         try:
-            require_heartbeat(Path(self.heartbeat), float(wall()))
+            require_heartbeat(self.heartbeat, float(wall()))
         except GuardError as exc:
             raise SupervisorStop(str(exc)) from exc
         readable = True

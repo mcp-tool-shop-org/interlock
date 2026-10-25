@@ -172,6 +172,21 @@ A `platform: linux-cuda` spec (the C2 specs under `experiments/c2-*/`) runs on a
 
 `--dry-run` prints the plan and the guards a real run would need, and starts nothing. A real run needs the flags its devices call for: `--grant` for the 5090, `--npu-session` for the NPU or iGPU, and `--cpu-window` for a CPU-heavy leg. It writes one receipt under `receipts/`. `interlock import --remote-window <path>` then adds a remote Colab window's receipt to `table/`, and `interlock check` validates the receipts. A full rebuild from the pinned source repositories needs `--source` (see below).
 
+## Paths and the watchdog
+
+No path of anyone's rig is written in the code. Each location below is an environment variable first, then `[paths]` in `interlock.toml` in the working directory, and a value is used as you gave it:
+
+- `INTERLOCK_SCRATCH_ROOT` / `scratch_root`: the scratch directory offrig opens as its project for `offrig verify calibrate`. Default: `interlock-scratch` under the system temp directory.
+- `INTERLOCK_WEIGHTS_HOT` / `weights_hot`: the hot weights cache an arm with `hf_cache: hot` reads; a missing copy is a refusal. Default: `hot/` under `HF_HOME`, or under the user's Hugging Face cache.
+- `WATCHDOG_HEARTBEAT` / `heartbeat`: the heartbeat file of the VRAM watchdog, which the heartbeat guard reads before a 5090 step. There is no default: unset, the run refuses and names `WATCHDOG_HEARTBEAT`. If you run no watchdog, pass `--no-watchdog`; the receipt's `notes` records that.
+
+```toml
+[paths]
+scratch_root = "scratch"
+weights_hot = "hf-hot"
+heartbeat = "watchdog/HEARTBEAT"
+```
+
 ## Importing receipts
 
 Most users only merge. `interlock import --remote-window <file>` adds the rows of a Colab window's receipt (the routing-row JSONL that `interlock run` writes, or the older `{run_id, date, remote_device, records}` JSON) to the existing `table/routing.jsonl`. It needs no other repository, and it refuses a row that is already in the table.
