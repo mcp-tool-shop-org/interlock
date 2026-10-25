@@ -58,7 +58,7 @@
 ## E. Identity (soft gate — does not block ship)
 
 - [x] `[all]` Logo in README header — centred brand URL, width 480 (2026-10-12). The image resolves when the brand PR merges.
-- [ ] `[all]` Translations (polyglot-mcp, 8 languages)
+- [x] `[all]` Translations (polyglot-mcp, 8 languages): README in 7 languages for 1.0.0 (#142)
 - [x] `[org]` Landing page (@mcptoolshop/site-theme) and Starlight handbook, base `/interlock` (2026-10-12)
 - [x] `[all]` GitHub repo metadata: description and topics were already set. Homepage set to https://mcp-tool-shop-org.github.io/interlock/ (2026-10-12)
 
