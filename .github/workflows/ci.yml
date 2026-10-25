@@ -87,7 +87,7 @@ jobs:
           disable_search: true
           files: coverage.xml
 
-      - name: Wheel install runs the C2 specs
+      - name: Wheel install loads the C2 specs and inputs
         run: |
           uv build --wheel --out-dir "$RUNNER_TEMP/wheel"
           uv venv --python 3.12 "$RUNNER_TEMP/wheel-venv"
@@ -95,6 +95,8 @@ jobs:
           for spec in c2-generate c2-fill-card c2-throughput; do
             "$RUNNER_TEMP/wheel-venv/bin/interlock" c2-sources "experiments/$spec/spec.yaml" > /dev/null
           done
+          # c2-sources reads the inputs file only with --verify-live (network); load it directly.
+          "$RUNNER_TEMP/wheel-venv/bin/python" -I -c "from interlock.harness.linux_cuda import load_throughput_inputs_fixture as f; f()"
 
       - name: Atlas check
         run: npx --yes @dogfood-lab/atlas@1.24.0 check
