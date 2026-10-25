@@ -25,12 +25,9 @@ from interlock.importers.nli import nli_rows, prereg_names_intel_igpu
 from interlock.importers.offers import offer_rows
 from interlock.importers.pins import (
     ASPIRE_COMMIT,
-    ASPIRE_REPO,
     LADDER_RUNS,
     NPU_BUILDOUT_COMMIT,
-    NPU_REPO,
     RND_COMMIT,
-    RND_REPO,
 )
 from interlock.importers.probe import probe_rows
 from interlock.receipt import ReceiptError, validate_row
@@ -73,9 +70,10 @@ def import_receipts(
     aspire_pin: str = ASPIRE_COMMIT,
     local_root: Path | None = None,
 ) -> tuple[list[dict], list[str]]:
-    rnd = Path(rnd_repo or RND_REPO)
-    npu = Path(npu_repo or NPU_REPO)
-    aspire = Path(aspire_repo or ASPIRE_REPO)
+    missing = [name for name, repo in (("rnd", rnd_repo), ("npu", npu_repo), ("aspire", aspire_repo)) if repo is None]
+    if missing:
+        raise ImportError_(f"import_receipts needs a clone for each source; not given: {', '.join(missing)}")
+    rnd, npu, aspire = Path(rnd_repo), Path(npu_repo), Path(aspire_repo)  # type: ignore[arg-type]
     require_pin(rnd, rnd_pin)
     require_pin(npu, npu_pin)
     require_pin(aspire, aspire_pin)
@@ -159,7 +157,10 @@ def _offer_source(path: Path) -> str:
 
 
 def require_pin(repo: Path, pin: str) -> None:
-    kind = _git(repo, "cat-file", "-t", pin).decode("utf-8").strip()
+    try:
+        kind = _git(repo, "cat-file", "-t", pin).decode("utf-8").strip()
+    except ImportError_ as exc:
+        raise ImportError_(f"REFUSED: {repo.as_posix()} does not hold the pinned commit {pin}: {exc}") from exc
     if kind != "commit":
         raise ImportError_(f"{pin} in {repo.as_posix()} is {kind}, not a commit")
 

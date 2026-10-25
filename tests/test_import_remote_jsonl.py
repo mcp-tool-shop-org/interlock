@@ -244,7 +244,16 @@ def _rebuild_returns(monkeypatch, rows: list[dict]) -> None:
 def _offers(root: Path) -> list[str]:
     path = root / "offers.json"
     path.write_text("[]", encoding="utf-8")
-    return ["--offers", str(path)]
+    return [
+        "--offers",
+        str(path),
+        "--source",
+        "rnd=clones/rnd",
+        "--source",
+        "npu=clones/rnd",
+        "--source",
+        "aspire=clones/aspire",
+    ]
 
 
 def test_a_rebuild_keeps_every_row_it_does_not_own(tmp_path, monkeypatch, capsys, window_rows):
