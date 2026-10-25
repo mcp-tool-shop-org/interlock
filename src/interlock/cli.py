@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from datetime import date
 from pathlib import Path
@@ -263,18 +264,67 @@ def _cmd_table(args: argparse.Namespace) -> int:
     return 0
 
 
+def _refuse_shrink(path: Path, rows: list[dict]) -> None:
+    """A full rebuild never drops a row the table holds."""
+
+    from interlock.importers.common import ImportError_
+    from interlock.receipt import load_jsonl
+
+    kept = {row["id"] for row in rows}
+    missing = [row["id"] for row in load_jsonl(path) if row["id"] not in kept]
+    if missing:
+        raise ImportError_(
+            f"REFUSED: the rebuild would write {len(rows)} row(s) and drop {len(missing)} of the "
+            f"{len(load_jsonl(path))} in {path.name}; first missing: {', '.join(missing[:5])}. "
+            "Import remote windows alone with --remote-window to merge them into the table"
+        )
+
+
+def _import_remote_windows(root: Path, windows: list[Path]) -> int:
+    """Merge remote window receipts into the existing table. Nothing is rebuilt, and nothing is dropped."""
+
+    from interlock.importers.assemble import _unique
+    from interlock.importers.remote import import_remote_window
+    from interlock.receipt import load_jsonl
+
+    table = root / "table"
+    path = table / "routing.jsonl"
+    existing = load_jsonl(path)
+    added: list[dict] = []
+    for window in windows:
+        added.extend(import_remote_window(Path(window).read_bytes(), source_path=Path(window).as_posix()))
+    rows = [*existing, *added]
+    _unique(rows)
+    rows.sort(key=lambda row: row["id"])
+    table.mkdir(exist_ok=True)
+    scratch = path.with_name(path.name + ".tmp")
+    scratch.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in rows), encoding="utf-8")
+    os.replace(scratch, path)
+    print(f"interlock import: {len(added)} remote row(s) added, {len(rows)} in the table")
+    return 0
+
+
 def _cmd_import(args: argparse.Namespace) -> int:
     from interlock.importers.assemble import import_receipts
+    from interlock.importers.common import ImportError_
     from interlock.importers.gaps import load_candidates, render_gaps
     from interlock.importers.pins import ASPIRE_COMMIT
+    from interlock.receipt import ReceiptError
 
     root = args.root.resolve()
-    rows, skipped = import_receipts(
-        offers_path=args.offers,
-        local_root=root,
-        remote_windows=args.remote_window,
-    )
     table = root / "table"
+    try:
+        if args.remote_window and args.offers is None:
+            return _import_remote_windows(root, args.remote_window)
+        rows, skipped = import_receipts(
+            offers_path=args.offers,
+            local_root=root,
+            remote_windows=args.remote_window,
+        )
+        _refuse_shrink(table / "routing.jsonl", rows)
+    except (ImportError_, ReceiptError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     table.mkdir(exist_ok=True)
     lines = [json.dumps(row, sort_keys=True) for row in rows]
     (table / "routing.jsonl").write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")

@@ -4,7 +4,13 @@
 
 ### Added
 
+- `interlock import --remote-window <file>` takes the routing-row JSONL that `interlock run` writes on Linux (one row per line, or one row object) as well as the `{run_id, date, remote_device, records}` envelope. The rows keep their `provenance`, `settings` and `notes` as written. A row that is not a `colab:` device, or is `descriptive` or `aborted`, or fails the schema, is refused with the file name.
+- With `--remote-window` and no `--offers`, the window rows are merged into the existing `table/routing.jsonl`: duplicates are refused (`duplicate row id ...`), the table is sorted by id and replaced atomically. `import_receipts` is not called, so no sibling repo is needed.
 - `interlock run --quants Q4_K_M,Q8_0` on a linux-cuda spec measures only the named quants (with `--models`, or on its own). An unknown quant exits 1 and lists the spec's quants. Without `--quants`, nothing changes. `--dry-run` prints `quants measured:`.
+
+### Changed
+
+- A full `interlock import` rebuild (with `--offers`) that would write fewer rows than `table/routing.jsonl` holds, or drop any existing row id, is refused: exit 1, `REFUSED: the rebuild would write N row(s) and drop M of the K ...` with the first missing ids, and the table is left as it was. An import error from `--remote-window` or the rebuild is a message and exit 1, not a traceback.
 
 ### Fixed
 

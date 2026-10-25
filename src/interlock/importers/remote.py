@@ -30,9 +30,17 @@ def import_remote_window(
     """Parse a remote window JSON receipt into validated remote routing rows."""
 
     try:
-        doc = json.loads(raw.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
         raise ImportError_(f"{source_path}: invalid UTF-8 JSON: {exc}") from exc
+    try:
+        doc = json.loads(text)
+    except json.JSONDecodeError as exc:
+        # Not one JSON document: the routing-row JSONL that `interlock run` writes on Linux, one row per line.
+        return _routing_rows(_jsonl_documents(text, source_path, exc), source_path)
+
+    if isinstance(doc, Mapping) and _is_routing_row(doc):
+        return _routing_rows([doc], source_path)
 
     if not isinstance(doc, Mapping):
         raise ImportError_(f"{source_path}: remote window receipt must be a JSON object")
@@ -66,6 +74,48 @@ def import_remote_window(
                 doc_engine_version=doc_engine_version,
             )
         )
+    return rows
+
+
+def _is_routing_row(doc: Mapping[str, Any]) -> bool:
+    return "records" not in doc and all(key in doc for key in ("id", "model", "provenance"))
+
+
+def _jsonl_documents(text: str, source_path: str, first_error: json.JSONDecodeError) -> list[Any]:
+    docs: list[Any] = []
+    for number, line in enumerate(text.splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            docs.append(json.loads(line))
+        except json.JSONDecodeError as exc:
+            raise ImportError_(f"{source_path}:{number}: invalid UTF-8 JSON: {exc}") from first_error
+    if not docs:
+        raise ImportError_(f"{source_path}: invalid UTF-8 JSON: {first_error}")
+    return docs
+
+
+def _routing_rows(docs: list[Any], source_path: str) -> list[dict[str, Any]]:
+    """Routing rows a Linux window already validated and wrote. Provenance, settings and notes stay as written."""
+
+    rows: list[dict[str, Any]] = []
+    for index, doc in enumerate(docs):
+        where = f"{source_path}[{index}]"
+        if not isinstance(doc, Mapping):
+            raise ImportError_(f"{where}: a routing row must be a JSON object")
+        row = dict(doc)
+        device = row.get("device")
+        if not isinstance(device, str) or not device.startswith("colab:"):
+            raise ImportError_(f"{where}: device {device!r} is not a remote colab:<card> device")
+        for flag in ("descriptive", "aborted"):
+            if row.get(flag):
+                raise ImportError_(f"{where}: a {flag} row does not route and is not imported")
+        stamp_family(row)
+        try:
+            validate_row(row)
+        except ReceiptError as exc:
+            raise ImportError_(f"{where}: {exc}") from exc
+        rows.append(row)
     return rows
 
 
