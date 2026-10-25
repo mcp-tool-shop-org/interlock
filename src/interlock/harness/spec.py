@@ -385,6 +385,16 @@ def _require_remote_model_source(model: dict) -> None:
         tag = model.get("ollama_tag")
         if not isinstance(tag, str) or not tag.strip():
             raise SpecError(f"roster entry {model.get('model')!r} has an invalid ollama_tag")
+        tag_lower = tag.strip().lower()
+        quant_val = str(model.get("quant") or "")
+        if tag_lower.endswith(("-fp16", "-f16")) and quant_val != "FP16":
+            raise SpecError(
+                f"roster entry {model.get('model')!r} pulls fp16 tag {tag!r} so quant must be 'FP16', not {quant_val!r}"
+            )
+        if tag_lower.endswith("-bf16") and quant_val != "BF16":
+            raise SpecError(
+                f"roster entry {model.get('model')!r} pulls bf16 tag {tag!r} so quant must be 'BF16', not {quant_val!r}"
+            )
         return
     if has_gguf:
         gguf = model.get("gguf")
@@ -403,6 +413,18 @@ def _require_remote_model_source(model: dict) -> None:
             raise SpecError(f"roster entry {model.get('model')!r} gguf.revision must be a 40-hex commit sha")
         if len(gguf["sha256"].strip()) != 64:
             raise SpecError(f"roster entry {model.get('model')!r} gguf.sha256 must be a 64-hex sha256")
+        file_lower = gguf["file"].strip().lower()
+        quant_val = str(model.get("quant") or "")
+        if file_lower.endswith(("-f16.gguf", "-fp16.gguf")) and quant_val != "FP16":
+            raise SpecError(
+                f"roster entry {model.get('model')!r} pulls fp16 GGUF {gguf['file']!r} "
+                f"so quant must be 'FP16', not {quant_val!r}"
+            )
+        if file_lower.endswith("-bf16.gguf") and quant_val != "BF16":
+            raise SpecError(
+                f"roster entry {model.get('model')!r} pulls bf16 GGUF {gguf['file']!r} "
+                f"so quant must be 'BF16', not {quant_val!r}"
+            )
         return
     if is_declared_refusal:
         return

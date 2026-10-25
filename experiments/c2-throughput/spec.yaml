@@ -67,7 +67,7 @@ models:
     model: nomic-ai/nomic-embed-text-v1.5
     ollama_tag: nomic-embed-text:137m-v1.5-fp16
     revision_or_digest: 0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f
-    quant: fp16
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:T4"
@@ -79,7 +79,7 @@ models:
       file: bge-base-en-v1.5-f16.gguf
       sha256: 88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2
     revision_or_digest: 88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2
-    quant: fp16
+    quant: FP16
     licence: mit
     engine: ollama
     device: "colab:T4"
@@ -87,14 +87,14 @@ models:
     model: Qwen/Qwen3-Embedding-0.6B
     ollama_tag: qwen3-embedding:0.6b-fp16
     revision_or_digest: 67a7592a8852b7b36f6328cdec193cfb7639769f5edf344ba709b088b2a51042
-    quant: fp16
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:T4"
   - task: rerank
     model: BAAI/bge-reranker-v2-m3
     revision_or_digest: 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
-    quant: fp16
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:T4"
@@ -103,7 +103,7 @@ models:
   - task: nli
     model: cross-encoder/nli-deberta-v3-base
     revision_or_digest: 6c749ce3425cd33b46d187e45b92bbf96ee12ec7
-    quant: fp16
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:T4"
@@ -114,7 +114,7 @@ models:
     model: nomic-ai/nomic-embed-text-v1.5
     ollama_tag: nomic-embed-text:137m-v1.5-fp16
     revision_or_digest: 0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f
-    quant: fp16
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:L4"
@@ -126,7 +126,7 @@ models:
       file: bge-base-en-v1.5-f16.gguf
       sha256: 88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2
     revision_or_digest: 88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2
-    quant: fp16
+    quant: FP16
     licence: mit
     engine: ollama
     device: "colab:L4"
@@ -134,14 +134,14 @@ models:
     model: Qwen/Qwen3-Embedding-0.6B
     ollama_tag: qwen3-embedding:0.6b-fp16
     revision_or_digest: 67a7592a8852b7b36f6328cdec193cfb7639769f5edf344ba709b088b2a51042
-    quant: fp16
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:L4"
   - task: rerank
     model: BAAI/bge-reranker-v2-m3
     revision_or_digest: 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
-    quant: fp16
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:L4"
@@ -150,7 +150,7 @@ models:
   - task: nli
     model: cross-encoder/nli-deberta-v3-base
     revision_or_digest: 6c749ce3425cd33b46d187e45b92bbf96ee12ec7
-    quant: fp16
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:L4"
@@ -161,7 +161,7 @@ models:
     model: nomic-ai/nomic-embed-text-v1.5
     ollama_tag: nomic-embed-text:137m-v1.5-fp16
     revision_or_digest: 0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f
-    quant: fp16
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:A100-40"
@@ -173,7 +173,7 @@ models:
       file: bge-base-en-v1.5-f16.gguf
       sha256: 88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2
     revision_or_digest: 88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2
-    quant: fp16
+    quant: FP16
     licence: mit
     engine: ollama
     device: "colab:A100-40"
@@ -181,14 +181,14 @@ models:
     model: Qwen/Qwen3-Embedding-0.6B
     ollama_tag: qwen3-embedding:0.6b-fp16
     revision_or_digest: 67a7592a8852b7b36f6328cdec193cfb7639769f5edf344ba709b088b2a51042
-    quant: fp16
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:A100-40"
   - task: rerank
     model: BAAI/bge-reranker-v2-m3
     revision_or_digest: 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
-    quant: fp16
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:A100-40"
@@ -197,7 +197,7 @@ models:
   - task: nli
     model: cross-encoder/nli-deberta-v3-base
     revision_or_digest: 6c749ce3425cd33b46d187e45b92bbf96ee12ec7
-    quant: fp16
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:A100-40"
@@ -208,7 +208,7 @@ models:
     model: nomic-ai/nomic-embed-text-v1.5
     ollama_tag: nomic-embed-text:137m-v1.5-fp16
     revision_or_digest: 0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f
-    quant: fp16
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:A100-80"
@@ -220,7 +220,7 @@ models:
       file: bge-base-en-v1.5-f16.gguf
       sha256: 88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2
     revision_or_digest: 88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2
-    quant: fp16
+    quant: FP16
     licence: mit
     engine: ollama
     device: "colab:A100-80"
@@ -228,14 +228,14 @@ models:
     model: Qwen/Qwen3-Embedding-0.6B
     ollama_tag: qwen3-embedding:0.6b-fp16
     revision_or_digest: 67a7592a8852b7b36f6328cdec193cfb7639769f5edf344ba709b088b2a51042
-    quant: fp16
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:A100-80"
   - task: rerank
     model: BAAI/bge-reranker-v2-m3
     revision_or_digest: 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
-    quant: fp16
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:A100-80"
@@ -244,7 +244,7 @@ models:
   - task: nli
     model: cross-encoder/nli-deberta-v3-base
     revision_or_digest: 6c749ce3425cd33b46d187e45b92bbf96ee12ec7
-    quant: fp16
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:A100-80"
@@ -255,7 +255,7 @@ models:
     model: nomic-ai/nomic-embed-text-v1.5
     ollama_tag: nomic-embed-text:137m-v1.5-fp16
     revision_or_digest: 0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f
-    quant: fp16
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:G4"
@@ -267,7 +267,7 @@ models:
       file: bge-base-en-v1.5-f16.gguf
       sha256: 88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2
     revision_or_digest: 88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2
-    quant: fp16
+    quant: FP16
     licence: mit
     engine: ollama
     device: "colab:G4"
@@ -275,14 +275,14 @@ models:
     model: Qwen/Qwen3-Embedding-0.6B
     ollama_tag: qwen3-embedding:0.6b-fp16
     revision_or_digest: 67a7592a8852b7b36f6328cdec193cfb7639769f5edf344ba709b088b2a51042
-    quant: fp16
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:G4"
   - task: rerank
     model: BAAI/bge-reranker-v2-m3
     revision_or_digest: 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
-    quant: fp16
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:G4"
@@ -291,7 +291,7 @@ models:
   - task: nli
     model: cross-encoder/nli-deberta-v3-base
     revision_or_digest: 6c749ce3425cd33b46d187e45b92bbf96ee12ec7
-    quant: fp16
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:G4"

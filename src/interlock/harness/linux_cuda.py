@@ -1547,6 +1547,15 @@ def resolve_c2_sources(spec: Mapping[str, Any]) -> list[dict[str, Any]]:
             raise LinuxCudaError(f"entry {model!r} ({quant!r}) on {device} cannot name both ollama_tag and gguf")
         if has_tag:
             served_tag = str(entry["ollama_tag"]).strip()
+            tag_lower = served_tag.lower()
+            if tag_lower.endswith(("-fp16", "-f16")) and quant != "FP16":
+                raise LinuxCudaError(
+                    f"entry {model!r} on {device} pulls fp16 tag {served_tag!r} so quant must be 'FP16', not {quant!r}"
+                )
+            if tag_lower.endswith("-bf16") and quant != "BF16":
+                raise LinuxCudaError(
+                    f"entry {model!r} on {device} pulls bf16 tag {served_tag!r} so quant must be 'BF16', not {quant!r}"
+                )
             resolved.append(
                 {
                     "device": device,
@@ -1569,6 +1578,15 @@ def resolve_c2_sources(spec: Mapping[str, Any]) -> list[dict[str, Any]]:
             rev = str(gguf["revision"]).strip()
             file = str(gguf["file"]).strip()
             sha256 = str(gguf["sha256"]).strip()
+            file_lower = file.lower()
+            if file_lower.endswith(("-f16.gguf", "-fp16.gguf")) and quant != "FP16":
+                raise LinuxCudaError(
+                    f"entry {model!r} on {device} pulls fp16 GGUF {file!r} so quant must be 'FP16', not {quant!r}"
+                )
+            if file_lower.endswith("-bf16.gguf") and quant != "BF16":
+                raise LinuxCudaError(
+                    f"entry {model!r} on {device} pulls bf16 GGUF {file!r} so quant must be 'BF16', not {quant!r}"
+                )
             resolved.append(
                 {
                     "device": device,

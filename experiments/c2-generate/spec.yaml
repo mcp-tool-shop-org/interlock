@@ -2,7 +2,7 @@
 #
 # PIN_PER_STEP: 2. Prompt lengths (512, 1024, 2048, 4096, 8192, 16384, 32768),
 #   concurrencies (1, 4, 8), num_predict (128), abort_fraction (0.90), the quant
-#   sweep (Q4_K_M, Q6_K, Q8_0, BF16), the 3-VM per card replication, and the
+#   sweep (Q4_K_M, Q6_K, Q8_0, FP16, BF16), the 3-VM per card replication, and the
 #   Colab card targets are pre-registered in this file.
 # ANDON_AUTHORITY: 2. Shapes exceeding floor(0.90 * vram_mib), offloaded to host
 #   memory, refused at load, or timing out are recorded as failure rows.
@@ -18,7 +18,7 @@ platform: linux-cuda
 question: >
   Across prompt lengths 512 to 32768 and concurrencies 1, 4, and 8 on each
   Colab card (A100-40, A100-80, G4, L4, T4) and quant (Q4_K_M, Q6_K, Q8_0,
-  BF16), what are the resident TTFT and decode tok/s, and which shapes fail
+  FP16, BF16), what are the resident TTFT and decode tok/s, and which shapes fail
   with oom, load_refused, timeout, or ctx_exceeded?
 decision: >
   Each (prompt_length, concurrency) cell produces a validated remote row on
@@ -68,7 +68,7 @@ stop_rules:
   - Residency and peak VRAM come from /api/ps and NVML or nvidia-smi; no Windows counters are used.
   - Every failed (prompt_length, concurrency) shape is recorded as a failure row (oom, load_refused, timeout, ctx_exceeded), never skipped.
 models:
-  # colab:T4 (16 GB) - Q4_K_M, Q6_K, Q8_0, BF16 per model; 30B/31B and 8B BF16 are pre-registered load_refused
+  # colab:T4 (16 GB) - Q4_K_M, Q6_K, Q8_0, FP16/BF16 per model; 30B/31B and 8B FP16 are pre-registered load_refused
   - model: qwen3:8b
     ollama_tag: qwen3:8b-q4_K_M
     revision_or_digest: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
@@ -97,7 +97,7 @@ models:
   - model: qwen3:8b
     ollama_tag: qwen3:8b-fp16
     revision_or_digest: 0b358e6e9d8cb39eaa4aa6b78136d09b91acb4be08c01bb707367811caed69ae
-    quant: BF16
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:T4"
@@ -127,7 +127,7 @@ models:
   - model: phi3.5:3.8b
     ollama_tag: phi3.5:3.8b-mini-instruct-fp16
     revision_or_digest: 4611ed13d4961f1ae0dab1b2e1c50f70777e21bdf97be507cc27312aa412d15a
-    quant: BF16
+    quant: FP16
     licence: mit
     engine: ollama
     device: "colab:T4"
@@ -230,7 +230,7 @@ models:
   - model: qwen3:8b
     ollama_tag: qwen3:8b-fp16
     revision_or_digest: 0b358e6e9d8cb39eaa4aa6b78136d09b91acb4be08c01bb707367811caed69ae
-    quant: BF16
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:L4"
@@ -258,7 +258,7 @@ models:
   - model: phi3.5:3.8b
     ollama_tag: phi3.5:3.8b-mini-instruct-fp16
     revision_or_digest: 4611ed13d4961f1ae0dab1b2e1c50f70777e21bdf97be507cc27312aa412d15a
-    quant: BF16
+    quant: FP16
     licence: mit
     engine: ollama
     device: "colab:L4"
@@ -357,7 +357,7 @@ models:
   - model: qwen3:8b
     ollama_tag: qwen3:8b-fp16
     revision_or_digest: 0b358e6e9d8cb39eaa4aa6b78136d09b91acb4be08c01bb707367811caed69ae
-    quant: BF16
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:A100-40"
@@ -385,7 +385,7 @@ models:
   - model: phi3.5:3.8b
     ollama_tag: phi3.5:3.8b-mini-instruct-fp16
     revision_or_digest: 4611ed13d4961f1ae0dab1b2e1c50f70777e21bdf97be507cc27312aa412d15a
-    quant: BF16
+    quant: FP16
     licence: mit
     engine: ollama
     device: "colab:A100-40"
@@ -480,7 +480,7 @@ models:
   - model: qwen3:8b
     ollama_tag: qwen3:8b-fp16
     revision_or_digest: 0b358e6e9d8cb39eaa4aa6b78136d09b91acb4be08c01bb707367811caed69ae
-    quant: BF16
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:A100-80"
@@ -508,7 +508,7 @@ models:
   - model: phi3.5:3.8b
     ollama_tag: phi3.5:3.8b-mini-instruct-fp16
     revision_or_digest: 4611ed13d4961f1ae0dab1b2e1c50f70777e21bdf97be507cc27312aa412d15a
-    quant: BF16
+    quant: FP16
     licence: mit
     engine: ollama
     device: "colab:A100-80"
@@ -599,7 +599,7 @@ models:
   - model: qwen3:8b
     ollama_tag: qwen3:8b-fp16
     revision_or_digest: 0b358e6e9d8cb39eaa4aa6b78136d09b91acb4be08c01bb707367811caed69ae
-    quant: BF16
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:G4"
@@ -627,7 +627,7 @@ models:
   - model: phi3.5:3.8b
     ollama_tag: phi3.5:3.8b-mini-instruct-fp16
     revision_or_digest: 4611ed13d4961f1ae0dab1b2e1c50f70777e21bdf97be507cc27312aa412d15a
-    quant: BF16
+    quant: FP16
     licence: mit
     engine: ollama
     device: "colab:G4"

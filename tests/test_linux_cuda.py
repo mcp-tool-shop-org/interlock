@@ -1849,6 +1849,94 @@ def test_fix1_gemma4_31b_real_ollama_sources_and_measured_refusal_reasons():
         )
 
 
+def test_fix2_labels_name_what_is_pulled_fp16_vs_bf16():
+    from interlock.harness.linux_cuda import LinuxCudaError, resolve_c2_sources
+
+    fill_spec = load_spec(ROOT / "experiments" / "c2-fill-card" / "spec.yaml")
+    gen_spec = load_spec(ROOT / "experiments" / "c2-generate" / "spec.yaml")
+    tput_spec = load_spec(ROOT / "experiments" / "c2-throughput" / "spec.yaml")
+
+    for spec in (fill_spec, gen_spec):
+        for entry in spec["models"]:
+            tag = str(entry.get("ollama_tag") or "")
+            if tag in ("qwen3:8b-fp16", "phi3.5:3.8b-mini-instruct-fp16"):
+                assert entry["quant"] == "FP16", (
+                    f"{entry['device']} {entry['model']} pulls {tag!r} but declares quant={entry['quant']!r}"
+                )
+            if tag in ("gemma4:31b-it-bf16", "muse-glimmer:30b-bf16"):
+                assert entry["quant"] == "BF16"
+
+    for entry in tput_spec["models"]:
+        assert entry["quant"] == "FP16"
+
+    base_linux = yaml.safe_load((ROOT / "experiments" / "c2-fill-card" / "spec.yaml").read_text(encoding="utf-8"))
+    for bad_entry, msg in (
+        (
+            {
+                "model": "qwen3:8b",
+                "ollama_tag": "qwen3:8b-fp16",
+                "revision_or_digest": "0b358e6e9d8cb39eaa4aa6b78136d09b91acb4be08c01bb707367811caed69ae",
+                "quant": "BF16",
+                "licence": "apache-2.0",
+                "engine": "ollama",
+                "device": "colab:L4",
+            },
+            "FP16",
+        ),
+        (
+            {
+                "model": "muse-glimmer:30b",
+                "ollama_tag": "muse-glimmer:30b-bf16",
+                "revision_or_digest": "318fb1b9b81696d14f4f2784b3bda2e4e633046a52fcc9fe0b94e74f889f5efe",
+                "quant": "FP16",
+                "licence": "apache-2.0",
+                "engine": "ollama",
+                "device": "colab:A100-80",
+            },
+            "BF16",
+        ),
+        (
+            {
+                "model": "BAAI/bge-base-en-v1.5",
+                "revision_or_digest": "88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2",
+                "quant": "BF16",
+                "licence": "mit",
+                "engine": "ollama",
+                "device": "colab:L4",
+                "gguf": {
+                    "repo": "CompendiumLabs/bge-base-en-v1.5-gguf",
+                    "revision": "24914efdfa9ee54e815c3fcaa78a617031251c5c",
+                    "file": "bge-base-en-v1.5-f16.gguf",
+                    "sha256": "88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2",
+                },
+            },
+            "FP16",
+        ),
+        (
+            {
+                "model": "example/model",
+                "revision_or_digest": "88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2",
+                "quant": "FP16",
+                "licence": "mit",
+                "engine": "ollama",
+                "device": "colab:L4",
+                "gguf": {
+                    "repo": "example/model-gguf",
+                    "revision": "24914efdfa9ee54e815c3fcaa78a617031251c5c",
+                    "file": "model-bf16.gguf",
+                    "sha256": "88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2",
+                },
+            },
+            "BF16",
+        ),
+    ):
+        with pytest.raises(SpecError, match=msg):
+            validate_spec({**base_linux, "models": [bad_entry]})
+        with pytest.raises(LinuxCudaError, match=msg):
+            resolve_c2_sources({"platform": "linux-cuda", "models": [bad_entry]})
+
+
+
 
 
 
