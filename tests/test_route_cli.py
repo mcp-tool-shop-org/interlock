@@ -176,3 +176,136 @@ def test_an_unknown_task_is_a_usage_error():
     with pytest.raises(SystemExit) as caught:
         main(["route", "--task", "verify"])
     assert caught.value.code == 2
+
+
+def test_table_cli_lists_colab_card_and_wildcard_and_route_cli_gates_allow_remote(tmp_path: Path, capsys):
+    rig = row("local/5090", "5090", 40)
+    colab_l4 = row("c2/l4", "colab:L4", 65)
+    colab_l4["remote_device"] = {
+        "provider": "colab",
+        "card": "L4",
+        "vram_mib": 23034,
+        "driver_version": "550.54.15",
+        "cuda_version": "12.4",
+        "pool": "us-central1-a",
+    }
+    colab_t4_fail = row("c2/t4-fail", "colab:T4", 10)
+    colab_t4_fail["model"]["repo_or_tag"] = "gemma4:31b"
+    colab_t4_fail["outcome"] = "load_refused"
+    colab_t4_fail["notes"] = "load_refused: model requires 22400 MiB VRAM, colab:T4 has 15360 MiB"
+    colab_t4_fail["settings"]["failure_reason"] = "model requires 22400 MiB VRAM, colab:T4 has 15360 MiB"
+    colab_t4_fail["artifacts"] = {"slots": []}
+    colab_t4_fail["latency"] = {"throughput": None}
+    colab_t4_fail["remote_device"] = {
+        "provider": "colab",
+        "card": "T4",
+        "vram_mib": 15360,
+        "driver_version": "550.54.15",
+        "cuda_version": "12.4",
+        "pool": "us-central1-a",
+    }
+    write_table(tmp_path, [rig, colab_l4, colab_t4_fail])
+
+    assert main(["table", "--root", str(tmp_path), "--device", "colab:L4"]) == 0
+    out_l4 = capsys.readouterr().out
+    assert "c2/l4" in out_l4
+    assert "local/5090" not in out_l4
+
+    assert main(["table", "--root", str(tmp_path), "--device", "colab:*"]) == 0
+    out_wild = capsys.readouterr().out
+    assert "c2/l4" in out_wild and "c2/t4-fail" in out_wild
+    assert "local/5090" not in out_wild
+
+    assert main(["route", "--root", str(tmp_path), "--task", "generate", "--model", "Phi", "--json"]) == 0
+    default_doc = json.loads(capsys.readouterr().out)
+    assert default_doc["device"] == "5090"
+
+    assert (
+        main(
+            [
+                "route",
+                "--root",
+                str(tmp_path),
+                "--task",
+                "generate",
+                "--model",
+                "Phi",
+                "--allow-remote",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    remote_doc = json.loads(capsys.readouterr().out)
+    assert remote_doc["device"] == "colab:L4"
+
+    assert (
+        main(
+            [
+                "route",
+                "--root",
+                str(tmp_path),
+                "--task",
+                "generate",
+                "--model",
+                "gemma4:31b",
+                "--allow-remote",
+                "--json",
+            ]
+        )
+        == 1
+    )
+    refused_doc = json.loads(capsys.readouterr().out)
+    assert refused_doc["code"] == "no_candidate"
+    assert "22400 MiB" in refused_doc["hint"]
+
+
+def test_route_help_and_docs_list_all_excluded_outcomes_and_remote_flags(capsys):
+    from interlock.router import policy
+
+    with pytest.raises(SystemExit) as caught:
+        main(["route", "--help"])
+    assert caught.value.code == 0
+    help_text = capsys.readouterr().out
+    readme_text = (ROOT / "README.md").read_text(encoding="utf-8")
+    policy_doc = policy.__doc__ or ""
+
+    for code in ("oom", "load_refused", "timeout", "ctx_exceeded"):
+        assert code in help_text
+        assert code in policy_doc
+        assert code in readme_text
+
+    for flag in ("--allow-remote", "--device"):
+        assert flag in help_text
+        assert flag in readme_text
+
+
+def test_docs_version_strings_match_pyproject_version():
+    import tomllib
+
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    version = str(pyproject["project"]["version"])
+    major_minor = ".".join(version.split(".")[:2]) + ".x"
+    assert major_minor == "0.3.x"
+
+    readme_lines = (ROOT / "README.md").read_text(encoding="utf-8").splitlines()
+    assert f"Prototype, {major_minor}:" in readme_lines[20]
+    assert "colab:<card>" in readme_lines[20]
+
+    handbook_lines = (ROOT / "site" / "src" / "content" / "docs" / "handbook" / "index.md").read_text(
+        encoding="utf-8"
+    ).splitlines()
+    assert f"version {major_minor}." in handbook_lines[11]
+    assert "colab:<card>" in handbook_lines[11]
+
+    for rel_path in (
+        "SECURITY.md",
+        "site/src/content/docs/handbook/security.md",
+        "site/src/site-config.ts",
+    ):
+        content = (ROOT / rel_path).read_text(encoding="utf-8")
+        assert major_minor in content, f"{rel_path} is missing {major_minor}"
+        assert "0.1.x" not in content, f"{rel_path} still contains stale 0.1.x"
+
+
+

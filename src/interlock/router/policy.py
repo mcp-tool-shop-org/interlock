@@ -28,10 +28,11 @@ A row dated more than 30 days before ``as_of`` is stale. A row with
 They stay eligible.
 
 Capability rows (``native_binary_rejected``, ``compile_rejected``,
-``compile_timeout``, ``hang``, ``device_lost``) are excluded, with those
-codes, and never ranked. A row with ``parity_valid`` false is excluded the
-same way, code ``parity_invalid``. When a row is both, the capability code
-is the one shown. Missing ``parity_valid`` stays eligible.
+``compile_timeout``, ``hang``, ``device_lost``, ``oom``, ``load_refused``,
+``timeout``, ``ctx_exceeded``) are excluded, with those codes, and never
+ranked. A row with ``parity_valid`` false is excluded the same way, code
+``parity_invalid``. When a row is both, the capability code is the one shown.
+Missing ``parity_valid`` stays eligible.
 
 ``thinking`` matches a family. ``off`` matches only ``off``. ``on`` matches
 any recorded thinking level. ``low``, ``medium`` and ``high`` match exactly
@@ -42,7 +43,9 @@ TTFT (``--max-ttft-ms``) is refused unless every row that would be compared
 records the same known ``settings.prefix_caching`` (``on``, ``off``, or
 ``default``). Unset means unknown, not "all the same".
 
-A remote row is a ``runpod:`` device. Its ``settings.offrig_plan`` must
+A remote row is a ``runpod:`` or ``colab:`` device. Remote ``colab:`` rows stay
+out of the pool unless the request opts in (``--allow-remote`` or
+``--device colab:<card>``). A ``runpod:`` row's ``settings.offrig_plan`` must
 include ``profile`` and ``max_hours``. ``--budget-left-usd`` drops a remote
 row whose ``settings.worst_case_usd`` is missing or greater than the flag,
 and that row is a runner-up with the reason. With no flag the suggestion is
@@ -56,12 +59,18 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
+from interlock.devices import is_colab_device, matches_device_filter
+
 EXCLUDED_OUTCOMES = (
     "native_binary_rejected",
     "compile_rejected",
     "compile_timeout",
     "hang",
     "device_lost",
+    "oom",
+    "load_refused",
+    "timeout",
+    "ctx_exceeded",
 )
 
 _KNOWN_PREFIX = frozenset({"on", "off", "default"})
@@ -86,6 +95,8 @@ class Request:
     quote_rule: int | None = None
     num_predict: int | None = None
     budget_left_usd: float | None = None
+    allow_remote: bool = False
+    device: str | None = None
 
 
 @dataclass(frozen=True)
@@ -105,12 +116,17 @@ class Refusal:
 def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
     """Return the choice, or a refusal that names the constraint and the gap."""
 
+    visible_rows = [row for row in rows if _remote_eligible(row, request)]
     excluded: list[dict] = []
+    failure_reasons: list[str] = []
     pool: list[Mapping] = []
-    for row in rows:
+    for row in visible_rows:
         outcome = row.get("outcome")
         if outcome in EXCLUDED_OUTCOMES and _task_model(row, request):
             excluded.append({"id": str(row["id"]), "code": str(outcome)})
+            measured = _measured_failure_reason(row)
+            if measured is not None:
+                failure_reasons.append(f"{row.get('device')}: {measured}")
         elif outcome in EXCLUDED_OUTCOMES:
             continue
         elif row.get("parity_valid") is False and _task_model(row, request):
@@ -122,6 +138,8 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
     excluded.sort(key=lambda item: item["id"])
 
     steps: list[tuple[str, object]] = [("task", None), ("model", None)]
+    if request.device is not None:
+        steps.append(("device", request.device))
     if request.thinking is not None:
         steps.append(("thinking", request.thinking))
     if request.ctx is not None:
@@ -146,7 +164,7 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
     for constraint, limit in steps:
         kept, dropped = _split(current, request, constraint, limit)
         if not kept:
-            return _empty(constraint, limit, dropped, excluded, request)
+            return _empty(constraint, limit, dropped, excluded, request, failure_reasons=failure_reasons)
         current = kept
 
     if request.max_ttft_ms is not None and current:
@@ -157,14 +175,14 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
     for constraint, limit in later:
         kept, dropped = _split(current, request, constraint, limit)
         if not kept:
-            return _empty(constraint, limit, dropped, excluded, request)
+            return _empty(constraint, limit, dropped, excluded, request, failure_reasons=failure_reasons)
         current = kept
 
     direction = "higher" if request.task == "generate" else "lower"
     metric = "decode_tok_s" if request.task == "generate" else "warm_latency_ms"
     ranked = [row for row in current if _rank_bound(row, request) is not None]
     if not ranked:
-        return _empty(metric, None, current, excluded, request)
+        return _empty(metric, None, current, excluded, request, failure_reasons=failure_reasons)
 
     ranked.sort(key=lambda row: _rank_key(row, request))
     winner = ranked[0]
@@ -200,7 +218,7 @@ def _document(
     if "5090" not in request.busy and not _any_5090(pool, request):
         notes.append("no 5090 row")
     remote = _is_remote(winner)
-    plan = _plan_args(winner) if remote else None
+    plan = _plan_args(winner) if _is_runpod(winner) else None
     if remote and request.budget_left_usd is None:
         notes.append("budget unchecked")
     budget = "not_applicable"
@@ -233,6 +251,11 @@ def _document(
         "notes": notes,
         "budget": budget,
     }
+    if remote:
+        document["remote"] = True
+        remote_ident = winner.get("remote_device")
+        if isinstance(remote_ident, Mapping):
+            document["remote_device"] = dict(remote_ident)
     if plan is not None:
         document["offrig_plan"] = plan
         worst = _worst_case(winner)
@@ -284,6 +307,8 @@ def _runners(pool: Sequence[Mapping], winner: Mapping, ranked: list[Mapping], re
 
 
 def _why(row: Mapping, winner: Mapping, request: Request) -> tuple[str, str]:
+    if request.device is not None and not matches_device_filter(row.get("device"), request.device):
+        return "device", f"device {row.get('device')} does not match {request.device}"
     if request.thinking is not None and not _thinking_matches(_thinking(row), request.thinking):
         return "thinking", f"thinking {_thinking(row)} does not match {request.thinking}"
     if request.ctx is not None and not _meets_ctx(row, request.ctx):
@@ -299,7 +324,7 @@ def _why(row: Mapping, winner: Mapping, request: Request) -> tuple[str, str]:
         return "num_predict", f"num_predict {_num_predict(row)} does not match {request.num_predict}"
     if row.get("device") in request.busy:
         return "busy", f"{row.get('device')} is busy"
-    if _is_remote(row) and _plan_args(row) is None:
+    if _is_runpod(row) and _plan_args(row) is None:
         return "remote_plan", "remote row has no offrig_plan profile and max_hours"
     if request.budget_left_usd is not None and _is_remote(row) and not _within_budget(row, request.budget_left_usd):
         return "budget", _budget_reason(row, request.budget_left_usd)
@@ -324,8 +349,15 @@ def _why(row: Mapping, winner: Mapping, request: Request) -> tuple[str, str]:
     return metric, f"conservative bound {mine:g} lost to {theirs:g}"
 
 
-def _empty(constraint: str, limit: object, dropped: Sequence[Mapping], excluded: list[dict],
-    request: Request) -> Refusal:
+def _empty(
+    constraint: str,
+    limit: object,
+    dropped: Sequence[Mapping],
+    excluded: list[dict],
+    request: Request,
+    *,
+    failure_reasons: Sequence[str] = (),
+) -> Refusal:
     closest_row, closest = _closest(constraint, limit, dropped)
     experiment = experiment_of(closest_row) if closest_row is not None else "unregistered"
     gap = ""
@@ -342,6 +374,8 @@ def _empty(constraint: str, limit: object, dropped: Sequence[Mapping], excluded:
     if constraint.startswith("min:") or constraint in {"decode_tok_s", "warm_latency_ms", "max_latency_ms",
         "max_ttft_ms"}:
         hint += " The bound is the conservative end of the measured spread, not the median."
+    if failure_reasons:
+        hint += " Measured failure reasons: " + "; ".join(failure_reasons) + "."
     return Refusal(
         {
             "code": "no_candidate",
@@ -471,6 +505,8 @@ def _keeps(row: Mapping, request: Request, constraint: str, limit: object) -> bo
         return row.get("task") == request.task
     if constraint == "model":
         return _model_matches(row, request.model)
+    if constraint == "device":
+        return matches_device_filter(row.get("device"), str(limit))
     if constraint == "thinking":
         return _thinking_matches(_thinking(row), str(limit))
     if constraint == "ctx":
@@ -482,7 +518,7 @@ def _keeps(row: Mapping, request: Request, constraint: str, limit: object) -> bo
     if constraint == "busy":
         return row.get("device") not in request.busy
     if constraint == "remote_plan":
-        return not _is_remote(row) or _plan_args(row) is not None
+        return not _is_runpod(row) or _plan_args(row) is not None
     if constraint == "budget":
         if not _is_remote(row):
             return True
@@ -751,8 +787,32 @@ def _meets_ctx(row: Mapping, needed: int) -> bool:
     return False
 
 
-def _is_remote(row: Mapping) -> bool:
+def _is_runpod(row: Mapping) -> bool:
     return str(row.get("device", "")).startswith("runpod:")
+
+
+def _is_remote(row: Mapping) -> bool:
+    return _is_runpod(row) or is_colab_device(row.get("device"))
+
+
+def _remote_eligible(row: Mapping, request: Request) -> bool:
+    if not is_colab_device(row.get("device")):
+        return True
+    if request.allow_remote:
+        return True
+    return request.device is not None and request.device.startswith("colab:")
+
+
+def _measured_failure_reason(row: Mapping) -> str | None:
+    settings = row.get("settings")
+    if isinstance(settings, Mapping):
+        reason = settings.get("failure_reason")
+        if isinstance(reason, str) and reason.strip():
+            return reason.strip()
+    notes = row.get("notes")
+    if isinstance(notes, str) and notes.strip():
+        return notes.strip()
+    return None
 
 
 def _worst_case(row: Mapping) -> float | None:

@@ -256,3 +256,155 @@ def test_a_bare_host_port_is_a_known_limit_until_host_port_is_set():
 
 def test_committed_receipts_pass_the_host_port_check():
     assert check_tree(ROOT, host_port=True) == []
+
+
+def _remote_row(**overrides):
+    card = overrides.pop("card", "A100-40")
+    remote_device = overrides.pop(
+        "remote_device",
+        {
+            "provider": "colab",
+            "card": card,
+            "vram_mib": 40960,
+            "driver_version": "550.54.15",
+            "cuda_version": "12.4",
+            "pool": "us-central1-a",
+        },
+    )
+    base = row(
+        id=f"C2-GENERATE/qwen3:8b/colab-{card}",
+        task="generate",
+        engine={"name": "ollama", "version": "0.35.1"},
+        device=f"colab:{card}",
+        remote_device=remote_device,
+        provenance={"experiment_spec": "experiments/c2-generate/spec.yaml", "run_id": "c2-win-1"},
+    )
+    base.update(overrides)
+    return base
+
+
+def test_remote_colab_rows_and_failure_outcomes_validate():
+    for card in ("A100-40", "A100-80", "L4", "T4", "G4"):
+        valid = _remote_row(card=card)
+        validate_row(valid)
+
+    for outcome, note in (
+        ("oom", "oom: CUDA out of memory at num_ctx 32768 (peak 15320 MiB / 15360 MiB)"),
+        ("load_refused", "load_refused: model requires 32000 MiB, colab:T4 has 15360 MiB"),
+        ("timeout", "timeout: request exceeded 120s deadline at concurrency 8"),
+        ("ctx_exceeded", "ctx_exceeded: num_ctx 65536 exceeds max_resident_ctx 16384"),
+    ):
+        failed = _remote_row(
+            card="T4",
+            outcome=outcome,
+            notes=note,
+            quality=[],
+            latency={
+                "cold_ms": None,
+                "warm_p50_ms": None,
+                "warm_p95_ms": None,
+                "throughput": None,
+                "throughput_unit": None,
+                "compile_ms": None,
+            },
+        )
+        validate_row(failed)
+
+
+def test_remote_row_refuses_missing_identity_mismatched_card_rig_mixing_or_unhashed_account():
+    unhashed_rig_setting = row(
+        settings={**row()["settings"], "account_id": "raw_account_handle", "tags": [{"user_id": "u1"}]}
+    )
+    with pytest.raises(ReceiptError, match="unhashed account id"):
+        validate_row(unhashed_rig_setting)
+
+    mixed_rig = row(
+        device="5090",
+        engine={"name": "ollama", "version": "0.35.1"},
+        remote_device={
+            "provider": "colab",
+            "card": "A100-40",
+            "vram_mib": 40960,
+            "driver_version": "550.54.15",
+            "cuda_version": "12.4",
+            "pool": "us-central1-a",
+        },
+    )
+    with pytest.raises(ReceiptError, match="never pooled"):
+        validate_row(mixed_rig)
+
+    missing = _remote_row()
+    del missing["remote_device"]
+    with pytest.raises(ReceiptError, match="remote_device"):
+        validate_row(missing)
+
+    mismatched = _remote_row(
+        card="A100-40",
+        remote_device={
+            "provider": "colab",
+            "card": "T4",
+            "vram_mib": 15360,
+            "driver_version": "550.54.15",
+            "cuda_version": "12.4",
+            "pool": "us-central1-a",
+        },
+    )
+    with pytest.raises(ReceiptError, match="does not match"):
+        validate_row(mismatched)
+
+    unhashed_pool = _remote_row(
+        remote_device={
+            "provider": "colab",
+            "card": "A100-40",
+            "vram_mib": 40960,
+            "driver_version": "550.54.15",
+            "cuda_version": "12.4",
+            "pool": "researcher@example.com",
+        }
+    )
+    with pytest.raises(ReceiptError, match="unhashed account id"):
+        validate_row(unhashed_pool)
+
+    unhashed_setting = _remote_row(
+        settings={**row()["settings"], "account_id": "raw_account_handle", "tags": [{"user_id": "u1"}]}
+    )
+    with pytest.raises(ReceiptError, match="unhashed account id"):
+        validate_row(unhashed_setting)
+
+    hashed_setting = _remote_row(
+        settings={**row()["settings"], "account_id": "sha256:" + ("b" * 64), "tags": [{"note": "ok"}]}
+    )
+    validate_row(hashed_setting)
+
+
+def test_validate_row_refuses_unhashed_account_in_any_remote_device_field_or_gguf_repo():
+    for field_name in ("provider", "card", "vram_mib", "driver_version", "cuda_version", "pool"):
+        for planted in (
+            "researcher@example.com",
+            "org/model-repo",
+            "user:alice",
+            "github:octocat",
+            "/" + "home/" + "researcher",
+            "C:" + "\\Users\\" + "researcher",
+        ):
+            bad_remote = {
+                "provider": "colab",
+                "card": "A100-40",
+                "vram_mib": 40960,
+                "driver_version": "550.54.15",
+                "cuda_version": "12.4",
+                "pool": "us-central1-a",
+            }
+            bad_remote[field_name] = planted
+            candidate = _remote_row(remote_device=bad_remote)
+            with pytest.raises(ReceiptError, match="unhashed account id"):
+                validate_row(candidate)
+
+    for gguf_key in ("ggufRepo", "gguf_repo", "gguf_source"):
+        unhashed_gguf = _remote_row(settings={**row()["settings"], gguf_key: "owner/role-set-gguf"})
+        with pytest.raises(ReceiptError, match="unhashed account id"):
+            validate_row(unhashed_gguf)
+        hashed_gguf = _remote_row(settings={**row()["settings"], gguf_key: "sha256:" + ("c" * 64)})
+        validate_row(hashed_gguf)
+
+

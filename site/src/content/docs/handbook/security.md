@@ -5,7 +5,7 @@ sidebar:
   order: 6
 ---
 
-interlock 0.x is a prototype. What it touches depends on the command. There is no telemetry.
+interlock 0.3.x is a prototype. What it touches depends on the command. There is no telemetry.
 
 ## By command
 

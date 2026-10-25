@@ -4,6 +4,14 @@
 
 - `CONTRIBUTORS.md` credits the AI seats that wrote the code: Grok ("Written with Grok", xAI), Kimi and Claude. The README links it.
 
+## [0.3.0] - 2026-10-24
+
+### Added
+
+- Remote Colab device identity (`colab:A100-40`, `colab:A100-80`, `colab:L4`, `colab:T4`, `colab:G4`) in `routing-row.schema.json`, `devices.py`, and `receipt.py`, recording `provider`, `card`, `vram_mib`, numeric `driver_version` and `cuda_version`, and a zone `pool` string while refusing unhashed account identifiers across every string field of `remote_device` and `ggufRepo`/`gguf_source`, and keeping remote rows separate from rig rows.
+- Linux CUDA measuring path (`src/interlock/harness/linux_cuda.py`) wired into `interlock run` (`--dry-run` and live `run_spec` for `platform: linux-cuda`): reads residency from `/api/ps` and VRAM/driver/CUDA from NVML or `nvidia-smi --query-gpu` with card-VRAM range checks and no Windows counters, records `engine_version` from `/api/version` (or `unrecorded` on pre-server failure), records failed shapes (`oom`, `load_refused`, `timeout`, `ctx_exceeded`) as capability rows, and provides the `fill-card` (with 2048-token grid bisection), `generate-ladder` (512..32k at concurrencies 1, 4, 8), and `batch-ladder` (`embed`/`rerank`/`nli` at batches 1, 8, 32) specs under `experiments/c2-fill-card/`, `experiments/c2-generate/`, and `experiments/c2-throughput/`.
+- Remote window receipt importer (`src/interlock/importers/remote.py`, `interlock import --remote-window <path>`) preserving every repeat slot in `artifacts.slots`, `interlock table --device colab:<card>` (and `colab:*`), and opt-in remote routing (`interlock route --allow-remote` / `--device colab:<card>`) that filters remote rows before the outcome loop on rig requests, marks remote winners with `remote: true` and `remote_device`, and names measured failure reasons on refusal.
+
 ## [0.2.0] - 2026-10-14
 
 - `--trace relay|events`: an opt-in **debug** tracer for interlock runs, built on NeMo Relay 0.10.1 (optional `relay` extra; the base install imports nothing from Relay). Every adapter request is counted, the card guard's included; spans close per slot; prompts are blanked, and only one Relay sink may be live in a process. A traced run is debug-only: its rows are marked descriptive and never reach `table/routing.jsonl`, and a name whose traced run left a trace without a receipt is refused. Tracing is never for counted runs: the pre-registered stage 1 trial (rnd `experiments/interlock-relay/`) measured about 0.27-0.34 ms of client time per traced call on a cold CPU, over its 0.5 ms per-slot budget. With `--trace off`, speed fields and routes are unchanged; untraced 5090 runs now count the card guard's request and the companion's stop in `artifacts`, which shifts call ids by one.

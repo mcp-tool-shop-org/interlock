@@ -11,7 +11,7 @@ export const config: SiteConfig = {
     'MIT Licensed — built by <a href="https://mcp-tool-shop.github.io/" style="color:var(--color-muted);text-decoration:underline">MCP Tool Shop</a>',
 
   hero: {
-    badge: 'Prototype 0.x',
+    badge: 'Prototype 0.3.x',
     headline: 'interlock',
     headlineAccent: 'local AI device router.',
     description:

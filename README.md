@@ -18,7 +18,7 @@
 
 # interlock: local AI device router
 
-> **Prototype, 0.x: a research instrument.** The CLI, the receipt format and the experiment specs can change without notice between 0.x releases. interlock is advisory only: it suggests a model, engine and device, and it never serves traffic. Every number in it was measured on one rig (Intel Core Ultra 9 285K with its NPU and iGPU, plus an RTX 5090). Treat its routes as that rig's evidence, not a general benchmark.
+> **Prototype, 0.3.x: a research instrument.** The CLI, the receipt format and the experiment specs can change without notice between 0.x releases. interlock is advisory only: it suggests a model, engine and device, and it never serves traffic. Every local number in it was measured on one rig (Intel Core Ultra 9 285K with its NPU and iGPU, plus an RTX 5090), and remote `colab:<card>` rows live in their own separate evidence pool with full card identity (`provider`, `card`, `vram_mib`, `driver_version`, `cuda_version`, `pool`). Treat its routes as measured evidence for that specific hardware pool, not a general benchmark.
 
 Railway interlocking stops a train being routed into a conflicting path. This tool does that for devices: it sends each job to a model, an engine and a device.
 
@@ -73,8 +73,11 @@ Every device is named.
 | `iGPU` | The Intel GPU. A live enumeration must say vendor `0x8086` and device type `INTEGRATED`. The full name is recorded, not the decision |
 | `CPU` | The same processor's CPU |
 | `5090` | The RTX 5090, reached only through Ollama at `127.0.0.1:11434` |
+| `colab:<card>` | Remote Colab CUDA cards (`A100-40`, `A100-80`, `L4`, `T4`, `G4`), measured on Linux via NVML or `nvidia-smi` |
 
 `GPU.1` is the 5090 as OpenVINO sees it on this rig. The resolver refuses that index even if the name or the vendor changes, refuses a bare `GPU`, refuses `AUTO`, `HETERO` and `MULTI`, and refuses a GPU that is not vendor `0x8086` and `INTEGRATED`. A list with neither device property still requires the full name to contain "Intel". A missing device is an error. interlock does not fall off onto a weaker one.
+
+Remote rows carry `remote_device` identity (`provider: "colab"`, `card`, `vram_mib`, `driver_version`, `cuda_version`, and a zone `pool` string—never an account id). Remote rows are kept apart from local rig rows and are never pooled into the rig pool. `interlock table --device colab:<card>` (or `colab:*`) lists remote rows, and `interlock route` considers remote cards only when opted in (`--allow-remote` or `--device colab:<card>`). Failed remote shapes (`oom`, `load_refused`, `timeout`, `ctx_exceeded`) are recorded as capability rows with their measured reason rather than skipped.
 
 The NPU is exclusive. A 5090 step runs only inside a Publisher grant. The runner records that grant. CPU-heavy legs wait for a window the Publisher announces.
 
@@ -132,13 +135,13 @@ The build brief and the four feedback notes it names are snapshotted in `docs/ha
 interlock route --task generate --model Phi --thinking off --ctx 1024 --busy 5090
 ```
 
-`--model` matches a substring of the repo or tag. Hyphens and colons are ignored, so `Qwen3-8B` matches `qwen3:8b`. A short substring can match an unintended repo. The matched model is printed. `--thinking off` matches only `off`. `--thinking on` matches any recorded thinking level, and the decision keeps that level, so an OpenVINO `low` arm stays `low`. `low`, `medium` and `high` match exactly when the request names one. `--min-tok-s` is the floor on the minimum repeat-slot decode rate. A refusal names that floor `min_tok_s`. `--budget-left-usd` is an input, like `--busy`. A remote row whose worst case exceeds it is a runner-up. With no flag, a remote suggestion is marked budget unchecked. `--as-of` defaults to today. The policy itself does not read the clock.
+`--model` matches a substring of the repo or tag. Hyphens and colons are ignored, so `Qwen3-8B` matches `qwen3:8b`. A short substring can match an unintended repo. The matched model is printed. `--thinking off` matches only `off`. `--thinking on` matches any recorded thinking level, and the decision keeps that level, so an OpenVINO `low` arm stays `low`. `low`, `medium` and `high` match exactly when the request names one. `--min-tok-s` is the floor on the minimum repeat-slot decode rate. A refusal names that floor `min_tok_s`. `--budget-left-usd` is an input, like `--busy`. A remote row whose worst case exceeds it is a runner-up. With no flag, a remote suggestion is marked budget unchecked. `--allow-remote` allows remote `colab:<card>` rows into the candidate pool (default off), and `--device` filters by an exact device (`colab:L4`, `5090`) or provider wildcard (`colab:*`). `--as-of` defaults to today. The policy itself does not read the clock.
 
 Generate ranks by the lowest repeat-slot decode tok/s. Every other task ranks by the highest repeat-slot latency, or by the maximum claim-wall when the row has no repeat slots. The margin is the gap between those conservative bounds, never a median. Ties leave the 5090 free. A row older than 30 days is stale. A row marked provisional, or with fewer than two repeats, is provisional. Both stay eligible and are flagged.
 
-`native_binary_rejected`, `compile_rejected`, `compile_timeout`, `hang`, `device_lost` and a row with `parity_valid` false (`parity_invalid`) are listed under excluded, with those codes. They are not candidates. A capability outcome is the code shown when the row is also parity-invalid. When no row meets the constraints the command exits 1 and names the constraint that emptied the set. It does not fall back. `--json` prints a document valid against `src/interlock/schema/route-decision.v1.json`. `--max-ttft-ms` refuses unless every compared row records the same `settings.prefix_caching` (`on`, `off`, or `default`). Unset means unknown.
+`native_binary_rejected`, `compile_rejected`, `compile_timeout`, `hang`, `device_lost`, `oom`, `load_refused`, `timeout`, `ctx_exceeded` and a row with `parity_valid` false (`parity_invalid`) are listed under excluded, with those codes. They are not candidates. Remote rows are filtered out before the outcome loop unless the request opts in (`--allow-remote` or `--device colab:...`), so they never appear in a rig-only request's excluded list or refusal reason. A capability outcome is the code shown when the row is also parity-invalid. When no row meets the constraints the command exits 1 and names the constraint that emptied the set. It does not fall back. `--json` prints a document valid against `src/interlock/schema/route-decision.v1.json` (marking remote winners with `remote: true` and `remote_device`). `--max-ttft-ms` refuses unless every compared row records the same `settings.prefix_caching` (`on`, `off`, or `default`). Unset means unknown.
 
-A remote suggestion includes an `offrig_plan` object. interlock does not call `offrig_plan` or `offrig_launch`, and it does not spend. See `docs/offrig-integration.md`.
+A remote suggestion includes an `offrig_plan` object when backed by a RunPod offer, or `remote: true` and `remote_device` when backed by a `colab:<card>` row. interlock does not call `offrig_plan` or `offrig_launch`, and it does not spend. See `docs/offrig-integration.md`.
 
 ## Run an experiment
 
@@ -149,7 +152,7 @@ interlock run experiments/e4/spec.yaml --dry-run
 interlock run experiments/e4/spec.yaml --grant "<grant text>" --npu-session "<session>"
 ```
 
-`--dry-run` prints the plan and the guards a real run would need, and starts nothing. A real run needs the flags its devices call for: `--grant` for the 5090, `--npu-session` for the NPU or iGPU, and `--cpu-window` for a CPU-heavy leg. It writes one receipt under `receipts/`. `interlock import` then rebuilds `table/` from the committed receipts, and `interlock check` validates them.
+`--dry-run` prints the plan and the guards a real run would need, and starts nothing. A real run needs the flags its devices call for: `--grant` for the 5090, `--npu-session` for the NPU or iGPU, and `--cpu-window` for a CPU-heavy leg. It writes one receipt under `receipts/`. `interlock import` (with optional `--remote-window <path>` for remote Colab window JSON receipts) then rebuilds `table/` from the committed receipts, and `interlock check` validates them.
 
 ## When Ollama hangs
 

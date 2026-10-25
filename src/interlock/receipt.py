@@ -91,9 +91,12 @@ def validator() -> Draft202012Validator:
 
 
 def validate_row(row: dict, *, host_port: bool = False) -> None:
+    if isinstance(row, dict) and ("remote_device" in row or str(row.get("device", "")).startswith("colab:")):
+        _check_remote_device(row)
     errors = sorted(validator().iter_errors(row), key=lambda item: list(item.path))
     if errors:
         raise ReceiptError(_format_error(errors[0]))
+    _check_remote_device(row)
     _reject_home_paths(row, host_port=host_port)
     for metric in row["quality"]:
         _check_interval(row, metric)
@@ -178,7 +181,8 @@ _TIMING = (
     "first_call_ms",
     "compile_warm_reload_ms",
 )
-_UNTIMED = frozenset({"device_lost", "hang", "compile_rejected", "compile_timeout"})
+_REMOTE_FAILURES = frozenset({"oom", "load_refused", "timeout", "ctx_exceeded"})
+_UNTIMED = frozenset({"device_lost", "hang", "compile_rejected", "compile_timeout"} | _REMOTE_FAILURES)
 # The compile finished and the device refused the native binary at execute.
 # Such a row keeps the compile time and nothing else.
 _COMPILE_ONLY = frozenset({"native_binary_rejected"})
@@ -337,3 +341,55 @@ def _check_residency(row: dict) -> None:
 def _format_error(error: ValidationError) -> str:
     location = "/".join(str(part) for part in error.path) or "$"
     return f"{location}: {error.message}"
+
+
+_ACCOUNT_KEY = re.compile(
+    r"^(?:account|account_id|user|user_id|owner|owner_id|ggufrepo|gguf_repo|gguf_source)$",
+    re.IGNORECASE,
+)
+_HASHED_ACCOUNT = re.compile(r"^sha256:[0-9a-f]{64}$")
+
+
+def _check_remote_device(row: dict) -> None:
+    from interlock.devices import (
+        DeviceRefused,
+        RemoteDeviceIdentity,
+        is_colab_device,
+        is_rig_device,
+    )
+
+    _reject_unhashed_account_fields(row, row["id"])
+    device = row.get("device")
+    remote_raw = row.get("remote_device")
+    if is_rig_device(device):
+        if remote_raw is not None:
+            raise ReceiptError(
+                f"{row['id']}: remote rows are never pooled with rig rows ({device} cannot carry remote_device)"
+            )
+        return
+    if is_colab_device(device):
+        if not isinstance(remote_raw, dict):
+            raise ReceiptError(f"{row['id']}: colab device {device} requires remote_device identity")
+        try:
+            identity = RemoteDeviceIdentity.from_dict(remote_raw)
+        except DeviceRefused as exc:
+            raise ReceiptError(f"{row['id']}: {exc}") from exc
+        if identity.logical_device != device:
+            raise ReceiptError(
+                f"{row['id']}: remote_device {identity.logical_device!r} does not match device {device!r}"
+            )
+
+
+def _reject_unhashed_account_fields(value: object, row_id: str, where: str = "$") -> None:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if _ACCOUNT_KEY.fullmatch(str(key)):
+                if not isinstance(item, str) or not _HASHED_ACCOUNT.fullmatch(item):
+                    raise ReceiptError(
+                        f"{row_id}: unhashed account id in {where}.{key}; hash with sha256:<64-hex> or omit"
+                    )
+            _reject_unhashed_account_fields(item, row_id, f"{where}.{key}")
+    elif isinstance(value, list):
+        for idx, item in enumerate(value):
+            _reject_unhashed_account_fields(item, row_id, f"{where}[{idx}]")
+

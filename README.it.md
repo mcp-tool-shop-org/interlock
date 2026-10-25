@@ -18,7 +18,7 @@
 
 # interlock: router per dispositivi AI locali
 
-> **Prototipo, 0.x: uno strumento di ricerca.** La CLI, il formato della ricevuta e le specifiche dell'esperimento possono cambiare senza preavviso tra le versioni 0.x. interlock è solo a scopo informativo: suggerisce un modello, un motore e un dispositivo, ma non gestisce il traffico. Ogni valore in esso è stato misurato su un'unica configurazione (Intel Core Ultra 9 285K con la sua NPU e iGPU, più una RTX 5090). Considera i suoi risultati come dati relativi a tale configurazione, non come un benchmark generale.
+> **Prototipo, 0.3.x: uno strumento di ricerca.** La CLI, il formato della ricevuta e le specifiche dell'esperimento possono cambiare senza preavviso tra le versioni 0.x. interlock è solo a scopo informativo: suggerisce un modello, un motore e un dispositivo, ma non gestisce il traffico. Ogni valore in esso è stato misurato su un'unica configurazione (Intel Core Ultra 9 285K con la sua NPU e iGPU, più una RTX 5090). Considera i suoi risultati come dati relativi a tale configurazione, non come un benchmark generale.
 
 L'interblocco ferroviario impedisce che un treno venga deviato su un percorso in conflitto. Questo strumento fa lo stesso per i dispositivi: invia ogni attività a un modello, un motore e un dispositivo.
 

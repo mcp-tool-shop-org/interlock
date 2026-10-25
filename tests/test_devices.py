@@ -161,3 +161,256 @@ def test_two_vendor_igpus_are_not_guessed():
         resolve_device("iGPU", [first, second])
     named = resolve_device("GPU.2", [first, second])
     assert named.ov_id == "GPU.2"
+
+
+def test_remote_colab_cards_and_identity_validation():
+    from interlock.devices import (
+        COLAB_CARDS,
+        REMOTE_DEVICES,
+        REMOTE_PROVIDERS,
+        RemoteDeviceIdentity,
+        parse_remote_device,
+    )
+
+    assert REMOTE_PROVIDERS == ("colab",)
+    assert COLAB_CARDS == ("A100-40", "A100-80", "L4", "T4", "G4")
+    assert REMOTE_DEVICES == (
+        "colab:A100-40",
+        "colab:A100-80",
+        "colab:L4",
+        "colab:T4",
+        "colab:G4",
+    )
+    for card in COLAB_CARDS:
+        ident = RemoteDeviceIdentity(
+            provider="colab",
+            card=card,
+            vram_mib=40960,
+            driver_version="550.54.15",
+            cuda_version="12.4",
+            pool="us-central1-a",
+        )
+        assert ident.logical_device == f"colab:{card}"
+        assert RemoteDeviceIdentity.from_dict(ident.to_dict()) == ident
+        assert parse_remote_device(f"colab:{card}") == ("colab", card)
+
+    with pytest.raises(DeviceRefused, match="provider"):
+        RemoteDeviceIdentity(
+            provider="aws",
+            card="A100-40",
+            vram_mib=40960,
+            driver_version="550.54.15",
+            cuda_version="12.4",
+            pool="us-central1-a",
+        )
+    with pytest.raises(DeviceRefused, match="card"):
+        RemoteDeviceIdentity(
+            provider="colab",
+            card="H100",
+            vram_mib=81920,
+            driver_version="550.54.15",
+            cuda_version="12.4",
+            pool="us-central1-a",
+        )
+    with pytest.raises(DeviceRefused, match="vram_mib"):
+        RemoteDeviceIdentity(
+            provider="colab",
+            card="T4",
+            vram_mib=0,
+            driver_version="550.54.15",
+            cuda_version="12.4",
+            pool="us-central1-a",
+        )
+    with pytest.raises(DeviceRefused, match="driver_version"):
+        RemoteDeviceIdentity(
+            provider="colab",
+            card="T4",
+            vram_mib=15360,
+            driver_version="",
+            cuda_version="12.4",
+            pool="us-central1-a",
+        )
+    with pytest.raises(DeviceRefused, match="cuda_version"):
+        RemoteDeviceIdentity(
+            provider="colab",
+            card="T4",
+            vram_mib=15360,
+            driver_version="550.54.15",
+            cuda_version="",
+            pool="us-central1-a",
+        )
+    with pytest.raises(DeviceRefused, match="pool"):
+        RemoteDeviceIdentity.from_dict({"provider": "colab"})
+    with pytest.raises(DeviceRefused, match="mapping"):
+        RemoteDeviceIdentity.from_dict("not-a-dict")  # type: ignore[arg-type]
+    with pytest.raises(DeviceRefused, match="unhashed account id"):
+        RemoteDeviceIdentity.from_dict(
+            {
+                "provider": "colab",
+                "card": "T4",
+                "vram_mib": 15360,
+                "driver_version": "550.54.15",
+                "cuda_version": "12.4",
+                "pool": "us-central1-a",
+                "account_id": "raw_acct",
+            }
+        )
+    with pytest.raises(DeviceRefused, match="unexpected fields"):
+        RemoteDeviceIdentity.from_dict(
+            {
+                "provider": "colab",
+                "card": "T4",
+                "vram_mib": 15360,
+                "driver_version": "550.54.15",
+                "cuda_version": "12.4",
+                "pool": "us-central1-a",
+                "extra_field": 1,
+            }
+        )
+    with pytest.raises(DeviceRefused, match="not a remote device"):
+        parse_remote_device("5090")
+    with pytest.raises(DeviceRefused, match="unsupported remote provider"):
+        parse_remote_device("aws:A100-40")
+    with pytest.raises(DeviceRefused, match="unsupported colab card"):
+        parse_remote_device("colab:H100")
+    with pytest.raises(DeviceRefused, match="non-empty zone"):
+        RemoteDeviceIdentity(
+            provider="colab",
+            card="T4",
+            vram_mib=15360,
+            driver_version="550.54.15",
+            cuda_version="12.4",
+            pool="",
+        )
+
+
+def test_remote_device_refuses_unhashed_account_in_pool():
+    from interlock.devices import RemoteDeviceIdentity, validate_remote_pool
+
+    assert validate_remote_pool("us-central1-a") == "us-central1-a"
+    assert validate_remote_pool("europe-west4-b") == "europe-west4-b"
+    hashed = "sha256:" + ("a" * 64)
+    assert validate_remote_pool(hashed) == hashed
+
+    for bad_pool in (
+        "researcher@example.com",
+        "account:researcher-01",
+        "user:demo_acct",
+        "uid_998877",
+        "/" + "home/" + "researcher",
+        "C:" + "\\Users\\" + "researcher",
+    ):
+        with pytest.raises(DeviceRefused, match="unhashed account id"):
+            RemoteDeviceIdentity(
+                provider="colab",
+                card="L4",
+                vram_mib=23034,
+                driver_version="550.54.15",
+                cuda_version="12.4",
+                pool=bad_pool,
+            )
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    ["provider", "card", "vram_mib", "driver_version", "cuda_version", "pool"],
+)
+@pytest.mark.parametrize(
+    "account_input",
+    [
+        "researcher@example.com",
+        "org/model-repo",
+        "github-owner/gguf-weights",
+        "github:octocat",
+        "user:alice",
+        "account:bob",
+        "hf:org_handle",
+        "/" + "home/" + "researcher",
+        "C:" + "\\Users\\" + "researcher",
+    ],
+)
+def test_remote_device_refuses_unhashed_account_across_all_six_fields(field_name, account_input):
+    from interlock.devices import RemoteDeviceIdentity
+
+    payload = {
+        "provider": "colab",
+        "card": "L4",
+        "vram_mib": 23034,
+        "driver_version": "550.54.15",
+        "cuda_version": "12.4",
+        "pool": "us-central1-a",
+    }
+    payload[field_name] = account_input
+    with pytest.raises(DeviceRefused, match="unhashed account id"):
+        RemoteDeviceIdentity.from_dict(payload)
+
+
+def test_remote_device_requires_numeric_driver_and_cuda_versions():
+    from interlock.devices import RemoteDeviceIdentity
+
+    for bad_version in ("r550-beta", "latest", "550", "12", "v12.4", "12.4.1-rc1"):
+        with pytest.raises(DeviceRefused, match="numeric version"):
+            RemoteDeviceIdentity(
+                provider="colab",
+                card="L4",
+                vram_mib=23034,
+                driver_version=bad_version,
+                cuda_version="12.4",
+                pool="us-central1-a",
+            )
+        with pytest.raises(DeviceRefused, match="numeric version"):
+            RemoteDeviceIdentity(
+                provider="colab",
+                card="L4",
+                vram_mib=23034,
+                driver_version="550.54.15",
+                cuda_version=bad_version,
+                pool="us-central1-a",
+            )
+
+
+
+def test_remote_and_rig_rows_stay_in_separate_pools():
+    from interlock.devices import (
+        RIG_DEVICES,
+        assert_single_pool,
+        device_pool_kind,
+        is_colab_device,
+        is_remote_device,
+        is_rig_device,
+        matches_device_filter,
+        partition_rows_by_pool,
+    )
+
+    for rig in RIG_DEVICES:
+        assert is_rig_device(rig) is True
+        assert is_remote_device(rig) is False
+        assert is_colab_device(rig) is False
+        assert device_pool_kind(rig) == "rig"
+
+    assert is_rig_device("colab:A100-40") is False
+    assert is_remote_device("colab:A100-40") is True
+    assert is_colab_device("colab:A100-40") is True
+    assert device_pool_kind("colab:A100-40") == "remote"
+    assert matches_device_filter("colab:A100-40", "colab:*") is True
+    assert matches_device_filter("colab:T4", "colab:T4") is True
+    assert matches_device_filter("5090", "colab:*") is False
+    assert matches_device_filter("5090", None) is True
+    assert matches_device_filter(None, "colab:*") is False
+    assert is_remote_device(None) is False
+    with pytest.raises(DeviceRefused, match="unknown device pool"):
+        device_pool_kind("unknown:card")
+
+    with pytest.raises(DeviceRefused):
+        resolve_device("colab:A100-40", PRESENT)
+
+    rig_row = {"id": "r1", "device": "5090"}
+    remote_row = {"id": "c1", "device": "colab:A100-40"}
+    pools = partition_rows_by_pool([rig_row, remote_row])
+    assert pools["rig"] == [rig_row]
+    assert pools["remote"] == [remote_row]
+    assert assert_single_pool([rig_row]) == "rig"
+    assert assert_single_pool([remote_row]) == "remote"
+    with pytest.raises(DeviceRefused, match="never pooled"):
+        assert_single_pool([rig_row, remote_row])
+

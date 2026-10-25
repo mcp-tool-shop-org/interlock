@@ -679,3 +679,182 @@ def test_the_policy_does_not_read_the_clock_or_a_file():
     assert "date.today" not in text
     assert "datetime.now" not in text
     assert "open(" not in text
+
+
+def _colab_measured(
+    row_id: str,
+    card: str,
+    *,
+    throughput: float = 60.0,
+    latency: float = 90.0,
+    repo: str = "acme/Phi-test",
+    num_ctx: int | None = 4096,
+    outcome: str | None = None,
+    failure_reason: str | None = None,
+    max_resident_ctx: int | None = None,
+) -> dict:
+    row = measured(
+        row_id,
+        f"colab:{card}",
+        throughput=throughput,
+        latency=latency,
+        repo=repo,
+        num_ctx=num_ctx,
+        outcome=outcome,
+        spec="experiments/c2-generate/spec.yaml",
+    )
+    row["engine"] = {"name": "ollama", "version": "0.35.1"}
+    row["remote_device"] = {
+        "provider": "colab",
+        "card": card,
+        "vram_mib": 40960 if "A100" in card else (23034 if card == "L4" else 15360),
+        "driver_version": "550.54.15",
+        "cuda_version": "12.4",
+        "pool": "us-central1-a",
+    }
+    if max_resident_ctx is not None:
+        row["settings"]["max_resident_ctx"] = max_resident_ctx
+    if outcome is not None:
+        row["artifacts"] = {"slots": []}
+        row["latency"] = {"throughput": None}
+        if failure_reason:
+            row["settings"]["failure_class"] = outcome
+            row["settings"]["failure_reason"] = failure_reason
+            row["notes"] = f"{outcome}: {failure_reason}"
+    return row
+
+
+def test_default_request_never_picks_a_colab_remote_card():
+    remote_fast = _colab_measured("c2/a100", "A100-40", throughput=140.0)
+    local_rig = measured("local/5090", "5090", throughput=45.0)
+
+    default_choice = decide([remote_fast, local_rig], ask())
+    assert isinstance(default_choice, Decision)
+    assert default_choice.document["device"] == "5090"
+
+
+def test_rig_request_decision_and_refusal_are_identical_with_or_without_remote_rows():
+    rig_rows = [
+        measured("rig/cpu", "CPU", throughput=18.0, repo="phi:mini"),
+        measured("rig/5090", "5090", throughput=95.0, repo="phi:mini"),
+        measured("rig/npu-hang", "NPU", outcome="hang", throughput=999.0, repo="phi:mini"),
+    ]
+    remote_rows = [
+        _colab_measured("c2/a100-phi", "A100-40", throughput=220.0, repo="phi:mini"),
+        _colab_measured(
+            "c2/t4-phi-oom",
+            "T4",
+            repo="phi:mini",
+            outcome="oom",
+            failure_reason="CUDA out of memory on T4",
+        ),
+        _colab_measured("c2/a100-remote-only", "A100-80", throughput=110.0, repo="muse-glimmer:30b"),
+        _colab_measured(
+            "c2/l4-remote-only-refused",
+            "L4",
+            repo="muse-glimmer:30b",
+            outcome="load_refused",
+            failure_reason="model requires 32000 MiB VRAM, colab:L4 has 23034 MiB",
+        ),
+    ]
+    combined = rig_rows + remote_rows
+
+    # 1. Winning rig decision with remote speed & failure rows in the table:
+    req_win = Request("generate", AS_OF, model="phi:mini")
+    dec_with_remote = decide(combined, req_win)
+    dec_rig_only = decide(rig_rows, req_win)
+    assert isinstance(dec_with_remote, Decision)
+    assert dec_with_remote.document == dec_rig_only.document
+
+    # 2. Refused rig request on min_metrics floor with remote failure rows in the table:
+    req_floor = Request("generate", AS_OF, model="phi:mini", min_metrics={"tok-s": 500.0})
+    ref_with_remote = decide(combined, req_floor)
+    ref_rig_only = decide(rig_rows, req_floor)
+    assert isinstance(ref_with_remote, Refusal)
+    assert ref_with_remote.document == ref_rig_only.document
+
+    # 3. Rig request for a remote-only model must refuse on constraint "model", identical to rig_rows alone:
+    req_remote_only_model = Request("generate", AS_OF, model="muse-glimmer:30b")
+    ref_model_with_remote = decide(combined, req_remote_only_model)
+    ref_model_rig_only = decide(rig_rows, req_remote_only_model)
+    assert isinstance(ref_model_with_remote, Refusal)
+    assert ref_model_with_remote.document == ref_model_rig_only.document
+    assert ref_model_with_remote.document["constraint"] == "model"
+
+
+def test_remote_winner_is_marked_remote_in_decision_document():
+    import json
+
+    from jsonschema import Draft202012Validator
+
+    t4 = _colab_measured("c2/t4", "T4", throughput=28.0)
+    l4 = _colab_measured("c2/l4", "L4", throughput=55.0)
+    try:
+        req = ask(device="colab:L4")
+    except TypeError:
+        req = ask()
+    chosen = decide([t4, l4], req)
+    assert isinstance(chosen, Decision)
+    doc = chosen.document
+    assert doc["device"] == "colab:L4"
+    assert doc.get("remote") is True
+    assert doc.get("remote_device") == l4["remote_device"]
+    assert doc["budget"] == "unchecked"
+    assert "budget unchecked" in doc["notes"]
+    schema = json.loads((ROOT / "src" / "interlock" / "schema" / "route-decision.v1.json").read_text(encoding="utf-8"))
+    Draft202012Validator(schema).validate(doc)
+
+
+
+def test_remote_allowed_request_picks_the_measured_best_card():
+    t4 = _colab_measured("c2/t4", "T4", throughput=28.0)
+    l4 = _colab_measured("c2/l4", "L4", throughput=55.0)
+    a100 = _colab_measured("c2/a100", "A100-40", throughput=115.0)
+
+    allowed = decide([t4, l4, a100], ask(allow_remote=True))
+    assert isinstance(allowed, Decision)
+    assert allowed.document["device"] == "colab:A100-40"
+    assert allowed.document["receipts"] == ["c2/a100"]
+
+    constrained = decide([t4, l4, a100], ask(device="colab:L4"))
+    assert isinstance(constrained, Decision)
+    assert constrained.document["device"] == "colab:L4"
+
+
+def test_shape_no_card_fits_refuses_with_the_measured_reason():
+    t4_refused = _colab_measured(
+        "c2/t4-31b",
+        "T4",
+        repo="gemma4:31b",
+        num_ctx=16384,
+        outcome="load_refused",
+        failure_reason="model requires 22400 MiB VRAM, colab:T4 has 15360 MiB",
+    )
+    l4_oom = _colab_measured(
+        "c2/l4-31b",
+        "L4",
+        repo="gemma4:31b",
+        num_ctx=16384,
+        outcome="oom",
+        failure_reason="peak 22100 MiB reached abort_mib 20730 MiB at num_ctx 16384",
+    )
+    a100_short_ctx = _colab_measured(
+        "c2/a100-31b",
+        "A100-40",
+        repo="gemma4:31b",
+        num_ctx=8192,
+        max_resident_ctx=8192,
+        throughput=72.0,
+    )
+
+    try:
+        req = ask(model="gemma4:31b", ctx=16384, allow_remote=True)
+    except TypeError:
+        req = ask(model="gemma4:31b", ctx=16384)
+    refused = decide([t4_refused, l4_oom, a100_short_ctx], req)
+    assert isinstance(refused, Refusal)
+    assert "22400 MiB" in refused.document["hint"]
+    assert "20730 MiB" in refused.document["hint"]
+    excluded_codes = {item["id"]: item["code"] for item in refused.document["excluded"]}
+    assert excluded_codes == {"c2/t4-31b": "load_refused", "c2/l4-31b": "oom"}
+

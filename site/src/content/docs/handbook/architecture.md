@@ -22,7 +22,7 @@ spec.yaml  ->  interlock run  ->  receipts/*.jsonl
 
 ## The parts
 
-`devices` is the allow-list. The names are `NPU`, `iGPU`, `CPU`, and `5090`. `GPU.1` is the 5090 as OpenVINO sees it on this rig. The resolver refuses that index even if the name or the vendor changes, refuses a bare `GPU`, refuses `AUTO`, `HETERO`, and `MULTI`, and refuses a GPU that is not vendor `0x8086` and `INTEGRATED`. A list with neither device property still requires the full name to contain "Intel". A missing device is an error.
+`devices` is the allow-list. The local rig names are `NPU`, `iGPU`, `CPU`, and `5090`. Remote Colab cards are named `colab:A100-40`, `colab:A100-80`, `colab:L4`, `colab:T4`, and `colab:G4`, and each remote row carries `remote_device` identity (`provider`, `card`, `vram_mib`, `driver_version`, `cuda_version`, and a zone `pool` string—never an account id). Remote rows are kept apart from rig rows and are never pooled with them. `GPU.1` is the 5090 as OpenVINO sees it on this rig. The resolver refuses that index even if the name or the vendor changes, refuses a bare `GPU`, refuses `AUTO`, `HETERO`, and `MULTI`, and refuses a GPU that is not vendor `0x8086` and `INTEGRATED`. A list with neither device property still requires the full name to contain "Intel". A missing device is an error.
 
 `guards` is the grant, the session, the heartbeat, and the empty card. A 5090 step without `--grant` does not start. An NPU or iGPU step without `--npu-session` does not start. A CPU-heavy leg waits for `--cpu-window`.
 
@@ -40,6 +40,6 @@ OpenVINO runs, when a run is actually started, use `NPU`, `CPU`, or the Intel iG
 
 ## What a route is not
 
-A route is not a server, a proxy, or a launch. A remote row can carry an `offrig_plan` object so a later tool could price a pod. interlock does not call that tool and does not spend. There is no `runpod:` row in the committed table. The remote shape is what the policy returns when a row of that shape is present. It is not a measured receipt.
+A route is not a server, a proxy, or a launch. A remote `colab:<card>` row is eligible only when the request opts in (`--allow-remote` or `--device colab:<card>`), and failed remote shapes (`oom`, `load_refused`, `timeout`, `ctx_exceeded`) are recorded as capability rows so refusals name the measured reason. A remote row can also carry an `offrig_plan` object so a later tool could price a pod. interlock does not call that tool and does not spend.
 
 The schema for a `--json` decision is `src/interlock/schema/route-decision.v1.json`.

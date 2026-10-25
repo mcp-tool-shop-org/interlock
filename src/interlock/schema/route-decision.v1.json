@@ -80,7 +80,11 @@
               "compile_timeout",
               "hang",
               "device_lost",
-              "parity_invalid"
+              "parity_invalid",
+              "oom",
+              "load_refused",
+              "timeout",
+              "ctx_exceeded"
             ]
           }
         }
@@ -95,6 +99,8 @@
       "items": {"type": "string", "minLength": 1}
     },
     "budget": {"enum": ["unchecked", "within", "not_applicable"]},
+    "remote": {"type": "boolean"},
+    "remote_device": {"type": "object"},
     "offrig_plan": {"type": "object"},
     "worst_case_usd": {"type": "number"}
   }
