@@ -286,7 +286,9 @@ def test_docs_version_strings_match_pyproject_version():
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     version = str(pyproject["project"]["version"])
     major = version.split(".")[0]
-    assert version == "1.0.0"
+    import interlock
+
+    assert interlock.__version__ == version
 
     readme_lines = (ROOT / "README.md").read_text(encoding="utf-8").splitlines()
     assert f"Version {version}:" in readme_lines[20]

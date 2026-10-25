@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## [1.0.1] - 2026-10-25
+
+### Added
+
+- `interlock run --quants Q4_K_M,Q8_0` on a linux-cuda spec measures only the named quants (with `--models`, or on its own). An unknown quant exits 1 and lists the spec's quants. Without `--quants`, nothing changes. `--dry-run` prints `quants measured:`.
 
 ### Added
 
