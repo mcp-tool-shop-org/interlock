@@ -4,17 +4,28 @@
 
 ### Added
 
-- `interlock import --remote-window <file>` takes the routing-row JSONL that `interlock run` writes on Linux (one row per line, or one row object) as well as the `{run_id, date, remote_device, records}` envelope. The rows keep their `provenance`, `settings` and `notes` as written. A row that is not a `colab:` device, or is `descriptive` or `aborted`, or fails the schema, is refused with the file name.
+- `interlock import --remote-window <file>` takes the routing-row JSONL that `interlock run` writes on Linux (one row per line, or one row object) as well as the `{run_id, date, remote_device, records}` envelope. The rows keep their `provenance`, `settings` and `notes` as written. A row that is not a `colab:` device, or is `descriptive` or `aborted`, or has a missing or malformed `id` or `model`, or fails the schema, is refused with the file name and the row (`file[1]`); a line that is not JSON is refused with the file and line (`file:2`).
 - With `--remote-window` and no `--offers`, the window rows are merged into the existing `table/routing.jsonl`: duplicates are refused (`duplicate row id ...`), the table is sorted by id and replaced atomically. `import_receipts` is not called, so no sibling repo is needed.
-- `interlock run --quants Q4_K_M,Q8_0` on a linux-cuda spec measures only the named quants (with `--models`, or on its own). An unknown quant exits 1 and lists the spec's quants. Without `--quants`, nothing changes. `--dry-run` prints `quants measured:`.
+- `interlock import --allow-shrink`: lets a full rebuild drop the rows it owns but no longer produces. Every dropped id is printed and written to `table/import-dropped.txt` before the table is written.
 
 ### Changed
 
-- A full `interlock import` rebuild (with `--offers`) that would write fewer rows than `table/routing.jsonl` holds, or drop any existing row id, is refused: exit 1, `REFUSED: the rebuild would write N row(s) and drop M of the K ...` with the first missing ids, and the table is left as it was. An import error from `--remote-window` or the rebuild is a message and exit 1, not a traceback.
+- A full `interlock import` rebuild replaces only the rows its own sources produce (the pinned imports and the E1 rerun) and leaves every other row in `table/routing.jsonl` as it is (E2-E4, remote windows, any other harness row). A rebuild that no longer produces a row it owns is refused (exit 1, the first missing ids, the table untouched) unless `--allow-shrink` is passed.
+- A table that holds a duplicate row id is refused, naming the ids, by both the rebuild and the `--remote-window` merge.
+- A missing or unreadable file, a non-UTF-8 table, or a bad JSON file in `interlock import` is a message on stderr and exit 1, not a traceback.
 
 ### Fixed
 
 - A VRAM sampler (or nvidia-smi) that fails after a cell's model call is now a `sampler_error` row, where it was written as `load_refused` (a claim that the card cannot load the quant). `sampler_error` is an untimed outcome that is not a capability outcome: it validates against the routing-row and route-decision schemas, is not a speed row, is listed under `excluded` by `interlock route` with the code `sampler_error` and no "measured failure reason", keeps its note unchanged in the table copy, and imports from a window receipt. A fill-card cell stops at it and does not bisect to a ceiling. A spec still cannot pre-register it.
+
+## [1.0.1] - 2026-10-25
+
+### Added
+
+- `interlock run --quants Q4_K_M,Q8_0` on a linux-cuda spec measures only the named quants (with `--models`, or on its own). An unknown quant exits 1 and lists the spec's quants. Without `--quants`, nothing changes. `--dry-run` prints `quants measured:`.
+
+### Fixed
+
 - A missing, failing or GPU-less `nvidia-smi` is now `REFUSED: no NVIDIA GPU available via nvidia-smi: ...` with exit 1, where `interlock run` ended in a `CalledProcessError` traceback or a bare `[Errno 2]`.
 - Each quant's model is unloaded when its cells end, also when a cell raises, so the next quant's VRAM baseline is taken on an empty card. `/api/ps` names match with `:latest` stripped from both sides, so a GGUF-created tag is found when two models are resident. A server that ignores `terminate()` for 5 s is killed.
 - The receipt `receipts/<run-id>.jsonl` is rewritten after every finished cell, so a run lost mid-way keeps the cells it finished. A run that completes writes the same bytes as before.

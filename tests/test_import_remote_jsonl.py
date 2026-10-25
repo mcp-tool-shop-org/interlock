@@ -136,29 +136,62 @@ def test_a_jsonl_row_that_cannot_route_is_refused_naming_the_file(window_rows, m
         import_remote_window(raw, source_path="receipts/bad.jsonl")
 
 
-def test_a_jsonl_row_that_fails_the_schema_is_refused_naming_the_file(window_rows):
-    broken = {k: v for k, v in window_rows[0].items() if k != "latency"}
-    with pytest.raises(ImportError_, match="receipts/bad.jsonl"):
-        import_remote_window(_jsonl([broken]), source_path="receipts/bad.jsonl")
+@pytest.mark.parametrize("drop_key", ["latency", "model", "id"])
+def test_a_jsonl_row_that_fails_the_schema_is_refused_naming_the_file_and_row(window_rows, drop_key):
+    broken = {k: v for k, v in window_rows[0].items() if k != drop_key}
+    with pytest.raises(ImportError_, match=rf"receipts/bad\.jsonl\[1\].*{drop_key}"):
+        import_remote_window(_jsonl([window_rows[0], broken]), source_path="receipts/bad.jsonl")
 
 
-def test_a_jsonl_line_that_is_not_json_is_refused_naming_the_file(window_rows):
+@pytest.mark.parametrize(
+    "bad_model", [None, ["not", "a", "mapping"], {"repo_or_tag": 7}], ids=["none", "list", "non-string-tag"]
+)
+def test_a_jsonl_row_with_a_malformed_model_is_an_import_error_not_a_crash(window_rows, bad_model):
+    broken = {**window_rows[0], "model": bad_model}
+    with pytest.raises(ImportError_, match=r"receipts/bad\.jsonl\[1\]"):
+        import_remote_window(_jsonl([window_rows[0], broken]), source_path="receipts/bad.jsonl")
+
+
+def test_a_jsonl_line_that_is_not_json_is_refused_naming_the_file_and_line(window_rows):
     raw = _jsonl(window_rows[:1]) + b"{not json\n"
-    with pytest.raises(ImportError_, match="receipts/bad.jsonl.*invalid"):
+    with pytest.raises(ImportError_, match=r"receipts/bad\.jsonl:2: invalid UTF-8 JSON"):
         import_remote_window(raw, source_path="receipts/bad.jsonl")
 
 
-def _seeded_table(root: Path) -> list[str]:
+def _owned(row_id: str) -> dict:
+    """A row a full rebuild owns: a pinned import (branch-1 provenance)."""
+
+    return {
+        "id": row_id,
+        "task": "generate",
+        "device": "5090",
+        "provenance": {"source_receipt_path": "receipts/x.json", "commit_sha": "c0ffee"},
+    }
+
+
+def _harness(row_id: str) -> dict:
+    """A row the rebuild does not own: a harness row (branch-2 provenance), as E2-E4 are."""
+
+    return {
+        "id": row_id,
+        "task": "generate",
+        "device": "5090",
+        "provenance": {"experiment_spec": "experiments/e2/spec.yaml", "run_id": "r"},
+    }
+
+
+def _write_table(root: Path, rows: list[dict]) -> bytes:
     table = root / "table"
-    table.mkdir()
-    old = [
-        {"id": "E2/z-old", "task": "generate", "device": "5090"},
-        {"id": "E1/a-old", "task": "embed", "device": "NPU"},
-    ]
-    # Rows only need to be rows here: the import does not validate what it keeps.
-    lines = [json.dumps(r, sort_keys=True) for r in sorted(old, key=lambda r: r["id"])]
-    (table / "routing.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    return lines
+    table.mkdir(exist_ok=True)
+    (table / "candidates.json").write_text("[]", encoding="utf-8")
+    data = "".join(json.dumps(r, sort_keys=True) + "\n" for r in sorted(rows, key=lambda r: r["id"]))
+    (table / "routing.jsonl").write_text(data, encoding="utf-8")
+    return data.encode("utf-8")
+
+
+def _seeded_table(root: Path) -> list[str]:
+    _write_table(root, [_harness("E2/z-old"), _harness("E1x/a-old")])
+    return (root / "table" / "routing.jsonl").read_text(encoding="utf-8").splitlines()
 
 
 def test_import_remote_window_merges_into_the_table_without_import_receipts(tmp_path, window_rows, capsys):
@@ -204,20 +237,96 @@ def test_import_remote_window_builds_the_table_when_there_is_none(tmp_path, wind
     assert len((tmp_path / "table" / "routing.jsonl").read_text(encoding="utf-8").splitlines()) == 4
 
 
-def test_a_full_rebuild_that_would_drop_a_table_row_is_refused(tmp_path, monkeypatch, capsys):
-    old_lines = _seeded_table(tmp_path)
-    table_file = tmp_path / "table" / "routing.jsonl"
-    # a row the rebuild will not produce, as E2-E4 rows are not produced by import_receipts
-    kept = json.loads(old_lines[0])
-    monkeypatch.setattr("interlock.importers.assemble.import_receipts", lambda **_kw: ([kept], []))
-    before = table_file.read_bytes()
-    offers = tmp_path / "offers.json"
-    offers.write_text("[]", encoding="utf-8")
+def _rebuild_returns(monkeypatch, rows: list[dict]) -> None:
+    monkeypatch.setattr("interlock.importers.assemble.import_receipts", lambda **_kw: (rows, []))
 
-    assert main(["import", "--root", str(tmp_path), "--offers", str(offers)]) == 1
+
+def _offers(root: Path) -> list[str]:
+    path = root / "offers.json"
+    path.write_text("[]", encoding="utf-8")
+    return ["--offers", str(path)]
+
+
+def test_a_rebuild_keeps_every_row_it_does_not_own(tmp_path, monkeypatch, capsys, window_rows):
+    harness = [_harness(f"E2/n{i:02d}") for i in range(53)]
+    remote = window_rows[0]
+    _write_table(tmp_path, [_owned("ladder/a"), *harness, remote])
+    before = {
+        json.loads(line)["id"]: line
+        for line in (tmp_path / "table" / "routing.jsonl").read_text(encoding="utf-8").splitlines()
+    }
+    _rebuild_returns(monkeypatch, [{**_owned("ladder/a"), "task": "embed"}, _owned("ladder/b")])
+
+    assert main(["import", "--root", str(tmp_path), *_offers(tmp_path)]) == 0
+    out = capsys.readouterr()
+    assert "Traceback" not in out.err
+    lines = (tmp_path / "table" / "routing.jsonl").read_text(encoding="utf-8").splitlines()
+    after = {json.loads(line)["id"]: line for line in lines}
+    assert len(lines) == 53 + 1 + 2
+    assert list(after) == sorted(after)
+    for row_id in [*(h["id"] for h in harness), remote["id"]]:
+        assert after[row_id] == before[row_id]
+    assert json.loads(after["ladder/a"])["task"] == "embed"
+    assert "ladder/b" in after
+
+
+def test_a_rebuild_that_no_longer_produces_a_row_it_owns_is_refused_unless_allowed(tmp_path, monkeypatch, capsys):
+    _write_table(tmp_path, [_owned("ladder/a"), _owned("ladder/b"), _harness("E2/keep")])
+    table_file = tmp_path / "table" / "routing.jsonl"
+    before = table_file.read_bytes()
+    # more rows than the table holds, so a row-count check alone would pass; ladder/b is still gone
+    _rebuild_returns(monkeypatch, [_owned("ladder/a"), _owned("ladder/c"), _owned("ladder/d"), _owned("ladder/e")])
+
+    assert main(["import", "--root", str(tmp_path), *_offers(tmp_path)]) == 1
     err = capsys.readouterr().err
-    assert "REFUSED" in err
-    assert "would write 1 row(s) and drop 1 of the 2" in err
-    assert json.loads(old_lines[1])["id"] in err
+    assert err.startswith("REFUSED: the rebuild no longer produces 1 of the 2 row(s) it owns")
+    assert "ladder/b" in err
+    assert "--allow-shrink" in err
     assert "Traceback" not in err
     assert table_file.read_bytes() == before
+    assert not (tmp_path / "table" / "import-dropped.txt").exists()
+
+    assert main(["import", "--root", str(tmp_path), *_offers(tmp_path), "--allow-shrink"]) == 0
+    out = capsys.readouterr().out
+    assert "dropped ladder/b" in out
+    assert (tmp_path / "table" / "import-dropped.txt").read_text(encoding="utf-8").splitlines() == ["ladder/b"]
+    ids = [json.loads(line)["id"] for line in table_file.read_text(encoding="utf-8").splitlines()]
+    assert "ladder/b" not in ids
+    assert "E2/keep" in ids
+
+
+@pytest.mark.parametrize("path", ["merge", "rebuild"])
+def test_a_table_with_duplicate_ids_is_refused_in_both_import_paths(tmp_path, monkeypatch, capsys, window_rows, path):
+    table = tmp_path / "table"
+    table.mkdir()
+    row = json.dumps(_harness("E2/dup"), sort_keys=True)
+    (table / "routing.jsonl").write_text(f"{row}\n{row}\n", encoding="utf-8")
+    before = (table / "routing.jsonl").read_bytes()
+    if path == "merge":
+        window = tmp_path / "w1.jsonl"
+        window.write_bytes(_jsonl(window_rows))
+        argv = ["import", "--root", str(tmp_path), "--remote-window", str(window)]
+    else:
+        _rebuild_returns(monkeypatch, [_owned("ladder/a")])
+        argv = ["import", "--root", str(tmp_path), *_offers(tmp_path)]
+
+    assert main(argv) == 1
+    err = capsys.readouterr().err
+    assert "duplicate row id(s): E2/dup" in err
+    assert "Traceback" not in err
+    assert (table / "routing.jsonl").read_bytes() == before
+
+
+def test_a_missing_window_file_and_an_unreadable_table_are_messages_not_tracebacks(tmp_path, capsys):
+    assert main(["import", "--root", str(tmp_path), "--remote-window", str(tmp_path / "nope.jsonl")]) == 1
+    err = capsys.readouterr().err
+    assert "nope.jsonl" in err
+    assert "Traceback" not in err
+
+    table = tmp_path / "table"
+    table.mkdir()
+    (table / "routing.jsonl").write_bytes(b"\xff\xfe not utf-8\n")
+    window = tmp_path / "w.jsonl"
+    window.write_bytes(b"{}\n")
+    assert main(["import", "--root", str(tmp_path), "--remote-window", str(window)]) == 1
+    assert "Traceback" not in capsys.readouterr().err
