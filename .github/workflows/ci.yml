@@ -58,7 +58,7 @@ jobs:
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
         with:
           enable-cache: true
-          python-version: "3.12"
+          python-version: "3.15"
 
       - name: Install
         run: uv sync --frozen --extra relay
@@ -90,7 +90,7 @@ jobs:
       - name: Wheel install loads the C2 specs and inputs
         run: |
           uv build --wheel --out-dir "$RUNNER_TEMP/wheel"
-          uv venv --python 3.12 "$RUNNER_TEMP/wheel-venv"
+          uv venv --python 3.15 "$RUNNER_TEMP/wheel-venv"
           uv pip install --python "$RUNNER_TEMP/wheel-venv/bin/python" "$RUNNER_TEMP"/wheel/*.whl
           for spec in c2-generate c2-fill-card c2-throughput; do
             "$RUNNER_TEMP/wheel-venv/bin/interlock" c2-sources "experiments/$spec/spec.yaml" > /dev/null
@@ -103,3 +103,73 @@ jobs:
 
       - name: Empty table
         run: uv run interlock check
+
+  # Python 3.13. A job of its own so the required status check "test" keeps its name (it runs on 3.15).
+  # Lint, tests with the coverage floor, and the wheel install run here; the audit, fuzz, Atlas check
+  # and Codecov upload run once, on the 3.15 job above.
+  test-py313:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          enable-cache: true
+          python-version: "3.13"
+
+      - name: Install
+        run: uv sync --frozen --extra relay
+
+      - name: Lint
+        run: uv run ruff check
+
+      - name: Test
+        run: uv run pytest
+
+      - name: Wheel install loads the C2 specs and inputs
+        run: |
+          uv build --wheel --out-dir "$RUNNER_TEMP/wheel"
+          uv venv --python 3.13 "$RUNNER_TEMP/wheel-venv"
+          uv pip install --python "$RUNNER_TEMP/wheel-venv/bin/python" "$RUNNER_TEMP"/wheel/*.whl
+          for spec in c2-generate c2-fill-card c2-throughput; do
+            "$RUNNER_TEMP/wheel-venv/bin/interlock" c2-sources "experiments/$spec/spec.yaml" > /dev/null
+          done
+          "$RUNNER_TEMP/wheel-venv/bin/python" -I -c "from interlock.harness.linux_cuda import load_throughput_inputs_fixture as f; f()"
+
+  # Python 3.14. A job of its own so the required status check "test" keeps its name (it runs on 3.15).
+  # Lint, tests with the coverage floor, and the wheel install run here; the audit, fuzz, Atlas check
+  # and Codecov upload run once, on the 3.15 job above.
+  test-py314:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          enable-cache: true
+          python-version: "3.14"
+
+      - name: Install
+        run: uv sync --frozen --extra relay
+
+      - name: Lint
+        run: uv run ruff check
+
+      - name: Test
+        run: uv run pytest
+
+      - name: Wheel install loads the C2 specs and inputs
+        run: |
+          uv build --wheel --out-dir "$RUNNER_TEMP/wheel"
+          uv venv --python 3.14 "$RUNNER_TEMP/wheel-venv"
+          uv pip install --python "$RUNNER_TEMP/wheel-venv/bin/python" "$RUNNER_TEMP"/wheel/*.whl
+          for spec in c2-generate c2-fill-card c2-throughput; do
+            "$RUNNER_TEMP/wheel-venv/bin/interlock" c2-sources "experiments/$spec/spec.yaml" > /dev/null
+          done
+          "$RUNNER_TEMP/wheel-venv/bin/python" -I -c "from interlock.harness.linux_cuda import load_throughput_inputs_fixture as f; f()"

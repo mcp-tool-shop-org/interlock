@@ -50,7 +50,7 @@
 - [x] `[all]` Dependabot opens a grouped pull request monthly for the uv lock, the docs-site npm lock, and GitHub Actions, at most three open per ecosystem (2026-10-14)
 - [ ] `[npm]` SKIP: not an npm package. Python publishing is trusted publishing in release.yml, and it runs only when a GitHub release is published. This pull request does not publish.
 - [ ] `[npm]` SKIP: not an npm package
-- [x] `[pypi]` `requires-python` is `>=3.12,<3.13` for `mcptoolshop-interlock` — `shipcheck manifest` engines passed 2026-10-12 (D6)
+- [x] `[pypi]` `requires-python` is `>=3.13` for `mcptoolshop-interlock` (changed in 1.0.3 from `>=3.12,<3.13`; core dependencies read on PyPI 2026-10-25: pyyaml has no cp315 wheel and builds from its sdist on 3.15) — `shipcheck manifest` engines passed 2026-10-12 (D6) at the earlier pin; not re-run
 - [x] `[pypi]` Lockfile committed (`uv.lock`). `verify.sh` builds the wheel and the sdist with `uv build`. `release.yml` publishes both, with a SLSA provenance file, when a GitHub release is published. This pull request does not publish. (D7)
 - [ ] `[vsix]` SKIP: not a VS Code extension
 - [ ] `[desktop]` SKIP: not a desktop app

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- **Python: `requires-python` is `>=3.13` (was `>=3.12,<3.13`).** 3.13 is what Colab's default image runs, so outside users there can now install interlock; 3.14 and 3.15 are supported, 3.15 is the main target (`.python-version`). **Python 3.12 is dropped.** The rig's own switchyard environment is on 3.12 and has to move (to 3.14 for the NPU lane, see the `intel` extra below).
+- On 3.15 PyYAML 6.0.3 installs from its source distribution, because it publishes no cp315 wheel yet. Measured on Windows with uv: it installs and builds pure Python (`yaml.__with_libyaml__` is `False`, no C extension), and the full suite passes (see the PR).
+- The `intel` extra's `openvino`, `openvino-tokenizers` and `openvino-genai` carry the environment marker `python_version < "3.15"`: OpenVINO 2026.4.1 has cp313 and cp314 wheels and none for 3.15 (PyPI, read 2026-10-25). On 3.15 the extra installs `transformers` but no OpenVINO; the Intel lane needs 3.13 or 3.14.
+- `uv.lock` is regenerated for the new range with no version changes.
+- CI: the required check `test` now runs on Python 3.15 (lint, tests with the 90% coverage floor, the audit, fuzz, the Atlas check, the Codecov upload, the wheel install). Two more jobs, `test-py313` and `test-py314`, run lint, the tests and the wheel install. `release.yml` builds on 3.15.
+
 ## [1.0.2] - 2026-10-25
 
 ### Added
