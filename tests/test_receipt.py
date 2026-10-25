@@ -471,6 +471,41 @@ def test_remote_row_allows_hashed_identifiers_where_permitted():
 @pytest.mark.parametrize(
     ("case_name", "overrides", "must_refuse"),
     [
+        # Bare _ACCOUNT_KEY names with unhashed values (the original rule, refused on every row).
+        (
+            "key_bare_account",
+            {"settings": {**row()["settings"], "account": "some_handle"}},
+            True,
+        ),
+        (
+            "key_bare_user",
+            {"settings": {**row()["settings"], "user": "some_handle"}},
+            True,
+        ),
+        (
+            "key_bare_owner",
+            {"settings": {**row()["settings"], "owner": "some_handle"}},
+            True,
+        ),
+        # Tagged account tokens in keys (':' or '=', optional whitespace around separator).
+        (
+            "key_top_account_colon",
+            {"settings": {**row()["settings"], "account:some_handle": "x"}},
+            True,
+        ),
+        (
+            "key_spaced_account_colon",
+            {"settings": {**row()["settings"], "account : some_handle": "x"}},
+            True,
+        ),
+        (
+            "key_spaced_user_equals",
+            {"settings": {**row()["settings"], "user= some_handle": "x"}},
+            True,
+        ),
+        # Tagged account tokens in string values (':' or '=', optional whitespace around separator).
+        ("val_spaced_account_colon", {"notes": "account : some_handle"}, True),
+        ("val_spaced_user_equals", {"notes": "user= some_handle"}, True),
         ("val_paren_account", {"notes": "(account:some_handle)"}, True),
         ("val_comma_account", {"notes": "ran,account:some_handle"}, True),
         ("val_equals_owner", {"notes": "by=owner:some_handle"}, True),
@@ -479,25 +514,54 @@ def test_remote_row_allows_hashed_identifiers_where_permitted():
         ("val_account_equals", {"notes": "account=some_handle"}, True),
         ("val_login_colon", {"notes": "login:some_handle"}, True),
         ("val_handle_equals", {"notes": "handle=some_handle"}, True),
+        # Legitimate snake_case settings and C2 field keys on a remote row must pass.
         (
-            "key_top_account_colon",
-            {"settings": {**row()["settings"], "account:some_handle": "x"}},
-            True,
+            "key_hf_cache",
+            {"settings": {**row()["settings"], "hf_cache": "hot"}},
+            False,
         ),
+        (
+            "key_hf_repo",
+            {"settings": {**row()["settings"], "hf_repo": "Qwen/Qwen3-8B"}},
+            False,
+        ),
+        (
+            "key_hf_revision",
+            {"settings": {**row()["settings"], "hf_revision": "a" * 40}},
+            False,
+        ),
+        (
+            "key_user_tokens",
+            {"settings": {**row()["settings"], "user_tokens": 128}},
+            False,
+        ),
+        (
+            "key_login_time",
+            {"settings": {**row()["settings"], "login_time": 0}},
+            False,
+        ),
+        (
+            "key_owner_id_hash",
+            {"settings": {**row()["settings"], "owner_id_hash": "sha256:" + ("a" * 64)}},
+            False,
+        ),
+        # Trade-off: keys use the same '[:=]' separators as values (no guessing at bare words in
+        # hyphenated or snake_case key names), so 'owner-some_handle' and 'GitHub_some_handle' pass.
         (
             "key_nested_owner_hyphen",
             {"settings": {**row()["settings"], "meta": {"owner-some_handle": 1}}},
-            True,
+            False,
         ),
         (
             "key_list_github_underscore",
             {"settings": {**row()["settings"], "tags": [{"GitHub_some_handle": True}]}},
-            True,
+            False,
         ),
-        ("pass_user_facing_latency", {"notes": "user-facing latency is fine"}, False),
-        ("pass_hf_transfer", {"notes": "hf-transfer was enabled"}, False),
-        ("pass_github_hosted", {"notes": "github-hosted runner"}, False),
+        # Must-pass free-text values.
+        ("pass_user_facing_latency", {"notes": "user-facing latency"}, False),
+        ("pass_hf_transfer_on", {"notes": "hf-transfer on"}, False),
         ("pass_owner_of_the_run", {"notes": "owner of the run"}, False),
+        ("pass_github_hosted", {"notes": "github-hosted runner"}, False),
         ("pass_owner_ok_check", {"notes": "owner_ok check"}, False),
         ("pass_user_prompt_length", {"notes": "user_prompt length 512"}, False),
         ("pass_uid_less_session", {"notes": "uid-less session"}, False),
@@ -510,6 +574,9 @@ def test_remote_row_precise_account_rule_values_and_keys(
     if must_refuse:
         with pytest.raises(ReceiptError, match="unhashed account id"):
             validate_row(candidate)
+        if case_name.startswith("key_bare_"):
+            with pytest.raises(ReceiptError, match="unhashed account id"):
+                validate_row(row(**overrides))
     else:
         validate_row(candidate)
 

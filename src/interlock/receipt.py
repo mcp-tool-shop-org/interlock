@@ -351,11 +351,13 @@ _ACCOUNT_KEY = re.compile(
 _HASHED_ACCOUNT = re.compile(r"^sha256:[0-9a-f]{64}$")
 _ACCOUNT_PREFIX_NAMES = _ACCOUNT_PREFIX.pattern.removeprefix("^").rsplit("[", 1)[0]
 _ACCOUNT_VALUE_TOKEN = re.compile(
-    rf"(?<![A-Za-z0-9_]){_ACCOUNT_PREFIX_NAMES}[:=][A-Za-z0-9_][A-Za-z0-9_.-]*",
+    rf"(?<![A-Za-z0-9_]){_ACCOUNT_PREFIX_NAMES}\s*[:=]\s*[A-Za-z0-9_][A-Za-z0-9_.-]*",
     re.IGNORECASE,
 )
+# Keys use the value rule's '[:=]' separators so ordinary snake_case/hyphenated key names pass
+# (trade-off: no guessing at bare words, the same as for values).
 _ACCOUNT_KEY_TOKEN = re.compile(
-    rf"(?<![A-Za-z0-9_]){_ACCOUNT_PREFIX_NAMES}[:_=-][A-Za-z0-9_][A-Za-z0-9_.-]*",
+    rf"(?<![A-Za-z0-9_]){_ACCOUNT_PREFIX_NAMES}\s*[:=]\s*[A-Za-z0-9_][A-Za-z0-9_.-]*",
     re.IGNORECASE,
 )
 
