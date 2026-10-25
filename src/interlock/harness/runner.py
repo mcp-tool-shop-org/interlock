@@ -41,7 +41,11 @@ from interlock.adapters.registry import for_engine
 from interlock.cli import announce_run
 from interlock.devices import CARD_5090
 from interlock.guards import (
+    HEARTBEAT_ENV,
+    NO_WATCHDOG,
+    NO_WATCHDOG_NOTE,
     GuardError,
+    WatchdogOptOut,
     assess_step,
     require_card_empty,
     require_heartbeat,
@@ -81,6 +85,7 @@ from interlock.ollama_supervisor import (
     restart_policy_lines,
     retry_budget,
 )
+from interlock.paths import configured
 from interlock.receipt import CAPABILITY_OUTCOMES, validate_row
 
 try:  # the CPU-window evidence of ruling #36's addendum; never a step failure
@@ -121,7 +126,8 @@ def _storage_lines(spec: dict) -> list[str]:
         cache = arm.get("hf_cache")
         if cache == "hot":
             lines.append(
-                f"{arm['id']}: hf_cache hot (C:/AI-Models/hf-cache-hot); a missing copy is a refusal"
+                f"{arm['id']}: hf_cache hot (INTERLOCK_WEIGHTS_HOT, [paths] weights_hot, or hot/ under HF_HOME); "
+                "a missing copy is a refusal"
             )
         elif cache == "archive":
             lines.append(f"{arm['id']}: hf_cache archive")
@@ -2122,17 +2128,18 @@ def check_flags(spec: dict, grant: str | None, npu_session: str | None, cpu_wind
     if needs["cpu_window"]:
         assess_step(device="CPU", cpu_window=cpu_window, cpu_heavy=True)
 
-HEARTBEAT_DEFAULT = Path("E:/AI/training/_watchdog_HEARTBEAT")
-HEARTBEAT_ENV = "WATCHDOG_HEARTBEAT"
+def heartbeat_path(override: Path | WatchdogOptOut | None = None) -> Path | WatchdogOptOut | None:
+    """The VRAM watchdog heartbeat file, or None when none is configured. None is not "off": the guard refuses it.
 
-
-def heartbeat_path(override: Path | None = None) -> Path:
-    """The VRAM watchdog heartbeat file. The WATCHDOG_HEARTBEAT environment
-    variable overrides the rig default, the same variable chain_step.sh honours."""
+    The file is written by the studio's watchdog and read only by the heartbeat guard. The argument wins (it may be
+    the ``--no-watchdog`` marker), then the WATCHDOG_HEARTBEAT environment variable (the one chain_step.sh honours),
+    then ``[paths] heartbeat`` in ``interlock.toml``. There is no default path.
+    """
 
     if override is not None:
         return override
-    return Path(os.environ.get(HEARTBEAT_ENV, str(HEARTBEAT_DEFAULT)))
+    found = configured(HEARTBEAT_ENV, "heartbeat")
+    return None if found is None else Path(found)
 
 
 def real_adapters(spec: dict) -> dict:
@@ -2181,8 +2188,8 @@ def _card_probe(adapters: dict, spec: dict):
     return probe
 
 
-def _card_guards(probe, path: Path, now: float) -> None:
-    """Heartbeat, then empty card. Both are read fresh on every call."""
+def _card_guards(probe, path: Path | WatchdogOptOut | None, now: float) -> None:
+    """Heartbeat, then empty card. Both are read fresh on every call. No heartbeat configured refuses."""
 
     require_heartbeat(path, now)
     require_card_empty(probe())
@@ -2239,7 +2246,7 @@ def run_spec(
     date: str | None = None,
     notes: str = "",
     adapters: dict | None = None,
-    heartbeat: Path | None = None,
+    heartbeat: Path | WatchdogOptOut | None = None,
     wall=None,
     python_path: str | None = None,
     watch: WatchHooks | None = None,
@@ -2270,6 +2277,10 @@ def run_spec(
 
     _refuse_repo_interpreter(root, Path(python_path or sys.executable))
     spec = load_spec(spec_path)
+    if heartbeat is NO_WATCHDOG:
+        # The opt-out is the user's explicit choice and it travels with the run: it is written into the notes of
+        # the receipt (the pilot document carries it too), and never implied by an unset variable.
+        notes = f"{notes}. {NO_WATCHDOG_NOTE}" if notes else NO_WATCHDOG_NOTE
     chosen_models = None
     recorded_models = None
     if models is not None:
@@ -2306,6 +2317,7 @@ def run_spec(
             notes=notes,
             quarantine=quarantine,
             pairs=pairs,
+            heartbeat=heartbeat,
         )
     if pilot:
         from interlock.harness.e4b import E4bError

@@ -7,6 +7,9 @@
 - `interlock import --remote-window <file>` takes the routing-row JSONL that `interlock run` writes on Linux (one row per line, or one row object) as well as the `{run_id, date, remote_device, records}` envelope. The rows keep their `provenance`, `settings` and `notes` as written. A row that is not a `colab:` device, or is `descriptive` or `aborted`, or has a missing or malformed `id` or `model`, or fails the schema, is refused with the file name and the row (`file[1]`); a line that is not JSON is refused with the file and line (`file:2`).
 - With `--remote-window` and no `--offers`, the window rows are merged into the existing `table/routing.jsonl`: duplicates are refused (`duplicate row id ...`), the table is sorted by id and replaced atomically. `import_receipts` is not called, so no sibling repo is needed.
 - `interlock import --allow-shrink`: lets a full rebuild drop the rows it owns but no longer produces. Every dropped id is printed and written to `table/import-dropped.txt` before the table is written.
+- `interlock run --no-watchdog`: runs a 5090 step with no VRAM watchdog heartbeat. It is never implied by an unset variable. The choice is written into the receipt's `notes` (and the `watchdog` field of an E4b pilot document), and the empty-card check still runs.
+- Three paths are now settings, each read from an environment variable, then from `[paths]` in `interlock.toml` in the working directory, and recorded as given: `INTERLOCK_SCRATCH_ROOT` / `scratch_root` (offrig's scratch project, default `interlock-scratch` under the system temp directory), `INTERLOCK_WEIGHTS_HOT` / `weights_hot` (the cache an `hf_cache: hot` arm reads, default `hot/` under `HF_HOME` or the user's Hugging Face cache) and `WATCHDOG_HEARTBEAT` / `heartbeat` (the heartbeat file, no default). A malformed `interlock.toml` is a structured error.
+- A test (`tests/test_portable_defaults.py`) scans `src/` for drive-letter, `/home/` and `/Users/` paths and fails on any. Its allow-list is empty.
 
 ### Changed
 
@@ -17,6 +20,16 @@
 - The full `interlock import` rebuild reads its three source repositories from configuration: `--source rnd|npu|aspire=<path>` (repeatable) or `[import.sources]` in `<root>/interlock.toml`; the flag wins. There is no default path in `interlock.importers`. Each source's pinned commit is unchanged and `require_pin` still runs; a clone that lacks it is refused, naming the commit. Each source's name, pin and path (as given) are written at the end of `table/gaps.md`, not into any row.
 - With a source missing, the rebuild exits 1 naming each missing source, its pinned commit, and the flag and key that set it. `--remote-window` alone (the merge) needs no source.
 - The NPU pin's comment names the rnd tag `data/npu-buildout-275e511`.
+- With `WATCHDOG_HEARTBEAT` (or `[paths] heartbeat`) unset, a run that uses the 5090 refuses before any device is touched, with a message that names `WATCHDOG_HEARTBEAT` and `--no-watchdog`. The same holds for the E4b block and pilot, and for an Ollama restart between steps. Before, an unset variable fell back to a heartbeat file at a fixed path on the author's rig.
+- The `--dry-run` line for an `hf_cache: hot` arm names the setting instead of a drive path.
+- A key under `[paths]` in `interlock.toml` that interlock does not know is refused, naming the valid keys, like `[import.sources]`.
+- `--no-watchdog` is also written into the header of an E4b block receipt (finished or aborted), and into a fill-card receipt row written when its preflight fails.
+- `heartbeat_age_s(None, now)` is infinity (stale) instead of an error, so `scripts/relay_s1.py` refuses with `WATCHDOG_HEARTBEAT` unset instead of crashing.
+- A heartbeat that is unset or has no file is refused with `REFUSED: no watchdog heartbeat: set WATCHDOG_HEARTBEAT (or [paths] heartbeat) to the watchdog's heartbeat file, or pass --no-watchdog if you run no watchdog`, in the guard and in `scripts/relay_s1.py`; the old "missing old" wording is gone.
+
+### Removed
+
+- The constants `SCRATCH_ROOT`, `HEARTBEAT_DEFAULT`, `HOT_ROOT` and `ARCHIVE_ROOT`, which held paths on the author's rig. `ARCHIVE_ROOT` had no callers.
 
 ### Fixed
 

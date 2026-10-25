@@ -37,19 +37,19 @@
       "added": 0,
       "changed": 5,
       "moved": 0,
-      "parts": 1,
+      "parts": 4,
       "removed": 0
     },
     "items": [
       {
         "kind": "counts",
-        "sentence": "Nothing structural changed since 2026-10-14; 5 files changed content.",
+        "sentence": "Nothing structural changed since 2026-10-25; 5 files changed content.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "a532013a20d82b7d9374b9649407ed3378c71bcd",
-      "generatedAt": "2026-10-14T04:38:24.699Z"
+      "commit": "699ab09342a15023299de9e468059d518d31c694",
+      "generatedAt": "2026-10-25T18:24:00.296Z"
     },
     "unchanged": true
   },
@@ -70,75 +70,45 @@
       "shared": 17
     },
     {
-      "a": "src/interlock/harness/fill.py",
-      "b": "tests/test_e5_preflight.py",
-      "either": 7,
+      "a": "src/switchyard/harness/receipts.py",
+      "b": "src/switchyard/receipt.py",
+      "either": 13,
       "partLabels": [
-        "src",
-        "tests"
+        null,
+        null
       ],
       "parts": [
-        "src",
-        "tests"
+        null,
+        null
       ],
-      "relation": "b-imports-a",
-      "shared": 5
-    },
-    {
-      "a": "src/interlock/harness/runner.py",
-      "b": "tests/test_e5_preflight.py",
-      "either": 7,
-      "partLabels": [
-        "src",
-        "tests"
-      ],
-      "parts": [
-        "src",
-        "tests"
-      ],
-      "relation": "b-imports-a",
-      "shared": 5
-    },
-    {
-      "a": "src/interlock/harness/fill.py",
-      "b": "tests/test_fill_card_live.py",
-      "either": 12,
-      "partLabels": [
-        "src",
-        "tests"
-      ],
-      "parts": [
-        "src",
-        "tests"
-      ],
-      "relation": "b-imports-a",
+      "relation": "unassigned",
       "shared": 7
     },
     {
       "a": "src/interlock/harness/fill.py",
-      "b": "src/interlock/harness/runner.py",
-      "either": 9,
+      "b": "tests/test_fill_card_live.py",
+      "either": 16,
       "partLabels": [
         "src",
-        "src"
+        "tests"
       ],
       "parts": [
         "src",
-        "src"
+        "tests"
       ],
-      "relation": "inside",
-      "shared": 5
+      "relation": "b-imports-a",
+      "shared": 8
     }
   ],
   "changesTogetherNote": [
     "1 file changed together with its own test, as expected.",
     "Confidence is low: fewer than 25 source files reach 10 revisions in the window.",
-    "Window: 180 days; a pair counts from 3 shared commits, since 9 source files reach 10 revisions; the floor rises to 10 when 25 do."
+    "Window: 180 days; a pair counts from 3 shared commits, since 14 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 1,
-  "commit": "0deac11d46af4fa1c35d96c42591e7d3e3423c31",
+  "commit": "fc864e402f5ce1ae717f39128a3dbb24229ddd86",
   "defaultBranch": "main",
-  "derived": "10 parts, mostly Python (88 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
+  "derived": "10 parts, mostly Python (106 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
   "doors": [
     {
       "checks": [],
@@ -151,26 +121,27 @@
       "pushes": false,
       "reach": [
         {
+          "boundary": "src",
+          "depth": 0,
+          "files": 55
+        },
+        {
           "boundary": "tests",
           "depth": 0,
-          "files": 37
+          "files": 48
         },
         {
           "boundary": "scripts",
           "depth": 1,
-          "files": 1
-        },
-        {
-          "boundary": "src",
-          "depth": 1,
-          "files": 47
+          "files": 2
         }
       ],
       "runs": [
+        "src/interlock/cli.py",
         "tests/fuzz_receipts.py",
         "tests/"
       ],
-      "runsCount": 2,
+      "runsCount": 3,
       "runsMore": 0,
       "sends": [
         "uploads coverage to Codecov"
@@ -197,7 +168,7 @@
         {
           "boundary": "src",
           "depth": 0,
-          "files": 50
+          "files": 56
         }
       ],
       "runs": [],
@@ -275,7 +246,7 @@
         {
           "boundary": "src",
           "depth": 0,
-          "files": 43
+          "files": 50
         }
       ],
       "runs": [
@@ -300,12 +271,12 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-14T05:02:40.059Z",
+  "generatedAt": "2026-10-25T18:33:37.959Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
-    "3 writes and 4 reads use paths built at run time and are not named here.",
-    "12 writes and 39 reads go to a path their caller passes, not to this repository.",
-    "3 reads go to the directory the command is run in (receipts/), not to this repository.",
+    "5 writes and 6 reads use paths built at run time and are not named here.",
+    "17 writes and 46 reads go to a path their caller passes, not to this repository.",
+    "5 reads go to the directory the command is run in (experiments/, interlock.toml and receipts/), not to this repository.",
     "18 files belong to no part: site/astro.config.mjs, site/package-lock.json, site/package.json and 15 more.",
     "Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window."
   ],
@@ -326,21 +297,21 @@
   "readers": [],
   "repo": "mcp-tool-shop-org/interlock",
   "sequences": [],
-  "startDoor": "pyproject.toml#interlock",
+  "startDoor": ".github/workflows/ci.yml",
   "startHere": [
+    ".github/workflows/ci.yml",
     "src/interlock/cli.py",
     "src/interlock/receipt.py",
-    "src/interlock/families.py"
+    "src/interlock/devices.py"
   ],
-  "startReason": "This path follows interlock (a command people run) from its entry, since CI runs only tests.",
   "summary": "interlock routes each job to a model, engine and device from a receipt-backed table.",
   "summaryFrom": "person",
-  "testFiles": 60,
+  "testFiles": 71,
   "testedBy": {
-    "scripts": 1,
-    "src": 34
+    "scripts": 2,
+    "src": 45
   },
-  "unnamedWrites": 3,
+  "unnamedWrites": 5,
   "unread": [],
   "unreadFiles": 0,
   "unreadNote": [],

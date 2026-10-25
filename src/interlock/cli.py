@@ -120,6 +120,12 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--dry-run", action="store_true")
     run.add_argument("--pilot", action="store_true")
     run.add_argument(
+        "--no-watchdog",
+        action="store_true",
+        help="run a 5090 step with no VRAM watchdog heartbeat; without it an unset WATCHDOG_HEARTBEAT refuses. "
+        "The choice is written into the run's receipt.",
+    )
+    run.add_argument(
         "--trace",
         choices=("off", "events", "relay"),
         default="off",
@@ -489,6 +495,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
     from interlock.harness.ollama_serve import ServeError
     from interlock.harness.runner import RunnerError, dry_run, heartbeat_path, parse_models, parse_quants, run_spec
     from interlock.harness.spec import SpecError, load_spec
+    from interlock.paths import PathsConfigError
 
     try:
         pairs = parse_pairs(getattr(args, "pairs", None))
@@ -511,8 +518,10 @@ def _cmd_run(args: argparse.Namespace) -> int:
             if not args.run_id:
                 print(f"run id: {chosen}", flush=True)
             args.run_id = chosen
+        from interlock.guards import NO_WATCHDOG
         from interlock.ollama_supervisor import OllamaSupervisor, real_seams
 
+        heartbeat = heartbeat_path(NO_WATCHDOG if getattr(args, "no_watchdog", False) else None)
         run_spec(
             args.spec,
             root=args.root.resolve(),
@@ -524,8 +533,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
             supervisor=OllamaSupervisor(
                 real_seams(),
                 grant=args.grant,
-                heartbeat=heartbeat_path(None),
+                heartbeat=heartbeat,
             ),
+            heartbeat=heartbeat,
             pilot=args.pilot,
             trace=args.trace,
             quarantine=getattr(args, "quarantine", None),
@@ -541,6 +551,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         E4bError,
         LifecycleError,
         LinuxCudaError,
+        PathsConfigError,
         ServeError,
         OSError,
     ) as exc:

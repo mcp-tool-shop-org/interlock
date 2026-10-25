@@ -84,7 +84,6 @@ from interlock.adapters.base import (
 )
 from interlock.devices import DeviceRefused, resolve_device
 from interlock.harness.storage import (
-    HOT_ROOT,
     StorageError,
     copy_unbuffered,
     default_snapshot_download,
@@ -92,6 +91,9 @@ from interlock.harness.storage import (
     drive_letter,
     fresh_copy_dir,
     hot_snapshot,
+)
+from interlock.harness.storage import (
+    hot_root as _hot_root,
 )
 
 try:  # CI has no intel extra; importing this module must still succeed.
@@ -291,7 +293,7 @@ class OpenvinoAdapter:
         self._snapshot_download = snapshot_download
         self._copy_tree = copy_tree
         self._disk_facts = disk_facts
-        self._hot_root = HOT_ROOT if hot_root is None else hot_root
+        self._hot_root = _hot_root() if hot_root is None else hot_root
         self._arm_dirs: dict = {}
         self._cold_copies: list[tuple[str, Path]] = []
         self._tokenizers: dict = {}

@@ -83,6 +83,7 @@ def test_a_healthy_preflight_returns_what_it_read(tmp_path: Path):
     [
         (None, {}, "no grant"),
         ("g", {"heartbeat": 10_000.0}, "heartbeat"),
+        ("g", {"heartbeat": float("inf")}, r"REFUSED: no watchdog heartbeat: set WATCHDOG_HEARTBEAT .*--no-watchdog"),
         ("g", {"environ": {"OTEL_SERVICE_NAME": "x"}}, "OTEL"),
         ("g", {"nemo-relay": None}, "nemo-relay is None"),
         ("g", {"config_paths": ["user/plugins.toml"]}, "layer in"),
@@ -99,6 +100,12 @@ def test_a_healthy_preflight_returns_what_it_read(tmp_path: Path):
 def test_each_preflight_item_refuses(tmp_path: Path, grant, changes, message):
     with pytest.raises(relay_s1.PreflightError, match=message):
         relay_s1.preflight(tmp_path, grant, Seams(**changes))
+
+
+def test_the_real_heartbeat_seam_reads_an_unset_heartbeat_as_stale_not_a_crash(tmp_path: Path, monkeypatch):
+    monkeypatch.delenv("WATCHDOG_HEARTBEAT", raising=False)
+    monkeypatch.chdir(tmp_path)
+    assert relay_s1.Seams().heartbeat_age_s() == float("inf")
 
 
 def test_after_the_first_step_receipts_and_table_may_change(tmp_path: Path):

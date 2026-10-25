@@ -16,7 +16,7 @@ import pytest
 from interlock.adapters.base import StepRequest
 from interlock.adapters.ollama import OllamaAdapter
 from interlock.adapters.record_fixtures import read_card_mib
-from interlock.guards import GuardError
+from interlock.guards import NO_WATCHDOG, NO_WATCHDOG_NOTE, GuardError
 from interlock.harness.e4b import (
     GENERATE_TIMEOUT_S,
     PILOT_CALLS,
@@ -1715,6 +1715,92 @@ def test_a_dead_heartbeat_refuses_the_block_and_the_pilot_before_spawn(tmp_path:
     del seams.wall
     run_block(_spec([PAIRS[0]]), seams, root=tmp_path / "default-heartbeat", run_id="default-hb", repo=tmp_path)
     assert server.events[0] == "start"
+
+
+def test_an_unset_heartbeat_refuses_the_block_and_the_pilot_before_spawn(tmp_path: Path, monkeypatch):
+    monkeypatch.delenv("WATCHDOG_HEARTBEAT", raising=False)
+    monkeypatch.chdir(tmp_path)
+
+    def call(arm, *, num_predict, measured, kind, prompt):
+        raise AssertionError("an unset heartbeat still ran")
+
+    for pilot in (False, True):
+        root = tmp_path / ("pilot" if pilot else "block")
+        server = _Server()
+        seams = _seams(server, call)
+        seams.heartbeat = None
+        spec = _spec([PAIRS[0]])
+        with pytest.raises(GuardError, match="WATCHDOG_HEARTBEAT"):
+            if pilot:
+                run_pilot(spec, seams, root=root, run_id="unset", repo=root, calls=1)
+            else:
+                run_block(spec, seams, root=root, run_id="unset", repo=root)
+        assert server.events == []
+
+
+def test_no_watchdog_runs_the_pilot_and_both_pilot_documents_record_it(tmp_path: Path):
+    def ok_call(arm, *, num_predict, measured, kind, prompt):
+        payload = _clean(arm, num_predict=num_predict, kind=kind)
+        if kind == "measure":
+            payload["clocks_mhz"] = [2000.0, 2001.0]
+            payload["eval_count"] = 1024
+        return payload
+
+    seams = _seams(_Server(), ok_call)
+    assert "watchdog" not in run_pilot(
+        _spec([PAIRS[0]]), seams, root=tmp_path / "with", run_id="with", repo=tmp_path, calls=PILOT_CALLS
+    )
+    seams = _seams(_Server(), ok_call)
+    seams.heartbeat = NO_WATCHDOG
+    document = run_pilot(
+        _spec([PAIRS[0]]), seams, root=tmp_path / "without", run_id="without", repo=tmp_path, calls=PILOT_CALLS
+    )
+    assert document["watchdog"] == NO_WATCHDOG_NOTE
+
+    def boom(arm, *, num_predict, measured, kind, prompt):
+        raise RuntimeError("boom")
+
+    seams = _seams(_Server(), boom)
+    seams.heartbeat = NO_WATCHDOG
+    root = tmp_path / "aborted-run"
+    with pytest.raises(RuntimeError, match="boom"):
+        run_pilot(_spec([PAIRS[0]]), seams, root=root, run_id="parked", repo=root, calls=1)
+    parked = next((root / "aborted").glob("parked-*")) / "parked.json"
+    body = json.loads(parked.read_text(encoding="utf-8"))
+    assert body["aborted"] is True
+    assert body["watchdog"] == NO_WATCHDOG_NOTE
+
+
+def test_no_watchdog_is_in_the_block_receipt_header_finished_or_aborted(tmp_path: Path):
+    from interlock.receipt import check_tree
+
+    def ok_call(arm, *, num_predict, measured, kind, prompt):
+        return _clean(arm, num_predict=num_predict, kind=kind)
+
+    seams = _seams(_Server(), ok_call)
+    seams.heartbeat = NO_WATCHDOG
+    done = tmp_path / "done"
+    run_block(_spec([PAIRS[0]]), seams, root=done, run_id="done", repo=tmp_path)
+    header = _rows(done / "receipts" / "done.jsonl")[0]
+    assert header["watchdog"] == NO_WATCHDOG_NOTE
+    assert check_tree(done) == []
+
+    plain = tmp_path / "plain"
+    run_block(_spec([PAIRS[0]]), _seams(_Server(), ok_call), root=plain, run_id="plain", repo=tmp_path)
+    assert "watchdog" not in _rows(plain / "receipts" / "plain.jsonl")[0]
+
+    def boom(arm, *, num_predict, measured, kind, prompt):
+        raise RuntimeError("boom")
+
+    seams = _seams(_Server(), boom)
+    seams.heartbeat = NO_WATCHDOG
+    stopped = tmp_path / "stopped"
+    with pytest.raises(RuntimeError, match="boom"):
+        run_block(_spec([PAIRS[0]]), seams, root=stopped, run_id="stopped", repo=tmp_path)
+    parked = next((stopped / "aborted").glob("stopped-*"))
+    aborted = _rows(parked / "stopped.jsonl")[0]
+    assert aborted["aborted"] is True
+    assert aborted["watchdog"] == NO_WATCHDOG_NOTE
 
 
 def test_a_card_that_is_not_empty_refuses_the_block_and_the_pilot_before_spawn(tmp_path: Path):

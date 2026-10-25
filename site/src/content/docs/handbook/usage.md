@@ -105,6 +105,7 @@ interlock run experiments/c2-fill-card/spec.yaml --dry-run
 | `--grant` | Required before a 5090 step starts. The runner records the grant text. |
 | `--npu-session` | Required before an NPU or iGPU step starts. |
 | `--cpu-window` | Required before a CPU-heavy leg starts. |
+| `--no-watchdog` | Run a 5090 step with no VRAM watchdog. Without it, an unset `WATCHDOG_HEARTBEAT` (or `[paths] heartbeat` in `interlock.toml`) refuses the run. The receipt's notes record the choice. |
 | `--run-id` | Use this id. An id already in use is refused. |
 | `--pilot` | For E4b, write the clock pilot and do not write receipts or the routing table. |
 | `--pairs` | Comma-separated E4b pair ids, a subset of the spec. The receipt records them. |
@@ -113,6 +114,8 @@ interlock run experiments/c2-fill-card/spec.yaml --dry-run
 | `--notes` | A note stored with the run. The default is empty. |
 | `--quarantine` | Where a stopped run is set aside. The default is `aborted/` under `--root`. |
 | `--root` | Project root. The default is the current directory. |
+
+Three locations are settings, not defaults on a rig: `INTERLOCK_SCRATCH_ROOT` (offrig's scratch project; default under the system temp directory), `INTERLOCK_WEIGHTS_HOT` (the cache an `hf_cache: hot` arm reads; default `hot/` under `HF_HOME`) and `WATCHDOG_HEARTBEAT` (no default). Each can also be a key under `[paths]` in `interlock.toml`.
 
 With no `--run-id`, E4b uses `e4b-block` or `e4b-pilot`, then `<base>-2`, `<base>-3`, and so on. The chosen id is the first line of the run and a field on the receipt.
 

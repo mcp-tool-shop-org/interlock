@@ -115,7 +115,7 @@
       "confidence": "low",
       "highWater": null,
       "name": "scripts",
-      "qualifyingSourceCommits": 2,
+      "qualifyingSourceCommits": 3,
       "rebaseline": null
     },
     {
@@ -130,12 +130,12 @@
           "scripts"
         ]
       },
-      "cohesion": 0.216383,
+      "cohesion": 0,
       "cohesionDropped": false,
       "confidence": "low",
       "highWater": null,
       "name": "src",
-      "qualifyingSourceCommits": 12,
+      "qualifyingSourceCommits": 29,
       "rebaseline": null
     },
     {
@@ -169,7 +169,7 @@
       "confidence": "full",
       "highWater": null,
       "name": "tests",
-      "qualifyingSourceCommits": 74,
+      "qualifyingSourceCommits": 90,
       "rebaseline": null
     }
   ],
@@ -187,8 +187,8 @@
         "path": ".github/dependabot.yml"
       },
       {
-        "commits": 8,
-        "lines": 192,
+        "commits": 10,
+        "lines": 205,
         "path": ".github/workflows/ci.yml"
       },
       {
@@ -217,8 +217,8 @@
         "path": ".python-version"
       },
       {
-        "commits": 34,
-        "lines": 109,
+        "commits": 53,
+        "lines": 214,
         "path": "CHANGELOG.md"
       },
       {
@@ -228,62 +228,67 @@
       },
       {
         "commits": 1,
+        "lines": 33,
+        "path": "CONTRIBUTORS.md"
+      },
+      {
+        "commits": 1,
         "lines": 21,
         "path": "LICENSE"
       },
       {
-        "commits": 3,
-        "lines": 239,
+        "commits": 9,
+        "lines": 536,
         "path": "README.es.md"
       },
       {
-        "commits": 3,
-        "lines": 261,
+        "commits": 9,
+        "lines": 578,
         "path": "README.fr.md"
       },
       {
-        "commits": 3,
-        "lines": 255,
+        "commits": 8,
+        "lines": 552,
         "path": "README.hi.md"
       },
       {
-        "commits": 3,
-        "lines": 241,
+        "commits": 9,
+        "lines": 542,
         "path": "README.it.md"
       },
       {
-        "commits": 3,
-        "lines": 263,
+        "commits": 9,
+        "lines": 612,
         "path": "README.ja.md"
       },
       {
-        "commits": 19,
-        "lines": 358,
+        "commits": 29,
+        "lines": 468,
         "path": "README.md"
       },
       {
-        "commits": 3,
-        "lines": 243,
+        "commits": 9,
+        "lines": 540,
         "path": "README.pt-BR.md"
       },
       {
-        "commits": 3,
-        "lines": 263,
+        "commits": 9,
+        "lines": 590,
         "path": "README.zh.md"
       },
       {
-        "commits": 1,
-        "lines": 46,
+        "commits": 2,
+        "lines": 63,
         "path": "SCORECARD.md"
       },
       {
-        "commits": 5,
-        "lines": 59,
+        "commits": 8,
+        "lines": 75,
         "path": "SECURITY.md"
       },
       {
-        "commits": 1,
-        "lines": 84,
+        "commits": 3,
+        "lines": 100,
         "path": "SHIP_GATE.md"
       },
       {
@@ -372,8 +377,8 @@
         "path": "assets/logo/switchyard_64.png"
       },
       {
-        "commits": 38,
-        "lines": 819,
+        "commits": 41,
+        "lines": 876,
         "path": "atlas/README.md"
       },
       {
@@ -382,18 +387,18 @@
         "path": "atlas/boundaries.yaml"
       },
       {
-        "commits": 38,
-        "lines": 2629,
+        "commits": 41,
+        "lines": 2867,
         "path": "atlas/page.json"
       },
       {
-        "commits": 38,
-        "lines": 6837,
+        "commits": 41,
+        "lines": 7663,
         "path": "atlas/statistics.json"
       },
       {
-        "commits": 38,
-        "lines": 36536,
+        "commits": 41,
+        "lines": 47061,
         "path": "atlas/structure.json"
       },
       {
@@ -435,6 +440,26 @@
         "commits": 2,
         "lines": 27,
         "path": "docs/offrig-integration.md"
+      },
+      {
+        "commits": 2,
+        "lines": 865,
+        "path": "experiments/c2-fill-card/spec.yaml"
+      },
+      {
+        "commits": 2,
+        "lines": 867,
+        "path": "experiments/c2-generate/spec.yaml"
+      },
+      {
+        "commits": 1,
+        "lines": 130,
+        "path": "experiments/c2-throughput/inputs.json"
+      },
+      {
+        "commits": 2,
+        "lines": 407,
+        "path": "experiments/c2-throughput/spec.yaml"
       },
       {
         "commits": 3,
@@ -510,6 +535,26 @@
         "commits": 9,
         "lines": 144,
         "path": "experiments/e5/spec.yaml"
+      },
+      {
+        "commits": 1,
+        "lines": 122,
+        "path": "experiments/relay-s1/companion.yaml"
+      },
+      {
+        "commits": 1,
+        "lines": 85,
+        "path": "experiments/relay-s1/decode.yaml"
+      },
+      {
+        "commits": 1,
+        "lines": 87,
+        "path": "experiments/relay-s1/long.yaml"
+      },
+      {
+        "commits": 1,
+        "lines": 86,
+        "path": "experiments/relay-s1/unload.yaml"
       },
       {
         "commits": 1,
@@ -807,8 +852,8 @@
         "path": "interlock}/tasks.py"
       },
       {
-        "commits": 11,
-        "lines": 154,
+        "commits": 21,
+        "lines": 184,
         "path": "pyproject.toml"
       },
       {
@@ -1223,17 +1268,22 @@
       },
       {
         "commits": 1,
-        "lines": 37,
+        "lines": 563,
+        "path": "scripts/relay_s1.py"
+      },
+      {
+        "commits": 2,
+        "lines": 39,
         "path": "site/astro.config.mjs"
       },
       {
-        "commits": 1,
-        "lines": 5669,
+        "commits": 3,
+        "lines": 5759,
         "path": "site/package-lock.json"
       },
       {
-        "commits": 1,
-        "lines": 18,
+        "commits": 3,
+        "lines": 24,
         "path": "site/package.json"
       },
       {
@@ -1252,38 +1302,38 @@
         "path": "site/src/content.config.ts"
       },
       {
-        "commits": 1,
-        "lines": 45,
+        "commits": 2,
+        "lines": 49,
         "path": "site/src/content/docs/handbook/architecture.md"
       },
       {
-        "commits": 1,
-        "lines": 42,
+        "commits": 2,
+        "lines": 67,
         "path": "site/src/content/docs/handbook/configuration.md"
       },
       {
-        "commits": 1,
-        "lines": 91,
+        "commits": 2,
+        "lines": 105,
         "path": "site/src/content/docs/handbook/experiments.md"
       },
       {
-        "commits": 1,
-        "lines": 43,
+        "commits": 3,
+        "lines": 67,
         "path": "site/src/content/docs/handbook/getting-started.md"
       },
       {
-        "commits": 1,
-        "lines": 27,
+        "commits": 6,
+        "lines": 41,
         "path": "site/src/content/docs/handbook/index.md"
       },
       {
-        "commits": 1,
-        "lines": 40,
+        "commits": 5,
+        "lines": 64,
         "path": "site/src/content/docs/handbook/security.md"
       },
       {
-        "commits": 1,
-        "lines": 123,
+        "commits": 6,
+        "lines": 192,
         "path": "site/src/content/docs/handbook/usage.md"
       },
       {
@@ -1292,8 +1342,8 @@
         "path": "site/src/pages/index.astro"
       },
       {
-        "commits": 1,
-        "lines": 131,
+        "commits": 6,
+        "lines": 145,
         "path": "site/src/site-config.ts"
       },
       {
@@ -1312,13 +1362,18 @@
         "path": "site/tsconfig.json"
       },
       {
-        "commits": 1,
-        "lines": 4,
+        "commits": 5,
+        "lines": 14,
         "path": "src/interlock/__init__.py"
       },
       {
-        "commits": 1,
-        "lines": 11,
+        "commits": 2,
+        "lines": 17,
+        "path": "src/interlock/adapters/offrig_calibrate.py"
+      },
+      {
+        "commits": 2,
+        "lines": 29,
         "path": "src/interlock/adapters/ollama.py"
       },
       {
@@ -1327,18 +1382,33 @@
         "path": "src/interlock/adapters/ollama_cases.py"
       },
       {
-        "commits": 1,
-        "lines": 42,
+        "commits": 4,
+        "lines": 105,
         "path": "src/interlock/adapters/openvino.py"
       },
       {
-        "commits": 3,
-        "lines": 28,
+        "commits": 1,
+        "lines": 464,
+        "path": "src/interlock/calltrace.py"
+      },
+      {
+        "commits": 13,
+        "lines": 346,
         "path": "src/interlock/cli.py"
       },
       {
-        "commits": 3,
-        "lines": 465,
+        "commits": 2,
+        "lines": 194,
+        "path": "src/interlock/devices.py"
+      },
+      {
+        "commits": 2,
+        "lines": 37,
+        "path": "src/interlock/guards.py"
+      },
+      {
+        "commits": 6,
+        "lines": 499,
         "path": "src/interlock/harness/e4b.py"
       },
       {
@@ -1352,8 +1422,8 @@
         "path": "src/interlock/harness/e5.py"
       },
       {
-        "commits": 8,
-        "lines": 1231,
+        "commits": 12,
+        "lines": 1261,
         "path": "src/interlock/harness/fill.py"
       },
       {
@@ -1362,28 +1432,33 @@
         "path": "src/interlock/harness/lifecycle.py"
       },
       {
+        "commits": 8,
+        "lines": 2656,
+        "path": "src/interlock/harness/linux_cuda.py"
+      },
+      {
         "commits": 1,
         "lines": 3,
         "path": "src/interlock/harness/ollama_serve.py"
       },
       {
-        "commits": 1,
-        "lines": 14,
+        "commits": 4,
+        "lines": 66,
         "path": "src/interlock/harness/receipts.py"
       },
       {
-        "commits": 8,
-        "lines": 180,
+        "commits": 15,
+        "lines": 606,
         "path": "src/interlock/harness/runner.py"
       },
       {
-        "commits": 5,
-        "lines": 36,
+        "commits": 8,
+        "lines": 245,
         "path": "src/interlock/harness/spec.py"
       },
       {
-        "commits": 1,
-        "lines": 3,
+        "commits": 3,
+        "lines": 28,
         "path": "src/interlock/harness/storage.py"
       },
       {
@@ -1395,6 +1470,11 @@
         "commits": 1,
         "lines": 21,
         "path": "src/interlock/importers/aspire_judges.py"
+      },
+      {
+        "commits": 3,
+        "lines": 39,
+        "path": "src/interlock/importers/assemble.py"
       },
       {
         "commits": 1,
@@ -1422,28 +1502,58 @@
         "path": "src/interlock/importers/offers.py"
       },
       {
+        "commits": 2,
+        "lines": 14,
+        "path": "src/interlock/importers/pins.py"
+      },
+      {
         "commits": 1,
         "lines": 5,
         "path": "src/interlock/importers/probe.py"
       },
       {
+        "commits": 4,
+        "lines": 315,
+        "path": "src/interlock/importers/remote.py"
+      },
+      {
         "commits": 2,
-        "lines": 152,
+        "lines": 156,
+        "path": "src/interlock/importers/sources.py"
+      },
+      {
+        "commits": 3,
+        "lines": 162,
         "path": "src/interlock/ollama_supervisor.py"
       },
       {
-        "commits": 1,
-        "lines": 3,
+        "commits": 2,
+        "lines": 48,
+        "path": "src/interlock/paths.py"
+      },
+      {
+        "commits": 5,
+        "lines": 108,
         "path": "src/interlock/receipt.py"
       },
       {
         "commits": 1,
-        "lines": 32,
+        "lines": 179,
+        "path": "src/interlock/relay_sink.py"
+      },
+      {
+        "commits": 4,
+        "lines": 128,
         "path": "src/interlock/router/policy.py"
       },
       {
-        "commits": 1,
-        "lines": 4,
+        "commits": 3,
+        "lines": 14,
+        "path": "src/interlock/schema/route-decision.v1.json"
+      },
+      {
+        "commits": 4,
+        "lines": 41,
         "path": "src/interlock/schema/routing-row.schema.json"
       },
       {
@@ -1882,6 +1992,11 @@
         "path": "tests/test_blocked.py"
       },
       {
+        "commits": 1,
+        "lines": 360,
+        "path": "tests/test_calltrace.py"
+      },
+      {
         "commits": 6,
         "lines": 100,
         "path": "tests/test_cli.py"
@@ -1892,18 +2007,18 @@
         "path": "tests/test_compile_rejected_rest.py"
       },
       {
-        "commits": 4,
-        "lines": 328,
+        "commits": 5,
+        "lines": 581,
         "path": "tests/test_devices.py"
       },
       {
-        "commits": 1,
-        "lines": 39,
+        "commits": 2,
+        "lines": 51,
         "path": "tests/test_distribution.py"
       },
       {
-        "commits": 11,
-        "lines": 2620,
+        "commits": 13,
+        "lines": 2708,
         "path": "tests/test_e4b.py"
       },
       {
@@ -1937,24 +2052,49 @@
         "path": "tests/test_env_fallback.py"
       },
       {
-        "commits": 14,
-        "lines": 2755,
+        "commits": 15,
+        "lines": 2783,
         "path": "tests/test_fill_card_live.py"
       },
       {
-        "commits": 4,
-        "lines": 174,
+        "commits": 5,
+        "lines": 180,
         "path": "tests/test_guards.py"
       },
       {
-        "commits": 24,
-        "lines": 2986,
+        "commits": 25,
+        "lines": 2990,
         "path": "tests/test_harness.py"
       },
       {
-        "commits": 9,
-        "lines": 783,
+        "commits": 3,
+        "lines": 374,
+        "path": "tests/test_import_remote_jsonl.py"
+      },
+      {
+        "commits": 2,
+        "lines": 358,
+        "path": "tests/test_import_sources.py"
+      },
+      {
+        "commits": 13,
+        "lines": 1020,
         "path": "tests/test_importers.py"
+      },
+      {
+        "commits": 4,
+        "lines": 2702,
+        "path": "tests/test_linux_cuda.py"
+      },
+      {
+        "commits": 3,
+        "lines": 365,
+        "path": "tests/test_linux_cuda_harness_fixes.py"
+      },
+      {
+        "commits": 2,
+        "lines": 554,
+        "path": "tests/test_linux_cuda_sampler_error.py"
       },
       {
         "commits": 1,
@@ -1967,8 +2107,8 @@
         "path": "tests/test_ollama_fixtures.py"
       },
       {
-        "commits": 9,
-        "lines": 2035,
+        "commits": 10,
+        "lines": 2053,
         "path": "tests/test_ollama_supervisor.py"
       },
       {
@@ -1982,14 +2122,39 @@
         "path": "tests/test_openvino_adapter.py"
       },
       {
-        "commits": 3,
-        "lines": 1230,
+        "commits": 4,
+        "lines": 1235,
         "path": "tests/test_phi_storage.py"
       },
       {
-        "commits": 8,
-        "lines": 332,
+        "commits": 4,
+        "lines": 260,
+        "path": "tests/test_portable_defaults.py"
+      },
+      {
+        "commits": 10,
+        "lines": 656,
         "path": "tests/test_receipt.py"
+      },
+      {
+        "commits": 1,
+        "lines": 356,
+        "path": "tests/test_relay_debug_only.py"
+      },
+      {
+        "commits": 2,
+        "lines": 438,
+        "path": "tests/test_relay_s1_driver.py"
+      },
+      {
+        "commits": 1,
+        "lines": 358,
+        "path": "tests/test_relay_stage0.py"
+      },
+      {
+        "commits": 1,
+        "lines": 191,
+        "path": "tests/test_relay_stage1.py"
       },
       {
         "commits": 3,
@@ -1997,8 +2162,8 @@
         "path": "tests/test_rest_removed_stops.py"
       },
       {
-        "commits": 3,
-        "lines": 184,
+        "commits": 6,
+        "lines": 336,
         "path": "tests/test_route_cli.py"
       },
       {
@@ -2007,8 +2172,8 @@
         "path": "tests/test_router_golden.py"
       },
       {
-        "commits": 3,
-        "lines": 701,
+        "commits": 4,
+        "lines": 880,
         "path": "tests/test_router_policy.py"
       },
       {
@@ -2022,8 +2187,8 @@
         "path": "tests/test_run_lifecycle.py"
       },
       {
-        "commits": 5,
-        "lines": 497,
+        "commits": 6,
+        "lines": 579,
         "path": "tests/test_run_path.py"
       },
       {
@@ -2032,8 +2197,8 @@
         "path": "tests/test_task_scope.py"
       },
       {
-        "commits": 10,
-        "lines": 1177,
+        "commits": 17,
+        "lines": 1222,
         "path": "uv.lock"
       },
       {
@@ -2047,73 +2212,290 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-10-14T05:02:40.059Z",
+  "generatedAt": "2026-10-25T18:33:37.959Z",
   "generatedFrom": {
-    "commit": "0deac11d46af4fa1c35d96c42591e7d3e3423c31"
+    "commit": "fc864e402f5ce1ae717f39128a3dbb24229ddd86"
   },
   "pairs": [
     {
+      "a": "README.es.md",
+      "b": "README.fr.md",
+      "either": 9,
+      "shared": 9,
+      "strength": 1
+    },
+    {
+      "a": "README.es.md",
+      "b": "README.hi.md",
+      "either": 9,
+      "shared": 8,
+      "strength": 0.888889
+    },
+    {
+      "a": "README.es.md",
+      "b": "README.it.md",
+      "either": 9,
+      "shared": 9,
+      "strength": 1
+    },
+    {
+      "a": "README.es.md",
+      "b": "README.ja.md",
+      "either": 9,
+      "shared": 9,
+      "strength": 1
+    },
+    {
+      "a": "README.es.md",
+      "b": "README.pt-BR.md",
+      "either": 9,
+      "shared": 9,
+      "strength": 1
+    },
+    {
+      "a": "README.es.md",
+      "b": "README.zh.md",
+      "either": 9,
+      "shared": 9,
+      "strength": 1
+    },
+    {
+      "a": "README.es.md",
+      "b": "site/src/content/docs/handbook/index.md",
+      "either": 10,
+      "shared": 5,
+      "strength": 0.5
+    },
+    {
+      "a": "README.es.md",
+      "b": "site/src/site-config.ts",
+      "either": 10,
+      "shared": 5,
+      "strength": 0.5
+    },
+    {
+      "a": "README.fr.md",
+      "b": "README.hi.md",
+      "either": 9,
+      "shared": 8,
+      "strength": 0.888889
+    },
+    {
+      "a": "README.fr.md",
+      "b": "README.it.md",
+      "either": 9,
+      "shared": 9,
+      "strength": 1
+    },
+    {
+      "a": "README.fr.md",
+      "b": "README.ja.md",
+      "either": 9,
+      "shared": 9,
+      "strength": 1
+    },
+    {
+      "a": "README.fr.md",
+      "b": "README.pt-BR.md",
+      "either": 9,
+      "shared": 9,
+      "strength": 1
+    },
+    {
+      "a": "README.fr.md",
+      "b": "README.zh.md",
+      "either": 9,
+      "shared": 9,
+      "strength": 1
+    },
+    {
+      "a": "README.fr.md",
+      "b": "site/src/content/docs/handbook/index.md",
+      "either": 10,
+      "shared": 5,
+      "strength": 0.5
+    },
+    {
+      "a": "README.fr.md",
+      "b": "site/src/site-config.ts",
+      "either": 10,
+      "shared": 5,
+      "strength": 0.5
+    },
+    {
+      "a": "README.hi.md",
+      "b": "README.it.md",
+      "either": 9,
+      "shared": 8,
+      "strength": 0.888889
+    },
+    {
+      "a": "README.hi.md",
+      "b": "README.ja.md",
+      "either": 9,
+      "shared": 8,
+      "strength": 0.888889
+    },
+    {
+      "a": "README.hi.md",
+      "b": "README.pt-BR.md",
+      "either": 9,
+      "shared": 8,
+      "strength": 0.888889
+    },
+    {
+      "a": "README.hi.md",
+      "b": "README.zh.md",
+      "either": 9,
+      "shared": 8,
+      "strength": 0.888889
+    },
+    {
+      "a": "README.it.md",
+      "b": "README.ja.md",
+      "either": 9,
+      "shared": 9,
+      "strength": 1
+    },
+    {
+      "a": "README.it.md",
+      "b": "README.pt-BR.md",
+      "either": 9,
+      "shared": 9,
+      "strength": 1
+    },
+    {
+      "a": "README.it.md",
+      "b": "README.zh.md",
+      "either": 9,
+      "shared": 9,
+      "strength": 1
+    },
+    {
+      "a": "README.it.md",
+      "b": "site/src/content/docs/handbook/index.md",
+      "either": 10,
+      "shared": 5,
+      "strength": 0.5
+    },
+    {
+      "a": "README.it.md",
+      "b": "site/src/site-config.ts",
+      "either": 10,
+      "shared": 5,
+      "strength": 0.5
+    },
+    {
+      "a": "README.ja.md",
+      "b": "README.pt-BR.md",
+      "either": 9,
+      "shared": 9,
+      "strength": 1
+    },
+    {
+      "a": "README.ja.md",
+      "b": "README.zh.md",
+      "either": 9,
+      "shared": 9,
+      "strength": 1
+    },
+    {
+      "a": "README.ja.md",
+      "b": "site/src/content/docs/handbook/index.md",
+      "either": 10,
+      "shared": 5,
+      "strength": 0.5
+    },
+    {
+      "a": "README.ja.md",
+      "b": "site/src/site-config.ts",
+      "either": 10,
+      "shared": 5,
+      "strength": 0.5
+    },
+    {
+      "a": "README.pt-BR.md",
+      "b": "README.zh.md",
+      "either": 9,
+      "shared": 9,
+      "strength": 1
+    },
+    {
+      "a": "README.pt-BR.md",
+      "b": "site/src/content/docs/handbook/index.md",
+      "either": 10,
+      "shared": 5,
+      "strength": 0.5
+    },
+    {
+      "a": "README.pt-BR.md",
+      "b": "site/src/site-config.ts",
+      "either": 10,
+      "shared": 5,
+      "strength": 0.5
+    },
+    {
+      "a": "README.zh.md",
+      "b": "site/src/content/docs/handbook/index.md",
+      "either": 10,
+      "shared": 5,
+      "strength": 0.5
+    },
+    {
+      "a": "README.zh.md",
+      "b": "site/src/site-config.ts",
+      "either": 10,
+      "shared": 5,
+      "strength": 0.5
+    },
+    {
+      "a": "SECURITY.md",
+      "b": "site/src/content/docs/handbook/security.md",
+      "either": 8,
+      "shared": 4,
+      "strength": 0.5
+    },
+    {
       "a": "atlas/README.md",
       "b": "atlas/page.json",
-      "either": 34,
-      "shared": 34,
+      "either": 37,
+      "shared": 37,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/statistics.json",
-      "either": 34,
-      "shared": 34,
+      "either": 37,
+      "shared": 37,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/structure.json",
-      "either": 34,
-      "shared": 34,
+      "either": 37,
+      "shared": 37,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/statistics.json",
-      "either": 34,
-      "shared": 34,
+      "either": 37,
+      "shared": 37,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/structure.json",
-      "either": 34,
-      "shared": 34,
+      "either": 37,
+      "shared": 37,
       "strength": 1
     },
     {
       "a": "atlas/statistics.json",
       "b": "atlas/structure.json",
-      "either": 34,
-      "shared": 34,
+      "either": 37,
+      "shared": 37,
       "strength": 1
-    },
-    {
-      "a": "experiments/e4b/spec.yaml",
-      "b": "tests/test_e4b.py",
-      "either": 9,
-      "shared": 5,
-      "strength": 0.555556
-    },
-    {
-      "a": "experiments/e5-smoke/spec.yaml",
-      "b": "src/interlock/harness/fill.py",
-      "either": 7,
-      "shared": 5,
-      "strength": 0.714286
-    },
-    {
-      "a": "experiments/e5-smoke/spec.yaml",
-      "b": "src/interlock/harness/runner.py",
-      "either": 8,
-      "shared": 4,
-      "strength": 0.5
     },
     {
       "a": "experiments/e5-smoke/spec.yaml",
@@ -2121,20 +2503,6 @@
       "either": 6,
       "shared": 4,
       "strength": 0.666667
-    },
-    {
-      "a": "experiments/e5/spec.yaml",
-      "b": "src/interlock/harness/fill.py",
-      "either": 10,
-      "shared": 5,
-      "strength": 0.5
-    },
-    {
-      "a": "experiments/e5/spec.yaml",
-      "b": "src/interlock/harness/runner.py",
-      "either": 10,
-      "shared": 5,
-      "strength": 0.5
     },
     {
       "a": "experiments/e5/spec.yaml",
@@ -2146,37 +2514,37 @@
     {
       "a": "pyproject.toml",
       "b": "uv.lock",
-      "either": 8,
-      "shared": 7,
-      "strength": 0.875
+      "either": 19,
+      "shared": 13,
+      "strength": 0.684211
     },
     {
-      "a": "src/interlock/harness/fill.py",
-      "b": "src/interlock/harness/runner.py",
-      "either": 9,
+      "a": "site/src/content/docs/handbook/index.md",
+      "b": "site/src/content/docs/handbook/security.md",
+      "either": 6,
       "shared": 5,
-      "strength": 0.555556
+      "strength": 0.833333
     },
     {
-      "a": "src/interlock/harness/fill.py",
-      "b": "tests/test_e5_preflight.py",
-      "either": 7,
+      "a": "site/src/content/docs/handbook/index.md",
+      "b": "site/src/site-config.ts",
+      "either": 6,
+      "shared": 6,
+      "strength": 1
+    },
+    {
+      "a": "site/src/content/docs/handbook/security.md",
+      "b": "site/src/site-config.ts",
+      "either": 6,
       "shared": 5,
-      "strength": 0.714286
+      "strength": 0.833333
     },
     {
       "a": "src/interlock/harness/fill.py",
       "b": "tests/test_fill_card_live.py",
-      "either": 12,
-      "shared": 7,
-      "strength": 0.583333
-    },
-    {
-      "a": "src/interlock/harness/runner.py",
-      "b": "tests/test_e5_preflight.py",
-      "either": 7,
-      "shared": 5,
-      "strength": 0.714286
+      "either": 16,
+      "shared": 8,
+      "strength": 0.5
     },
     {
       "a": "src/switchyard/adapters/openvino.py",
@@ -2188,9 +2556,9 @@
     {
       "a": "src/switchyard/harness/e4b.py",
       "b": "tests/test_e4b.py",
-      "either": 9,
+      "either": 11,
       "shared": 6,
-      "strength": 0.666667
+      "strength": 0.545455
     },
     {
       "a": "src/switchyard/harness/receipts.py",
@@ -2245,16 +2613,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-10-13T21:46:34-07:00",
-    "inScopeFiles": 270,
+    "headDate": "2026-10-25T14:32:02-04:00",
+    "inScopeFiles": 297,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 110,
+    "qualifyingCommits": 139,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-04-17T04:46:34.000Z",
+    "since": "2026-04-28T18:32:02.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",
@@ -2270,7 +2638,7 @@
     ],
     "sourceFileReach": 20,
     "sourceFileRise": 25,
-    "sourceFilesReachingStrongFloor": 9,
+    "sourceFilesReachingStrongFloor": 14,
     "strength": 0.5,
     "windowDays": 180
   },

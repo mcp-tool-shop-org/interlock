@@ -11,6 +11,21 @@ from pathlib import Path
 from interlock.devices import CARD_5090, CPU, IGPU, NPU
 
 HEARTBEAT_MAX_AGE_S = 60
+HEARTBEAT_ENV = "WATCHDOG_HEARTBEAT"
+
+
+class WatchdogOptOut:
+    """The explicit ``--no-watchdog`` choice: this run uses no VRAM watchdog, so there is no heartbeat to read.
+
+    An unset heartbeat is ``None`` and refuses. Only this marker, which only the flag creates, skips the guard.
+    """
+
+    def __repr__(self) -> str:
+        return "NO_WATCHDOG"
+
+
+NO_WATCHDOG = WatchdogOptOut()
+NO_WATCHDOG_NOTE = "no watchdog: run with --no-watchdog; the heartbeat guard was not applied"
 
 
 class GuardError(Exception):
@@ -41,9 +56,11 @@ def require_cpu_window(window: str | None, *, required: bool) -> str | None:
     return window.strip()
 
 
-def heartbeat_age_s(path: Path, now: float) -> float:
-    """Age of the heartbeat from its modified time. The file is not opened."""
+def heartbeat_age_s(path: Path | None, now: float) -> float:
+    """Age of the heartbeat from its modified time. The file is not opened. No path reads as infinitely stale."""
 
+    if path is None:
+        return float("inf")
     try:
         modified = path.stat().st_mtime
     except OSError:
@@ -51,11 +68,32 @@ def heartbeat_age_s(path: Path, now: float) -> float:
     return now - modified
 
 
-def require_heartbeat(path: Path, now: float, *, max_age_s: float = HEARTBEAT_MAX_AGE_S) -> float:
+def heartbeat_problem(age: float) -> str:
+    """Why a heartbeat of this age is refused. An infinite age is nothing to read (unset, or no file), not a time."""
+
+    if age == float("inf"):
+        return (
+            f"no watchdog heartbeat: set {HEARTBEAT_ENV} (or [paths] heartbeat) to the watchdog's heartbeat file, "
+            "or pass --no-watchdog if you run no watchdog"
+        )
+    return f"watchdog heartbeat is {age:.0f}s old"
+
+
+def require_heartbeat(
+    path: Path | WatchdogOptOut | None, now: float, *, max_age_s: float = HEARTBEAT_MAX_AGE_S
+) -> float:
+    """Refuse a stale or missing heartbeat. With no heartbeat configured it refuses too, naming how to set one.
+
+    Only the ``--no-watchdog`` marker skips the check; the run records that it did.
+    """
+
+    if path is NO_WATCHDOG:
+        return 0.0
+    if path is None:
+        raise GuardError(f"REFUSED: {heartbeat_problem(float('inf'))}")
     age = heartbeat_age_s(path, now)
     if age > max_age_s:
-        shown = "missing" if age == float("inf") else f"{age:.0f}s"
-        raise GuardError(f"REFUSED: watchdog heartbeat is {shown} old")
+        raise GuardError(f"REFUSED: {heartbeat_problem(age)}")
     return age
 
 

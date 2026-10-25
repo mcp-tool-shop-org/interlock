@@ -2,9 +2,8 @@
 
 ``archive`` is the default and keeps today's snapshot fetch: no cache directory
 is forced, so the process cache is the one already in use. ``hot`` resolves the
-same repo and revision under ``C:/AI-Models/hf-cache-hot`` and refuses when that
-copy is absent. It does not download, and it does not fall back to the archive
-at ``E:/AI-Models/hf-cache``.
+same repo and revision under the hot cache (``hot_root()``) and refuses when that
+copy is absent. It does not download, and it does not fall back to the archive.
 
 A cold copy is a fresh directory on the snapshot's own drive, filled with
 unbuffered I/O (``robocopy /J``), so the first load does not reuse the
@@ -14,16 +13,30 @@ operating system's file cache. The copy is deleted when the arm unloads.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
 from pathlib import Path
 
-HOT_ROOT = Path("C:/AI-Models/hf-cache-hot")
-ARCHIVE_ROOT = Path("E:/AI-Models/hf-cache")
+from interlock.paths import PathsConfigError, configured
 
 
 class StorageError(Exception):
     """The weights could not be resolved or copied. The caller refuses the arm."""
+
+
+def hot_root() -> Path:
+    """The hot weights cache an arm with ``hf_cache: hot`` reads: ``INTERLOCK_WEIGHTS_HOT``, else ``[paths]
+    weights_hot`` in ``interlock.toml``, else ``hot/`` under ``HF_HOME`` (or the user's Hugging Face cache)."""
+
+    try:
+        found = configured("INTERLOCK_WEIGHTS_HOT", "weights_hot")
+    except PathsConfigError as exc:
+        raise StorageError(str(exc)) from exc
+    if found is not None:
+        return Path(found)
+    base = os.environ.get("HF_HOME")
+    return (Path(base) if base else Path.home() / ".cache" / "huggingface") / "hot"
 
 
 def repo_folder(repo: str) -> str:

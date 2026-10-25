@@ -1,11 +1,11 @@
 ---
 title: Configuration
-description: The INTERLOCK_* variables, and the one watchdog path.
+description: The INTERLOCK_* variables, WATCHDOG_HEARTBEAT, and the interlock.toml file.
 sidebar:
   order: 3
 ---
 
-interlock has no config file. A measurement run reads a few environment variables. `route`, `table`, `check`, and `runs` do not need them.
+A measurement run reads a few environment variables. `route`, `table`, `check`, and `runs` do not need them. Two things can also be set in an optional `interlock.toml` in the working directory: `[paths]` (below) and `[import.sources]` (where `interlock import` finds its source repositories; see the README). An unknown key in either table is refused, naming the valid ones. An environment variable beats the file, and there is no default path on anyone's rig.
 
 `SWITCHYARD_*` still works for this release. When a `SWITCHYARD_` name answers and the `INTERLOCK_` name does not, interlock warns once on stderr and tells you the new name.
 
@@ -33,7 +33,26 @@ Path of the `ollama` executable. The CUDA library path is derived beside it, und
 
 ## WATCHDOG_HEARTBEAT
 
-Path of the VRAM watchdog heartbeat file. The 5090 path checks that the file's modified time is at most 60 seconds old, and that no model is loaded, before a step starts. The file is not opened. Only its modified time is read. The default is a path on the measurement rig. Set the variable to point somewhere else. This name is not an `INTERLOCK_` name.
+Path of the VRAM watchdog heartbeat file, or `heartbeat` under `[paths]` in `interlock.toml`. The 5090 path checks that the file's modified time is at most 60 seconds old, and that no model is loaded, before a step starts. The file is not opened. Only its modified time is read. There is no default path: with neither set, the run refuses before any device is touched, and the message names `WATCHDOG_HEARTBEAT`. If you run no watchdog, pass `--no-watchdog` to `interlock run`. That is the only way to skip the check; it is never implied by an unset variable, and the receipt records it (in its `notes`, and in the `watchdog` field of an E4b header or pilot document). The empty-card check still runs. This name is not an `INTERLOCK_` name.
+
+## INTERLOCK_SCRATCH_ROOT
+
+Path of the scratch directory offrig opens as its project for `offrig verify calibrate`, or `scratch_root` under `[paths]`. The default is `interlock-scratch` under the system temp directory.
+
+## INTERLOCK_WEIGHTS_HOT
+
+Path of the hot weights cache an arm with `hf_cache: hot` reads, or `weights_hot` under `[paths]`. A missing copy is a refusal. The default is `hot/` under `HF_HOME`, or under the user's Hugging Face cache.
+
+## interlock.toml
+
+```toml
+[paths]
+scratch_root = "scratch"
+weights_hot = "hf-hot"
+heartbeat = "watchdog/HEARTBEAT"
+```
+
+A value is used as you gave it and is never expanded to a home path in anything interlock publishes.
 
 ## What is not configuration
 
