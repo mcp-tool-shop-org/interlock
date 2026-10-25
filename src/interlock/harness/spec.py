@@ -367,6 +367,18 @@ def _require_remote_model_source(model: dict) -> None:
         failure_reason.startswith("no published ") or "out of scope" in failure_reason.lower()
     )
 
+    if expected_outcome == "load_refused":
+        if not failure_reason or not (
+            failure_reason.startswith("no published ")
+            or "out of scope" in failure_reason.lower()
+            or "mib" in failure_reason.lower()
+        ):
+            raise SpecError(
+                f"roster entry {model.get('model')!r} ({model.get('quant')!r}) on {model.get('device')!r} "
+                "with expected_outcome: load_refused must state a measured failure_reason "
+                "(weight MiB vs card VRAM/abort ceiling, 'no published <quant> build', or 'out of scope')"
+            )
+
     if has_tag and has_gguf:
         raise SpecError(f"roster entry {model.get('model')!r} cannot name both ollama_tag and gguf")
     if has_tag:
@@ -382,6 +394,11 @@ def _require_remote_model_source(model: dict) -> None:
             val = gguf.get(req_key)
             if not isinstance(val, str) or not val.strip():
                 raise SpecError(f"roster entry {model.get('model')!r} gguf is missing {req_key}")
+        repo = gguf["repo"].strip()
+        if repo.startswith("sha256:") or "/" not in repo:
+            raise SpecError(
+                f"roster entry {model.get('model')!r} gguf.repo must be an 'owner/name' Hugging Face repo id"
+            )
         if len(gguf["revision"].strip()) != 40:
             raise SpecError(f"roster entry {model.get('model')!r} gguf.revision must be a 40-hex commit sha")
         if len(gguf["sha256"].strip()) != 64:

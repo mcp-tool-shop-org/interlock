@@ -102,6 +102,7 @@ models:
     engine: ollama
     device: "colab:T4"
     expected_outcome: load_refused
+    failure_reason: "model layer 15629 MiB (16388043552 B) exceeds colab:T4 15360 MiB VRAM (13824 MiB 0.90 abort ceiling)"
   - model: phi3.5:3.8b
     ollama_tag: phi3.5:3.8b-mini-instruct-q4_K_M
     revision_or_digest: 57096159698481b47ea17995d1a71f28eea1e26fc801df39a841b29badb4aa63
@@ -131,19 +132,16 @@ models:
     engine: ollama
     device: "colab:T4"
   - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
-    gguf:
-      repo: "sha256:07151d7dc3921fb2e53f4fed1870d0806fcf1312aae45d60d22a9ff1b0ec8678"
-      revision: 9dfbad5aa9ecec08cd4275a1779ae2be3bcf2725
-      file: blobs/sha256-280af6832eca23cb322c4dcc65edfea98a21b8f8ab07dc7553bd6f7e6e7a3313
-      sha256: 280af6832eca23cb322c4dcc65edfea98a21b8f8ab07dc7553bd6f7e6e7a3313
-    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    ollama_tag: gemma4:31b-it-q4_K_M
+    revision_or_digest: 17ba34c06c801ba22f6047bab21ced9429c6d43e0e42ecf339b0f3e5a61e8d97
     quant: Q4_K_M
     licence: gemma
     engine: ollama
     device: "colab:T4"
     expected_outcome: load_refused
+    failure_reason: "model layer 17805 MiB (18670033120 B) exceeds colab:T4 15360 MiB VRAM (13824 MiB 0.90 abort ceiling)"
   - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
-    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    revision_or_digest: 17ba34c06c801ba22f6047bab21ced9429c6d43e0e42ecf339b0f3e5a61e8d97
     quant: Q6_K
     licence: gemma
     engine: ollama
@@ -151,21 +149,23 @@ models:
     expected_outcome: load_refused
     failure_reason: "no published Q6_K build"
   - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
-    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    ollama_tag: gemma4:31b-it-q8_0
+    revision_or_digest: ac97b596ee1f1eca8cc5e35b7aab3226051c0204cd8324f3de4e0bb46b00c533
     quant: Q8_0
     licence: gemma
     engine: ollama
     device: "colab:T4"
     expected_outcome: load_refused
-    failure_reason: "no published Q8_0 build"
+    failure_reason: "model layer 31124 MiB (32635676896 B) exceeds colab:T4 15360 MiB VRAM (13824 MiB 0.90 abort ceiling)"
   - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
-    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    ollama_tag: gemma4:31b-it-bf16
+    revision_or_digest: df1661a2a6aaa94faf24bbaf23a691877a27d0e6052598f105a225618a079e76
     quant: BF16
     licence: gemma
     engine: ollama
     device: "colab:T4"
     expected_outcome: load_refused
-    failure_reason: "no published BF16 build"
+    failure_reason: "model layer 58568 MiB (61413189856 B) exceeds colab:T4 15360 MiB VRAM (13824 MiB 0.90 abort ceiling)"
   - model: muse-glimmer:30b
     ollama_tag: muse-glimmer:30b-q4_K_M
     revision_or_digest: de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1
@@ -174,6 +174,7 @@ models:
     engine: ollama
     device: "colab:T4"
     expected_outcome: load_refused
+    failure_reason: "model layer 15980 MiB (16756681056 B) exceeds colab:T4 15360 MiB VRAM (13824 MiB 0.90 abort ceiling)"
   - model: muse-glimmer:30b
     revision_or_digest: de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1
     quant: Q6_K
@@ -190,6 +191,7 @@ models:
     engine: ollama
     device: "colab:T4"
     expected_outcome: load_refused
+    failure_reason: "model layer 28241 MiB (29612958048 B) exceeds colab:T4 15360 MiB VRAM (13824 MiB 0.90 abort ceiling)"
   - model: muse-glimmer:30b
     ollama_tag: muse-glimmer:30b-bf16
     revision_or_digest: 318fb1b9b81696d14f4f2784b3bda2e4e633046a52fcc9fe0b94e74f889f5efe
@@ -198,6 +200,7 @@ models:
     engine: ollama
     device: "colab:T4"
     expected_outcome: load_refused
+    failure_reason: "model layer 53144 MiB (55725511008 B) exceeds colab:T4 15360 MiB VRAM (13824 MiB 0.90 abort ceiling)"
   # colab:L4 (24 GB)
   - model: qwen3:8b
     ollama_tag: qwen3:8b-q4_K_M
@@ -260,18 +263,14 @@ models:
     engine: ollama
     device: "colab:L4"
   - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
-    gguf:
-      repo: "sha256:07151d7dc3921fb2e53f4fed1870d0806fcf1312aae45d60d22a9ff1b0ec8678"
-      revision: 9dfbad5aa9ecec08cd4275a1779ae2be3bcf2725
-      file: blobs/sha256-280af6832eca23cb322c4dcc65edfea98a21b8f8ab07dc7553bd6f7e6e7a3313
-      sha256: 280af6832eca23cb322c4dcc65edfea98a21b8f8ab07dc7553bd6f7e6e7a3313
-    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    ollama_tag: gemma4:31b-it-q4_K_M
+    revision_or_digest: 17ba34c06c801ba22f6047bab21ced9429c6d43e0e42ecf339b0f3e5a61e8d97
     quant: Q4_K_M
     licence: gemma
     engine: ollama
     device: "colab:L4"
   - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
-    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    revision_or_digest: 17ba34c06c801ba22f6047bab21ced9429c6d43e0e42ecf339b0f3e5a61e8d97
     quant: Q6_K
     licence: gemma
     engine: ollama
@@ -279,21 +278,23 @@ models:
     expected_outcome: load_refused
     failure_reason: "no published Q6_K build"
   - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
-    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    ollama_tag: gemma4:31b-it-q8_0
+    revision_or_digest: ac97b596ee1f1eca8cc5e35b7aab3226051c0204cd8324f3de4e0bb46b00c533
     quant: Q8_0
     licence: gemma
     engine: ollama
     device: "colab:L4"
     expected_outcome: load_refused
-    failure_reason: "no published Q8_0 build"
+    failure_reason: "model layer 31124 MiB (32635676896 B) exceeds colab:L4 23034 MiB VRAM (20730 MiB 0.90 abort ceiling)"
   - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
-    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    ollama_tag: gemma4:31b-it-bf16
+    revision_or_digest: df1661a2a6aaa94faf24bbaf23a691877a27d0e6052598f105a225618a079e76
     quant: BF16
     licence: gemma
     engine: ollama
     device: "colab:L4"
     expected_outcome: load_refused
-    failure_reason: "no published BF16 build"
+    failure_reason: "model layer 58568 MiB (61413189856 B) exceeds colab:L4 23034 MiB VRAM (20730 MiB 0.90 abort ceiling)"
   - model: muse-glimmer:30b
     ollama_tag: muse-glimmer:30b-q4_K_M
     revision_or_digest: de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1
@@ -317,6 +318,7 @@ models:
     engine: ollama
     device: "colab:L4"
     expected_outcome: load_refused
+    failure_reason: "model layer 28241 MiB (29612958048 B) exceeds colab:L4 23034 MiB VRAM (20730 MiB 0.90 abort ceiling)"
   - model: muse-glimmer:30b
     ollama_tag: muse-glimmer:30b-bf16
     revision_or_digest: 318fb1b9b81696d14f4f2784b3bda2e4e633046a52fcc9fe0b94e74f889f5efe
@@ -325,6 +327,7 @@ models:
     engine: ollama
     device: "colab:L4"
     expected_outcome: load_refused
+    failure_reason: "model layer 53144 MiB (55725511008 B) exceeds colab:L4 23034 MiB VRAM (20730 MiB 0.90 abort ceiling)"
   # colab:A100-40 (40 GB)
   - model: qwen3:8b
     ollama_tag: qwen3:8b-q4_K_M
@@ -387,18 +390,14 @@ models:
     engine: ollama
     device: "colab:A100-40"
   - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
-    gguf:
-      repo: "sha256:07151d7dc3921fb2e53f4fed1870d0806fcf1312aae45d60d22a9ff1b0ec8678"
-      revision: 9dfbad5aa9ecec08cd4275a1779ae2be3bcf2725
-      file: blobs/sha256-280af6832eca23cb322c4dcc65edfea98a21b8f8ab07dc7553bd6f7e6e7a3313
-      sha256: 280af6832eca23cb322c4dcc65edfea98a21b8f8ab07dc7553bd6f7e6e7a3313
-    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    ollama_tag: gemma4:31b-it-q4_K_M
+    revision_or_digest: 17ba34c06c801ba22f6047bab21ced9429c6d43e0e42ecf339b0f3e5a61e8d97
     quant: Q4_K_M
     licence: gemma
     engine: ollama
     device: "colab:A100-40"
   - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
-    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    revision_or_digest: 17ba34c06c801ba22f6047bab21ced9429c6d43e0e42ecf339b0f3e5a61e8d97
     quant: Q6_K
     licence: gemma
     engine: ollama
@@ -406,21 +405,21 @@ models:
     expected_outcome: load_refused
     failure_reason: "no published Q6_K build"
   - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
-    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    ollama_tag: gemma4:31b-it-q8_0
+    revision_or_digest: ac97b596ee1f1eca8cc5e35b7aab3226051c0204cd8324f3de4e0bb46b00c533
     quant: Q8_0
     licence: gemma
     engine: ollama
     device: "colab:A100-40"
-    expected_outcome: load_refused
-    failure_reason: "no published Q8_0 build"
   - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
-    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    ollama_tag: gemma4:31b-it-bf16
+    revision_or_digest: df1661a2a6aaa94faf24bbaf23a691877a27d0e6052598f105a225618a079e76
     quant: BF16
     licence: gemma
     engine: ollama
     device: "colab:A100-40"
     expected_outcome: load_refused
-    failure_reason: "no published BF16 build"
+    failure_reason: "model layer 58568 MiB (61413189856 B) exceeds colab:A100-40 40960 MiB VRAM (36864 MiB 0.90 abort ceiling)"
   - model: muse-glimmer:30b
     ollama_tag: muse-glimmer:30b-q4_K_M
     revision_or_digest: de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1
@@ -451,6 +450,7 @@ models:
     engine: ollama
     device: "colab:A100-40"
     expected_outcome: load_refused
+    failure_reason: "model layer 53144 MiB (55725511008 B) exceeds colab:A100-40 40960 MiB VRAM (36864 MiB 0.90 abort ceiling)"
   # colab:A100-80 (80 GB)
   - model: qwen3:8b
     ollama_tag: qwen3:8b-q4_K_M
@@ -513,18 +513,14 @@ models:
     engine: ollama
     device: "colab:A100-80"
   - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
-    gguf:
-      repo: "sha256:07151d7dc3921fb2e53f4fed1870d0806fcf1312aae45d60d22a9ff1b0ec8678"
-      revision: 9dfbad5aa9ecec08cd4275a1779ae2be3bcf2725
-      file: blobs/sha256-280af6832eca23cb322c4dcc65edfea98a21b8f8ab07dc7553bd6f7e6e7a3313
-      sha256: 280af6832eca23cb322c4dcc65edfea98a21b8f8ab07dc7553bd6f7e6e7a3313
-    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    ollama_tag: gemma4:31b-it-q4_K_M
+    revision_or_digest: 17ba34c06c801ba22f6047bab21ced9429c6d43e0e42ecf339b0f3e5a61e8d97
     quant: Q4_K_M
     licence: gemma
     engine: ollama
     device: "colab:A100-80"
   - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
-    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    revision_or_digest: 17ba34c06c801ba22f6047bab21ced9429c6d43e0e42ecf339b0f3e5a61e8d97
     quant: Q6_K
     licence: gemma
     engine: ollama
@@ -532,21 +528,19 @@ models:
     expected_outcome: load_refused
     failure_reason: "no published Q6_K build"
   - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
-    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    ollama_tag: gemma4:31b-it-q8_0
+    revision_or_digest: ac97b596ee1f1eca8cc5e35b7aab3226051c0204cd8324f3de4e0bb46b00c533
     quant: Q8_0
     licence: gemma
     engine: ollama
     device: "colab:A100-80"
-    expected_outcome: load_refused
-    failure_reason: "no published Q8_0 build"
   - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
-    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    ollama_tag: gemma4:31b-it-bf16
+    revision_or_digest: df1661a2a6aaa94faf24bbaf23a691877a27d0e6052598f105a225618a079e76
     quant: BF16
     licence: gemma
     engine: ollama
     device: "colab:A100-80"
-    expected_outcome: load_refused
-    failure_reason: "no published BF16 build"
   - model: muse-glimmer:30b
     ollama_tag: muse-glimmer:30b-q4_K_M
     revision_or_digest: de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1
@@ -638,18 +632,14 @@ models:
     engine: ollama
     device: "colab:G4"
   - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
-    gguf:
-      repo: "sha256:07151d7dc3921fb2e53f4fed1870d0806fcf1312aae45d60d22a9ff1b0ec8678"
-      revision: 9dfbad5aa9ecec08cd4275a1779ae2be3bcf2725
-      file: blobs/sha256-280af6832eca23cb322c4dcc65edfea98a21b8f8ab07dc7553bd6f7e6e7a3313
-      sha256: 280af6832eca23cb322c4dcc65edfea98a21b8f8ab07dc7553bd6f7e6e7a3313
-    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    ollama_tag: gemma4:31b-it-q4_K_M
+    revision_or_digest: 17ba34c06c801ba22f6047bab21ced9429c6d43e0e42ecf339b0f3e5a61e8d97
     quant: Q4_K_M
     licence: gemma
     engine: ollama
     device: "colab:G4"
   - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
-    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    revision_or_digest: 17ba34c06c801ba22f6047bab21ced9429c6d43e0e42ecf339b0f3e5a61e8d97
     quant: Q6_K
     licence: gemma
     engine: ollama
@@ -657,21 +647,19 @@ models:
     expected_outcome: load_refused
     failure_reason: "no published Q6_K build"
   - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
-    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    ollama_tag: gemma4:31b-it-q8_0
+    revision_or_digest: ac97b596ee1f1eca8cc5e35b7aab3226051c0204cd8324f3de4e0bb46b00c533
     quant: Q8_0
     licence: gemma
     engine: ollama
     device: "colab:G4"
-    expected_outcome: load_refused
-    failure_reason: "no published Q8_0 build"
   - model: "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
-    revision_or_digest: 6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7
+    ollama_tag: gemma4:31b-it-bf16
+    revision_or_digest: df1661a2a6aaa94faf24bbaf23a691877a27d0e6052598f105a225618a079e76
     quant: BF16
     licence: gemma
     engine: ollama
     device: "colab:G4"
-    expected_outcome: load_refused
-    failure_reason: "no published BF16 build"
   - model: muse-glimmer:30b
     ollama_tag: muse-glimmer:30b-q4_K_M
     revision_or_digest: de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1

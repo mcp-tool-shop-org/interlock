@@ -1295,6 +1295,9 @@ def test_part_a_c2_spec_entries_each_have_one_source_verified_digests_and_unpubl
         "phi3.5:3.8b-mini-instruct-q6_K": "64777e5c68030bbf6eba5761cc6efe22a69b2f9a46fdce942d2b50181dff787a",
         "phi3.5:3.8b-mini-instruct-q8_0": "8b50e8e1e21653ad0085ed8209f4f0cf7f9af78e0352ebd2d303f7b604d313be",
         "phi3.5:3.8b-mini-instruct-fp16": "4611ed13d4961f1ae0dab1b2e1c50f70777e21bdf97be507cc27312aa412d15a",
+        "gemma4:31b-it-q4_K_M": "17ba34c06c801ba22f6047bab21ced9429c6d43e0e42ecf339b0f3e5a61e8d97",
+        "gemma4:31b-it-q8_0": "ac97b596ee1f1eca8cc5e35b7aab3226051c0204cd8324f3de4e0bb46b00c533",
+        "gemma4:31b-it-bf16": "df1661a2a6aaa94faf24bbaf23a691877a27d0e6052598f105a225618a079e76",
         "muse-glimmer:30b-q4_K_M": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
         "muse-glimmer:30b-q8_0": "6ffafcdbd728b7d7ce94ad7db12c2b8a5ba4a1fdaad20c0d4b45a1257458485a",
         "muse-glimmer:30b-bf16": "318fb1b9b81696d14f4f2784b3bda2e4e633046a52fcc9fe0b94e74f889f5efe",
@@ -1330,12 +1333,12 @@ def test_part_a_c2_spec_entries_each_have_one_source_verified_digests_and_unpubl
     for spec in (fill_spec, gen_spec):
         for entry in spec["models"]:
             if entry["model"] == gemma_hash and entry["quant"] == "Q4_K_M":
-                assert entry["gguf"]["sha256"] == "280af6832eca23cb322c4dcc65edfea98a21b8f8ab07dc7553bd6f7e6e7a3313"
+                assert entry["ollama_tag"] == "gemma4:31b-it-q4_K_M"
                 derived_tag = _ollama_model_tag(entry["model"], entry["quant"], entry.get("ollama_tag"))
-                assert not derived_tag.startswith("sha256:")
-            if entry["model"] == gemma_hash and entry["quant"] in ("Q6_K", "Q8_0", "BF16"):
+                assert derived_tag == "gemma4:31b-it-q4_K_M"
+            if entry["model"] == gemma_hash and entry["quant"] == "Q6_K":
                 assert entry.get("expected_outcome") == "load_refused"
-                assert entry.get("failure_reason") == f"no published {entry['quant']} build"
+                assert entry.get("failure_reason") == "no published Q6_K build"
             if entry["model"] == "muse-glimmer:30b" and entry["quant"] == "Q6_K":
                 assert entry.get("expected_outcome") == "load_refused"
                 assert entry.get("failure_reason") == "no published Q6_K build"
@@ -1723,6 +1726,130 @@ def test_part_d_c2_sources_cli_resolves_every_c2_entry_to_one_source_and_command
     bad_spec.write_text("not: a: valid: spec\n", encoding="utf-8")
     assert cli_main(["c2-sources", str(bad_spec)]) == 1
     capsys.readouterr()
+
+
+def test_fix1_gemma4_31b_real_ollama_sources_and_measured_refusal_reasons():
+    fill_spec = load_spec(ROOT / "experiments" / "c2-fill-card" / "spec.yaml")
+    gen_spec = load_spec(ROOT / "experiments" / "c2-generate" / "spec.yaml")
+    gemma_hash = "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
+
+    for spec in (fill_spec, gen_spec):
+        gemma_entries = [e for e in spec["models"] if e["model"] == gemma_hash]
+        assert len(gemma_entries) == 20
+        for entry in gemma_entries:
+            q = entry["quant"]
+            card = entry["device"]
+            assert "gguf" not in entry, f"Gemma 4 31B {q} on {card} still uses gguf={entry.get('gguf')}"
+            if q == "Q4_K_M":
+                assert entry.get("ollama_tag") == "gemma4:31b-it-q4_K_M"
+                assert (
+                    entry["revision_or_digest"]
+                    == "17ba34c06c801ba22f6047bab21ced9429c6d43e0e42ecf339b0f3e5a61e8d97"
+                )
+                if card == "colab:T4":
+                    assert entry.get("expected_outcome") == "load_refused"
+                    assert "17805 MiB" in str(entry.get("failure_reason"))
+                else:
+                    assert entry.get("expected_outcome") is None
+            elif q == "Q6_K":
+                assert entry.get("expected_outcome") == "load_refused"
+                assert entry.get("failure_reason") == "no published Q6_K build"
+                assert (
+                    entry["revision_or_digest"]
+                    == "17ba34c06c801ba22f6047bab21ced9429c6d43e0e42ecf339b0f3e5a61e8d97"
+                )
+            elif q == "Q8_0":
+                assert entry.get("ollama_tag") == "gemma4:31b-it-q8_0"
+                assert (
+                    entry["revision_or_digest"]
+                    == "ac97b596ee1f1eca8cc5e35b7aab3226051c0204cd8324f3de4e0bb46b00c533"
+                )
+                if card in ("colab:T4", "colab:L4"):
+                    assert entry.get("expected_outcome") == "load_refused"
+                    assert "31124 MiB" in str(entry.get("failure_reason"))
+                else:
+                    assert entry.get("expected_outcome") is None
+                    assert entry.get("failure_reason") is None
+            elif q == "BF16":
+                assert entry.get("ollama_tag") == "gemma4:31b-it-bf16"
+                assert (
+                    entry["revision_or_digest"]
+                    == "df1661a2a6aaa94faf24bbaf23a691877a27d0e6052598f105a225618a079e76"
+                )
+                if card in ("colab:T4", "colab:L4", "colab:A100-40"):
+                    assert entry.get("expected_outcome") == "load_refused"
+                    assert "58568 MiB" in str(entry.get("failure_reason"))
+                else:
+                    assert entry.get("expected_outcome") is None
+                    assert entry.get("failure_reason") is None
+
+        refused_by_card: dict[str, list[dict[str, Any]]] = {
+            "colab:A100-40": [],
+            "colab:A100-80": [],
+            "colab:G4": [],
+            "colab:L4": [],
+            "colab:T4": [],
+        }
+        for entry in spec["models"]:
+            if isinstance(entry.get("gguf"), dict):
+                assert not str(entry["gguf"]["repo"]).startswith("sha256:")
+                assert "/" in str(entry["gguf"]["repo"])
+            if entry.get("expected_outcome") == "load_refused":
+                reason = str(entry.get("failure_reason") or "").strip()
+                assert reason, f"missing failure_reason on {entry['device']} {entry['model']} {entry['quant']}"
+                assert "no published " in reason or "MiB" in reason or "out of scope" in reason.lower()
+                refused_by_card[entry["device"]].append(entry)
+
+        assert len(refused_by_card["colab:T4"]) == 9
+        assert len(refused_by_card["colab:L4"]) == 6
+        assert len(refused_by_card["colab:A100-40"]) == 4
+        assert len(refused_by_card["colab:A100-80"]) == 2
+        assert len(refused_by_card["colab:G4"]) == 2
+
+    base_linux = yaml.safe_load((ROOT / "experiments" / "c2-fill-card" / "spec.yaml").read_text(encoding="utf-8"))
+    with pytest.raises(SpecError, match="gguf.repo"):
+        validate_spec(
+            {
+                **base_linux,
+                "models": [
+                    {
+                        "model": gemma_hash,
+                        "revision_or_digest": "280af6832eca23cb322c4dcc65edfea98a21b8f8ab07dc7553bd6f7e6e7a3313",
+                        "quant": "Q4_K_M",
+                        "licence": "apache-2.0",
+                        "engine": "ollama",
+                        "device": "colab:L4",
+                        "gguf": {
+                            "repo": gemma_hash,
+                            "revision": "c9f3b814e2076d51a48c920b1e73f60d5a4219e8",
+                            "file": "gemma-4-31B-it-Q4_K_M.gguf",
+                            "sha256": "280af6832eca23cb322c4dcc65edfea98a21b8f8ab07dc7553bd6f7e6e7a3313",
+                        },
+                    }
+                ],
+            }
+        )
+    with pytest.raises(SpecError, match="failure_reason"):
+        validate_spec(
+            {
+                **base_linux,
+                "models": [
+                    {
+                        "model": "qwen3:8b",
+                        "ollama_tag": "qwen3:8b-fp16",
+                        "revision_or_digest": "0b358e6e9d8cb39eaa4aa6b78136d09b91acb4be08c01bb707367811caed69ae",
+                        "quant": "FP16",
+                        "licence": "apache-2.0",
+                        "engine": "ollama",
+                        "device": "colab:T4",
+                        "expected_outcome": "load_refused",
+                    }
+                ],
+            }
+        )
+
+
+
 
 
 
