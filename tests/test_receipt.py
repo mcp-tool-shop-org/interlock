@@ -447,11 +447,69 @@ def test_remote_row_allows_hashed_identifiers_where_permitted():
         settings={
             **row()["settings"],
             "account": hashed_id,
+            "account_id": hashed_id,
+            "user_id": hashed_id,
+            "owner_id": hashed_id,
             "gguf_source": hashed_id,
             "tags": [hashed_id, {"digest": hashed_id}],
         },
     )
     validate_row(allowed)
 
+    rig_candidate = row(
+        notes="(account:some_handle) user-facing latency is fine",
+        settings={
+            **row()["settings"],
+            "account:some_handle": "x",
+            "meta": {"owner-some_handle": 1},
+            "tags": [{"GitHub_some_handle": True}],
+        },
+    )
+    validate_row(rig_candidate)
 
+
+@pytest.mark.parametrize(
+    ("case_name", "overrides", "must_refuse"),
+    [
+        ("val_paren_account", {"notes": "(account:some_handle)"}, True),
+        ("val_comma_account", {"notes": "ran,account:some_handle"}, True),
+        ("val_equals_owner", {"notes": "by=owner:some_handle"}, True),
+        ("val_quoted_user", {"notes": '"user:some_handle"'}, True),
+        ("val_semicolon_uid", {"notes": "x;uid:42"}, True),
+        ("val_account_equals", {"notes": "account=some_handle"}, True),
+        ("val_login_colon", {"notes": "login:some_handle"}, True),
+        ("val_handle_equals", {"notes": "handle=some_handle"}, True),
+        (
+            "key_top_account_colon",
+            {"settings": {**row()["settings"], "account:some_handle": "x"}},
+            True,
+        ),
+        (
+            "key_nested_owner_hyphen",
+            {"settings": {**row()["settings"], "meta": {"owner-some_handle": 1}}},
+            True,
+        ),
+        (
+            "key_list_github_underscore",
+            {"settings": {**row()["settings"], "tags": [{"GitHub_some_handle": True}]}},
+            True,
+        ),
+        ("pass_user_facing_latency", {"notes": "user-facing latency is fine"}, False),
+        ("pass_hf_transfer", {"notes": "hf-transfer was enabled"}, False),
+        ("pass_github_hosted", {"notes": "github-hosted runner"}, False),
+        ("pass_owner_of_the_run", {"notes": "owner of the run"}, False),
+        ("pass_owner_ok_check", {"notes": "owner_ok check"}, False),
+        ("pass_user_prompt_length", {"notes": "user_prompt length 512"}, False),
+        ("pass_uid_less_session", {"notes": "uid-less session"}, False),
+    ],
+)
+def test_remote_row_precise_account_rule_values_and_keys(
+    case_name: str, overrides: dict, must_refuse: bool
+):
+    candidate = _remote_row(**overrides)
+    if must_refuse:
+        with pytest.raises(ReceiptError, match="unhashed account id"):
+            validate_row(candidate)
+    else:
+        validate_row(candidate)
 

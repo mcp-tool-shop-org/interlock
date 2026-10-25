@@ -21,6 +21,7 @@ from pathlib import Path
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
+from interlock.devices import _ACCOUNT_PREFIX
 from interlock.families import FamilyError, family_of
 
 RUN_MARKER_SUFFIX = ".run.json"
@@ -348,6 +349,15 @@ _ACCOUNT_KEY = re.compile(
     re.IGNORECASE,
 )
 _HASHED_ACCOUNT = re.compile(r"^sha256:[0-9a-f]{64}$")
+_ACCOUNT_PREFIX_NAMES = _ACCOUNT_PREFIX.pattern.removeprefix("^").rsplit("[", 1)[0]
+_ACCOUNT_VALUE_TOKEN = re.compile(
+    rf"(?<![A-Za-z0-9_]){_ACCOUNT_PREFIX_NAMES}[:=][A-Za-z0-9_][A-Za-z0-9_.-]*",
+    re.IGNORECASE,
+)
+_ACCOUNT_KEY_TOKEN = re.compile(
+    rf"(?<![A-Za-z0-9_]){_ACCOUNT_PREFIX_NAMES}[:_=-][A-Za-z0-9_][A-Za-z0-9_.-]*",
+    re.IGNORECASE,
+)
 
 
 def _check_remote_device(row: dict) -> None:
@@ -384,21 +394,24 @@ def _check_remote_device(row: dict) -> None:
 def _reject_unhashed_account_fields(
     value: object, row_id: str, where: str = "$", *, check_strings: bool = True
 ) -> None:
-    from interlock.devices import _ACCOUNT_PREFIX
-
     if isinstance(value, dict):
         for key, item in value.items():
-            if _ACCOUNT_KEY.fullmatch(str(key)):
+            key_text = str(key)
+            if _ACCOUNT_KEY.fullmatch(key_text):
                 if not isinstance(item, str) or not _HASHED_ACCOUNT.fullmatch(item):
                     raise ReceiptError(
                         f"{row_id}: unhashed account id in {where}.{key}; hash with sha256:<64-hex> or omit"
                     )
+            elif check_strings and _ACCOUNT_KEY_TOKEN.search(key_text):
+                raise ReceiptError(
+                    f"{row_id}: unhashed account id in key {where}.{key}; hash with sha256:<64-hex> or omit"
+                )
             _reject_unhashed_account_fields(item, row_id, f"{where}.{key}", check_strings=check_strings)
     elif isinstance(value, list):
         for idx, item in enumerate(value):
             _reject_unhashed_account_fields(item, row_id, f"{where}[{idx}]", check_strings=check_strings)
     elif check_strings and isinstance(value, str):
-        if _ACCOUNT_PREFIX.search(value.strip()) or any(_ACCOUNT_PREFIX.search(tok) for tok in value.split()):
+        if _ACCOUNT_VALUE_TOKEN.search(value):
             raise ReceiptError(
                 f"{row_id}: unhashed account id in {where}; hash with sha256:<64-hex> or omit"
             )
