@@ -67,7 +67,7 @@ interlock check --host-port
 
 ## interlock import
 
-Rebuilds `table/` from the committed receipts.
+Adds remote window receipts to `table/`, or rebuilds the pinned rows.
 
 ```bash
 interlock import
@@ -75,6 +75,19 @@ interlock import --remote-window receipts/c2-l4-window-01.json
 ```
 
 `--offers` points at an offers file, and `--remote-window <path>` (repeatable) imports a remote Colab window receipt JSON into `table/routing.jsonl` while preserving every repeat slot in `artifacts.slots`. The default rebuild does not need either flag. Import does not read `aborted/`.
+
+Most users only merge. `interlock import --remote-window <file>` adds the rows of a Colab window's receipt (the routing-row JSONL that `interlock run` writes, or the older `{run_id, date, remote_device, records}` JSON) to the existing `table/routing.jsonl`. It needs no other repository, and it refuses a row that is already in the table.
+
+A full rebuild (`interlock import` with no `--remote-window`, or with `--offers`) regenerates the pinned rows from three source repositories, each at a pinned commit: `rnd` (`08ca419f647a3ed69ee645610eaa1c7f35f40f91`), `npu` (`275e51101f7557bf50898608812cd61d25d5ff17`, on rnd's `npu-buildout` branch and tagged `data/npu-buildout-275e511`, so it is a clone of rnd) and `aspire` (`3b05eab928894311993ffa3af2075fef39cccce6`). Say where each clone is with `--source name=path` (repeatable), or once in `interlock.toml` next to the table:
+
+```toml
+[import.sources]
+rnd = "../rnd"
+npu = "../rnd"
+aspire = "../aspire-si"
+```
+
+The flag beats the file, and there is no default path. The commit is not configurable: a clone that does not hold it is refused. The import writes each source's name, pin and path (as you gave it) at the end of `table/gaps.md`, never into a row. A rebuild replaces only the rows it produces; every other row in the table stays, and a rebuild that would drop a row it owns is refused unless you pass `--allow-shrink`.
 
 ## interlock run
 

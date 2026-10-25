@@ -95,6 +95,14 @@ def main(argv: list[str] | None = None) -> int:
         help="remote window JSON file to import (repeatable)",
     )
     importer.add_argument(
+        "--source",
+        action="append",
+        default=None,
+        metavar="NAME=PATH",
+        help="where a full rebuild finds a source repo: rnd, npu or aspire (repeatable). "
+        "Also [import.sources] in <root>/interlock.toml; the flag wins. A merge needs none",
+    )
+    importer.add_argument(
         "--allow-shrink",
         action="store_true",
         help="let a full rebuild drop the rows it owns but no longer produces; every dropped id is printed",
@@ -359,6 +367,7 @@ def _cmd_import(args: argparse.Namespace) -> int:
     from interlock.importers.common import ImportError_
     from interlock.importers.gaps import load_candidates, render_gaps
     from interlock.importers.pins import ASPIRE_COMMIT
+    from interlock.importers.sources import SOURCE_PINS, require_all_sources, resolve_sources
     from interlock.receipt import ReceiptError
 
     root = args.root.resolve()
@@ -366,7 +375,12 @@ def _cmd_import(args: argparse.Namespace) -> int:
     try:
         if args.remote_window and args.offers is None:
             return _import_remote_windows(root, args.remote_window)
+        sources = resolve_sources(args.source, root)
+        require_all_sources(sources)
         rebuilt, skipped = import_receipts(
+            rnd_repo=Path(sources["rnd"]),
+            npu_repo=Path(sources["npu"]),
+            aspire_repo=Path(sources["aspire"]),
             offers_path=args.offers,
             local_root=root,
             remote_windows=args.remote_window,
@@ -382,7 +396,12 @@ def _cmd_import(args: argparse.Namespace) -> int:
             f"B's planted-error judge row is imported from aspire-si at {ASPIRE_COMMIT}. "
             "That commit has B's receipts only. The 3b judge-control receipts are a later pin."
         )
-        gaps_text = render_gaps(rebuilt, candidates, ladder_note=note, skipped=skipped)
+        # Each source's name and pinned commit, with the path as the user gave it (never resolved), go in
+        # gaps.md and never in a row's provenance.
+        used = "\n".join(f"- {name} @ {pin}: {sources[name]}" for name, pin in SOURCE_PINS.items())
+        gaps_text = (
+            render_gaps(rebuilt, candidates, ladder_note=note, skipped=skipped) + f"\n## Import sources\n\n{used}\n"
+        )
         lines = [json.dumps(row, sort_keys=True) for row in rows]
         table.mkdir(exist_ok=True)
         for row_id in dropped:

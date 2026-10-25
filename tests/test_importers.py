@@ -371,8 +371,11 @@ def test_import_command_writes_jsonl_and_the_gap_report(tmp_path: Path, monkeypa
         return [row()], ["one skip"]
 
     monkeypatch.setattr("interlock.importers.assemble.import_receipts", fake_import)
-    assert main(["import", "--root", str(tmp_path)]) == 0
+    sources = ["--source", "rnd=clones/rnd", "--source", "npu=clones/rnd", "--source", "aspire=clones/aspire"]
+    assert main(["import", "--root", str(tmp_path), *sources]) == 0
     assert seen["local_root"] == tmp_path.resolve()
+    assert seen["rnd_repo"] == Path("clones/rnd")
+    assert seen["aspire_repo"] == Path("clones/aspire")
     written = (table / "routing.jsonl").read_text(encoding="utf-8")
     assert "BAAI/bge-base-en-v1.5" in written
     assert "Why E1" in (table / "gaps.md").read_text(encoding="utf-8")
@@ -653,9 +656,10 @@ def test_local_e1_rows_join_an_import_only_when_a_root_is_passed(monkeypatch):
     monkeypatch.setattr(assemble, "_nli", lambda *_args, **_kwargs: [{"id": "pin"}])
     monkeypatch.setattr(assemble, "_aspire_b", lambda *_args, **_kwargs: [])
     monkeypatch.setattr(assemble, "e1_rerun2_rows", lambda _root: [{"id": "E1/x"}])
-    bare, _skipped = assemble.import_receipts()
+    repos = {"rnd_repo": Path("r"), "npu_repo": Path("n"), "aspire_repo": Path("a")}
+    bare, _skipped = assemble.import_receipts(**repos)
     assert [row["id"] for row in bare] == ["pin"]
-    both, _skipped = assemble.import_receipts(local_root=Path("."))
+    both, _skipped = assemble.import_receipts(local_root=Path("."), **repos)
     assert [row["id"] for row in both] == ["E1/x", "pin"]
 
 
@@ -916,7 +920,9 @@ def test_import_remote_window_records_all_repeat_slots_and_cli_imports_remote_wi
 
     monkeypatch.setattr("interlock.importers.assemble.import_receipts", fake_import_receipts)
     offers_file = tmp_path / "offers.json"
-    argv = ["import", "--root", str(tmp_path), "--offers", str(offers_file), "--remote-window", str(window_file)]
+    sources = ["--source", "rnd=clones/rnd", "--source", "npu=clones/rnd", "--source", "aspire=clones/aspire"]
+    argv = ["import", "--root", str(tmp_path), "--offers", str(offers_file)]
+    argv += ["--remote-window", str(window_file), *sources]
     assert main(argv) == 0
     assert captured_kwargs.get("remote_windows") == [window_file]
 

@@ -14,6 +14,9 @@
 - A table that holds a duplicate row id is refused, naming the ids, by both the rebuild and the `--remote-window` merge.
 - A missing or unreadable file, a non-UTF-8 table, or a bad JSON file in `interlock import` is a message on stderr and exit 1, not a traceback.
 - A full rebuild reads `candidates.json` and renders `gaps.md` before it writes anything, then replaces `import-dropped.txt`, `routing.jsonl` and `gaps.md` atomically; a missing or invalid `candidates.json` exits 1 with the table and `import-dropped.txt` byte-identical.
+- The full `interlock import` rebuild reads its three source repositories from configuration: `--source rnd|npu|aspire=<path>` (repeatable) or `[import.sources]` in `<root>/interlock.toml`; the flag wins. There is no default path in `interlock.importers`. Each source's pinned commit is unchanged and `require_pin` still runs; a clone that lacks it is refused, naming the commit. Each source's name, pin and path (as given) are written at the end of `table/gaps.md`, not into any row.
+- With a source missing, the rebuild exits 1 naming each missing source, its pinned commit, and the flag and key that set it. `--remote-window` alone (the merge) needs no source.
+- The NPU pin's comment names the rnd tag `data/npu-buildout-275e511`.
 
 ### Fixed
 

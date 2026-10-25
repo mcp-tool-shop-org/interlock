@@ -5,6 +5,8 @@
 RND_COMMIT = "08ca419f647a3ed69ee645610eaa1c7f35f40f91"
 
 # Kimi's npu-buildout, unmerged. Re-import from the merge commit when the PR merges.
+# It is on rnd's `npu-buildout` branch and carries the rnd tag `data/npu-buildout-275e511`, so a branch cleanup
+# cannot strand it. The source for this pin is therefore a clone of rnd (`--source npu=<rnd clone>`).
 NPU_BUILDOUT_COMMIT = "275e51101f7557bf50898608812cd61d25d5ff17"
 
 # aspire-si #78. B's auditor receipts only. The 3b judge-control manifest,
@@ -18,9 +20,8 @@ OFFRIG_COMMIT = "751fb1d06e600536f91b72e18ce15a8faa4f075e"
 # Ladder runs are in RND_COMMIT at math-ladder/results/2026-10-09-ladder/.
 # Import those committed copies. Do not read a side directory.
 
-RND_REPO = "E:/AI/Research and Development"
-NPU_REPO = "E:/AI/rnd-npu-buildout"
-ASPIRE_REPO = "E:/AI/aspire-si"
+# Where each source repo is cloned is configuration, not code: see ``sources.py`` (`--source name=path`,
+# or `[import.sources]` in interlock.toml). The commits above stay pinned.
 
 LADDER_RUNS = (
     "ladder-gemma4_31b",
