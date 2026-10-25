@@ -304,7 +304,12 @@ def test_a_lost_run_keeps_the_cells_it_finished(repo):
         )
     lines = (repo / "receipts" / "lost.jsonl").read_text(encoding="utf-8").splitlines()
     rows = [json.loads(line) for line in lines if line.strip()]
-    assert len(rows) >= 1
+    # exactly the cells written before the VM was lost: the first quant's measured cell, then the second quant's
+    # cell, whose sampler failed after its call (a sampler_error row, not a refusal); the third quant never began
+    assert [(row["id"], row.get("outcome")) for row in rows] == [
+        ("C2-FILL-CARD/qwen3:8b/Q4_K_M/L4-fill/lost", None),
+        ("C2-FILL-CARD/qwen3:8b/Q6_K/L4/ctx2048/lost", "sampler_error"),
+    ]
     assert all(row["device"] == "colab:L4" for row in rows)
 
 

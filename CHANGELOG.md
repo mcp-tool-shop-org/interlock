@@ -14,6 +14,7 @@
 
 ### Fixed
 
+- A VRAM sampler (or nvidia-smi) that fails after a cell's model call is now a `sampler_error` row, where it was written as `load_refused` (a claim that the card cannot load the quant). `sampler_error` is an untimed outcome that is not a capability outcome: it validates against the routing-row and route-decision schemas, is not a speed row, is listed under `excluded` by `interlock route` with the code `sampler_error` and no "measured failure reason", keeps its note unchanged in the table copy, and imports from a window receipt. A fill-card cell stops at it and does not bisect to a ceiling. A spec still cannot pre-register it.
 - A missing, failing or GPU-less `nvidia-smi` is now `REFUSED: no NVIDIA GPU available via nvidia-smi: ...` with exit 1, where `interlock run` ended in a `CalledProcessError` traceback or a bare `[Errno 2]`.
 - Each quant's model is unloaded when its cells end, also when a cell raises, so the next quant's VRAM baseline is taken on an empty card. `/api/ps` names match with `:latest` stripped from both sides, so a GGUF-created tag is found when two models are resident. A server that ignores `terminate()` for 5 s is killed.
 - The receipt `receipts/<run-id>.jsonl` is rewritten after every finished cell, so a run lost mid-way keeps the cells it finished. A run that completes writes the same bytes as before.
