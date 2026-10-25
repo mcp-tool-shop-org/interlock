@@ -6,6 +6,13 @@ readme = "README.md"
 requires-python = ">=3.12,<3.13"
 license = "MIT"
 authors = [{name = "mcp-tool-shop"}]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: POSIX :: Linux",
+]
 keywords = [
     "local-ai",
     "gpu",

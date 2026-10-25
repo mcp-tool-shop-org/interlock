@@ -26,6 +26,18 @@ def test_the_distribution_name_is_mcptoolshop_interlock():
     assert project["keywords"] == KEYWORDS
 
 
+def test_the_classifiers_match_what_ci_tests_and_the_license_is_an_spdx_expression():
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    classifiers = project["classifiers"]
+    assert "Development Status :: 5 - Production/Stable" in classifiers
+    assert "Programming Language :: Python :: 3.12" in classifiers
+    assert "Operating System :: POSIX :: Linux" in classifiers
+    # The license is the SPDX expression (PEP 639). A License classifier next to it is
+    # deprecated and PyPI can refuse the pair, so none is listed.
+    assert project["license"] == "MIT"
+    assert not [c for c in classifiers if c.startswith("License ::")]
+
+
 def test_the_help_header_names_the_router(capsys):
     from interlock.cli import main
 
