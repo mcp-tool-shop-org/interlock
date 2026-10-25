@@ -36,6 +36,8 @@ GENERATE_PROMPT_LENGTHS = (512, 1024, 2048, 4096, 8192, 16384, 32768)
 GENERATE_CONCURRENCIES = (1, 4, 8)
 THROUGHPUT_TASKS = ("embed", "rerank", "nli")
 THROUGHPUT_BATCH_SIZES = (1, 8, 32)
+THROUGHPUT_TOKEN_LENGTHS = (128, 512)
+THROUGHPUT_SEED = "The switchyard parity check measures every batch on the same text. "
 FORBIDDEN_SHARED_PORTS = frozenset({11434, 11490})
 COLAB_CARD_VRAM_MIB_RANGES: dict[str, tuple[int, int]] = {
     "T4": (14000, 17000),
@@ -364,6 +366,7 @@ def build_linux_failure_row(
     num_predict: int | None = None,
     batch: int | None = None,
     prompt_tokens: int | None = None,
+    token_length: int | None = None,
     concurrency: int | None = None,
     peak_mib: int | None = None,
     abort_mib: int | None = None,
@@ -376,27 +379,37 @@ def build_linux_failure_row(
         raise LinuxCudaError("failure row requires a non-empty measured reason")
     clean_reason = reason.strip()
     note = clean_reason if clean_reason.startswith(f"{failure_class}:") else f"{failure_class}: {clean_reason}"
-    shape_tag = _shape_suffix(num_ctx=num_ctx, prompt_tokens=prompt_tokens, concurrency=concurrency, batch=batch)
+    shape_tag = _shape_suffix(
+        num_ctx=num_ctx,
+        prompt_tokens=prompt_tokens,
+        token_length=token_length,
+        concurrency=concurrency,
+        batch=batch,
+    )
     settings: dict[str, Any] = {
-        "thinking_level": "off",
+        "thinking_level": "off" if task == "generate" else None,
         "num_predict": num_predict,
         "num_ctx": num_ctx,
         "batch": batch,
-        "static_shape": None,
+        "static_shape": f"{batch}x{token_length}" if (batch is not None and token_length is not None) else None,
         "precision": None,
         "failure_class": failure_class,
         "failure_reason": clean_reason,
     }
     if prompt_tokens is not None:
         settings["prompt_tokens"] = prompt_tokens
+    elif token_length is not None:
+        settings["prompt_tokens"] = token_length
+        settings["prompt_token_method"] = "word_approx_1to1"  # noqa: S105
     if concurrency is not None:
         settings["concurrency"] = concurrency
     if peak_mib is not None:
         settings["peak_mib"] = peak_mib
     if abort_mib is not None:
         settings["abort_mib"] = abort_mib
+    row_prefix = f"{spec_id}/{task}/{model}" if task != "generate" else f"{spec_id}/{model}"
     row: dict[str, Any] = {
-        "id": f"{spec_id}/{model}/{quant}/{remote_device.card}{shape_tag}/{run_id}",
+        "id": f"{row_prefix}/{quant}/{remote_device.card}{shape_tag}/{run_id}",
         "task": task,
         "model": {
             "repo_or_tag": model,
@@ -435,12 +448,15 @@ def _shape_suffix(
     prompt_tokens: int | None,
     concurrency: int | None,
     batch: int | None,
+    token_length: int | None = None,
 ) -> str:
     parts: list[str] = []
     if num_ctx is not None:
         parts.append(f"ctx{num_ctx}")
     if prompt_tokens is not None:
         parts.append(f"p{prompt_tokens}")
+    if token_length is not None:
+        parts.append(f"l{token_length}")
     if concurrency is not None:
         parts.append(f"c{concurrency}")
     if batch is not None:
@@ -812,135 +828,144 @@ def run_linux_throughput_ladder(
     date: str,
     remote_device: RemoteDeviceIdentity,
     models_by_task: Mapping[str, tuple[str, str]],
-    measure_batch: Callable[[str, int], Mapping[str, Any]],
+    measure_batch: Callable[..., Mapping[str, Any]],
     tasks: tuple[str, ...] = THROUGHPUT_TASKS,
     batch_sizes: tuple[int, ...] = THROUGHPUT_BATCH_SIZES,
+    token_lengths: tuple[int, ...] = (512,),
     abort_fraction: float = 0.90,
     engine_version: str = UNRECORDED,
     quant: str = UNRECORDED,
     licence: str = UNRECORDED,
     meta_by_task: Mapping[str, tuple[str, str]] | None = None,
 ) -> list[dict[str, Any]]:
-    """Sweep embed, rerank, and NLI throughput across batch sizes 1, 8, and 32 on Linux CUDA."""
+    """Sweep embed, rerank, and NLI throughput across token lengths and batch sizes 1, 8, and 32 on Linux CUDA."""
 
     abort_mib = compute_abort_mib(remote_device.vram_mib, abort_fraction)
     rows: list[dict[str, Any]] = []
     for task in tasks:
         model, digest = models_by_task[task]
         task_quant, task_licence = meta_by_task.get(task, (quant, licence)) if meta_by_task else (quant, licence)
-        for batch in batch_sizes:
-            try:
-                measured = measure_batch(task, batch)
-            except LinuxShapeFailure as exc:
-                rows.append(
-                    build_linux_failure_row(
-                        spec_id=spec_id,
-                        spec_rel=spec_rel,
-                        run_id=run_id,
-                        date=date,
-                        task=task,
-                        model=model,
-                        revision_or_digest=digest,
-                        remote_device=remote_device,
-                        failure_class=exc.failure_class,
-                        reason=exc.reason,
-                        batch=batch,
-                        peak_mib=exc.peak_mib,
-                        abort_mib=abort_mib,
-                        engine_version=engine_version,
-                        quant=task_quant,
-                        licence=task_licence,
+        for token_len in token_lengths:
+            for batch in batch_sizes:
+                try:
+                    try:
+                        measured = measure_batch(task, batch, token_length=token_len)
+                    except TypeError:
+                        measured = measure_batch(task, batch)
+                except LinuxShapeFailure as exc:
+                    rows.append(
+                        build_linux_failure_row(
+                            spec_id=spec_id,
+                            spec_rel=spec_rel,
+                            run_id=run_id,
+                            date=date,
+                            task=task,
+                            model=model,
+                            revision_or_digest=digest,
+                            remote_device=remote_device,
+                            failure_class=exc.failure_class,
+                            reason=exc.reason,
+                            batch=batch,
+                            token_length=token_len,
+                            peak_mib=exc.peak_mib,
+                            abort_mib=abort_mib,
+                            engine_version=engine_version,
+                            quant=task_quant,
+                            licence=task_licence,
+                        )
                     )
-                )
-                continue
+                    continue
 
-            tput = float(measured["throughput"])
-            p50 = float(measured["warm_p50_ms"])
-            p95 = float(measured.get("warm_p95_ms", p50))
-            peak_mib = int(measured["peak_mib"])
-            size = int(measured["size"])
-            size_vram = int(measured["size_vram"])
-            if size_vram < size or peak_mib >= abort_mib:
-                reason = (
-                    f"partial offload ({size_vram} < {size})"
-                    if size_vram < size
-                    else f"peak {peak_mib} MiB >= abort_mib {abort_mib} MiB"
-                )
-                rows.append(
-                    build_linux_failure_row(
-                        spec_id=spec_id,
-                        spec_rel=spec_rel,
-                        run_id=run_id,
-                        date=date,
-                        task=task,
-                        model=model,
-                        revision_or_digest=digest,
-                        remote_device=remote_device,
-                        failure_class="oom",
-                        reason=reason,
-                        batch=batch,
-                        peak_mib=peak_mib,
-                        abort_mib=abort_mib,
-                        engine_version=engine_version,
-                        quant=task_quant,
-                        licence=task_licence,
+                tput = float(measured["throughput"])
+                p50 = float(measured["warm_p50_ms"])
+                p95 = float(measured.get("warm_p95_ms", p50))
+                peak_mib = int(measured["peak_mib"])
+                size = int(measured["size"])
+                size_vram = int(measured["size_vram"])
+                if size_vram < size or peak_mib >= abort_mib:
+                    reason = (
+                        f"partial offload ({size_vram} < {size})"
+                        if size_vram < size
+                        else f"peak {peak_mib} MiB >= abort_mib {abort_mib} MiB"
                     )
-                )
-                continue
+                    rows.append(
+                        build_linux_failure_row(
+                            spec_id=spec_id,
+                            spec_rel=spec_rel,
+                            run_id=run_id,
+                            date=date,
+                            task=task,
+                            model=model,
+                            revision_or_digest=digest,
+                            remote_device=remote_device,
+                            failure_class="oom",
+                            reason=reason,
+                            batch=batch,
+                            token_length=token_len,
+                            peak_mib=peak_mib,
+                            abort_mib=abort_mib,
+                            engine_version=engine_version,
+                            quant=task_quant,
+                            licence=task_licence,
+                        )
+                    )
+                    continue
 
-            raw_slots = measured.get("slots")
-            slots = (
-                list(raw_slots)
-                if isinstance(raw_slots, list) and len(raw_slots) >= 2
-                else [
-                    {"phase": "warmup", "throughput": tput, "latency_ms": p50},
-                    {"phase": "repeat", "throughput": tput, "latency_ms": p50},
-                ]
-            )
-            repeats = sum(1 for s in slots if isinstance(s, Mapping) and s.get("phase") == "repeat") or 1
-            row: dict[str, Any] = {
-                "id": f"{spec_id}/{task}/{model}/{task_quant}/{remote_device.card}/b{batch}/{run_id}",
-                "task": task,
-                "model": {
-                    "repo_or_tag": model,
-                    "revision_or_digest": digest,
-                    "quant": task_quant,
-                    "licence": task_licence,
-                    "size": size,
-                    "size_vram": size_vram,
-                },
-                "engine": {"name": "ollama", "version": engine_version},
-                "device": remote_device.logical_device,
-                "remote_device": remote_device.to_dict(),
-                "gpu_resident": True,
-                "settings": {
-                    "thinking_level": None,
-                    "num_predict": None,
-                    "num_ctx": None,
-                    "batch": batch,
-                    "static_shape": f"{batch}x512",
-                    "precision": "fp16",
-                    "peak_mib": peak_mib,
-                    "abort_mib": abort_mib,
-                },
-                "quality": [],
-                "latency": {
-                    "cold_ms": None,
-                    "warm_p50_ms": p50,
-                    "warm_p95_ms": p95,
-                    "throughput": tput,
-                    "throughput_unit": "items/s",
-                    "compile_ms": None,
-                },
-                "artifacts": {"slots": slots},
-                "date": date,
-                "repeats": repeats,
-                "provisional": False,
-                "provenance": {"experiment_spec": spec_rel, "run_id": run_id},
-            }
-            stamp_family(row)
-            validate_row(row)
-            rows.append(row)
+                raw_slots = measured.get("slots")
+                slots = (
+                    list(raw_slots)
+                    if isinstance(raw_slots, list) and len(raw_slots) >= 2
+                    else [
+                        {"phase": "warmup", "throughput": tput, "latency_ms": p50},
+                        {"phase": "repeat", "throughput": tput, "latency_ms": p50},
+                    ]
+                )
+                repeats = sum(1 for s in slots if isinstance(s, Mapping) and s.get("phase") == "repeat") or 1
+                row: dict[str, Any] = {
+                    "id": f"{spec_id}/{task}/{model}/{task_quant}/{remote_device.card}/l{token_len}-b{batch}/{run_id}",
+                    "task": task,
+                    "model": {
+                        "repo_or_tag": model,
+                        "revision_or_digest": digest,
+                        "quant": task_quant,
+                        "licence": task_licence,
+                        "size": size,
+                        "size_vram": size_vram,
+                    },
+                    "engine": {"name": "ollama", "version": engine_version},
+                    "device": remote_device.logical_device,
+                    "remote_device": remote_device.to_dict(),
+                    "gpu_resident": True,
+                    "settings": {
+                        "thinking_level": None,
+                        "num_predict": None,
+                        "num_ctx": None,
+                        "batch": batch,
+                        "static_shape": f"{batch}x{token_len}",
+                        "precision": "fp16",
+                        "prompt_tokens": token_len,
+                        "prompt_token_method": "word_approx_1to1",
+                        "peak_mib": peak_mib,
+                        "abort_mib": abort_mib,
+                    },
+                    "quality": [],
+                    "latency": {
+                        "cold_ms": None,
+                        "warm_p50_ms": p50,
+                        "warm_p95_ms": p95,
+                        "throughput": tput,
+                        "throughput_unit": "items/s",
+                        "compile_ms": None,
+                    },
+                    "artifacts": {"slots": slots},
+                    "date": date,
+                    "repeats": repeats,
+                    "provisional": False,
+                    "provenance": {"experiment_spec": spec_rel, "run_id": run_id},
+                }
+                stamp_family(row)
+                validate_row(row)
+                rows.append(row)
     return rows
 
 
@@ -1144,27 +1169,28 @@ def measure_linux_ollama_generate(
     }
 
 
-def _batch_endpoint_and_payload(model: str, task: str, batch: int) -> tuple[str, dict[str, Any]]:
+def _build_fixed_token_item(token_length: int, item_index: int = 0, seed: str = THROUGHPUT_SEED) -> str:
+    if isinstance(token_length, bool) or not isinstance(token_length, int) or token_length < 1:
+        raise LinuxCudaError(f"token_length must be a positive integer, got {token_length!r}")
+    words = [w for w in seed.split() if w] or ["token"]
+    chosen = [words[(item_index + i) % len(words)] for i in range(token_length)]
+    return " ".join(chosen)
+
+
+def _batch_endpoint_and_payload(
+    model: str,
+    task: str,
+    batch: int,
+    *,
+    token_length: int = 512,
+) -> tuple[str, dict[str, Any]]:
     if task == "embed":
-        return "/api/embed", {"model": model, "input": [f"item-{idx}" for idx in range(batch)]}
-    if task == "rerank":
-        return (
-            "/api/rerank",
-            {
-                "model": model,
-                "query": "interlock rerank query",
-                "documents": [f"doc-{idx}" for idx in range(batch)],
-            },
-        )
-    if task == "nli":
-        return (
-            "/api/nli",
-            {
-                "model": model,
-                "pairs": [
-                    {"premise": f"premise-{idx}", "hypothesis": f"hypothesis-{idx}"} for idx in range(batch)
-                ],
-            },
+        items = [_build_fixed_token_item(token_length, idx) for idx in range(batch)]
+        return "/api/embed", {"model": model, "input": items}
+    if task in ("rerank", "nli"):
+        raise LinuxCudaError(
+            f"out of scope: stock Ollama does not serve {task!r} (/api/{task}); "
+            "declare the entry as a pre-registered load_refused row"
         )
     raise LinuxCudaError(f"unsupported batch task: {task!r}")
 
@@ -1176,11 +1202,12 @@ def measure_linux_ollama_batch(
     model: str,
     task: str,
     batch: int,
+    token_length: int = 512,
     repeats: int = 3,
 ) -> dict[str, Any]:
-    """Measure one ``(task, batch)`` cell on a running ``LinuxOllamaServer``."""
+    """Measure one ``(task, token_length, batch)`` cell on a running ``LinuxOllamaServer``."""
 
-    endpoint, payload = _batch_endpoint_and_payload(model, task, batch)
+    endpoint, payload = _batch_endpoint_and_payload(model, task, batch, token_length=token_length)
     used_before, _ = sample_vram_mib()
     peak_mib = used_before
     passes = ("warmup", *("repeat" for _ in range(max(1, repeats))))
@@ -1218,9 +1245,14 @@ def measure_linux_ollama_batch(
 def _ollama_model_tag(model_tag: str, quant: str, explicit_tag: Any = None) -> str:
     if isinstance(explicit_tag, str) and explicit_tag.strip():
         return explicit_tag.strip()
+    base = model_tag
+    if base.startswith("sha256:") and len(base) >= len("sha256:") + 12:
+        base = f"c2-sha256-{base.removeprefix('sha256:')[:12]}"
+    elif "/" in base:
+        base = re.sub(r"[^a-zA-Z0-9._-]+", "-", base).strip("-").lower()
     if quant and quant != UNRECORDED:
-        return f"{model_tag}-{quant.lower()}"
-    return model_tag
+        return f"{base}-{quant.lower()}"
+    return base
 
 
 def _relative_spec_posix(spec_path: Path, spec_rel: str | None) -> str:
@@ -1405,6 +1437,7 @@ def run_linux_spec(
         if mode == "batch-ladder":
             tasks = tuple(str(t) for t in (spec.get("tasks") or THROUGHPUT_TASKS))
             batch_sizes = tuple(int(b) for b in (spec.get("batch_sizes") or THROUGHPUT_BATCH_SIZES))
+            token_lengths = tuple(int(tl) for tl in (spec.get("token_lengths") or THROUGHPUT_TOKEN_LENGTHS))
             for task in tasks:
                 task_entries = [
                     e
@@ -1420,6 +1453,37 @@ def run_linux_spec(
                     digest = str(entry.get("revision_or_digest", UNRECORDED))
                     quant = str(entry.get("quant", UNRECORDED))
                     licence = str(entry.get("licence", UNRECORDED))
+                    expected_outcome = entry.get("expected_outcome")
+                    if isinstance(expected_outcome, str) and expected_outcome in FAILURE_CLASSES:
+                        dev_desc = f"{remote_device.logical_device} ({remote_device.vram_mib} MiB)"
+                        reason = str(
+                            entry.get("failure_reason")
+                            or f"pre-registered {expected_outcome}: {model_tag} ({quant}) on {dev_desc}"
+                        )
+                        for token_len in token_lengths:
+                            for batch in batch_sizes:
+                                rows.append(
+                                    build_linux_failure_row(
+                                        spec_id=spec_id,
+                                        spec_rel=resolved_spec_rel,
+                                        run_id=run_id,
+                                        date=date,
+                                        task=task,
+                                        model=model_tag,
+                                        revision_or_digest=digest,
+                                        remote_device=remote_device,
+                                        failure_class=expected_outcome,
+                                        reason=reason,
+                                        batch=batch,
+                                        token_length=token_len,
+                                        abort_mib=abort_mib,
+                                        engine_version=engine_version,
+                                        quant=quant,
+                                        licence=licence,
+                                    )
+                                )
+                        continue
+                    ollama_tag = _ollama_model_tag(model_tag, quant, entry.get("ollama_tag"))
                     rows.extend(
                         run_linux_throughput_ladder(
                             spec_id=spec_id,
@@ -1430,12 +1494,18 @@ def run_linux_spec(
                             models_by_task={task: (model_tag, digest)},
                             tasks=(task,),
                             batch_sizes=batch_sizes,
+                            token_lengths=token_lengths,
                             abort_fraction=abort_fraction,
                             engine_version=engine_version,
                             quant=quant,
                             licence=licence,
-                            measure_batch=lambda t, b, m=model_tag: measure_linux_ollama_batch(
-                                active_server, sample_vram_mib, model=m, task=t, batch=b
+                            measure_batch=lambda t, b, token_length=512, m=ollama_tag: measure_linux_ollama_batch(
+                                active_server,
+                                sample_vram_mib,
+                                model=m,
+                                task=t,
+                                batch=b,
+                                token_length=token_length,
                             ),
                         )
                     )
@@ -1445,4 +1515,108 @@ def run_linux_spec(
     finally:
         if owns_server:
             active_server.stop()
+
+
+def resolve_c2_sources(spec: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Resolve every model entry in a C2 ``linux-cuda`` spec to its single source, served tag, digest, and command."""
+
+    if spec.get("platform") != "linux-cuda":
+        raise LinuxCudaError("resolve_c2_sources requires a spec with platform: linux-cuda")
+    models = spec.get("models")
+    if not isinstance(models, list) or not models:
+        raise LinuxCudaError("resolve_c2_sources requires a non-empty models roster")
+
+    resolved: list[dict[str, Any]] = []
+    for entry in models:
+        device = str(entry.get("device") or entry.get("card") or UNRECORDED)
+        model = str(entry.get("repo_or_tag") or entry.get("model") or UNRECORDED)
+        quant = str(entry.get("quant") or UNRECORDED)
+        task = str(entry.get("task") or "generate")
+        digest = str(entry.get("revision_or_digest") or UNRECORDED)
+        expected_outcome = entry.get("expected_outcome")
+        failure_reason = str(entry.get("failure_reason") or "").strip() or None
+
+        has_tag = bool(entry.get("ollama_tag"))
+        has_gguf = entry.get("gguf") is not None
+        is_declared_refusal = expected_outcome == "load_refused" and bool(
+            failure_reason
+            and (failure_reason.startswith("no published ") or "out of scope" in failure_reason.lower())
+        )
+
+        if has_tag and has_gguf:
+            raise LinuxCudaError(f"entry {model!r} ({quant!r}) on {device} cannot name both ollama_tag and gguf")
+        if has_tag:
+            served_tag = str(entry["ollama_tag"]).strip()
+            resolved.append(
+                {
+                    "device": device,
+                    "task": task,
+                    "model": model,
+                    "quant": quant,
+                    "source_kind": "ollama_tag",
+                    "served_tag": served_tag,
+                    "expected_digest": digest,
+                    "command": f"ollama pull {served_tag}",
+                    "expected_outcome": expected_outcome,
+                    "failure_reason": failure_reason,
+                }
+            )
+            continue
+        if has_gguf:
+            gguf = entry["gguf"]
+            served_tag = _ollama_model_tag(model, quant)
+            repo = str(gguf["repo"]).strip()
+            rev = str(gguf["revision"]).strip()
+            file = str(gguf["file"]).strip()
+            sha256 = str(gguf["sha256"]).strip()
+            resolved.append(
+                {
+                    "device": device,
+                    "task": task,
+                    "model": model,
+                    "quant": quant,
+                    "source_kind": "gguf",
+                    "served_tag": served_tag,
+                    "repo": repo,
+                    "revision": rev,
+                    "file": file,
+                    "expected_digest": sha256,
+                    "command": f"hf download {repo} {file} --revision {rev} && ollama create {served_tag} -f Modelfile",
+                    "expected_outcome": expected_outcome,
+                    "failure_reason": failure_reason,
+                }
+            )
+            continue
+        if is_declared_refusal:
+            resolved.append(
+                {
+                    "device": device,
+                    "task": task,
+                    "model": model,
+                    "quant": quant,
+                    "source_kind": "load_refused",
+                    "served_tag": None,
+                    "expected_digest": digest,
+                    "command": f"skip-pull ({failure_reason})",
+                    "expected_outcome": expected_outcome,
+                    "failure_reason": failure_reason,
+                }
+            )
+            continue
+        raise LinuxCudaError(f"entry {model!r} ({quant!r}) on {device} must name exactly one source")
+
+    return resolved
+
+
+def format_c2_sources(spec: Mapping[str, Any]) -> str:
+    """Format resolved C2 model sources as tab-separated lines for the window launcher."""
+
+    items = resolve_c2_sources(spec)
+    lines = [
+        f"{item['device']}\t{item['model']}\t{item['quant']}\t{item['source_kind']}\t"
+        f"{item['served_tag'] or '-'}\t{item['expected_digest']}\t{item['command']}"
+        for item in items
+    ]
+    return "\n".join(lines) + ("\n" if lines else "")
+
 

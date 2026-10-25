@@ -150,6 +150,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     health_cmd.set_defaults(func=_cmd_ollama_health)
 
+    c2_sources = sub.add_parser(
+        "c2-sources",
+        help="print the resolved source, pull or create command, and expected digest for each entry in a C2 spec",
+    )
+    c2_sources.add_argument("spec", type=Path)
+    c2_sources.add_argument("--json", action="store_true", help="print resolved entries as JSON")
+    c2_sources.set_defaults(func=_cmd_c2_sources)
+
     route = sub.add_parser(
         "route",
         help="choose a model, engine and device from the routing table",
@@ -408,6 +416,22 @@ def _cmd_ollama_health(_args: argparse.Namespace) -> int:
     text, ok = health_report()
     print(text, end="")
     return 0 if ok else 1
+
+
+def _cmd_c2_sources(args: argparse.Namespace) -> int:
+    from interlock.harness.linux_cuda import LinuxCudaError, format_c2_sources, resolve_c2_sources
+    from interlock.harness.spec import SpecError, load_spec
+
+    try:
+        spec = load_spec(args.spec)
+        if args.json:
+            print(json.dumps(resolve_c2_sources(spec), indent=2))
+        else:
+            print(format_c2_sources(spec), end="")
+    except (SpecError, LinuxCudaError, OSError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    return 0
 
 
 def _cmd_route(args: argparse.Namespace) -> int:

@@ -802,7 +802,7 @@ def test_interlock_run_dry_run_and_offline_execution_produce_validated_linux_cud
             "http_post": lambda _url, _payload: {"total_duration": 25_000_000},
         },
     )
-    assert len(tput_rows) == 9
+    assert len(tput_rows) == 18
 
 
 def test_c2_specs_cover_sweep_plan_matrix_quants_and_hashed_gemma_repo():
@@ -1043,7 +1043,7 @@ def test_c2_multi_quant_row_ids_never_collide_and_load_refused_cells_are_honoure
     refused_rows = [r for r in t4_rows if r.get("outcome") == "load_refused"]
     assert len(refused_rows) >= 2
     assert not any(m.startswith("sha256:") for m in queried_models)
-    assert "qwen3:8b-q4_k_m" in queried_models
+    assert "qwen3:8b-q4_K_M" in queried_models
     assert "qwen3:8b-q8_0" in queried_models
 
 
@@ -1242,18 +1242,17 @@ def test_measure_linux_ollama_batch_dispatches_per_task_and_throughput_ladder_pr
     )
     srv.start()
 
-    for task, expected_path in (("rerank", "/api/rerank"), ("nli", "/api/nli"), ("embed", "/api/embed")):
-        called_paths.clear()
-        res = measure_linux_ollama_batch(
-            srv,
-            lambda: (2000, 23034),
-            model="m",
-            task=task,
-            batch=8,
-        )
-        assert called_paths[0] == expected_path
-        assert called_paths == [expected_path] * 4
-        assert len([s for s in res["slots"] if s["phase"] == "repeat"]) == 3
+    called_paths.clear()
+    res = measure_linux_ollama_batch(
+        srv,
+        lambda: (2000, 23034),
+        model="m",
+        task="embed",
+        batch=8,
+    )
+    assert called_paths[0] == "/api/embed"
+    assert called_paths == ["/api/embed"] * 4
+    assert len([s for s in res["slots"] if s["phase"] == "repeat"]) == 3
 
     l4 = _remote_ident("L4", 23034)
     tput_rows = run_linux_throughput_ladder(
@@ -1279,6 +1278,456 @@ def test_measure_linux_ollama_batch_dispatches_per_task_and_throughput_ladder_pr
     assert tput_rows[0]["model"]["quant"] == "FP16"
     assert tput_rows[0]["model"]["licence"] == "mit"
     assert tput_rows[0]["repeats"] == 1
+
+
+def test_part_a_c2_spec_entries_each_have_one_source_verified_digests_and_unpublished_quant_refusals():
+    from interlock.harness.linux_cuda import _ollama_model_tag
+
+    fill_spec = load_spec(ROOT / "experiments" / "c2-fill-card" / "spec.yaml")
+    gen_spec = load_spec(ROOT / "experiments" / "c2-generate" / "spec.yaml")
+    tput_spec = load_spec(ROOT / "experiments" / "c2-throughput" / "spec.yaml")
+
+    confirmed_ollama_digests = {
+        "qwen3:8b-q4_K_M": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+        "qwen3:8b-q8_0": "e56358ca25dd14db6853a9f68a92d717aaa6f0a94250a72d1a0f3d86a9f30130",
+        "qwen3:8b-fp16": "0b358e6e9d8cb39eaa4aa6b78136d09b91acb4be08c01bb707367811caed69ae",
+        "phi3.5:3.8b-mini-instruct-q4_K_M": "57096159698481b47ea17995d1a71f28eea1e26fc801df39a841b29badb4aa63",
+        "phi3.5:3.8b-mini-instruct-q6_K": "64777e5c68030bbf6eba5761cc6efe22a69b2f9a46fdce942d2b50181dff787a",
+        "phi3.5:3.8b-mini-instruct-q8_0": "8b50e8e1e21653ad0085ed8209f4f0cf7f9af78e0352ebd2d303f7b604d313be",
+        "phi3.5:3.8b-mini-instruct-fp16": "4611ed13d4961f1ae0dab1b2e1c50f70777e21bdf97be507cc27312aa412d15a",
+        "muse-glimmer:30b-q4_K_M": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+        "muse-glimmer:30b-q8_0": "6ffafcdbd728b7d7ce94ad7db12c2b8a5ba4a1fdaad20c0d4b45a1257458485a",
+        "muse-glimmer:30b-bf16": "318fb1b9b81696d14f4f2784b3bda2e4e633046a52fcc9fe0b94e74f889f5efe",
+        "nomic-embed-text:137m-v1.5-fp16": "0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f",
+        "qwen3-embedding:0.6b-fp16": "67a7592a8852b7b36f6328cdec193cfb7639769f5edf344ba709b088b2a51042",
+    }
+
+    for spec in (fill_spec, gen_spec, tput_spec):
+        for entry in spec["models"]:
+            has_tag = bool(entry.get("ollama_tag"))
+            has_gguf = isinstance(entry.get("gguf"), dict)
+            is_declared_refusal = entry.get("expected_outcome") == "load_refused" and (
+                str(entry.get("failure_reason") or "").startswith("no published ")
+                or "out of scope" in str(entry.get("failure_reason") or "").lower()
+            )
+            if has_tag or has_gguf:
+                assert has_tag != has_gguf, f"entry {entry} must name at most one of ollama_tag or gguf"
+                if has_tag:
+                    tag = entry["ollama_tag"]
+                    assert tag in confirmed_ollama_digests, f"unverified ollama_tag {tag!r}"
+                    assert entry["revision_or_digest"] == confirmed_ollama_digests[tag]
+                if has_gguf:
+                    gguf = entry["gguf"]
+                    assert set(gguf) >= {"repo", "revision", "file", "sha256"}
+                    assert len(str(gguf["revision"])) == 40
+                    assert len(str(gguf["sha256"])) == 64
+            else:
+                assert is_declared_refusal, (
+                    f"entry {entry['model']} ({entry.get('quant')}) on {entry['device']} lacks a source"
+                )
+
+    gemma_hash = "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
+    for spec in (fill_spec, gen_spec):
+        for entry in spec["models"]:
+            if entry["model"] == gemma_hash and entry["quant"] == "Q4_K_M":
+                assert entry["gguf"]["sha256"] == "280af6832eca23cb322c4dcc65edfea98a21b8f8ab07dc7553bd6f7e6e7a3313"
+                derived_tag = _ollama_model_tag(entry["model"], entry["quant"], entry.get("ollama_tag"))
+                assert not derived_tag.startswith("sha256:")
+            if entry["model"] == gemma_hash and entry["quant"] in ("Q6_K", "Q8_0", "BF16"):
+                assert entry.get("expected_outcome") == "load_refused"
+                assert entry.get("failure_reason") == f"no published {entry['quant']} build"
+            if entry["model"] == "muse-glimmer:30b" and entry["quant"] == "Q6_K":
+                assert entry.get("expected_outcome") == "load_refused"
+                assert entry.get("failure_reason") == "no published Q6_K build"
+
+    base_linux = yaml.safe_load((ROOT / "experiments" / "c2-fill-card" / "spec.yaml").read_text(encoding="utf-8"))
+    with pytest.raises(SpecError, match="cannot name both"):
+        validate_spec(
+            {
+                **base_linux,
+                "models": [
+                    {
+                        **base_linux["models"][0],
+                        "ollama_tag": "qwen3:8b-q4_K_M",
+                        "gguf": {
+                            "repo": "Qwen/Qwen3-8B-GGUF",
+                            "revision": "7c41481f57cb95916b40956ab2f0b139b296d974",
+                            "file": "Qwen3-8B-Q6_K.gguf",
+                            "sha256": "cb042ccd76795a8830d6be6bd4165245847cc68e41797b13bd61aed4c2cfbce6",
+                        },
+                    }
+                ],
+            }
+        )
+    with pytest.raises(SpecError, match="must name exactly one source"):
+        validate_spec(
+            {
+                **base_linux,
+                "models": [
+                    {
+                        "model": "qwen3:8b",
+                        "revision_or_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+                        "quant": "Q4_K_M",
+                        "licence": "apache-2.0",
+                        "engine": "ollama",
+                        "device": "colab:T4",
+                    }
+                ],
+            }
+        )
+    with pytest.raises(SpecError, match="40-hex"):
+        validate_spec(
+            {
+                **base_linux,
+                "models": [
+                    {
+                        "model": "qwen3:8b",
+                        "revision_or_digest": "cb042ccd76795a8830d6be6bd4165245847cc68e41797b13bd61aed4c2cfbce6",
+                        "quant": "Q6_K",
+                        "licence": "apache-2.0",
+                        "engine": "ollama",
+                        "device": "colab:T4",
+                        "gguf": {
+                            "repo": "Qwen/Qwen3-8B-GGUF",
+                            "revision": "main",
+                            "file": "Qwen3-8B-Q6_K.gguf",
+                            "sha256": "cb042ccd76795a8830d6be6bd4165245847cc68e41797b13bd61aed4c2cfbce6",
+                        },
+                    }
+                ],
+            }
+        )
+    with pytest.raises(SpecError, match="64-hex"):
+        validate_spec(
+            {
+                **base_linux,
+                "models": [
+                    {
+                        "model": "qwen3:8b",
+                        "revision_or_digest": "cb042ccd76795a8830d6be6bd4165245847cc68e41797b13bd61aed4c2cfbce6",
+                        "quant": "Q6_K",
+                        "licence": "apache-2.0",
+                        "engine": "ollama",
+                        "device": "colab:T4",
+                        "gguf": {
+                            "repo": "Qwen/Qwen3-8B-GGUF",
+                            "revision": "7c41481f57cb95916b40956ab2f0b139b296d974",
+                            "file": "Qwen3-8B-Q6_K.gguf",
+                            "sha256": "short",
+                        },
+                    }
+                ],
+            }
+        )
+    with pytest.raises(SpecError, match="invalid ollama_tag"):
+        validate_spec(
+            {
+                **base_linux,
+                "models": [
+                    {
+                        "model": "qwen3:8b",
+                        "revision_or_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+                        "quant": "Q4_K_M",
+                        "licence": "apache-2.0",
+                        "engine": "ollama",
+                        "device": "colab:T4",
+                        "ollama_tag": "   ",
+                    }
+                ],
+            }
+        )
+    with pytest.raises(SpecError, match="gguf must be a mapping"):
+        validate_spec(
+            {
+                **base_linux,
+                "models": [
+                    {
+                        "model": "qwen3:8b",
+                        "revision_or_digest": "cb042ccd76795a8830d6be6bd4165245847cc68e41797b13bd61aed4c2cfbce6",
+                        "quant": "Q6_K",
+                        "licence": "apache-2.0",
+                        "engine": "ollama",
+                        "device": "colab:T4",
+                        "gguf": "not-a-dict",
+                    }
+                ],
+            }
+        )
+    with pytest.raises(SpecError, match="gguf is missing file"):
+        validate_spec(
+            {
+                **base_linux,
+                "models": [
+                    {
+                        "model": "qwen3:8b",
+                        "revision_or_digest": "cb042ccd76795a8830d6be6bd4165245847cc68e41797b13bd61aed4c2cfbce6",
+                        "quant": "Q6_K",
+                        "licence": "apache-2.0",
+                        "engine": "ollama",
+                        "device": "colab:T4",
+                        "gguf": {
+                            "repo": "Qwen/Qwen3-8B-GGUF",
+                            "revision": "7c41481f57cb95916b40956ab2f0b139b296d974",
+                            "sha256": "cb042ccd76795a8830d6be6bd4165245847cc68e41797b13bd61aed4c2cfbce6",
+                        },
+                    }
+                ],
+            }
+        )
+
+
+def test_part_b_c2_rerank_and_nli_are_declared_out_of_scope_rows_and_ollama_batch_refuses_non_embed():
+    from interlock.harness.linux_cuda import (
+        LinuxCudaError,
+        LinuxOllamaServer,
+        _batch_endpoint_and_payload,
+        run_linux_spec,
+    )
+
+    tput_spec = load_spec(ROOT / "experiments" / "c2-throughput" / "spec.yaml")
+    for entry in tput_spec["models"]:
+        if entry["task"] in ("rerank", "nli"):
+            assert entry.get("expected_outcome") == "load_refused"
+            reason = str(entry.get("failure_reason") or "")
+            assert "out of scope" in reason.lower()
+
+    for bad_task in ("rerank", "nli"):
+        with pytest.raises(LinuxCudaError, match="does not serve"):
+            _batch_endpoint_and_payload("m", bad_task, 8)
+
+    class DummyProc:
+        pid = 9999
+
+        def poll(self):
+            return None
+
+        def terminate(self):
+            return None
+
+        def wait(self, timeout=None):
+            return 0
+
+    called_urls: list[str] = []
+
+    def fake_get(url: str) -> dict[str, Any]:
+        if url.endswith("/api/version"):
+            return {"version": "0.6.2"}
+        if url.endswith("/api/ps"):
+            return {"models": [{"name": "m", "size": 500, "size_vram": 500}]}
+        return {}
+
+    def fake_post(url: str, _payload: dict[str, Any]) -> dict[str, Any]:
+        called_urls.append(url)
+        return {"total_duration": 10_000_000}
+
+    srv = LinuxOllamaServer(
+        popen=lambda *_a, **_kw: DummyProc(),
+        http_get=fake_get,
+        http_post=fake_post,
+    )
+    srv.start()
+    l4 = _remote_ident("L4", 23034)
+    rows = run_linux_spec(
+        tput_spec,
+        spec_path=ROOT / "experiments" / "c2-throughput" / "spec.yaml",
+        spec_rel="experiments/c2-throughput/spec.yaml",
+        run_id="r-part-b",
+        date="2026-10-24",
+        remote_device=l4,
+        sample_vram_mib=lambda: (2000, 23034),
+        server=srv,
+    )
+    assert not any("/api/rerank" in u or "/api/nli" in u for u in called_urls)
+    rerank_nli_rows = [r for r in rows if r["task"] in ("rerank", "nli")]
+    assert len(rerank_nli_rows) >= 6
+    for r in rerank_nli_rows:
+        validate_row(r)
+        assert r["outcome"] == "load_refused"
+        assert "out of scope" in r["settings"]["failure_reason"].lower()
+
+
+def test_part_c_throughput_inputs_use_fixed_token_lengths_128_and_512_with_distinct_row_ids():
+    from interlock.harness.linux_cuda import (
+        THROUGHPUT_TOKEN_LENGTHS,
+        LinuxCudaError,
+        LinuxOllamaServer,
+        _batch_endpoint_and_payload,
+        _build_fixed_token_item,
+        _ollama_model_tag,
+        measure_linux_ollama_batch,
+        run_linux_throughput_ladder,
+    )
+
+    assert THROUGHPUT_TOKEN_LENGTHS == (128, 512)
+    tput_spec = load_spec(ROOT / "experiments" / "c2-throughput" / "spec.yaml")
+    assert tuple(tput_spec.get("token_lengths") or ()) == (128, 512)
+    with pytest.raises(SpecError, match="token_lengths"):
+        validate_spec({**tput_spec, "token_lengths": [512]})
+    with pytest.raises(LinuxCudaError, match="positive integer"):
+        _build_fixed_token_item(0)
+    with pytest.raises(LinuxCudaError, match="unsupported batch task"):
+        _batch_endpoint_and_payload("m", "generate", 1)
+    assert _ollama_model_tag("BAAI/bge-base-en-v1.5", "unrecorded") == "baai-bge-base-en-v1.5"
+
+    ep_128, payload_128 = _batch_endpoint_and_payload("m", "embed", 4, token_length=128)
+    ep_512, payload_512 = _batch_endpoint_and_payload("m", "embed", 4, token_length=512)
+    assert ep_128 == "/api/embed" and ep_512 == "/api/embed"
+    assert len(payload_128["input"]) == 4 and len(payload_512["input"]) == 4
+    assert len(payload_128["input"][0].split()) == 128
+    assert len(payload_512["input"][0].split()) == 512
+    assert payload_128["input"][0] != "item-0"
+
+    l4 = _remote_ident("L4", 23034)
+    nomic_sha = "0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f"
+    rows = run_linux_throughput_ladder(
+        spec_id="C2-THROUGHPUT",
+        spec_rel="experiments/c2-throughput/spec.yaml",
+        run_id="r-len",
+        date="2026-10-24",
+        remote_device=l4,
+        models_by_task={"embed": ("nomic-ai/nomic-embed-text-v1.5", nomic_sha)},
+        tasks=("embed",),
+        batch_sizes=(8,),
+        token_lengths=(128, 512),
+        quant="fp16",
+        licence="apache-2.0",
+        measure_batch=lambda _t, _b, **_kw: {
+            "throughput": 250.0,
+            "warm_p50_ms": 32.0,
+            "warm_p95_ms": 35.0,
+            "peak_mib": 1800,
+            "size": 550,
+            "size_vram": 550,
+        },
+    )
+    assert len(rows) == 2
+    row_128, row_512 = rows[0], rows[1]
+    assert row_128["id"] != row_512["id"]
+    assert "/l128-b8/" in row_128["id"]
+    assert "/l512-b8/" in row_512["id"]
+    assert row_128["settings"]["prompt_tokens"] == 128
+    assert row_512["settings"]["prompt_tokens"] == 512
+    assert row_128["settings"]["static_shape"] == "8x128"
+    assert row_512["settings"]["static_shape"] == "8x512"
+
+    # Also verify measure_linux_ollama_batch forwards token_length to payload generation:
+    class DummyProc:
+        pid = 4321
+
+        def poll(self):
+            return None
+
+        def terminate(self):
+            return None
+
+        def wait(self, timeout=None):
+            return 0
+
+    seen_inputs: list[list[str]] = []
+    srv = LinuxOllamaServer(
+        popen=lambda *_a, **_kw: DummyProc(),
+        http_get=lambda url: {"version": "0.6.2"}
+        if url.endswith("/api/version")
+        else {"models": [{"name": "m", "size": 500, "size_vram": 500}]},
+        http_post=lambda _url, payload: (seen_inputs.append(list(payload["input"])), {"total_duration": 10_000_000})[1],
+    )
+    srv.start()
+    measure_linux_ollama_batch(srv, lambda: (1500, 23034), model="m", task="embed", batch=2, token_length=128)
+    assert len(seen_inputs[-1][0].split()) == 128
+
+
+def test_part_d_c2_sources_cli_resolves_every_c2_entry_to_one_source_and_command(capsys, tmp_path):
+    import json
+
+    from interlock.cli import main as cli_main
+    from interlock.harness.linux_cuda import LinuxCudaError, format_c2_sources, resolve_c2_sources
+
+    for spec_rel in (
+        "experiments/c2-fill-card/spec.yaml",
+        "experiments/c2-generate/spec.yaml",
+        "experiments/c2-throughput/spec.yaml",
+    ):
+        spec_path = ROOT / spec_rel
+        spec = load_spec(spec_path)
+        resolved = resolve_c2_sources(spec)
+        assert len(resolved) == len(spec["models"])
+        for entry, item in zip(spec["models"], resolved, strict=True):
+            assert item["device"] == entry["device"]
+            assert item["model"] == entry["model"]
+            assert item["source_kind"] in ("ollama_tag", "gguf", "load_refused")
+            if item["source_kind"] == "ollama_tag":
+                assert item["expected_digest"] == entry["revision_or_digest"]
+                assert item["served_tag"] == entry["ollama_tag"]
+                assert item["command"] == f"ollama pull {entry['ollama_tag']}"
+            elif item["source_kind"] == "gguf":
+                gguf = entry["gguf"]
+                assert item["expected_digest"] == gguf["sha256"]
+                served = item["served_tag"]
+                assert served and not served.startswith("sha256:") and "/" not in served
+                assert f"hf download {gguf['repo']} {gguf['file']} --revision {gguf['revision']}" in item["command"]
+                assert f"ollama create {served} -f Modelfile" in item["command"]
+            else:
+                assert item["expected_digest"] == entry["revision_or_digest"]
+                assert item["served_tag"] is None
+                assert item["command"].startswith("skip-pull (")
+
+        text_out = format_c2_sources(spec)
+        assert len(text_out.strip().splitlines()) == len(spec["models"])
+
+        rc = cli_main(["c2-sources", str(spec_path)])
+        assert rc == 0
+        captured = capsys.readouterr()
+        assert len(captured.out.strip().splitlines()) == len(spec["models"])
+
+        rc_json = cli_main(["c2-sources", str(spec_path), "--json"])
+        assert rc_json == 0
+        parsed_json = json.loads(capsys.readouterr().out)
+        assert len(parsed_json) == len(spec["models"])
+
+    # Invalid / non-linux-cuda spec or malformed entry refuses cleanly:
+    with pytest.raises(LinuxCudaError, match="linux-cuda"):
+        resolve_c2_sources({"platform": "windows", "models": []})
+    with pytest.raises(LinuxCudaError, match="non-empty"):
+        resolve_c2_sources({"platform": "linux-cuda", "models": []})
+    with pytest.raises(LinuxCudaError, match="cannot name both"):
+        resolve_c2_sources(
+            {
+                "platform": "linux-cuda",
+                "models": [
+                    {
+                        "device": "colab:T4",
+                        "model": "qwen3:8b",
+                        "quant": "Q4_K_M",
+                        "ollama_tag": "qwen3:8b-q4_K_M",
+                        "gguf": {"repo": "r", "revision": "a" * 40, "file": "f", "sha256": "b" * 64},
+                        "revision_or_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+                    }
+                ],
+            }
+        )
+    with pytest.raises(LinuxCudaError, match="exactly one source"):
+        resolve_c2_sources(
+            {
+                "platform": "linux-cuda",
+                "models": [
+                    {
+                        "device": "colab:T4",
+                        "model": "qwen3:8b",
+                        "quant": "Q4_K_M",
+                        "revision_or_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+                    }
+                ],
+            }
+        )
+    bad_spec = tmp_path / "bad.yaml"
+    bad_spec.write_text("not: a: valid: spec\n", encoding="utf-8")
+    assert cli_main(["c2-sources", str(bad_spec)]) == 1
+    capsys.readouterr()
+
+
+
+
+
 
 
 

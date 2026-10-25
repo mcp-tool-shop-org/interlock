@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- C2 (`linux-cuda`) model sources, throughput job sizes, and source resolver: every entry in `experiments/c2-{fill-card,generate,throughput}/spec.yaml` now names exactly one verified source (`ollama_tag` with its Ollama registry manifest digest in `revision_or_digest`, or `gguf` with its Hugging Face repo, 40-hex commit `revision`, `file`, and 64-hex `sha256`), while unpublished quant builds (`muse-glimmer:30b` `Q6_K`, Gemma 4 31B `Q6_K`/`Q8_0`/`BF16`) and stock-Ollama-unsupported `rerank` and `nli` tasks are pre-registered `load_refused` rows (`no published <quant> build` and `out of scope: stock Ollama does not serve <task>`) and `_batch_endpoint_and_payload` refuses non-`embed` tasks instead of calling non-existent `/api/rerank` or `/api/nli`. Throughput (`batch-ladder`) inputs are generated at fixed `token_lengths` of `128` and `512` words/tokens per item with `/l<token_len>-b<batch>/` in the row id, and `interlock c2-sources <spec> [--json]` resolves each C2 entry to its single pull/create/skip command and expected digest.
+
 - `CONTRIBUTORS.md` credits the AI seats that wrote the code: Grok ("Written with Grok", xAI), Kimi and Claude. The README links it.
 
 ## [0.3.0] - 2026-10-24
