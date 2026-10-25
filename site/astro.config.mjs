@@ -11,7 +11,7 @@ export default defineConfig({
     starlight({
       title: 'interlock',
       description:
-        'Local AI device router: a prototype that sends each job to a model, an engine and a device named by a measured receipt.',
+        'Local AI device router: it sends each job to a model, an engine and a device named by a measured receipt.',
       logo: {
         src: './src/assets/logo.png',
         alt: 'interlock',
