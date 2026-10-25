@@ -16,7 +16,7 @@ keywords = [
     "scheduling",
 ]
 dependencies = [
-    "jsonschema==4.25.1",
+    "jsonschema==4.26.0",
     "nvidia-ml-py==13.615.71",
     "psutil==7.2.2",
     "pyyaml==6.0.3",
@@ -27,11 +27,11 @@ intel = [
     "openvino==2026.4.1",
     "openvino-tokenizers==2026.4.1.0",
     "openvino-genai==2026.4.1.0",
-    "transformers==5.10.1",
+    "transformers==5.20.2",
 ]
 # NVIDIA NeMo Relay for `--trace relay` (the interlock-relay experiment, stage 0). Nothing imports it otherwise.
 relay = [
-    "nemo-relay==0.10.1",
+    "nemo-relay==0.10.4",
 ]
 
 [project.scripts]
@@ -39,10 +39,10 @@ interlock = "interlock.cli:main"
 
 [dependency-groups]
 dev = [
-    "hypothesis==6.168.5",
-    "pytest==9.0.3",
-    "pytest-cov==7.0.0",
-    "ruff==0.17.0",
+    "hypothesis==6.170.5",
+    "pytest==9.1.1",
+    "pytest-cov==7.1.0",
+    "ruff==0.17.1",
 ]
 # Atheris publishes manylinux wheels only. It stays out of default-groups so
 # `uv sync` never tries to install it.
