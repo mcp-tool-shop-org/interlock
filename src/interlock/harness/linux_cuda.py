@@ -24,8 +24,9 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from dataclasses import dataclass
 from importlib import resources
 from importlib.resources.abc import Traversable
@@ -216,6 +217,15 @@ def probe_nvidia_smi(
     pool: str = "us-central1-a",
 ) -> LinuxGpuReading:
     """Read GPU identity, residency/used MiB, total MiB, driver and CUDA version via ``nvidia-smi``."""
+
+    raw_runner = runner
+
+    def runner(argv: list[str]) -> str:  # noqa: F811 - every call below goes through the refusal
+        try:
+            return raw_runner(argv)
+        except (OSError, subprocess.SubprocessError) as exc:
+            detail = (getattr(exc, "stderr", None) or "").strip() or str(exc)
+            raise LinuxCudaError(f"REFUSED: no NVIDIA GPU available via nvidia-smi: {detail}") from exc
 
     query_out = runner(
         [
@@ -496,7 +506,11 @@ class LinuxOllamaServer:
         try:
             if self._proc is not None and self._proc.poll() is None:
                 self._proc.terminate()
-                self._proc.wait(timeout=5.0)
+                try:
+                    self._proc.wait(timeout=5.0)
+                except subprocess.TimeoutExpired:
+                    self._proc.kill()
+                    self._proc.wait()
         finally:
             if self._log_handle is not None:
                 self._log_handle.close()
@@ -834,6 +848,24 @@ def run_linux_fill_card(
     return row
 
 
+class _ProgressRows(list):
+    """A list that reports itself to ``notify`` each time a row is added, so a lost run keeps its finished cells."""
+
+    def __init__(self, notify: Callable[[list[dict[str, Any]]], None] | None) -> None:
+        super().__init__()
+        self._notify = notify
+
+    def append(self, item: Any) -> None:
+        super().append(item)
+        if self._notify is not None:
+            self._notify(self)
+
+    def extend(self, items: Any) -> None:
+        super().extend(items)
+        if self._notify is not None:
+            self._notify(self)
+
+
 def run_linux_generate_ladder(
     *,
     spec_id: str,
@@ -851,11 +883,12 @@ def run_linux_generate_ladder(
     engine_version: str = UNRECORDED,
     quant: str = UNRECORDED,
     licence: str = UNRECORDED,
+    on_progress: Callable[[list[dict[str, Any]]], None] | None = None,
 ) -> list[dict[str, Any]]:
     """Sweep generate TTFT and decode tok/s across prompt lengths 512..32k at concurrencies 1, 4, 8."""
 
     abort_mib = compute_abort_mib(remote_device.vram_mib, abort_fraction)
-    rows: list[dict[str, Any]] = []
+    rows: list[dict[str, Any]] = _ProgressRows(on_progress)
     for prompt_len in prompt_lengths:
         for concurrency in concurrencies:
             try:
@@ -999,12 +1032,13 @@ def run_linux_throughput_ladder(
     engine_version: str = UNRECORDED,
     quant: str = UNRECORDED,
     licence: str = UNRECORDED,
+    on_progress: Callable[[list[dict[str, Any]]], None] | None = None,
     meta_by_task: Mapping[str, tuple[str, str]] | None = None,
 ) -> list[dict[str, Any]]:
     """Sweep embed, rerank, and NLI throughput across token lengths and batch sizes 1, 8, and 32 on Linux CUDA."""
 
     abort_mib = compute_abort_mib(remote_device.vram_mib, abort_fraction)
-    rows: list[dict[str, Any]] = []
+    rows: list[dict[str, Any]] = _ProgressRows(on_progress)
     for task in tasks:
         model, digest = models_by_task[task]
         task_quant, task_licence = meta_by_task.get(task, (quant, licence)) if meta_by_task else (quant, licence)
@@ -1200,15 +1234,23 @@ def probe_linux_gpu(
         )
 
 
+def _bare_tag(name: object) -> str:
+    """A model name as ``/api/ps`` and ``/api/generate`` may each spell it: ``foo`` and ``foo:latest`` match."""
+
+    text = name if isinstance(name, str) else ""
+    return text[: -len(":latest")] if text.endswith(":latest") else text
+
+
 def _query_ps_entry(server: LinuxOllamaServer, model: str) -> tuple[int, int]:
     """Read ``(size, size_vram)`` for ``model`` from ``/api/ps``."""
 
     ps_doc = server.get("/api/ps")
     models = ps_doc.get("models") if isinstance(ps_doc, Mapping) else None
     if isinstance(models, list):
+        wanted = _bare_tag(model)
         for entry in models:
             if isinstance(entry, Mapping) and (
-                entry.get("name") == model or entry.get("model") == model or len(models) == 1
+                _bare_tag(entry.get("name")) == wanted or _bare_tag(entry.get("model")) == wanted or len(models) == 1
             ):
                 size = int(entry.get("size") or 0)
                 size_vram = int(entry.get("size_vram") or 0)
@@ -1447,6 +1489,19 @@ def _relative_spec_posix(spec_path: Path, spec_rel: str | None) -> str:
     return spec_path.name if spec_path.is_absolute() else spec_path.as_posix()
 
 
+@contextmanager
+def _unloaded_after(server: Any, tag: str) -> Iterator[None]:
+    """Unload ``tag`` when its cells end, however they end, so the next quant's baseline is an empty card."""
+
+    try:
+        yield
+    finally:
+        try:
+            server.unload(tag)
+        except (OSError, RuntimeError, ValueError):
+            pass
+
+
 def run_linux_spec(
     spec: Mapping[str, Any],
     *,
@@ -1457,6 +1512,7 @@ def run_linux_spec(
     remote_device: RemoteDeviceIdentity | None = None,
     sample_vram_mib: Callable[[], tuple[int, int]] | None = None,
     server: LinuxOllamaServer | None = None,
+    on_rows: Callable[[list[dict[str, Any]]], None] | None = None,
 ) -> list[dict[str, Any]]:
     """Execute a ``platform: linux-cuda`` experiment spec and return validated routing rows."""
 
@@ -1478,7 +1534,12 @@ def run_linux_spec(
         abort_fraction = float(spec.get("abort_fraction", 0.90))
         abort_mib = compute_abort_mib(remote_device.vram_mib, abort_fraction)
         models = list(spec.get("models") or [])
-        rows: list[dict[str, Any]] = []
+        rows: list[dict[str, Any]] = _ProgressRows(on_rows)
+
+        def progress(part: list[dict[str, Any]]) -> None:
+            if on_rows is not None:
+                on_rows([*rows, *part])
+
 
         if mode == "fill-card":
             grain = int(spec.get("grain", 2048))
@@ -1520,27 +1581,28 @@ def run_linux_spec(
                     )
                     continue
                 ollama_tag = _ollama_model_tag(model_tag, quant, entry.get("ollama_tag"))
-                rows.append(
-                    run_linux_fill_card(
-                        spec_id=spec_id,
-                        spec_rel=resolved_spec_rel,
-                        run_id=run_id,
-                        date=date,
-                        remote_device=remote_device,
-                        model=model_tag,
-                        revision_or_digest=digest,
-                        trained_ctx=trained_ctx,
-                        abort_fraction=abort_fraction,
-                        grain=grain,
-                        spill_prompt_ratio=spill_ratio,
-                        engine_version=engine_version,
-                        quant=quant,
-                        licence=licence,
-                        measure_window=lambda ctx, m=ollama_tag: measure_linux_ollama_window(
-                            active_server, sample_vram_mib, model=m, num_ctx=ctx
-                        ),
+                with _unloaded_after(active_server, ollama_tag):
+                    rows.append(
+                        run_linux_fill_card(
+                            spec_id=spec_id,
+                            spec_rel=resolved_spec_rel,
+                            run_id=run_id,
+                            date=date,
+                            remote_device=remote_device,
+                            model=model_tag,
+                            revision_or_digest=digest,
+                            trained_ctx=trained_ctx,
+                            abort_fraction=abort_fraction,
+                            grain=grain,
+                            spill_prompt_ratio=spill_ratio,
+                            engine_version=engine_version,
+                            quant=quant,
+                            licence=licence,
+                            measure_window=lambda ctx, m=ollama_tag: measure_linux_ollama_window(
+                                active_server, sample_vram_mib, model=m, num_ctx=ctx
+                            ),
+                        )
                     )
-                )
             return rows
 
         if mode == "generate-ladder":
@@ -1588,32 +1650,34 @@ def run_linux_spec(
                             )
                     continue
                 ollama_tag = _ollama_model_tag(model_tag, quant, entry.get("ollama_tag"))
-                rows.extend(
-                    run_linux_generate_ladder(
-                        spec_id=spec_id,
-                        spec_rel=resolved_spec_rel,
-                        run_id=run_id,
-                        date=date,
-                        remote_device=remote_device,
-                        model=model_tag,
-                        revision_or_digest=digest,
-                        prompt_lengths=prompt_lengths,
-                        concurrencies=concurrencies,
-                        abort_fraction=abort_fraction,
-                        num_predict=num_predict,
-                        engine_version=engine_version,
-                        quant=quant,
-                        licence=licence,
-                        measure_shape=lambda plen, conc, m=ollama_tag: measure_linux_ollama_generate(
-                            active_server,
-                            sample_vram_mib,
-                            model=m,
-                            prompt_tokens=plen,
-                            concurrency=conc,
+                with _unloaded_after(active_server, ollama_tag):
+                    rows.extend(
+                        run_linux_generate_ladder(
+                            spec_id=spec_id,
+                            spec_rel=resolved_spec_rel,
+                            run_id=run_id,
+                            date=date,
+                            remote_device=remote_device,
+                            model=model_tag,
+                            revision_or_digest=digest,
+                            prompt_lengths=prompt_lengths,
+                            concurrencies=concurrencies,
+                            abort_fraction=abort_fraction,
                             num_predict=num_predict,
-                        ),
+                            on_progress=progress,
+                            engine_version=engine_version,
+                            quant=quant,
+                            licence=licence,
+                            measure_shape=lambda plen, conc, m=ollama_tag: measure_linux_ollama_generate(
+                                active_server,
+                                sample_vram_mib,
+                                model=m,
+                                prompt_tokens=plen,
+                                concurrency=conc,
+                                num_predict=num_predict,
+                            ),
+                        )
                     )
-                )
             return rows
 
         if mode == "batch-ladder":
@@ -1666,31 +1730,33 @@ def run_linux_spec(
                                 )
                         continue
                     ollama_tag = _ollama_model_tag(model_tag, quant, entry.get("ollama_tag"))
-                    rows.extend(
-                        run_linux_throughput_ladder(
-                            spec_id=spec_id,
-                            spec_rel=resolved_spec_rel,
-                            run_id=run_id,
-                            date=date,
-                            remote_device=remote_device,
-                            models_by_task={task: (model_tag, digest)},
-                            tasks=(task,),
-                            batch_sizes=batch_sizes,
-                            token_lengths=token_lengths,
-                            abort_fraction=abort_fraction,
-                            engine_version=engine_version,
-                            quant=quant,
-                            licence=licence,
-                            measure_batch=lambda t, b, token_length=510, m=ollama_tag: measure_linux_ollama_batch(
-                                active_server,
-                                sample_vram_mib,
-                                model=m,
-                                task=t,
-                                batch=b,
-                                token_length=token_length,
-                            ),
+                    with _unloaded_after(active_server, ollama_tag):
+                        rows.extend(
+                            run_linux_throughput_ladder(
+                                spec_id=spec_id,
+                                spec_rel=resolved_spec_rel,
+                                run_id=run_id,
+                                date=date,
+                                remote_device=remote_device,
+                                models_by_task={task: (model_tag, digest)},
+                                tasks=(task,),
+                                batch_sizes=batch_sizes,
+                                token_lengths=token_lengths,
+                                abort_fraction=abort_fraction,
+                                on_progress=progress,
+                                engine_version=engine_version,
+                                quant=quant,
+                                licence=licence,
+                                measure_batch=lambda t, b, token_length=510, m=ollama_tag: measure_linux_ollama_batch(
+                                    active_server,
+                                    sample_vram_mib,
+                                    model=m,
+                                    task=t,
+                                    batch=b,
+                                    token_length=token_length,
+                                ),
+                            )
                         )
-                    )
             return rows
 
         raise LinuxCudaError(f"unsupported linux-cuda mode: {mode!r}")
