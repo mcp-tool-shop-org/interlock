@@ -20,6 +20,8 @@ from interlock.harness.linux_cuda import (
     GENERATE_CONCURRENCIES,
     GENERATE_PROMPT_LENGTHS,
     THROUGHPUT_BATCH_SIZES,
+    THROUGHPUT_INPUTS_REL,
+    THROUGHPUT_INPUTS_SHA256,
     THROUGHPUT_TASKS,
     THROUGHPUT_TOKEN_LENGTHS,
 )
@@ -496,6 +498,11 @@ def _linux_batch_ladder(data: dict) -> None:
     batches = data.get("batch_sizes")
     if not isinstance(batches, list) or tuple(batches) != THROUGHPUT_BATCH_SIZES:
         raise SpecError(f"batch-ladder batch_sizes must be {list(THROUGHPUT_BATCH_SIZES)}")
+    dataset = data.get("dataset")
+    if not isinstance(dataset, dict) or dataset.get("fixture") != THROUGHPUT_INPUTS_REL:
+        raise SpecError(f"batch-ladder dataset.fixture must be {THROUGHPUT_INPUTS_REL!r}")
+    if dataset.get("sha256") != THROUGHPUT_INPUTS_SHA256:
+        raise SpecError(f"batch-ladder dataset.sha256 must be {THROUGHPUT_INPUTS_SHA256!r}")
     _require_remote_models(data)
 
 

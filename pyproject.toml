@@ -42,6 +42,7 @@ dev = [
     "pytest==9.0.3",
     "pytest-cov==7.0.0",
     "ruff==0.17.0",
+    "tokenizers==0.22.2",
 ]
 # Atheris publishes manylinux wheels only. It stays out of default-groups so
 # `uv sync` never tries to install it.

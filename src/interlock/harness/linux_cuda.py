@@ -12,6 +12,7 @@ recorded as validated routing rows, never silently skipped.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
@@ -36,8 +37,66 @@ GENERATE_PROMPT_LENGTHS = (512, 1024, 2048, 4096, 8192, 16384, 32768)
 GENERATE_CONCURRENCIES = (1, 4, 8)
 THROUGHPUT_TASKS = ("embed", "rerank", "nli")
 THROUGHPUT_BATCH_SIZES = (1, 8, 32)
-THROUGHPUT_TOKEN_LENGTHS = (128, 512)
+THROUGHPUT_TOKEN_LENGTHS = (128, 510)
 THROUGHPUT_SEED = "The switchyard parity check measures every batch on the same text. "
+THROUGHPUT_INPUTS_REL = "experiments/c2-throughput/inputs.json"
+THROUGHPUT_INPUTS_SHA256 = "48f5905ddcb24f66d9a6cd59ff2376e8766db3f8ebd4aa1e141f2fb290332966"
+THROUGHPUT_INPUTS_PATH = Path(__file__).resolve().parents[3] / "experiments" / "c2-throughput" / "inputs.json"
+_THROUGHPUT_MODEL_ALIASES: dict[str, str] = {
+    "nomic-ai/nomic-embed-text-v1.5": "nomic-ai/nomic-embed-text-v1.5",
+    "nomic-embed-text:137m-v1.5-fp16": "nomic-ai/nomic-embed-text-v1.5",
+    "nomic-ai-nomic-embed-text-v1.5-fp16": "nomic-ai/nomic-embed-text-v1.5",
+    "BAAI/bge-base-en-v1.5": "BAAI/bge-base-en-v1.5",
+    "baai-bge-base-en-v1.5-fp16": "BAAI/bge-base-en-v1.5",
+    "baai-bge-base-en-v1.5": "BAAI/bge-base-en-v1.5",
+    "Qwen/Qwen3-Embedding-0.6B": "Qwen/Qwen3-Embedding-0.6B",
+    "qwen3-embedding:0.6b-fp16": "Qwen/Qwen3-Embedding-0.6B",
+    "qwen-qwen3-embedding-0.6b-fp16": "Qwen/Qwen3-Embedding-0.6B",
+    "BAAI/bge-reranker-v2-m3": "BAAI/bge-reranker-v2-m3",
+    "baai-bge-reranker-v2-m3-fp16": "BAAI/bge-reranker-v2-m3",
+    "cross-encoder/nli-deberta-v3-base": "cross-encoder/nli-deberta-v3-base",
+    "cross-encoder-nli-deberta-v3-base-fp16": "cross-encoder/nli-deberta-v3-base",
+}
+_CACHED_THROUGHPUT_FIXTURE: dict[str, Any] | None = None
+
+
+def load_throughput_inputs_fixture(fixture_path: Path | None = None) -> dict[str, Any]:
+    """Load and verify the committed per-model throughput inputs fixture."""
+
+    global _CACHED_THROUGHPUT_FIXTURE
+    target = fixture_path or THROUGHPUT_INPUTS_PATH
+    if fixture_path is None and _CACHED_THROUGHPUT_FIXTURE is not None:
+        return _CACHED_THROUGHPUT_FIXTURE
+    raw = target.read_bytes()
+    actual_sha = hashlib.sha256(raw).hexdigest()
+    if fixture_path is None and actual_sha != THROUGHPUT_INPUTS_SHA256:
+        raise LinuxCudaError(
+            f"throughput inputs fixture {target} sha256 mismatch: expected {THROUGHPUT_INPUTS_SHA256}, got {actual_sha}"
+        )
+    parsed = json.loads(raw.decode("utf-8"))
+    if fixture_path is None:
+        _CACHED_THROUGHPUT_FIXTURE = parsed
+    return parsed
+
+
+def get_throughput_input_spec(model: str, token_length: int) -> dict[str, Any] | None:
+    """Return the exact tokenized input record for ``(model, token_length)`` when present in the committed fixture."""
+
+    fixture = load_throughput_inputs_fixture()
+    canonical = _THROUGHPUT_MODEL_ALIASES.get(model, model)
+    model_entry = (fixture.get("models") or {}).get(canonical)
+    if not isinstance(model_entry, Mapping):
+        return None
+    inp = (model_entry.get("inputs") or {}).get(str(token_length))
+    if not isinstance(inp, Mapping):
+        return None
+    return {
+        "text": str(inp["text"]),
+        "prompt_tokens": int(inp["tokens"]),
+        "prompt_tokens_with_special": int(inp["tokens_with_special"]),
+        "prompt_token_method": "tokenizer_exact",
+        "input_fixture_sha256": THROUGHPUT_INPUTS_SHA256,
+    }
 FORBIDDEN_SHARED_PORTS = frozenset({11434, 11490})
 COLAB_CARD_VRAM_MIB_RANGES: dict[str, tuple[int, int]] = {
     "T4": (14000, 17000),
@@ -399,8 +458,15 @@ def build_linux_failure_row(
     if prompt_tokens is not None:
         settings["prompt_tokens"] = prompt_tokens
     elif token_length is not None:
-        settings["prompt_tokens"] = token_length
-        settings["prompt_token_method"] = "word_approx_1to1"  # noqa: S105
+        input_spec = get_throughput_input_spec(model, token_length)
+        if input_spec is not None:
+            settings["prompt_tokens"] = input_spec["prompt_tokens"]
+            settings["prompt_tokens_with_special"] = input_spec["prompt_tokens_with_special"]
+            settings["prompt_token_method"] = input_spec["prompt_token_method"]
+            settings["input_fixture_sha256"] = input_spec["input_fixture_sha256"]
+        else:
+            settings["prompt_tokens"] = token_length
+            settings["prompt_token_method"] = "word_approx_1to1"  # noqa: S105
     if concurrency is not None:
         settings["concurrency"] = concurrency
     if peak_mib is not None:
@@ -831,7 +897,7 @@ def run_linux_throughput_ladder(
     measure_batch: Callable[..., Mapping[str, Any]],
     tasks: tuple[str, ...] = THROUGHPUT_TASKS,
     batch_sizes: tuple[int, ...] = THROUGHPUT_BATCH_SIZES,
-    token_lengths: tuple[int, ...] = (512,),
+    token_lengths: tuple[int, ...] = (510,),
     abort_fraction: float = 0.90,
     engine_version: str = UNRECORDED,
     quant: str = UNRECORDED,
@@ -921,6 +987,26 @@ def run_linux_throughput_ladder(
                     ]
                 )
                 repeats = sum(1 for s in slots if isinstance(s, Mapping) and s.get("phase") == "repeat") or 1
+                input_spec = get_throughput_input_spec(model, token_len)
+                row_settings: dict[str, Any] = {
+                    "thinking_level": None,
+                    "num_predict": None,
+                    "num_ctx": None,
+                    "batch": batch,
+                    "static_shape": f"{batch}x{token_len}",
+                    "precision": "fp16",
+                    "prompt_tokens": input_spec["prompt_tokens"] if input_spec is not None else token_len,
+                    "prompt_token_method": (
+                        input_spec["prompt_token_method"]
+                        if input_spec is not None
+                        else "word_approx_1to1"  # noqa: S105
+                    ),
+                    "peak_mib": peak_mib,
+                    "abort_mib": abort_mib,
+                }
+                if input_spec is not None:
+                    row_settings["prompt_tokens_with_special"] = input_spec["prompt_tokens_with_special"]
+                    row_settings["input_fixture_sha256"] = input_spec["input_fixture_sha256"]
                 row: dict[str, Any] = {
                     "id": f"{spec_id}/{task}/{model}/{task_quant}/{remote_device.card}/l{token_len}-b{batch}/{run_id}",
                     "task": task,
@@ -936,18 +1022,7 @@ def run_linux_throughput_ladder(
                     "device": remote_device.logical_device,
                     "remote_device": remote_device.to_dict(),
                     "gpu_resident": True,
-                    "settings": {
-                        "thinking_level": None,
-                        "num_predict": None,
-                        "num_ctx": None,
-                        "batch": batch,
-                        "static_shape": f"{batch}x{token_len}",
-                        "precision": "fp16",
-                        "prompt_tokens": token_len,
-                        "prompt_token_method": "word_approx_1to1",
-                        "peak_mib": peak_mib,
-                        "abort_mib": abort_mib,
-                    },
+                    "settings": row_settings,
                     "quality": [],
                     "latency": {
                         "cold_ms": None,
@@ -1169,9 +1244,19 @@ def measure_linux_ollama_generate(
     }
 
 
-def _build_fixed_token_item(token_length: int, item_index: int = 0, seed: str = THROUGHPUT_SEED) -> str:
+def _build_fixed_token_item(
+    token_length: int,
+    item_index: int = 0,
+    seed: str = THROUGHPUT_SEED,
+    *,
+    model: str | None = None,
+) -> str:
     if isinstance(token_length, bool) or not isinstance(token_length, int) or token_length < 1:
         raise LinuxCudaError(f"token_length must be a positive integer, got {token_length!r}")
+    if model is not None:
+        input_spec = get_throughput_input_spec(model, token_length)
+        if input_spec is not None:
+            return str(input_spec["text"])
     words = [w for w in seed.split() if w] or ["token"]
     chosen = [words[(item_index + i) % len(words)] for i in range(token_length)]
     return " ".join(chosen)
@@ -1182,10 +1267,10 @@ def _batch_endpoint_and_payload(
     task: str,
     batch: int,
     *,
-    token_length: int = 512,
+    token_length: int = 510,
 ) -> tuple[str, dict[str, Any]]:
     if task == "embed":
-        items = [_build_fixed_token_item(token_length, idx) for idx in range(batch)]
+        items = [_build_fixed_token_item(token_length, idx, model=model) for idx in range(batch)]
         return "/api/embed", {"model": model, "input": items}
     if task in ("rerank", "nli"):
         raise LinuxCudaError(
@@ -1202,7 +1287,7 @@ def measure_linux_ollama_batch(
     model: str,
     task: str,
     batch: int,
-    token_length: int = 512,
+    token_length: int = 510,
     repeats: int = 3,
 ) -> dict[str, Any]:
     """Measure one ``(task, token_length, batch)`` cell on a running ``LinuxOllamaServer``."""
@@ -1499,7 +1584,7 @@ def run_linux_spec(
                             engine_version=engine_version,
                             quant=quant,
                             licence=licence,
-                            measure_batch=lambda t, b, token_length=512, m=ollama_tag: measure_linux_ollama_batch(
+                            measure_batch=lambda t, b, token_length=510, m=ollama_tag: measure_linux_ollama_batch(
                                 active_server,
                                 sample_vram_mib,
                                 model=m,

@@ -1561,9 +1561,9 @@ def test_part_c_throughput_inputs_use_fixed_token_lengths_128_and_512_with_disti
         run_linux_throughput_ladder,
     )
 
-    assert THROUGHPUT_TOKEN_LENGTHS == (128, 512)
+    assert THROUGHPUT_TOKEN_LENGTHS == (128, 510)
     tput_spec = load_spec(ROOT / "experiments" / "c2-throughput" / "spec.yaml")
-    assert tuple(tput_spec.get("token_lengths") or ()) == (128, 512)
+    assert tuple(tput_spec.get("token_lengths") or ()) == (128, 510)
     with pytest.raises(SpecError, match="token_lengths"):
         validate_spec({**tput_spec, "token_lengths": [512]})
     with pytest.raises(LinuxCudaError, match="positive integer"):
@@ -1573,11 +1573,11 @@ def test_part_c_throughput_inputs_use_fixed_token_lengths_128_and_512_with_disti
     assert _ollama_model_tag("BAAI/bge-base-en-v1.5", "unrecorded") == "baai-bge-base-en-v1.5"
 
     ep_128, payload_128 = _batch_endpoint_and_payload("m", "embed", 4, token_length=128)
-    ep_512, payload_512 = _batch_endpoint_and_payload("m", "embed", 4, token_length=512)
-    assert ep_128 == "/api/embed" and ep_512 == "/api/embed"
-    assert len(payload_128["input"]) == 4 and len(payload_512["input"]) == 4
+    ep_510, payload_510 = _batch_endpoint_and_payload("m", "embed", 4, token_length=510)
+    assert ep_128 == "/api/embed" and ep_510 == "/api/embed"
+    assert len(payload_128["input"]) == 4 and len(payload_510["input"]) == 4
     assert len(payload_128["input"][0].split()) == 128
-    assert len(payload_512["input"][0].split()) == 512
+    assert len(payload_510["input"][0].split()) == 510
     assert payload_128["input"][0] != "item-0"
 
     l4 = _remote_ident("L4", 23034)
@@ -1591,8 +1591,8 @@ def test_part_c_throughput_inputs_use_fixed_token_lengths_128_and_512_with_disti
         models_by_task={"embed": ("nomic-ai/nomic-embed-text-v1.5", nomic_sha)},
         tasks=("embed",),
         batch_sizes=(8,),
-        token_lengths=(128, 512),
-        quant="fp16",
+        token_lengths=(128, 510),
+        quant="FP16",
         licence="apache-2.0",
         measure_batch=lambda _t, _b, **_kw: {
             "throughput": 250.0,
@@ -1604,14 +1604,14 @@ def test_part_c_throughput_inputs_use_fixed_token_lengths_128_and_512_with_disti
         },
     )
     assert len(rows) == 2
-    row_128, row_512 = rows[0], rows[1]
-    assert row_128["id"] != row_512["id"]
+    row_128, row_510 = rows[0], rows[1]
+    assert row_128["id"] != row_510["id"]
     assert "/l128-b8/" in row_128["id"]
-    assert "/l512-b8/" in row_512["id"]
+    assert "/l510-b8/" in row_510["id"]
     assert row_128["settings"]["prompt_tokens"] == 128
-    assert row_512["settings"]["prompt_tokens"] == 512
+    assert row_510["settings"]["prompt_tokens"] == 510
     assert row_128["settings"]["static_shape"] == "8x128"
-    assert row_512["settings"]["static_shape"] == "8x512"
+    assert row_510["settings"]["static_shape"] == "8x510"
 
     # Also verify measure_linux_ollama_batch forwards token_length to payload generation:
     class DummyProc:
@@ -1934,6 +1934,140 @@ def test_fix2_labels_name_what_is_pulled_fp16_vs_bf16():
             validate_spec({**base_linux, "models": [bad_entry]})
         with pytest.raises(LinuxCudaError, match=msg):
             resolve_c2_sources({"platform": "linux-cuda", "models": [bad_entry]})
+
+
+def test_fix3_throughput_inputs_exact_tokenized_lengths_and_committed_fixture(monkeypatch):
+    import hashlib
+
+    from tokenizers import Tokenizer
+
+    import interlock.harness.linux_cuda as lc
+    from interlock.harness.linux_cuda import (
+        THROUGHPUT_INPUTS_PATH,
+        THROUGHPUT_INPUTS_REL,
+        THROUGHPUT_INPUTS_SHA256,
+        THROUGHPUT_TOKEN_LENGTHS,
+        LinuxCudaError,
+        _batch_endpoint_and_payload,
+        _build_fixed_token_item,
+        build_linux_failure_row,
+        get_throughput_input_spec,
+        load_throughput_inputs_fixture,
+        run_linux_throughput_ladder,
+    )
+
+    assert THROUGHPUT_TOKEN_LENGTHS == (128, 510)
+    assert THROUGHPUT_INPUTS_PATH.is_file()
+    assert hashlib.sha256(THROUGHPUT_INPUTS_PATH.read_bytes()).hexdigest() == THROUGHPUT_INPUTS_SHA256
+
+    tput_spec = load_spec(ROOT / "experiments" / "c2-throughput" / "spec.yaml")
+    assert tput_spec["token_lengths"] == [128, 510]
+    assert tput_spec["dataset"]["fixture"] == THROUGHPUT_INPUTS_REL
+    assert tput_spec["dataset"]["sha256"] == THROUGHPUT_INPUTS_SHA256
+
+    fixture = load_throughput_inputs_fixture()
+    assert fixture["token_lengths"] == [128, 510]
+    spec_models = {entry["model"] for entry in tput_spec["models"]}
+    assert set(fixture["models"].keys()) == spec_models
+
+    for model_name in sorted(spec_models):
+        m_entry = fixture["models"][model_name]
+        assert len(m_entry["hf_revision"]) == 40
+        assert len(m_entry["tokenizer_sha256"]) == 64
+        max_pos = int(m_entry["max_position_embeddings"])
+        tok = Tokenizer.from_str(m_entry["tokenizer_json"])
+        tok.no_truncation()
+        tok.no_padding()
+        for target_len in (128, 510):
+            inp = m_entry["inputs"][str(target_len)]
+            text = inp["text"]
+            assert hashlib.sha256(text.encode("utf-8")).hexdigest() == inp["text_sha256"]
+            ids_no_special = tok.encode(text, add_special_tokens=False).ids
+            ids_with_special = tok.encode(text, add_special_tokens=True).ids
+            assert len(ids_no_special) == target_len
+            assert len(ids_with_special) == inp["tokens_with_special"]
+            assert len(ids_with_special) <= max_pos
+            assert _build_fixed_token_item(target_len, model=model_name) == text
+
+    # Specifically verify bge-base-en-v1.5 and nli-deberta-v3-base fit inside max_position_embeddings=512:
+    assert fixture["models"]["BAAI/bge-base-en-v1.5"]["max_position_embeddings"] == 512
+    assert fixture["models"]["BAAI/bge-base-en-v1.5"]["inputs"]["510"]["tokens_with_special"] == 512
+    assert fixture["models"]["cross-encoder/nli-deberta-v3-base"]["max_position_embeddings"] == 512
+    assert fixture["models"]["cross-encoder/nli-deberta-v3-base"]["inputs"]["510"]["tokens_with_special"] == 512
+
+    # Verify served Ollama tags also resolve to the exact tokenized input:
+    _, nomic_payload = _batch_endpoint_and_payload(
+        "nomic-embed-text:137m-v1.5-fp16", "embed", 2, token_length=510
+    )
+    assert nomic_payload["input"][0] == fixture["models"]["nomic-ai/nomic-embed-text-v1.5"]["inputs"]["510"]["text"]
+
+    # Verify throughput rows and failure rows record exact token counts and fixture sha256:
+    l4 = _remote_ident("L4", 23034)
+    bge_sha = "88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2"
+    rows = run_linux_throughput_ladder(
+        spec_id="C2-THROUGHPUT",
+        spec_rel="experiments/c2-throughput/spec.yaml",
+        run_id="r-fix3",
+        date="2026-10-25",
+        remote_device=l4,
+        models_by_task={"embed": ("BAAI/bge-base-en-v1.5", bge_sha)},
+        tasks=("embed",),
+        batch_sizes=(1,),
+        token_lengths=(128, 510),
+        quant="FP16",
+        licence="mit",
+        measure_batch=lambda _t, _b, **_kw: {
+            "throughput": 300.0,
+            "warm_p50_ms": 10.0,
+            "warm_p95_ms": 11.0,
+            "peak_mib": 1500,
+            "size": 500,
+            "size_vram": 500,
+        },
+    )
+    assert rows[0]["settings"]["prompt_tokens"] == 128
+    assert rows[0]["settings"]["prompt_tokens_with_special"] == 130
+    assert rows[0]["settings"]["prompt_token_method"] == "tokenizer_exact"  # noqa: S105
+    assert rows[0]["settings"]["input_fixture_sha256"] == THROUGHPUT_INPUTS_SHA256
+    assert rows[1]["settings"]["prompt_tokens"] == 510
+    assert rows[1]["settings"]["prompt_tokens_with_special"] == 512
+    assert rows[1]["settings"]["prompt_token_method"] == "tokenizer_exact"  # noqa: S105
+    assert rows[1]["settings"]["input_fixture_sha256"] == THROUGHPUT_INPUTS_SHA256
+
+    fail_row = build_linux_failure_row(
+        spec_id="C2-THROUGHPUT",
+        spec_rel="experiments/c2-throughput/spec.yaml",
+        run_id="r-fix3-fail",
+        date="2026-10-25",
+        task="rerank",
+        model="BAAI/bge-reranker-v2-m3",
+        revision_or_digest="953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+        remote_device=l4,
+        failure_class="load_refused",
+        reason="out of scope: stock Ollama does not serve rerank",
+        batch=8,
+        token_length=510,
+        quant="FP16",
+        licence="apache-2.0",
+    )
+    validate_row(fail_row)
+    assert fail_row["settings"]["prompt_tokens"] == 510
+    assert fail_row["settings"]["prompt_tokens_with_special"] == 512
+    assert fail_row["settings"]["prompt_token_method"] == "tokenizer_exact"  # noqa: S105
+    assert fail_row["settings"]["input_fixture_sha256"] == THROUGHPUT_INPUTS_SHA256
+
+    assert get_throughput_input_spec("BAAI/bge-base-en-v1.5", 999) is None
+
+    with pytest.raises(SpecError, match="dataset.fixture"):
+        validate_spec({**tput_spec, "dataset": {**tput_spec["dataset"], "fixture": "wrong.json"}})
+    with pytest.raises(SpecError, match="dataset.sha256"):
+        validate_spec({**tput_spec, "dataset": {**tput_spec["dataset"], "sha256": "0" * 64}})
+
+    monkeypatch.setattr(lc, "_CACHED_THROUGHPUT_FIXTURE", None)
+    monkeypatch.setattr(lc, "THROUGHPUT_INPUTS_SHA256", "0" * 64)
+    with pytest.raises(LinuxCudaError, match="sha256 mismatch"):
+        load_throughput_inputs_fixture()
+
 
 
 

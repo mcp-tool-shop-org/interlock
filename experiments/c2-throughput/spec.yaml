@@ -29,7 +29,7 @@ tasks:
   - nli
 token_lengths:
   - 128
-  - 512
+  - 510
 batch_sizes:
   - 1
   - 8
@@ -48,10 +48,14 @@ needs:
   cpu_window: false
 dataset:
   name: c2-batch-throughput-inputs
+  fixture: experiments/c2-throughput/inputs.json
+  sha256: 48f5905ddcb24f66d9a6cd59ff2376e8766db3f8ebd4aa1e141f2fb290332966
   seed: "The switchyard parity check measures every batch on the same text. "
   rule: >
-    Build fixed 128-token and 512-token inputs (1-word-per-token approximation)
-    at batch sizes 1, 8, and 32 for embed, rerank, and NLI.
+    Build fixed 128-token and 510-token inputs per model with that model's own
+    tokenizer at the pinned revision, staying within max_position_embeddings
+    after special tokens (bge-base-en-v1.5 and nli-deberta-v3-base allow 512,
+    so 510 + 2 special tokens = 512), committed in experiments/c2-throughput/inputs.json.
 metrics:
   - throughput
   - warm_p50_ms
