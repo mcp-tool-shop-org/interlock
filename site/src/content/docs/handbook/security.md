@@ -15,6 +15,8 @@ interlock 0.3.x is a prototype. What it touches depends on the command. There is
 
 A `platform: linux-cuda` spec runs on a remote Colab VM, not on the rig. It starts its own Ollama on a dedicated loopback port (`127.0.0.1:11441` by default), refuses the shared ports `11434` and `11490`, refuses any Ollama URL that isn't loopback, and reads the card through NVML or `nvidia-smi`. It downloads nothing.
 
+`interlock c2-sources --verify-live` checks a C2 spec's sources. It sends read-only HTTPS requests to `registry.ollama.ai` and `huggingface.co` only, downloads no model weights (it fetches manifests, config blobs, file trees and `tokenizer.json` files to compare digests), and sends no credentials. Without `--verify-live` it makes no network request.
+
 `interlock check` and `interlock table` read local files. `interlock import` rebuilds `table/` from committed receipts, and `--remote-window` reads a remote window's receipt file. interlock does not connect to Colab. None of them touches the network. `interlock runs` does not start a device.
 
 `interlock route` can emit an `offrig_plan` argument object. interlock never launches, rents, or spends anything.

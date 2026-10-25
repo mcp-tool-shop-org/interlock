@@ -53,6 +53,8 @@ The receipt schema, the routing table, and the harness came first. `interlock ro
 
 - **Remote Colab cards as devices.** `colab:A100-40`, `colab:A100-80`, `colab:L4`, `colab:T4` and `colab:G4` rows carry the card's identity (`provider`, `card`, `vram_mib`, driver and CUDA versions, and a zone `pool`) and sit in their own pool, apart from the rig's rows. See [Devices](#devices).
 - **A Linux CUDA measuring path** for those cards (`interlock run` with a `platform: linux-cuda` spec), with three pre-registered specs: `experiments/c2-fill-card/`, `experiments/c2-generate/` and `experiments/c2-throughput/`. Failed shapes (`oom`, `load_refused`, `timeout`, `ctx_exceeded`) are kept as capability rows.
+- **Every C2 model names a checked source:** an Ollama tag with its registry manifest digest, or a GGUF file with its Hugging Face repo, commit and sha256. Gemma 4 31B uses the Ollama library's Q4_K_M, Q8_0 and BF16 builds; it has no published Q6_K build, so that cell is pre-registered as `load_refused`. `interlock c2-sources <spec>` prints each entry's source and pull command, and `--verify-live` checks every source, digest and quant label against `registry.ollama.ai` and `huggingface.co`.
+- **Throughput inputs are exact token lengths.** Each throughput model gets fixed 128-token and 510-token inputs built with its own tokenizer at a pinned revision (510 leaves room for the special tokens inside a 512-token limit), committed in `experiments/c2-throughput/inputs.json`. Rerank and NLI are out of scope on C2: stock Ollama serves neither, so those cells are pre-registered as `load_refused` with that reason.
 - **Opt-in remote routing.** `interlock route` ignores remote rows unless the request passes `--allow-remote` or `--device colab:<card>`. A remote winner is marked `remote: true` with its `remote_device`. See [Route](#route).
 - **Importing a remote window:** `interlock import --remote-window <path>` keeps every repeat slot, and `interlock table --device colab:<card>` (or `colab:*`) lists remote rows.
 
@@ -119,7 +121,7 @@ With no `--run-id`, E4b uses `e4b-block` or `e4b-pilot`, then `<base>-2`, `<base
 
 ## Threat model
 
-interlock touches local devices and local HTTP, and the network only to download a model that an experiment spec already named, from that model's publisher.
+interlock touches local devices and local HTTP, and the network only to download a model that an experiment spec already named, from that model's publisher, or to check C2 sources when asked.
 
 - Receipts and the routing table are local files.
 - Ollama calls, when a run is actually started, go to `127.0.0.1:11434` (the 5090) or `127.0.0.1:11490` (CPU). Cloud model tags are refused.
@@ -129,6 +131,7 @@ interlock touches local devices and local HTTP, and the network only to download
 - Nothing here listens on a port.
 - interlock does not send telemetry.
 - The Linux CUDA path (`platform: linux-cuda`, for remote `colab:<card>` windows) runs on the remote VM, not on the rig. It starts its own Ollama on a dedicated loopback port (`127.0.0.1:11441` by default), refuses the shared ports `11434` and `11490`, and refuses any Ollama URL that isn't loopback. It reads the card through NVML or `nvidia-smi`. It does not download models, and it does not touch Windows counters.
+- `interlock c2-sources --verify-live` is the one command that reaches the internet for C2. It sends read-only HTTPS requests to `registry.ollama.ai` (manifests and config blobs) and `huggingface.co` (file trees and `tokenizer.json`), and nothing else. It downloads no model weights and sends no credentials. Without `--verify-live`, `c2-sources` reads only local files.
 - A remote window's results reach the table only as a receipt file that `interlock import --remote-window` reads. interlock does not connect to Colab. Remote rows refuse an unhashed account identifier in any string field.
 - interlock does not rent a GPU, set a spending cap, or open offrig's database. A remote price enters only as a dated snapshot file.
 
