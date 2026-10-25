@@ -10,11 +10,21 @@ Dry-run and the tests do not.
 
 from __future__ import annotations
 
-from interlock.adapters.base import AdapterError, StepRequest, StepResult
+import tempfile
+from pathlib import Path
 
-SCRATCH_ROOT = "E:/AI/switchyard-scratch"
+from interlock.adapters.base import AdapterError, StepRequest, StepResult
+from interlock.paths import configured
+
 LOOPBACK = frozenset({"http://127.0.0.1:11434", "http://127.0.0.1:11490"})
 THINKING = frozenset({"off", "on", "low", "medium", "high"})
+
+
+def scratch_root() -> str:
+    """The scratch directory offrig opens as its project: ``INTERLOCK_SCRATCH_ROOT``, else ``[paths] scratch_root`` in
+    ``interlock.toml``, else ``interlock-scratch`` under the system temp directory."""
+
+    return configured("INTERLOCK_SCRATCH_ROOT", "scratch_root") or (Path(tempfile.gettempdir()) / "interlock-scratch").as_posix()
 
 
 def scratch_project(experiment_id: str) -> str:
@@ -23,7 +33,7 @@ def scratch_project(experiment_id: str) -> str:
     name = experiment_id.strip()
     if any(part in name for part in ("/", "\\", "..")) or name.startswith("."):
         raise AdapterError(f"{experiment_id} is not a single scratch name")
-    return f"{SCRATCH_ROOT}/{name}"
+    return f"{scratch_root()}/{name}"
 
 
 def plan_argv(spec: dict) -> list[str]:

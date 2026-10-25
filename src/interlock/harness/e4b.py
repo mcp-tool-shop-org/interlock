@@ -669,7 +669,8 @@ def _require_ready(seams) -> None:
         path = heartbeat_path()
     wall = getattr(seams, "wall", None)
     now = wall() if callable(wall) else time.time()
-    require_heartbeat(Path(path), now)
+    if path is not None:
+        require_heartbeat(Path(path), now)
     card = getattr(seams, "card_models", None)
     models = card() if callable(card) else ["unreadable"]
     if not isinstance(models, list):

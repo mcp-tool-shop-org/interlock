@@ -81,6 +81,7 @@ from interlock.ollama_supervisor import (
     restart_policy_lines,
     retry_budget,
 )
+from interlock.paths import configured
 from interlock.receipt import CAPABILITY_OUTCOMES, validate_row
 
 try:  # the CPU-window evidence of ruling #36's addendum; never a step failure
@@ -121,7 +122,8 @@ def _storage_lines(spec: dict) -> list[str]:
         cache = arm.get("hf_cache")
         if cache == "hot":
             lines.append(
-                f"{arm['id']}: hf_cache hot (C:/AI-Models/hf-cache-hot); a missing copy is a refusal"
+                f"{arm['id']}: hf_cache hot (INTERLOCK_WEIGHTS_HOT, [paths] weights_hot, or hot/ under HF_HOME); "
+                "a missing copy is a refusal"
             )
         elif cache == "archive":
             lines.append(f"{arm['id']}: hf_cache archive")
@@ -2122,17 +2124,21 @@ def check_flags(spec: dict, grant: str | None, npu_session: str | None, cpu_wind
     if needs["cpu_window"]:
         assess_step(device="CPU", cpu_window=cpu_window, cpu_heavy=True)
 
-HEARTBEAT_DEFAULT = Path("E:/AI/training/_watchdog_HEARTBEAT")
 HEARTBEAT_ENV = "WATCHDOG_HEARTBEAT"
 
 
-def heartbeat_path(override: Path | None = None) -> Path:
-    """The VRAM watchdog heartbeat file. The WATCHDOG_HEARTBEAT environment
-    variable overrides the rig default, the same variable chain_step.sh honours."""
+def heartbeat_path(override: Path | None = None) -> Path | None:
+    """The VRAM watchdog heartbeat file, or None when none is configured (the guard is then off).
+
+    The file is written by the studio's watchdog and read only by the heartbeat guard. The argument wins, then the
+    WATCHDOG_HEARTBEAT environment variable (the one chain_step.sh honours), then ``[paths] heartbeat`` in
+    ``interlock.toml``. There is no default path.
+    """
 
     if override is not None:
         return override
-    return Path(os.environ.get(HEARTBEAT_ENV, str(HEARTBEAT_DEFAULT)))
+    found = configured(HEARTBEAT_ENV, "heartbeat")
+    return None if found is None else Path(found)
 
 
 def real_adapters(spec: dict) -> dict:
@@ -2181,10 +2187,11 @@ def _card_probe(adapters: dict, spec: dict):
     return probe
 
 
-def _card_guards(probe, path: Path, now: float) -> None:
-    """Heartbeat, then empty card. Both are read fresh on every call."""
+def _card_guards(probe, path: Path | None, now: float) -> None:
+    """Heartbeat (when one is configured), then empty card. Both are read fresh on every call."""
 
-    require_heartbeat(path, now)
+    if path is not None:
+        require_heartbeat(path, now)
     require_card_empty(probe())
 
 

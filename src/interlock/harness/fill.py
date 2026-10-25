@@ -1467,7 +1467,7 @@ def run_fill_card(
     spec_rel: str,
     run_id: str,
     date: str,
-    heartbeat: Path,
+    heartbeat: Path | None,
     wall,
     marker,
     notes: str = "",
@@ -1506,7 +1506,8 @@ def run_fill_card(
                     marker.note_restart_disabled(reason)
                 record_checked = True
             require_grant(grant, uses_5090=True)
-            require_heartbeat(heartbeat, wall())
+            if heartbeat is not None:
+                require_heartbeat(heartbeat, wall())
             adapter = _ollama(adapters)
             require_card_empty(adapter.loaded_models())
             if not getattr(seams, "preflight_done", False):
