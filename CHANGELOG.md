@@ -5,7 +5,7 @@
 ### Security
 
 - `LinuxOllamaServer` and `run_spec` (`seams["host"]`) refuse any non-loopback Ollama host before starting `ollama serve`, accepting only `127.0.0.1:<port>`, `[::1]:<port>`, or `localhost:<port>` with an ASCII port when `localhost` resolves exclusively to loopback, re-checking the host when the server starts, and keeping the shared ports `11434` and `11490` refused.
-- Remote rows now refuse an unhashed account token (`account:<id>`, `user=<id>`, `owner:<id>`, `uid:<id>`, and related prefixes followed by `:` or `=` and an identifier) anywhere in any string value, and refuse account-prefixed dict keys (`account:`, `owner-`, `github_`, …) at any depth, alongside the existing `sha256:<64-hex>` check on account and GGUF-source fields.
+- Remote rows now refuse an unhashed account token (`account:<id>`, `user=<id>`, `owner:<id>`, `uid:<id>`, and related prefixes followed by `:` or `=`, with optional whitespace around the separator, and an identifier) anywhere in any string value or dict key at any depth, alongside the existing `sha256:<64-hex>` check on account and GGUF-source fields.
 
 ### Fixed
 
