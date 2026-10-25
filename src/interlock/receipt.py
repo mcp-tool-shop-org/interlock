@@ -358,9 +358,10 @@ def _check_remote_device(row: dict) -> None:
         is_rig_device,
     )
 
-    _reject_unhashed_account_fields(row, row["id"])
     device = row.get("device")
     remote_raw = row.get("remote_device")
+    is_remote = is_colab_device(device) or remote_raw is not None
+    _reject_unhashed_account_fields(row, row["id"], check_strings=is_remote)
     if is_rig_device(device):
         if remote_raw is not None:
             raise ReceiptError(
@@ -380,7 +381,11 @@ def _check_remote_device(row: dict) -> None:
             )
 
 
-def _reject_unhashed_account_fields(value: object, row_id: str, where: str = "$") -> None:
+def _reject_unhashed_account_fields(
+    value: object, row_id: str, where: str = "$", *, check_strings: bool = True
+) -> None:
+    from interlock.devices import _ACCOUNT_PREFIX
+
     if isinstance(value, dict):
         for key, item in value.items():
             if _ACCOUNT_KEY.fullmatch(str(key)):
@@ -388,8 +393,13 @@ def _reject_unhashed_account_fields(value: object, row_id: str, where: str = "$"
                     raise ReceiptError(
                         f"{row_id}: unhashed account id in {where}.{key}; hash with sha256:<64-hex> or omit"
                     )
-            _reject_unhashed_account_fields(item, row_id, f"{where}.{key}")
+            _reject_unhashed_account_fields(item, row_id, f"{where}.{key}", check_strings=check_strings)
     elif isinstance(value, list):
         for idx, item in enumerate(value):
-            _reject_unhashed_account_fields(item, row_id, f"{where}[{idx}]")
+            _reject_unhashed_account_fields(item, row_id, f"{where}[{idx}]", check_strings=check_strings)
+    elif check_strings and isinstance(value, str):
+        if _ACCOUNT_PREFIX.search(value.strip()) or any(_ACCOUNT_PREFIX.search(tok) for tok in value.split()):
+            raise ReceiptError(
+                f"{row_id}: unhashed account id in {where}; hash with sha256:<64-hex> or omit"
+            )
 

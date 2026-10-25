@@ -408,3 +408,50 @@ def test_validate_row_refuses_unhashed_account_in_any_remote_device_field_or_ggu
         validate_row(hashed_gguf)
 
 
+@pytest.mark.parametrize(
+    ("case_name", "overrides"),
+    [
+        ("notes_account_prefix", {"notes": "account:some_handle ran this"}),
+        (
+            "settings_failure_reason_owner_prefix",
+            {"settings": {**row()["settings"], "failure_reason": "owner:some_handle"}},
+        ),
+        (
+            "settings_nested_list_account_prefix",
+            {"settings": {**row()["settings"], "tags": ["ok", {"detail": "user:some_handle"}]}},
+        ),
+        (
+            "top_level_string_account_prefix",
+            {"id": "account:some_handle/qwen3:8b/colab-A100-40"},
+        ),
+    ],
+)
+def test_remote_row_refuses_account_prefix_in_any_string_field(case_name: str, overrides: dict):
+    candidate = _remote_row(**overrides)
+    with pytest.raises(ReceiptError, match="unhashed account id"):
+        validate_row(candidate)
+
+
+def test_remote_row_allows_hashed_identifiers_where_permitted():
+    hashed_id = "sha256:" + ("d" * 64)
+    allowed = _remote_row(
+        remote_device={
+            "provider": "colab",
+            "card": "A100-40",
+            "vram_mib": 40960,
+            "driver_version": "550.54.15",
+            "cuda_version": "12.4",
+            "pool": hashed_id,
+        },
+        notes=f"measured role-set {hashed_id}",
+        settings={
+            **row()["settings"],
+            "account": hashed_id,
+            "gguf_source": hashed_id,
+            "tags": [hashed_id, {"digest": hashed_id}],
+        },
+    )
+    validate_row(allowed)
+
+
+
