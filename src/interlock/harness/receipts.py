@@ -206,7 +206,9 @@ def for_table(row: dict) -> dict:
     if row.get("outcome") == "native_binary_rejected":
         cleaned["latency"]["compile_ms"] = (row.get("latency") or {}).get("compile_ms")
     notes = cleaned.get("notes") or ""
-    if DEVICE_LOST_NOTE not in notes:
+    if row.get("outcome") == "sampler_error":
+        pass  # the cell was not measured; nothing is known about what the device can do
+    elif DEVICE_LOST_NOTE not in notes:
         cleaned["notes"] = DEVICE_LOST_NOTE if not notes else f"{DEVICE_LOST_NOTE}. {notes}"
     validate_row(cleaned)
     return cleaned

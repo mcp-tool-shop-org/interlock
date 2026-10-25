@@ -15,6 +15,10 @@
 - A missing or unreadable file, a non-UTF-8 table, or a bad JSON file in `interlock import` is a message on stderr and exit 1, not a traceback.
 - A full rebuild reads `candidates.json` and renders `gaps.md` before it writes anything, then replaces `import-dropped.txt`, `routing.jsonl` and `gaps.md` atomically; a missing or invalid `candidates.json` exits 1 with the table and `import-dropped.txt` byte-identical.
 
+### Fixed
+
+- A VRAM sampler (or nvidia-smi) that fails after a cell's model call is now a `sampler_error` row, where it was written as `load_refused` (a claim that the card cannot load the quant). `sampler_error` is an untimed outcome that is not a capability outcome: it validates against the routing-row and route-decision schemas, is not a speed row, is listed under `excluded` by `interlock route` with the code `sampler_error` and no "measured failure reason", keeps its note unchanged in the table copy, and imports from a window receipt. A fill-card cell stops at it and does not bisect to a ceiling. A spec still cannot pre-register it.
+
 ## [1.0.1] - 2026-10-25
 
 ### Added
