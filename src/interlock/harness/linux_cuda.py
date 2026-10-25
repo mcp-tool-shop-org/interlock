@@ -40,6 +40,10 @@ from interlock.receipt import validate_row
 
 UNRECORDED = "unrecorded"
 FAILURE_CLASSES = ("oom", "load_refused", "timeout", "ctx_exceeded")
+# A cell that was not measured. It says nothing about what the card can load, so it is not a capability outcome and
+# a spec cannot pre-register it (spec.py checks FAILURE_CLASSES, which stays the capability set).
+MEASUREMENT_FAILURE_CLASSES = ("sampler_error",)
+ROW_FAILURE_CLASSES = FAILURE_CLASSES + MEASUREMENT_FAILURE_CLASSES
 GENERATE_PROMPT_LENGTHS = (512, 1024, 2048, 4096, 8192, 16384, 32768)
 GENERATE_CONCURRENCIES = (1, 4, 8)
 THROUGHPUT_TASKS = ("embed", "rerank", "nli")
@@ -135,9 +139,9 @@ class LinuxShapeFailure(Exception):
     """A measured shape failed on the remote card and must be recorded as a failure row."""
 
     def __init__(self, failure_class: str, reason: str, *, peak_mib: int | None = None) -> None:
-        if failure_class not in FAILURE_CLASSES:
+        if failure_class not in ROW_FAILURE_CLASSES:
             raise LinuxCudaError(
-                f"unknown Linux CUDA failure class {failure_class!r}; expected one of {FAILURE_CLASSES}"
+                f"unknown Linux CUDA failure class {failure_class!r}; expected one of {ROW_FAILURE_CLASSES}"
             )
         if not isinstance(reason, str) or not reason.strip():
             raise LinuxCudaError("LinuxShapeFailure requires a non-empty reason")
@@ -543,7 +547,7 @@ def build_linux_failure_row(
 ) -> dict[str, Any]:
     """Build a schema-valid capability/failure row for a failed remote shape."""
 
-    if failure_class not in FAILURE_CLASSES:
+    if failure_class not in ROW_FAILURE_CLASSES:
         raise LinuxCudaError(f"invalid failure_class {failure_class!r}")
     if not isinstance(reason, str) or not reason.strip():
         raise LinuxCudaError("failure row requires a non-empty measured reason")
@@ -733,18 +737,20 @@ def run_linux_fill_card(
     prev_prompt_rate: float | None = None
     last_failure: tuple[str, str, int | None] | None = None
     failed_ctx: int | None = None
+    measurement_failed = False
 
     for candidate in candidates:
         reading, failure = _eval_window(candidate, prev_prompt_rate)
         if failure is not None or reading is None:
             last_failure = failure
             failed_ctx = candidate
+            measurement_failed = failure is not None and failure[0] in MEASUREMENT_FAILURE_CLASSES
             break
         best_ctx = candidate
         best_reading = reading
         prev_prompt_rate = float(reading["prompt_tok_s"])
 
-    if best_ctx is not None and failed_ctx is not None and failed_ctx - best_ctx > grain:
+    if not measurement_failed and best_ctx is not None and failed_ctx is not None and failed_ctx - best_ctx > grain:
         low_steps = best_ctx // grain
         high_steps = failed_ctx // grain
         while high_steps - low_steps > 1:
@@ -759,8 +765,11 @@ def run_linux_fill_card(
             else:
                 last_failure = failure
                 high_steps = mid_steps
+                if failure is not None and failure[0] in MEASUREMENT_FAILURE_CLASSES:
+                    measurement_failed = True
+                    break
 
-    if best_ctx is None or best_reading is None:
+    if measurement_failed or best_ctx is None or best_reading is None:
         f_class, f_reason, f_peak = last_failure or ("load_refused", "no resident window found", None)
         return build_linux_failure_row(
             spec_id=spec_id,
@@ -1234,6 +1243,15 @@ def probe_linux_gpu(
         )
 
 
+def _sample_during_cell(sample_vram_mib: Callable[[], tuple[int, int]]) -> tuple[int, int]:
+    """A VRAM reading taken inside a cell. A sampler failure is a failed measurement, never a load refusal."""
+
+    try:
+        return sample_vram_mib()
+    except Exception as exc:
+        raise LinuxShapeFailure("sampler_error", f"VRAM sampler failed: {exc}") from exc
+
+
 def _bare_tag(name: object) -> str:
     """A model name as ``/api/ps`` and ``/api/generate`` may each spell it: ``foo`` and ``foo:latest`` match."""
 
@@ -1282,7 +1300,7 @@ def measure_linux_ollama_window(
         )
         if isinstance(resp, Mapping) and resp.get("error"):
             raise RuntimeError(str(resp["error"]))
-        used_after, _ = sample_vram_mib()
+        used_after, _ = _sample_during_cell(sample_vram_mib)
         peak_mib = max(peak_mib, used_after)
         size, size_vram = _query_ps_entry(server, model)
     except BaseException as exc:
@@ -1343,7 +1361,7 @@ def measure_linux_ollama_generate(
             else:
                 with ThreadPoolExecutor(max_workers=workers) as pool:
                     pass_resps = list(pool.map(_call_once, range(workers)))
-            used_now, _ = sample_vram_mib()
+            used_now, _ = _sample_during_cell(sample_vram_mib)
             peak_mib = max(peak_mib, used_now)
             ttfts_ns = [max(1, int(r.get("prompt_eval_duration") or 10_000_000)) for r in pass_resps]
             eval_counts = [max(1, int(r.get("eval_count") or num_predict)) for r in pass_resps]
@@ -1441,7 +1459,7 @@ def measure_linux_ollama_batch(
             resp = server.post(endpoint, payload)
             if isinstance(resp, Mapping) and resp.get("error"):
                 raise RuntimeError(str(resp["error"]))
-            used_after, _ = sample_vram_mib()
+            used_after, _ = _sample_during_cell(sample_vram_mib)
             peak_mib = max(peak_mib, used_after)
             total_ns = max(1, int(resp.get("total_duration") or 10_000_000))
             pass_lat_ms = round(total_ns / 1_000_000.0, 3)

@@ -137,7 +137,8 @@
         "oom",
         "load_refused",
         "timeout",
-        "ctx_exceeded"
+        "ctx_exceeded",
+        "sampler_error"
       ]
     },
     "parity_valid": {"type": "boolean"},

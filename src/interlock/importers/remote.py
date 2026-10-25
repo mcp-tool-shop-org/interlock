@@ -16,7 +16,7 @@ from interlock.devices import (
     partition_rows_by_pool,
 )
 from interlock.families import FamilyError, stamp_family
-from interlock.harness.linux_cuda import FAILURE_CLASSES
+from interlock.harness.linux_cuda import ROW_FAILURE_CLASSES
 from interlock.importers.common import UNRECORDED, ImportError_, blank_latency, blank_settings, source_provenance
 from interlock.receipt import ReceiptError, validate_row
 
@@ -155,7 +155,7 @@ def _record_to_row(
     )
 
     if failure_class is not None:
-        if failure_class not in FAILURE_CLASSES:
+        if failure_class not in ROW_FAILURE_CLASSES:
             raise ImportError_(f"{row_id}: unsupported failure_class {failure_class!r}")
         reason = str(entry.get("failure_reason") or "").strip()
         if not reason:

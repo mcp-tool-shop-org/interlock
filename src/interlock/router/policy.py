@@ -71,6 +71,7 @@ EXCLUDED_OUTCOMES = (
     "load_refused",
     "timeout",
     "ctx_exceeded",
+    "sampler_error",
 )
 
 _KNOWN_PREFIX = frozenset({"on", "off", "default"})
@@ -124,7 +125,7 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
         outcome = row.get("outcome")
         if outcome in EXCLUDED_OUTCOMES and _task_model(row, request):
             excluded.append({"id": str(row["id"]), "code": str(outcome)})
-            measured = _measured_failure_reason(row)
+            measured = None if outcome == "sampler_error" else _measured_failure_reason(row)
             if measured is not None:
                 failure_reasons.append(f"{row.get('device')}: {measured}")
         elif outcome in EXCLUDED_OUTCOMES:
