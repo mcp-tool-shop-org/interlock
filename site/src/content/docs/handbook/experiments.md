@@ -89,3 +89,15 @@ rnd drew the charts from these receipts. They are up:
 - [Triplet effects](https://mcp-tool-shop-org.github.io/rnd/charts/e4b-triplet-effects.svg)
 - [Pilot clock](https://mcp-tool-shop-org.github.io/rnd/charts/e4b-pilot-clock.svg)
 - [iGPU latency](https://mcp-tool-shop-org.github.io/rnd/charts/e4b-igpu-latency.svg)
+
+## C2: remote Colab cards
+
+C2 measures the same questions on rented Colab cards (`colab:A100-40`, `colab:A100-80`, `colab:L4`, `colab:T4`, `colab:G4`) through the Linux CUDA path, `platform: linux-cuda`. The specs are pre-registered like the rig's:
+
+- `experiments/c2-fill-card/`: the largest resident context per model, with 2048-token grid bisection.
+- `experiments/c2-generate/`: time to first token and decode rate at prompt lengths 512 to 32768 and concurrencies 1, 4 and 8.
+- `experiments/c2-throughput/`: `embed`, `rerank` and `nli` at batches 1, 8 and 32.
+
+A shape that runs out of memory, is refused at load, times out or exceeds the context is kept as a capability row with its measured reason (`oom`, `load_refused`, `timeout`, `ctx_exceeded`). The harness reads residency from `/api/ps`, the card from NVML or `nvidia-smi`, and the engine version from `/api/version` (or records `unrecorded` when the server failed before answering).
+
+A window's receipt reaches the table through `interlock import --remote-window`. Remote rows stay in their own pool and are routed only on request. No remote window has been imported yet.

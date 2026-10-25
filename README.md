@@ -43,15 +43,24 @@ pip install mcptoolshop-interlock
 uv tool install mcptoolshop-interlock
 ```
 
-The distribution name is `mcptoolshop-interlock`. The import and the command are `interlock`. Python 3.12 only (`requires-python` is `>=3.12,<3.13`). CI runs the tests on Ubuntu. A live measurement run is written for the Windows rig this table was measured on.
+The distribution name is `mcptoolshop-interlock`. The import and the command are `interlock`. Python 3.12 only (`requires-python` is `>=3.12,<3.13`). CI runs the tests on Ubuntu. A live measurement run on the rig is written for the Windows rig this table was measured on. The Linux CUDA path (since 0.3.0) runs on a remote Colab VM.
 
 What this program is allowed to touch is in the [threat model](#threat-model).
 
 The receipt schema, the routing table, and the harness came first. `interlock route` reads that table. It does not spend device time.
 
+## What's new in 0.3.0
+
+- **Remote Colab cards as devices.** `colab:A100-40`, `colab:A100-80`, `colab:L4`, `colab:T4` and `colab:G4` rows carry the card's identity (`provider`, `card`, `vram_mib`, driver and CUDA versions, and a zone `pool`) and sit in their own pool, apart from the rig's rows. See [Devices](#devices).
+- **A Linux CUDA measuring path** for those cards (`interlock run` with a `platform: linux-cuda` spec), with three pre-registered specs: `experiments/c2-fill-card/`, `experiments/c2-generate/` and `experiments/c2-throughput/`. Failed shapes (`oom`, `load_refused`, `timeout`, `ctx_exceeded`) are kept as capability rows.
+- **Opt-in remote routing.** `interlock route` ignores remote rows unless the request passes `--allow-remote` or `--device colab:<card>`. A remote winner is marked `remote: true` with its `remote_device`. See [Route](#route).
+- **Importing a remote window:** `interlock import --remote-window <path>` keeps every repeat slot, and `interlock table --device colab:<card>` (or `colab:*`) lists remote rows.
+
+The table holds no remote rows yet: no remote window has been imported. See [CHANGELOG.md](CHANGELOG.md) for the full list.
+
 ## What the table says today
 
-The routing table holds 509 rows from committed receipts. A few of the answers it already gives:
+The routing table holds 509 rows from committed receipts, all measured on the rig. A few of the answers it already gives:
 
 - **A small model runs well on the Intel side.** Phi-3.5-mini decodes at about 20–22 tokens/s on the CPU and the iGPU, and about 15 tokens/s on the NPU, at a 1024-token prompt with thinking off. That leaves the 5090 free for bigger work.
 - **An 8B model doesn't belong on the Intel side.** At the same 1024-token prompt with thinking off, Qwen3-8B decodes at about 10–12 tokens/s on the CPU, iGPU and NPU. On the 5090 it decodes at about 208 tokens/s with thinking off and 211 with it on. Ask for 15 tokens/s with the 5090 busy, and the router refuses and names the experiment behind the gap: `interlock route --task generate --model qwen3-8b --min-tok-s 15 --busy 5090`.
@@ -119,11 +128,13 @@ interlock touches local devices and local HTTP, and the network only to download
 - The 5090 path checks that the VRAM watchdog heartbeat is at most 60 seconds old and that no model is loaded. The heartbeat file is not opened. Only its modified time is read.
 - Nothing here listens on a port.
 - interlock does not send telemetry.
+- The Linux CUDA path (`platform: linux-cuda`, for remote `colab:<card>` windows) runs on the remote VM, not on the rig. It starts its own Ollama on a dedicated loopback port (`127.0.0.1:11441` by default), refuses the shared ports `11434` and `11490`, and refuses any Ollama URL that isn't loopback. It reads the card through NVML or `nvidia-smi`. It does not download models, and it does not touch Windows counters.
+- A remote window's results reach the table only as a receipt file that `interlock import --remote-window` reads. interlock does not connect to Colab. Remote rows refuse an unhashed account identifier in any string field.
 - interlock does not rent a GPU, set a spending cap, or open offrig's database. A remote price enters only as a dated snapshot file.
 
 ## Layout
 
-`devices` is the allow-list. `guards` is the grant, the session, the heartbeat and the empty card. `receipt` is the schema and `interlock check`. `importers` rebuilds `table/routing.jsonl` from pinned receipts. `interlock table` prints that table, filtered by task or device. `table/gaps.md` is the experiment backlog. The harness runs a committed spec. `interlock route` reads that table and does not touch a device.
+`devices` is the allow-list. `guards` is the grant, the session, the heartbeat and the empty card. `receipt` is the schema and `interlock check`. `importers` rebuilds `table/routing.jsonl` from pinned receipts, and `importers/remote.py` reads a remote window's receipt. `interlock table` prints that table, filtered by task or device. `table/gaps.md` is the experiment backlog. The harness runs a committed spec; `harness/linux_cuda.py` is the Linux CUDA path for remote cards. `interlock route` reads that table and does not touch a device.
 
 The build brief and the four feedback notes it names are snapshotted in `docs/handoff/`. The copy in the studio memory store stays authoritative.
 
@@ -151,6 +162,8 @@ Every experiment is pre-registered: its spec under `experiments/<id>/spec.yaml` 
 interlock run experiments/e4/spec.yaml --dry-run
 interlock run experiments/e4/spec.yaml --grant "<grant text>" --npu-session "<session>"
 ```
+
+A `platform: linux-cuda` spec (the C2 specs under `experiments/c2-*/`) runs on a remote Colab VM inside a booked window, against its own Ollama on a dedicated loopback port.
 
 `--dry-run` prints the plan and the guards a real run would need, and starts nothing. A real run needs the flags its devices call for: `--grant` for the 5090, `--npu-session` for the NPU or iGPU, and `--cpu-window` for a CPU-heavy leg. It writes one receipt under `receipts/`. `interlock import` (with optional `--remote-window <path>` for remote Colab window JSON receipts) then rebuilds `table/` from the committed receipts, and `interlock check` validates them.
 

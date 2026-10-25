@@ -2,9 +2,12 @@
 
 ## Unreleased
 
-- `CONTRIBUTORS.md` credits the AI seats that wrote the code: Grok ("Written with Grok", xAI), Kimi and Claude. The README links it.
+## [0.3.0] - 2026-10-25
 
-## [0.3.0] - 2026-10-24
+### Docs
+
+- The README and handbook say what is new in 0.3.0. The handbook's experiments page has a C2 section for the remote Colab specs, and the threat model and security page cover the Linux CUDA path and the remote importer.
+- `CONTRIBUTORS.md` credits the AI seats that wrote the code: Grok ("Written with Grok", xAI), Kimi and Claude. The README links it.
 
 ### Added
 
