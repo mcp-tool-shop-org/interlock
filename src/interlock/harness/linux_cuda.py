@@ -432,6 +432,7 @@ class LinuxOllamaServer:
         return self._http_post(f"{self.base_url}{path}", payload)
 
     def __enter__(self) -> LinuxOllamaServer:
+        validate_loopback_ollama_host(self.host)
         env = dict(os.environ)
         env["OLLAMA_HOST"] = self.host
         self.log_path.parent.mkdir(parents=True, exist_ok=True)

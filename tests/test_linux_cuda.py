@@ -2603,3 +2603,28 @@ def test_run_spec_seams_host_refuses_non_ascii_port(tmp_path: Path, bad_host: st
     assert spawned == []
 
 
+def test_linux_ollama_server_revalidates_host_at_start(tmp_path: Path):
+    from interlock.harness.linux_cuda import LinuxCudaError, LinuxOllamaServer
+
+    spawned: list[list[str]] = []
+
+    class _DummyProc:
+        pid = 1234
+
+        def poll(self):
+            return None
+
+    server = LinuxOllamaServer(
+        host="127.0.0.1:11441",
+        log_path=tmp_path / "ollama.log",
+        popen=lambda argv, **_kw: (spawned.append(list(argv)), _DummyProc())[1],
+        http_get=lambda _url: {"version": "0.6.2"},
+        http_post=lambda _url, _payload: {"done": True},
+    )
+    server.host = "0.0.0.0:11441"
+    with pytest.raises(LinuxCudaError, match="non-loopback"):
+        server.start()
+    assert spawned == []
+
+
+
