@@ -85,7 +85,7 @@ source = ["interlock"]
 omit = ["*/schema/*"]
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py313"
 # Sources were already written past the 88 default. 120 keeps E501 on.
 line-length = 120
 

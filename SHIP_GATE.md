@@ -33,7 +33,7 @@
 
 ## C. Operator Docs
 
-- [x] `[all]` README is current: what it does, install from a clone and the PyPI commands marked from v0.1.0, usage, Python 3.12, Ubuntu CI, Windows for a live run (2026-10-14)
+- [x] `[all]` README is current: what it does, install from a clone and the PyPI commands marked from v0.1.0, usage, Python 3.13, 3.14 and 3.15 (3.15 main), Ubuntu CI, Windows for a live run (2026-10-14)
 - [x] `[all]` CHANGELOG.md (Keep a Changelog format) — Unreleased and [0.1.0] - 2026-10-14 (checked 2026-10-14)
 - [x] `[all]` LICENSE file present and repo states support status — MIT, supported 0.1.x, prototype (2026-10-12)
 - [x] `[cli]` `--help` output accurate for all commands and flags — checked against `interlock --help`, `route --help`, `run --help`, and `runs --help` on 2026-10-12
