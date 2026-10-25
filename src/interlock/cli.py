@@ -127,7 +127,10 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument(
         "--quants",
         default=None,
-        help="comma-separated quants of a linux-cuda spec, applied with --models. Names an unpulled quant to skip it",
+        help=(
+            "comma-separated quants of a linux-cuda spec to measure (with --models, or on its own); "
+            "an unknown quant is refused with the spec's list"
+        ),
     )
     run.add_argument(
         "--quarantine",
