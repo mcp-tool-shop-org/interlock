@@ -13,7 +13,7 @@ interlock 1.x is a research instrument. What it touches depends on the command. 
 
 `interlock run` drives local devices: CPU, the Intel iGPU, the NPU via OpenVINO, and the RTX 5090 via loopback Ollama. The 5090 needs an explicit `--grant`. The NPU and the iGPU need `--npu-session`. A CPU-heavy leg needs `--cpu-window`. It calls Ollama on loopback only, and downloads only spec-named models at pinned revisions. It writes receipts under `receipts/`, a run marker, and a compile cache on local disk.
 
-A `platform: linux-cuda` spec runs on a remote Colab VM, not on the rig. It starts its own Ollama on a dedicated loopback port (`127.0.0.1:11441` by default), refuses the shared ports `11434` and `11490`, refuses any Ollama URL that isn't loopback, and reads the card through NVML or `nvidia-smi`. It downloads nothing.
+A `platform: linux-cuda` spec runs on a remote Colab VM, not on the rig. It starts its own Ollama on a dedicated loopback port (`127.0.0.1:11441` by default), refuses the shared ports `11434` and `11490`, refuses any Ollama URL that isn't loopback (`127.0.0.1:<port>`, `[::1]:<port>`, or `localhost:<port>` when `localhost` resolves only to loopback, with the port in ASCII digits from 1 to 65535), and reads the card through NVML or `nvidia-smi`. It downloads nothing.
 
 `interlock c2-sources --verify-live` checks a C2 spec's sources. It sends read-only HTTPS requests to `registry.ollama.ai` and `huggingface.co` only, downloads no model weights (it fetches manifests, config blobs, file trees and `tokenizer.json` files to compare digests), and sends no credentials. Without `--verify-live` it makes no network request.
 
@@ -25,7 +25,7 @@ A `platform: linux-cuda` spec runs on a remote Colab VM, not on the rig. It star
 
 A receipt may record a model repo and a revision or digest, an engine and version, device names and driver versions, settings, a dataset hash, timings, the run's start state, and grant text.
 
-A receipt must not carry a home path, a hostname beyond loopback, a token, or a user identity. A remote row records the card and a zone `pool`, and refuses an unhashed account identifier in any string field of `remote_device` and in the GGUF source. `interlock check` enforces the path, host, and token rules. It does not detect a person's name. The maintainers run a separate identity scan before a push. That scan is not this program.
+A receipt must not carry a home path, a hostname beyond loopback, a token, or a user identity. A remote row records the card and a zone `pool`. A field named for an account (`account`, `user`, `owner`, their `_id` forms, `ggufRepo`, `gguf_repo` or `gguf_source`) must hold `sha256:<64-hex>`. Remote rows also refuse a tagged account token, such as `account:<id>` or `user=<id>`, in any string value or key, and `remote_device` refuses account ids, emails, paths and repo handles in its own fields. Ordinary words such as "user-facing" pass in a value. `interlock check` enforces the path, host, and token rules. It does not detect a person's name. The maintainers run a separate identity scan before a push. That scan is not this program.
 
 `interlock check` refuses a home-directory path, including one an expanded profile variable would produce, a UNC path, an `ssh://` or `sftp://` host, a `git@host:` form, a `user@host.domain` form, and a token-shaped value. Hex or base64 values of 32 or more characters are refused only in fields named like key, token, secret, or password.
 
