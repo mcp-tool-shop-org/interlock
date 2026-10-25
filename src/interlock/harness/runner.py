@@ -243,6 +243,7 @@ def dry_run(
             lines.append("concurrencies: " + ", ".join(str(x) for x in spec["concurrencies"]))
         elif spec["procedure"] == "batch-ladder":
             lines.append("tasks: " + ", ".join(str(x) for x in spec["tasks"]))
+            lines.append("token_lengths: " + ", ".join(str(x) for x in spec["token_lengths"]))
             lines.append("batch_sizes: " + ", ".join(str(x) for x in spec["batch_sizes"]))
     elif spec["procedure"] == "fill-card":
         lines.append(f"abort_mib: {spec['abort_mib']}")

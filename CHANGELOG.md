@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- C2 (`linux-cuda`) model sources, quant labels, tokenizer-exact throughput inputs, and live source verification: every entry in `experiments/c2-{fill-card,generate,throughput}/spec.yaml` now names a real, verified source (`ollama_tag` with its Ollama registry manifest digest in `revision_or_digest`, or `gguf` with its Hugging Face repo, 40-hex commit `revision`, `file`, and 64-hex `sha256`), including the Ollama library builds for Gemma 4 31B (`gemma4:31b-it-q4_K_M`, `gemma4:31b-it-q8_0`, and `gemma4:31b-it-bf16` while keeping `model` as the role-set `sha256:<64-hex>` hash and `Q6_K` as `no published Q6_K build`). Every pre-registered `load_refused` cell states a measured `failure_reason` (layer MiB vs card VRAM/0.90 abort ceiling, `no published Q6_K build`, or `out of scope: stock Ollama does not serve <task>`). Entries that pull `fp16` builds (`qwen3:8b-fp16`, `phi3.5:3.8b-mini-instruct-fp16`, and all C2 throughput models) declare `quant: FP16`, while true `bf16` builds (`gemma4:31b-it-bf16`, `muse-glimmer:30b-bf16`) declare `quant: BF16`. Throughput (`batch-ladder`) inputs are built per model with each model's own tokenizer at its pinned Hugging Face revision to exact `128`-token and `510`-token lengths (staying within `max_position_embeddings: 512` after special tokens on `bge-base-en-v1.5` and `nli-deberta-v3-base`) in the committed fixture `experiments/c2-throughput/inputs.json` (`sha256: 48f5905ddcb24f66d9a6cd59ff2376e8766db3f8ebd4aa1e141f2fb290332966`). `interlock c2-sources <spec> [--json] [--verify-live]` resolves every entry and, with `--verify-live`, queries `registry.ollama.ai` and `huggingface.co` to verify every source, manifest/LFS digest, config `file_type` quant label, refusal condition, and upstream `tokenizer.json` digest.
+
 - `CONTRIBUTORS.md` credits the AI seats that wrote the code: Grok ("Written with Grok", xAI), Kimi and Claude. The README links it.
 
 ## [0.3.0] - 2026-10-24

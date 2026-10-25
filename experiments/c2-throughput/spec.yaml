@@ -27,6 +27,9 @@ tasks:
   - embed
   - rerank
   - nli
+token_lengths:
+  - 128
+  - 510
 batch_sizes:
   - 1
   - 8
@@ -45,10 +48,14 @@ needs:
   cpu_window: false
 dataset:
   name: c2-batch-throughput-inputs
+  fixture: experiments/c2-throughput/inputs.json
+  sha256: 48f5905ddcb24f66d9a6cd59ff2376e8766db3f8ebd4aa1e141f2fb290332966
   seed: "The switchyard parity check measures every batch on the same text. "
   rule: >
-    Build fixed 512-token inputs at batch sizes 1, 8, and 32 for embed, rerank,
-    and NLI.
+    Build fixed 128-token and 510-token inputs per model with that model's own
+    tokenizer at the pinned revision, staying within max_position_embeddings
+    after special tokens (bge-base-en-v1.5 and nli-deberta-v3-base allow 512,
+    so 510 + 2 special tokens = 512), committed in experiments/c2-throughput/inputs.json.
 metrics:
   - throughput
   - warm_p50_ms
@@ -62,180 +69,235 @@ models:
   # colab:T4 (16 GB)
   - task: embed
     model: nomic-ai/nomic-embed-text-v1.5
-    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
-    quant: fp16
+    ollama_tag: nomic-embed-text:137m-v1.5-fp16
+    revision_or_digest: 0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:T4"
   - task: embed
     model: BAAI/bge-base-en-v1.5
-    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
-    quant: fp16
+    gguf:
+      repo: CompendiumLabs/bge-base-en-v1.5-gguf
+      revision: 24914efdfa9ee54e815c3fcaa78a617031251c5c
+      file: bge-base-en-v1.5-f16.gguf
+      sha256: 88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2
+    revision_or_digest: 88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2
+    quant: FP16
     licence: mit
     engine: ollama
     device: "colab:T4"
   - task: embed
     model: Qwen/Qwen3-Embedding-0.6B
-    revision_or_digest: 82a0035040926a5c0dcf251209218e096c5eeb1c
-    quant: fp16
+    ollama_tag: qwen3-embedding:0.6b-fp16
+    revision_or_digest: 67a7592a8852b7b36f6328cdec193cfb7639769f5edf344ba709b088b2a51042
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:T4"
   - task: rerank
     model: BAAI/bge-reranker-v2-m3
-    revision_or_digest: 5617a9f61b028005a4858fdac845db406aefb181
-    quant: fp16
-    licence: mit
-    engine: ollama
-    device: "colab:T4"
-  - task: nli
-    model: cross-encoder/nli-deberta-v3-base
-    revision_or_digest: 6c749ce3425cd33b46d187e45b92bbf96ee12ec7
-    quant: fp16
+    revision_or_digest: 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:T4"
+    expected_outcome: load_refused
+    failure_reason: "out of scope: stock Ollama does not serve rerank"
+  - task: nli
+    model: cross-encoder/nli-deberta-v3-base
+    revision_or_digest: 6c749ce3425cd33b46d187e45b92bbf96ee12ec7
+    quant: FP16
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:T4"
+    expected_outcome: load_refused
+    failure_reason: "out of scope: stock Ollama does not serve nli"
   # colab:L4 (24 GB)
   - task: embed
     model: nomic-ai/nomic-embed-text-v1.5
-    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
-    quant: fp16
+    ollama_tag: nomic-embed-text:137m-v1.5-fp16
+    revision_or_digest: 0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:L4"
   - task: embed
     model: BAAI/bge-base-en-v1.5
-    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
-    quant: fp16
+    gguf:
+      repo: CompendiumLabs/bge-base-en-v1.5-gguf
+      revision: 24914efdfa9ee54e815c3fcaa78a617031251c5c
+      file: bge-base-en-v1.5-f16.gguf
+      sha256: 88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2
+    revision_or_digest: 88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2
+    quant: FP16
     licence: mit
     engine: ollama
     device: "colab:L4"
   - task: embed
     model: Qwen/Qwen3-Embedding-0.6B
-    revision_or_digest: 82a0035040926a5c0dcf251209218e096c5eeb1c
-    quant: fp16
+    ollama_tag: qwen3-embedding:0.6b-fp16
+    revision_or_digest: 67a7592a8852b7b36f6328cdec193cfb7639769f5edf344ba709b088b2a51042
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:L4"
   - task: rerank
     model: BAAI/bge-reranker-v2-m3
-    revision_or_digest: 5617a9f61b028005a4858fdac845db406aefb181
-    quant: fp16
-    licence: mit
-    engine: ollama
-    device: "colab:L4"
-  - task: nli
-    model: cross-encoder/nli-deberta-v3-base
-    revision_or_digest: 6c749ce3425cd33b46d187e45b92bbf96ee12ec7
-    quant: fp16
+    revision_or_digest: 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:L4"
+    expected_outcome: load_refused
+    failure_reason: "out of scope: stock Ollama does not serve rerank"
+  - task: nli
+    model: cross-encoder/nli-deberta-v3-base
+    revision_or_digest: 6c749ce3425cd33b46d187e45b92bbf96ee12ec7
+    quant: FP16
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:L4"
+    expected_outcome: load_refused
+    failure_reason: "out of scope: stock Ollama does not serve nli"
   # colab:A100-40 (40 GB)
   - task: embed
     model: nomic-ai/nomic-embed-text-v1.5
-    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
-    quant: fp16
+    ollama_tag: nomic-embed-text:137m-v1.5-fp16
+    revision_or_digest: 0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:A100-40"
   - task: embed
     model: BAAI/bge-base-en-v1.5
-    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
-    quant: fp16
+    gguf:
+      repo: CompendiumLabs/bge-base-en-v1.5-gguf
+      revision: 24914efdfa9ee54e815c3fcaa78a617031251c5c
+      file: bge-base-en-v1.5-f16.gguf
+      sha256: 88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2
+    revision_or_digest: 88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2
+    quant: FP16
     licence: mit
     engine: ollama
     device: "colab:A100-40"
   - task: embed
     model: Qwen/Qwen3-Embedding-0.6B
-    revision_or_digest: 82a0035040926a5c0dcf251209218e096c5eeb1c
-    quant: fp16
+    ollama_tag: qwen3-embedding:0.6b-fp16
+    revision_or_digest: 67a7592a8852b7b36f6328cdec193cfb7639769f5edf344ba709b088b2a51042
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:A100-40"
   - task: rerank
     model: BAAI/bge-reranker-v2-m3
-    revision_or_digest: 5617a9f61b028005a4858fdac845db406aefb181
-    quant: fp16
-    licence: mit
-    engine: ollama
-    device: "colab:A100-40"
-  - task: nli
-    model: cross-encoder/nli-deberta-v3-base
-    revision_or_digest: 6c749ce3425cd33b46d187e45b92bbf96ee12ec7
-    quant: fp16
+    revision_or_digest: 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:A100-40"
+    expected_outcome: load_refused
+    failure_reason: "out of scope: stock Ollama does not serve rerank"
+  - task: nli
+    model: cross-encoder/nli-deberta-v3-base
+    revision_or_digest: 6c749ce3425cd33b46d187e45b92bbf96ee12ec7
+    quant: FP16
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:A100-40"
+    expected_outcome: load_refused
+    failure_reason: "out of scope: stock Ollama does not serve nli"
   # colab:A100-80 (80 GB)
   - task: embed
     model: nomic-ai/nomic-embed-text-v1.5
-    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
-    quant: fp16
+    ollama_tag: nomic-embed-text:137m-v1.5-fp16
+    revision_or_digest: 0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:A100-80"
   - task: embed
     model: BAAI/bge-base-en-v1.5
-    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
-    quant: fp16
+    gguf:
+      repo: CompendiumLabs/bge-base-en-v1.5-gguf
+      revision: 24914efdfa9ee54e815c3fcaa78a617031251c5c
+      file: bge-base-en-v1.5-f16.gguf
+      sha256: 88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2
+    revision_or_digest: 88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2
+    quant: FP16
     licence: mit
     engine: ollama
     device: "colab:A100-80"
   - task: embed
     model: Qwen/Qwen3-Embedding-0.6B
-    revision_or_digest: 82a0035040926a5c0dcf251209218e096c5eeb1c
-    quant: fp16
+    ollama_tag: qwen3-embedding:0.6b-fp16
+    revision_or_digest: 67a7592a8852b7b36f6328cdec193cfb7639769f5edf344ba709b088b2a51042
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:A100-80"
   - task: rerank
     model: BAAI/bge-reranker-v2-m3
-    revision_or_digest: 5617a9f61b028005a4858fdac845db406aefb181
-    quant: fp16
-    licence: mit
-    engine: ollama
-    device: "colab:A100-80"
-  - task: nli
-    model: cross-encoder/nli-deberta-v3-base
-    revision_or_digest: 6c749ce3425cd33b46d187e45b92bbf96ee12ec7
-    quant: fp16
+    revision_or_digest: 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:A100-80"
+    expected_outcome: load_refused
+    failure_reason: "out of scope: stock Ollama does not serve rerank"
+  - task: nli
+    model: cross-encoder/nli-deberta-v3-base
+    revision_or_digest: 6c749ce3425cd33b46d187e45b92bbf96ee12ec7
+    quant: FP16
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:A100-80"
+    expected_outcome: load_refused
+    failure_reason: "out of scope: stock Ollama does not serve nli"
   # colab:G4 (96 GB)
   - task: embed
     model: nomic-ai/nomic-embed-text-v1.5
-    revision_or_digest: e9b6763023c676ca8431644204f50c2b100d9aab
-    quant: fp16
+    ollama_tag: nomic-embed-text:137m-v1.5-fp16
+    revision_or_digest: 0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:G4"
   - task: embed
     model: BAAI/bge-base-en-v1.5
-    revision_or_digest: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a
-    quant: fp16
+    gguf:
+      repo: CompendiumLabs/bge-base-en-v1.5-gguf
+      revision: 24914efdfa9ee54e815c3fcaa78a617031251c5c
+      file: bge-base-en-v1.5-f16.gguf
+      sha256: 88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2
+    revision_or_digest: 88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2
+    quant: FP16
     licence: mit
     engine: ollama
     device: "colab:G4"
   - task: embed
     model: Qwen/Qwen3-Embedding-0.6B
-    revision_or_digest: 82a0035040926a5c0dcf251209218e096c5eeb1c
-    quant: fp16
+    ollama_tag: qwen3-embedding:0.6b-fp16
+    revision_or_digest: 67a7592a8852b7b36f6328cdec193cfb7639769f5edf344ba709b088b2a51042
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:G4"
   - task: rerank
     model: BAAI/bge-reranker-v2-m3
-    revision_or_digest: 5617a9f61b028005a4858fdac845db406aefb181
-    quant: fp16
-    licence: mit
-    engine: ollama
-    device: "colab:G4"
-  - task: nli
-    model: cross-encoder/nli-deberta-v3-base
-    revision_or_digest: 6c749ce3425cd33b46d187e45b92bbf96ee12ec7
-    quant: fp16
+    revision_or_digest: 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
+    quant: FP16
     licence: apache-2.0
     engine: ollama
     device: "colab:G4"
+    expected_outcome: load_refused
+    failure_reason: "out of scope: stock Ollama does not serve rerank"
+  - task: nli
+    model: cross-encoder/nli-deberta-v3-base
+    revision_or_digest: 6c749ce3425cd33b46d187e45b92bbf96ee12ec7
+    quant: FP16
+    licence: apache-2.0
+    engine: ollama
+    device: "colab:G4"
+    expected_outcome: load_refused
+    failure_reason: "out of scope: stock Ollama does not serve nli"
