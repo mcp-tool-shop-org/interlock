@@ -125,6 +125,11 @@ def main(argv: list[str] | None = None) -> int:
         help="comma-separated fill-card model names (a subset of the spec). The receipt records them",
     )
     run.add_argument(
+        "--quants",
+        default=None,
+        help="comma-separated quants of a linux-cuda spec, applied with --models. Names an unpulled quant to skip it",
+    )
+    run.add_argument(
         "--quarantine",
         type=Path,
         default=None,
@@ -356,14 +361,16 @@ def _cmd_run(args: argparse.Namespace) -> int:
     from interlock.harness.lifecycle import LifecycleError
     from interlock.harness.linux_cuda import LinuxCudaError
     from interlock.harness.ollama_serve import ServeError
-    from interlock.harness.runner import RunnerError, dry_run, heartbeat_path, parse_models, run_spec
+    from interlock.harness.runner import RunnerError, dry_run, heartbeat_path, parse_models, parse_quants, run_spec
     from interlock.harness.spec import SpecError, load_spec
 
     try:
         pairs = parse_pairs(getattr(args, "pairs", None))
         models = parse_models(getattr(args, "models", None))
+        quants = parse_quants(getattr(args, "quants", None))
         if args.dry_run:
-            print(dry_run(args.spec, args.root.resolve(), pilot=args.pilot, pairs=pairs, models=models), end="")
+            plan = dry_run(args.spec, args.root.resolve(), pilot=args.pilot, pairs=pairs, models=models, quants=quants)
+            print(plan, end="")
             return 0
         spec = load_spec(args.spec)
         if spec.get("id") == "E4b":
@@ -398,6 +405,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
             quarantine=getattr(args, "quarantine", None),
             pairs=pairs,
             models=models,
+            quants=quants,
         )
     except (
         AdapterError,

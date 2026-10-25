@@ -2,7 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- `interlock run --quants Q4_K_M,Q8_0` on a linux-cuda spec measures only the named quants (with `--models`, or on its own). An unknown quant exits 1 and lists the spec's quants. Without `--quants`, nothing changes. `--dry-run` prints `quants measured:`.
+
 ### Fixed
+
+- A missing, failing or GPU-less `nvidia-smi` is now `REFUSED: no NVIDIA GPU available via nvidia-smi: ...` with exit 1, where `interlock run` ended in a `CalledProcessError` traceback or a bare `[Errno 2]`.
+- Each quant's model is unloaded when its cells end, also when a cell raises, so the next quant's VRAM baseline is taken on an empty card. `/api/ps` names match with `:latest` stripped from both sides, so a GGUF-created tag is found when two models are resident. A server that ignores `terminate()` for 5 s is killed.
+- The receipt `receipts/<run-id>.jsonl` is rewritten after every finished cell, so a run lost mid-way keeps the cells it finished. A run that completes writes the same bytes as before.
 
 - The C2 throughput inputs now ship inside the wheel as package data and load through `importlib.resources`. In 1.0.0 a wheel install looked for `experiments/` next to site-packages, so `interlock run` and `c2-sources --verify-live` on `experiments/c2-throughput/spec.yaml` failed with a missing `inputs.json`. A source checkout or editable install falls back to the committed copy.
 - CI builds the wheel, installs it in a clean virtual environment, runs `c2-sources` on all three C2 specs and loads the throughput inputs from the installed wheel, so a packaging gap like this fails the pull request.

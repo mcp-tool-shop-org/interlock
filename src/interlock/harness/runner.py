@@ -59,7 +59,7 @@ from interlock.harness.receipts import (
     write_receipt,
     write_run,
 )
-from interlock.harness.spec import load_spec
+from interlock.harness.spec import SpecError, load_spec
 from interlock.harness.steady import BlockPlan, SlotStream, UntilSteady, call_metric, warmup_policy, warmup_trace
 from interlock.harness.timing import Slot, TimingError, aba_call, schedule, schedule_aba, summarize
 from interlock.harness.watch import (
@@ -146,6 +146,34 @@ def parse_models(text: str | None) -> list[str] | None:
     return names
 
 
+def parse_quants(text: str | None) -> list[str] | None:
+    """The ``--quants`` names, or None when the flag is absent."""
+
+    if text is None:
+        return None
+    names = [part.strip() for part in str(text).split(",")]
+    if not names or any(not name for name in names):
+        raise RunnerError("--quants names at least one quant")
+    return names
+
+
+def resolve_quants(roster: list[dict], quants: list[str] | None) -> list[dict]:
+    """The roster entries whose quant is named. An unknown quant lists the spec's own."""
+
+    if quants is None:
+        return roster
+    known = list(dict.fromkeys(str(entry.get("quant")) for entry in roster if entry.get("quant") is not None))
+    unknown = [name for name in quants if name not in known]
+    if unknown:
+        raise SpecError(f"unknown quant: {unknown[0]}; this spec's quants are {', '.join(known)}")
+    if len(quants) != len(set(quants)):
+        raise RunnerError("a quant is named more than once")
+    chosen = [entry for entry in roster if str(entry.get("quant")) in set(quants)]
+    if not chosen:
+        raise RunnerError("--models and --quants together name no roster entry")
+    return chosen
+
+
 def resolve_models(spec: dict, models: list[str] | None) -> tuple[list[dict], list[str] | None]:
     """The roster entries this run measures, in spec order. None records no subset."""
 
@@ -170,12 +198,19 @@ def dry_run(
     pilot: bool = False,
     pairs: list[str] | None = None,
     models: list[str] | None = None,
+    quants: list[str] | None = None,
 ) -> str:
     spec = load_spec(spec_path)
     if models is not None and spec.get("procedure") != "fill-card" and spec.get("platform") != "linux-cuda":
         raise RunnerError("--models is for a fill-card spec")
     recorded_models = None
-    if models is not None:
+    recorded_quants = None
+    if quants is not None:
+        if spec.get("platform") != "linux-cuda":
+            raise RunnerError("--quants is for a linux-cuda spec")
+        by_model, recorded_models = resolve_models(spec, models)
+        recorded_quants = list(dict.fromkeys(str(e.get("quant")) for e in resolve_quants(by_model, quants)))
+    elif models is not None:
         _chosen, recorded_models = resolve_models(spec, models)
     if pilot and spec.get("id") != "E4b":
         from interlock.harness.e4b import E4bError
@@ -235,6 +270,8 @@ def dry_run(
         lines.append(f"models: {len(spec['models'])}")
         if recorded_models is not None:
             lines.append("models measured: " + ", ".join(recorded_models))
+        if recorded_quants is not None:
+            lines.append("quants measured: " + ", ".join(recorded_quants))
         if spec["procedure"] == "fill-card":
             lines.append(f"grain: {spec['grain']}")
             lines.append(f"spill_prompt_ratio: {spec['spill_prompt_ratio']}")
@@ -2214,6 +2251,7 @@ def run_spec(
     pairs: list[str] | None = None,
     models: list[str] | None = None,
     trace: str = "off",
+    quants: list[str] | None = None,
 ) -> list[dict]:
     """Run a committed spec. Every refusal lands before device contact.
 
@@ -2238,6 +2276,11 @@ def run_spec(
         if spec.get("procedure") != "fill-card" and spec.get("platform") != "linux-cuda":
             raise RunnerError("--models is for a fill-card spec")
         chosen_models, recorded_models = resolve_models(spec, models)
+    if quants is not None:
+        if spec.get("platform") != "linux-cuda":
+            raise RunnerError("--quants is for a linux-cuda spec")
+        roster = chosen_models if chosen_models is not None else resolve_models(spec, None)[0]
+        chosen_models = resolve_quants(roster, quants)
     if trace == "off" and any("trace" in arm for arm in spec.get("arms") or [] if isinstance(arm, dict)):
         # A spec that switches tracing per arm would run both arms untraced: the comparison would be empty.
         raise RunnerError("REFUSED: this spec traces some arms and not others; run it with --trace relay or events")
@@ -2352,6 +2395,7 @@ def run_spec(
                     remote_device=remote_dev,
                     sample_vram_mib=vram_sampler,
                     server=server,
+                    on_rows=lambda done: write_receipt(root, name, done),
                 )
                 write_receipt(root, name, rows)
                 marker.close(_iso(wall()))
