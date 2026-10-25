@@ -57,7 +57,6 @@ def test_the_scratch_default_is_under_the_system_temp_directory():
 
     expected = (Path(tempfile.gettempdir()) / "interlock-scratch").as_posix()
     assert scratch_project("cal") == f"{expected}/cal"
-    assert "switchyard" not in scratch_project("cal")
 
 
 def test_the_scratch_root_comes_from_env_then_the_config_file(monkeypatch, tmp_path):
@@ -193,3 +192,26 @@ def test_a_malformed_config_file_is_a_structured_error(tmp_path):
     (tmp_path / "interlock.toml").write_text("[paths\n", encoding="utf-8")
     with pytest.raises(storage.StorageError, match="interlock.toml"):
         storage.hot_root()
+
+
+def test_a_paths_table_that_is_not_a_table_or_a_value_that_is_not_a_path_is_a_structured_error(tmp_path):
+    from interlock.paths import PathsConfigError, configured
+
+    (tmp_path / "interlock.toml").write_text('paths = "x"\n', encoding="utf-8")
+    with pytest.raises(PathsConfigError, match="must be a table"):
+        configured("NOT_SET_ANYWHERE", "heartbeat")
+    for body in ('heartbeat = 3', 'heartbeat = "  "'):
+        _toml(tmp_path, body)
+        with pytest.raises(PathsConfigError, match="must be a path string"):
+            configured("NOT_SET_ANYWHERE", "heartbeat")
+    _toml(tmp_path, 'scratch_root = "x"')
+    assert configured("NOT_SET_ANYWHERE", "heartbeat") is None
+
+
+def test_the_run_command_reports_a_malformed_paths_file_on_stderr_and_exits_1(tmp_path, capsys):
+    from interlock.cli import main
+
+    (tmp_path / "interlock.toml").write_text("[paths\n", encoding="utf-8")
+    spec = ROOT / "experiments" / "e5" / "spec.yaml"
+    assert main(["run", str(spec), "--root", str(ROOT), "--grant", "g"]) == 1
+    assert "interlock.toml" in capsys.readouterr().err
