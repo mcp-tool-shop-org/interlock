@@ -156,6 +156,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     c2_sources.add_argument("spec", type=Path)
     c2_sources.add_argument("--json", action="store_true", help="print resolved entries as JSON")
+    c2_sources.add_argument(
+        "--verify-live",
+        action="store_true",
+        help="query registry.ollama.ai and huggingface.co to verify every source, digest, and quant label",
+    )
     c2_sources.set_defaults(func=_cmd_c2_sources)
 
     route = sub.add_parser(
@@ -419,12 +424,23 @@ def _cmd_ollama_health(_args: argparse.Namespace) -> int:
 
 
 def _cmd_c2_sources(args: argparse.Namespace) -> int:
-    from interlock.harness.linux_cuda import LinuxCudaError, format_c2_sources, resolve_c2_sources
+    from interlock.harness.linux_cuda import (
+        LinuxCudaError,
+        format_c2_sources,
+        format_c2_sources_live,
+        resolve_c2_sources,
+        verify_c2_sources_live,
+    )
     from interlock.harness.spec import SpecError, load_spec
 
     try:
         spec = load_spec(args.spec)
-        if args.json:
+        if getattr(args, "verify_live", False):
+            if args.json:
+                print(json.dumps(verify_c2_sources_live(spec), indent=2))
+            else:
+                print(format_c2_sources_live(spec), end="")
+        elif args.json:
             print(json.dumps(resolve_c2_sources(spec), indent=2))
         else:
             print(format_c2_sources(spec), end="")

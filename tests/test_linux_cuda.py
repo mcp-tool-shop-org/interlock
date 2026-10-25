@@ -2069,6 +2069,288 @@ def test_fix3_throughput_inputs_exact_tokenized_lengths_and_committed_fixture(mo
         load_throughput_inputs_fixture()
 
 
+def test_fix4_c2_sources_verify_live_checks_ollama_registry_and_huggingface(monkeypatch, capsys):
+    import hashlib
+    import json
+    import urllib.error
+
+    import interlock.harness.linux_cuda as lc
+    from interlock.cli import main as cli_main
+    from interlock.harness.linux_cuda import (
+        LinuxCudaError,
+        _default_live_fetch,
+        format_c2_sources_live,
+        load_throughput_inputs_fixture,
+        verify_c2_sources_live,
+    )
+
+    fixture = load_throughput_inputs_fixture()
+
+    # Build a deterministic mock fetcher that serves exact-digest manifests, config blobs, HF trees, and tokenizers:
+    def make_manifest_and_config(s_tag: str, file_type: str, size_bytes: int) -> tuple[bytes, str, bytes]:
+        cfg_bytes = json.dumps({"file_type": file_type, "_tag": s_tag}).encode("utf-8")
+        cfg_digest = "sha256:" + hashlib.sha256(cfg_bytes).hexdigest()
+        base_doc = {
+            "schemaVersion": 2,
+            "_tag": s_tag,
+            "config": {"digest": cfg_digest},
+            "layers": [{"mediaType": "application/vnd.ollama.image.model", "size": size_bytes}],
+        }
+        return json.dumps(base_doc).encode("utf-8"), cfg_digest, cfg_bytes
+
+    def build_mock_fetch(
+        spec_list: list[dict[str, Any]],
+        *,
+        override_status: dict[str, int] | None = None,
+        override_file_type: dict[str, str] | None = None,
+        tamper_digest_tag: str | None = None,
+        tamper_gguf_repo: str | None = None,
+        tamper_tok_repo: str | None = None,
+        override_size_bytes: dict[str, int] | None = None,
+    ):
+        url_map: dict[str, tuple[int, bytes]] = {}
+        sha_overrides: dict[bytes, str] = {}
+
+        real_sha256 = hashlib.sha256
+
+        class FakeHash:
+            def __init__(self, data: bytes = b"") -> None:
+                self._data = data
+                self._h = real_sha256(data)
+
+            def hexdigest(self) -> str:
+                if self._data in sha_overrides:
+                    return sha_overrides[self._data]
+                return self._h.hexdigest()
+
+        monkeypatch.setattr(lc.hashlib, "sha256", FakeHash)
+
+        tag_file_types = {
+            "qwen3:8b-q4_K_M": ("Q4_K_M", 5225000000),
+            "qwen3:8b-q8_0": ("Q8_0", 8850000000),
+            "qwen3:8b-fp16": ("F16", 16388043552),
+            "phi3.5:3.8b-mini-instruct-q4_K_M": ("Q4_K_M", 2390000000),
+            "phi3.5:3.8b-mini-instruct-q6_K": ("Q6_K", 3140000000),
+            "phi3.5:3.8b-mini-instruct-q8_0": ("Q8_0", 4060000000),
+            "phi3.5:3.8b-mini-instruct-fp16": ("F16", 7640000000),
+            "gemma4:31b-it-q4_K_M": ("Q4_K_M", 18670033120),
+            "gemma4:31b-it-q8_0": ("Q8_0", 32635676896),
+            "gemma4:31b-it-bf16": ("BF16", 61413189856),
+            "gemma4:31b": ("Q4_K_M", 18670033120),
+            "muse-glimmer:30b-q4_K_M": ("Q4_K_M", 16756681056),
+            "muse-glimmer:30b-q8_0": ("Q8_0", 29612958048),
+            "muse-glimmer:30b-bf16": ("BF16", 55725511008),
+            "muse-glimmer:30b": ("Q4_K_M", 16756681056),
+            "nomic-embed-text:137m-v1.5-fp16": ("F16", 274000000),
+            "qwen3-embedding:0.6b-fp16": ("F16", 1197000000),
+        }
+
+        for sp in spec_list:
+            for entry in sp["models"]:
+                if entry.get("ollama_tag"):
+                    s_tag = entry["ollama_tag"]
+                    repo, tag = s_tag.split(":", 1)
+                    ft, sz = tag_file_types[s_tag]
+                    if override_file_type and s_tag in override_file_type:
+                        ft = override_file_type[s_tag]
+                    if override_size_bytes and s_tag in override_size_bytes:
+                        sz = override_size_bytes[s_tag]
+                    m_bytes, c_dig, c_bytes = make_manifest_and_config(s_tag, ft, sz)
+                    sha_overrides[m_bytes] = (
+                        "0" * 64 if tamper_digest_tag == s_tag else str(entry["revision_or_digest"])
+                    )
+                    m_url = f"https://registry.ollama.ai/v2/library/{repo}/manifests/{tag}"
+                    b_url = f"https://registry.ollama.ai/v2/library/{repo}/blobs/{c_dig}"
+                    url_map[m_url] = (200, m_bytes)
+                    url_map[b_url] = (200, c_bytes)
+                elif isinstance(entry.get("gguf"), dict):
+                    g = entry["gguf"]
+                    t_url = f"https://huggingface.co/api/models/{g['repo']}/tree/{g['revision']}"
+                    oid = "0" * 64 if tamper_gguf_repo == g["repo"] else g["sha256"]
+                    tree = [{"path": g["file"], "lfs": {"oid": oid, "size": 6725812480}}]
+                    url_map[t_url] = (200, json.dumps(tree).encode("utf-8"))
+                else:
+                    reason = str(entry.get("failure_reason") or "")
+                    if reason == "no published Q6_K build":
+                        m_name = entry["model"]
+                        o_repo, b_tag = ("gemma4", "31b") if m_name.startswith("sha256:") else m_name.split(":", 1)
+                        b_url = f"https://registry.ollama.ai/v2/library/{o_repo}/manifests/{b_tag}"
+                        b_bytes = b"base-" + o_repo.encode("utf-8")
+                        sha_overrides[b_bytes] = str(entry["revision_or_digest"])
+                        url_map[b_url] = (200, b_bytes)
+                    elif "out of scope" in reason.lower():
+                        t_url = f"https://huggingface.co/api/models/{entry['model']}/tree/{entry['revision_or_digest']}"
+                        url_map[t_url] = (200, b"[]")
+
+        for m_name, m_fix in fixture["models"].items():
+            tok_url = f"https://huggingface.co/{m_fix['hf_repo']}/resolve/{m_fix['hf_revision']}/tokenizer.json"
+            tok_bytes = b"tok-" + m_name.encode("utf-8")
+            sha_overrides[tok_bytes] = "0" * 64 if tamper_tok_repo == m_name else m_fix["tokenizer_sha256"]
+            url_map[tok_url] = (200, tok_bytes)
+
+        def fake_fetch(url: str) -> tuple[int, bytes]:
+            if override_status and url in override_status:
+                return override_status[url], b""
+            return url_map.get(url, (404, b""))
+
+        return fake_fetch
+
+    fill_spec = load_spec(ROOT / "experiments" / "c2-fill-card" / "spec.yaml")
+    gen_spec = load_spec(ROOT / "experiments" / "c2-generate" / "spec.yaml")
+    tput_spec = load_spec(ROOT / "experiments" / "c2-throughput" / "spec.yaml")
+
+    fetch_fn = build_mock_fetch([fill_spec, gen_spec, tput_spec])
+    for sp, expected_count in ((fill_spec, 80), (gen_spec, 80), (tput_spec, 25)):
+        verified = verify_c2_sources_live(sp, fetch=fetch_fn)
+        assert len(verified) == expected_count
+        assert all(item["live_status"] == "PASS" for item in verified)
+        text = format_c2_sources_live(sp, fetch=fetch_fn)
+        assert f"VERIFY-LIVE PASS: {expected_count}/{expected_count}" in text
+
+    # Verify CLI --verify-live and --verify-live --json:
+    monkeypatch.setattr(lc, "_default_live_fetch", fetch_fn)
+    fill_path = str(ROOT / "experiments" / "c2-fill-card" / "spec.yaml")
+    assert cli_main(["c2-sources", fill_path, "--verify-live"]) == 0
+    assert "VERIFY-LIVE PASS: 80/80" in capsys.readouterr().out
+    assert cli_main(["c2-sources", fill_path, "--verify-live", "--json"]) == 0
+    parsed = json.loads(capsys.readouterr().out)
+    assert len(parsed) == 80
+
+    # Failure cases:
+    # 1. Unresolvable Ollama tag (404)
+    f_404 = build_mock_fetch(
+        [fill_spec],
+        override_status={"https://registry.ollama.ai/v2/library/qwen3/manifests/8b-q4_K_M": 404},
+    )
+    with pytest.raises(LinuxCudaError, match="HTTP 404"):
+        verify_c2_sources_live(fill_spec, fetch=f_404)
+
+    # 2. Digest mismatch on Ollama manifest
+    f_dig = build_mock_fetch([fill_spec], tamper_digest_tag="qwen3:8b-q4_K_M")
+    with pytest.raises(LinuxCudaError, match="live digest mismatch"):
+        verify_c2_sources_live(fill_spec, fetch=f_dig)
+
+    # 3. Label mismatch (config file_type is F16 vs BF16)
+    f_lbl = build_mock_fetch([fill_spec], override_file_type={"qwen3:8b-fp16": "BF16"})
+    with pytest.raises(LinuxCudaError, match="live label mismatch"):
+        verify_c2_sources_live(fill_spec, fetch=f_lbl)
+
+    # 4. Stale size-based refusal (model layer smaller than abort ceiling)
+    f_sz = build_mock_fetch([fill_spec], override_size_bytes={"qwen3:8b-fp16": 2000 * 1024 * 1024})
+    with pytest.raises(LinuxCudaError, match="live size check failed"):
+        verify_c2_sources_live(fill_spec, fetch=f_sz)
+
+    # 5. GGUF digest mismatch
+    f_gguf = build_mock_fetch([fill_spec], tamper_gguf_repo="Qwen/Qwen3-8B-GGUF")
+    with pytest.raises(LinuxCudaError, match="live digest mismatch"):
+        verify_c2_sources_live(fill_spec, fetch=f_gguf)
+
+    # 6. Stale 'no published Q6_K build' (candidate returns 200)
+    f_pub = build_mock_fetch(
+        [fill_spec],
+        override_status={"https://registry.ollama.ai/v2/library/gemma4/manifests/31b-it-q6_K": 200},
+    )
+    with pytest.raises(LinuxCudaError, match="no published Q6_K build"):
+        verify_c2_sources_live(fill_spec, fetch=f_pub)
+
+    # 7. Tokenizer sha256 mismatch on throughput spec
+    f_tok = build_mock_fetch([tput_spec], tamper_tok_repo="BAAI/bge-base-en-v1.5")
+    with pytest.raises(LinuxCudaError, match="tokenizer.json sha256 mismatch"):
+        verify_c2_sources_live(tput_spec, fetch=f_tok)
+
+    # Additional HTTP / missing-file error branches:
+    f_cfg_404 = build_mock_fetch(
+        [fill_spec],
+        override_status={
+            "https://registry.ollama.ai/v2/library/qwen3/blobs/"
+            + make_manifest_and_config("qwen3:8b-q4_K_M", "Q4_K_M", 5225000000)[1]: 404
+        },
+    )
+    with pytest.raises(LinuxCudaError, match="live config check failed"):
+        verify_c2_sources_live(fill_spec, fetch=f_cfg_404)
+
+    f_gguf_404 = build_mock_fetch(
+        [fill_spec],
+        override_status={
+            "https://huggingface.co/api/models/Qwen/Qwen3-8B-GGUF/tree/7c41481f57cb95916b40956ab2f0b139b296d974": 404
+        },
+    )
+    with pytest.raises(LinuxCudaError, match="live check failed for HF GGUF"):
+        verify_c2_sources_live(fill_spec, fetch=f_gguf_404)
+
+    def fetch_empty_tree(url: str) -> tuple[int, bytes]:
+        if "Qwen3-8B-GGUF" in url:
+            return 200, b"[]"
+        return fetch_fn(url)
+
+    with pytest.raises(LinuxCudaError, match="not found in tree"):
+        verify_c2_sources_live(fill_spec, fetch=fetch_empty_tree)
+
+    f_base_404 = build_mock_fetch(
+        [fill_spec],
+        override_status={"https://registry.ollama.ai/v2/library/gemma4/manifests/31b": 404},
+    )
+    with pytest.raises(LinuxCudaError, match="live check failed for base tag"):
+        verify_c2_sources_live(fill_spec, fetch=f_base_404)
+
+    def fetch_bad_base_digest(url: str) -> tuple[int, bytes]:
+        if url == "https://registry.ollama.ai/v2/library/gemma4/manifests/31b":
+            return 200, b"tampered-base"
+        return fetch_fn(url)
+
+    with pytest.raises(LinuxCudaError, match="live base digest mismatch"):
+        verify_c2_sources_live(fill_spec, fetch=fetch_bad_base_digest)
+
+    oos_url = (
+        "https://huggingface.co/api/models/BAAI/bge-reranker-v2-m3/tree/"
+        "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
+    )
+    f_oos_404 = build_mock_fetch([tput_spec], override_status={oos_url: 404})
+    with pytest.raises(LinuxCudaError, match="live check failed for HF revision"):
+        verify_c2_sources_live(tput_spec, fetch=f_oos_404)
+
+    tok_url = (
+        "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5/resolve/"
+        "e9b6763023c676ca8431644204f50c2b100d9aab/tokenizer.json"
+    )
+    f_tok_404 = build_mock_fetch([tput_spec], override_status={tok_url: 404})
+    with pytest.raises(LinuxCudaError, match="live tokenizer check failed"):
+        verify_c2_sources_live(tput_spec, fetch=f_tok_404)
+
+    # 8. _default_live_fetch scheme & error handling
+    with pytest.raises(LinuxCudaError, match="https://"):
+        _default_live_fetch("http://example.com")
+
+    class FakeResp:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return None
+
+        def read(self) -> bytes:
+            return b"ok"
+
+    monkeypatch.setattr(lc.urllib.request, "urlopen", lambda *_a, **_kw: FakeResp())
+    assert _default_live_fetch("https://registry.ollama.ai/v2/library/qwen3/manifests/8b") == (200, b"ok")
+
+    def raise_404(*_a, **_kw):
+        raise urllib.error.HTTPError("https://registry.ollama.ai", 404, "Not Found", {}, None)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(lc.urllib.request, "urlopen", raise_404)
+    assert _default_live_fetch("https://registry.ollama.ai/v2/library/qwen3/manifests/none") == (404, b"")
+
+    def raise_os(*_a, **_kw):
+        raise OSError("conn refused")
+
+    monkeypatch.setattr(lc.urllib.request, "urlopen", raise_os)
+    with pytest.raises(LinuxCudaError, match="network error"):
+        _default_live_fetch("https://registry.ollama.ai/v2/library/qwen3/manifests/8b")
+
+
+
 
 
 

@@ -1723,3 +1723,253 @@ def format_c2_sources(spec: Mapping[str, Any]) -> str:
     return "\n".join(lines) + ("\n" if lines else "")
 
 
+_CANONICAL_CARD_VRAM_MIB: dict[str, int] = {
+    "colab:T4": 15360,
+    "colab:L4": 23034,
+    "colab:A100-40": 40960,
+    "colab:A100-80": 81920,
+    "colab:G4": 98304,
+}
+
+
+def _default_live_fetch(url: str) -> tuple[int, bytes]:
+    if not url.startswith("https://"):
+        raise LinuxCudaError(f"verify_c2_sources_live only permits https:// URLs, got {url!r}")
+    headers = {"User-Agent": "interlock-c2-sources/0.3.0"}
+    if "registry.ollama.ai" in url and "/manifests/" in url:
+        headers["Accept"] = "application/vnd.docker.distribution.manifest.v2+json"
+    req = urllib.request.Request(url, headers=headers)  # noqa: S310
+    try:
+        with urllib.request.urlopen(req, timeout=30.0) as resp:  # noqa: S310
+            return int(resp.status), resp.read()
+    except urllib.error.HTTPError as exc:
+        return int(exc.code), b""
+    except OSError as exc:
+        raise LinuxCudaError(f"network error fetching {url}: {exc}") from exc
+
+
+def _canonical_quant_from_file_type(file_type: str) -> str:
+    upper = file_type.strip().upper()
+    if upper in ("F16", "FP16"):
+        return "FP16"
+    if upper == "BF16":
+        return "BF16"
+    return upper
+
+
+def verify_c2_sources_live(
+    spec: Mapping[str, Any],
+    *,
+    fetch: Callable[[str], tuple[int, bytes]] | None = None,
+) -> list[dict[str, Any]]:
+    """Query the live Ollama registry and Hugging Face for every entry in ``spec``."""
+
+    items = resolve_c2_sources(spec)
+    raw_fetch = fetch or _default_live_fetch
+    cache: dict[str, tuple[int, bytes]] = {}
+
+    def get_url(url: str) -> tuple[int, bytes]:
+        if url not in cache:
+            cache[url] = raw_fetch(url)
+        return cache[url]
+
+    verified: list[dict[str, Any]] = []
+    for item in items:
+        source_kind = item["source_kind"]
+        quant = item["quant"]
+        device = item["device"]
+        model = item["model"]
+        expected_digest = item["expected_digest"]
+        expected_outcome = item.get("expected_outcome")
+        failure_reason = str(item.get("failure_reason") or "")
+
+        if source_kind == "ollama_tag":
+            served_tag = str(item["served_tag"])
+            repo, tag = served_tag.split(":", 1) if ":" in served_tag else ("library", served_tag)
+            manifest_url = f"https://registry.ollama.ai/v2/library/{repo}/manifests/{tag}"
+            status, manifest_bytes = get_url(manifest_url)
+            if status != 200:
+                raise LinuxCudaError(f"live check failed for {served_tag} ({manifest_url}): HTTP {status}")
+            actual_digest = hashlib.sha256(manifest_bytes).hexdigest()
+            if actual_digest != expected_digest:
+                raise LinuxCudaError(
+                    f"live digest mismatch for {served_tag}: expected {expected_digest}, got {actual_digest}"
+                )
+            manifest_doc = json.loads(manifest_bytes.decode("utf-8"))
+            config_digest = str((manifest_doc.get("config") or {}).get("digest") or "")
+            blob_url = f"https://registry.ollama.ai/v2/library/{repo}/blobs/{config_digest}"
+            c_status, config_bytes = get_url(blob_url)
+            if c_status != 200:
+                raise LinuxCudaError(f"live config check failed for {served_tag} ({blob_url}): HTTP {c_status}")
+            config_doc = json.loads(config_bytes.decode("utf-8"))
+            file_type = str(config_doc.get("file_type") or "")
+            expected_quant = _canonical_quant_from_file_type(file_type)
+            if expected_quant != quant:
+                raise LinuxCudaError(
+                    f"live label mismatch for {served_tag} on {device}: "
+                    f"config file_type is {file_type!r} ({expected_quant}), but spec declares quant={quant!r}"
+                )
+            model_bytes = 0
+            for layer in manifest_doc.get("layers") or []:
+                if isinstance(layer, Mapping) and layer.get("mediaType") == "application/vnd.ollama.image.model":
+                    model_bytes = int(layer.get("size") or 0)
+                    break
+            model_mib = round(model_bytes / (1024 * 1024)) if model_bytes else 0
+            card_vram = _CANONICAL_CARD_VRAM_MIB.get(device)
+            if expected_outcome == "load_refused" and card_vram is not None and "MiB" in failure_reason:
+                abort_ceiling = compute_abort_mib(card_vram, float(spec.get("abort_fraction", 0.90)))
+                if model_mib < abort_ceiling:
+                    raise LinuxCudaError(
+                        f"live size check failed for {served_tag} on {device}: "
+                        f"model layer is {model_mib} MiB < abort ceiling {abort_ceiling} MiB, so refusal is stale"
+                    )
+            verified.append(
+                {
+                    **item,
+                    "live_status": "PASS",
+                    "live_digest": actual_digest,
+                    "live_file_type": file_type,
+                    "live_model_bytes": model_bytes,
+                    "live_model_mib": model_mib,
+                }
+            )
+            continue
+
+        if source_kind == "gguf":
+            repo = str(item["repo"])
+            rev = str(item["revision"])
+            file = str(item["file"])
+            tree_url = f"https://huggingface.co/api/models/{repo}/tree/{rev}"
+            status, tree_bytes = get_url(tree_url)
+            if status != 200:
+                raise LinuxCudaError(f"live check failed for HF GGUF {repo}@{rev} ({tree_url}): HTTP {status}")
+            tree_doc = json.loads(tree_bytes.decode("utf-8"))
+            matched_entry = next(
+                (e for e in tree_doc if isinstance(e, Mapping) and e.get("path") == file),
+                None,
+            )
+            if matched_entry is None:
+                raise LinuxCudaError(f"live check failed for {repo}@{rev}: file {file!r} not found in tree")
+            lfs = matched_entry.get("lfs") if isinstance(matched_entry.get("lfs"), Mapping) else {}
+            actual_sha = str(lfs.get("oid") or matched_entry.get("oid") or "")
+            if actual_sha != expected_digest:
+                raise LinuxCudaError(
+                    f"live digest mismatch for {repo}/{file}@{rev}: expected {expected_digest}, got {actual_sha}"
+                )
+            file_size = int(lfs.get("size") or matched_entry.get("size") or 0)
+            verified.append(
+                {
+                    **item,
+                    "live_status": "PASS",
+                    "live_digest": actual_sha,
+                    "live_file_type": quant,
+                    "live_model_bytes": file_size,
+                    "live_model_mib": round(file_size / (1024 * 1024)) if file_size else 0,
+                }
+            )
+            continue
+
+        if source_kind == "load_refused":
+            if failure_reason == "no published Q6_K build":
+                if model.startswith("sha256:"):
+                    ollama_repo, base_tag = "gemma4", "31b"
+                    cand_tags = ("31b-it-q6_K", "31b-q6_K")
+                else:
+                    ollama_repo, base_tag = model.split(":", 1) if ":" in model else (model, "latest")
+                    cand_tags = (f"{base_tag}-q6_K", f"{base_tag}-it-q6_K")
+                base_url = f"https://registry.ollama.ai/v2/library/{ollama_repo}/manifests/{base_tag}"
+                b_status, b_bytes = get_url(base_url)
+                if b_status != 200:
+                    raise LinuxCudaError(f"live check failed for base tag {ollama_repo}:{base_tag}: HTTP {b_status}")
+                b_digest = hashlib.sha256(b_bytes).hexdigest()
+                if b_digest != expected_digest:
+                    raise LinuxCudaError(
+                        f"live base digest mismatch for {ollama_repo}:{base_tag}: "
+                        f"expected {expected_digest}, got {b_digest}"
+                    )
+                for c_tag in cand_tags:
+                    c_url = f"https://registry.ollama.ai/v2/library/{ollama_repo}/manifests/{c_tag}"
+                    c_status, _ = get_url(c_url)
+                    if c_status == 200:
+                        raise LinuxCudaError(
+                            f"live check failed: {ollama_repo}:{c_tag} now resolves (HTTP 200), "
+                            "so 'no published Q6_K build' is stale"
+                        )
+                verified.append(
+                    {
+                        **item,
+                        "live_status": "PASS",
+                        "live_digest": b_digest,
+                        "live_file_type": "unpublished_404_verified",
+                        "live_model_bytes": 0,
+                        "live_model_mib": 0,
+                    }
+                )
+                continue
+
+            if "out of scope" in failure_reason.lower():
+                tree_url = f"https://huggingface.co/api/models/{model}/tree/{expected_digest}"
+                status, _ = get_url(tree_url)
+                if status != 200:
+                    raise LinuxCudaError(
+                        f"live check failed for HF revision {model}@{expected_digest} ({tree_url}): HTTP {status}"
+                    )
+                verified.append(
+                    {
+                        **item,
+                        "live_status": "PASS",
+                        "live_digest": expected_digest,
+                        "live_file_type": "hf_revision_verified",
+                        "live_model_bytes": 0,
+                        "live_model_mib": 0,
+                    }
+                )
+                continue
+
+    if str(spec.get("procedure") or "") == "batch-ladder":
+        fixture = load_throughput_inputs_fixture()
+        seen_models: set[str] = set()
+        for item in verified:
+            m_name = item["model"]
+            if m_name in seen_models:
+                continue
+            seen_models.add(m_name)
+            m_fix = (fixture.get("models") or {})[m_name]
+            hf_repo = str(m_fix["hf_repo"])
+            hf_rev = str(m_fix["hf_revision"])
+            tok_url = f"https://huggingface.co/{hf_repo}/resolve/{hf_rev}/tokenizer.json"
+            t_status, t_bytes = get_url(tok_url)
+            if t_status != 200:
+                raise LinuxCudaError(f"live tokenizer check failed for {hf_repo}@{hf_rev}: HTTP {t_status}")
+            actual_tok_sha = hashlib.sha256(t_bytes).hexdigest()
+            if actual_tok_sha != m_fix["tokenizer_sha256"]:
+                raise LinuxCudaError(
+                    f"live tokenizer.json sha256 mismatch for {hf_repo}@{hf_rev}: "
+                    f"expected {m_fix['tokenizer_sha256']}, got {actual_tok_sha}"
+                )
+
+    return verified
+
+
+def format_c2_sources_live(
+    spec: Mapping[str, Any],
+    *,
+    fetch: Callable[[str], tuple[int, bytes]] | None = None,
+) -> str:
+    """Verify every C2 spec entry live and format the evidence table."""
+
+    verified = verify_c2_sources_live(spec, fetch=fetch)
+    lines = [
+        f"{item['device']}\t{item['model']}\t{item['quant']}\t{item['source_kind']}\t"
+        f"{item['served_tag'] or '-'}\t{item['live_digest']}\t{item['live_file_type']}\t"
+        f"{item['live_model_mib']}MiB\t{item['live_status']}"
+        for item in verified
+    ]
+    lines.append(
+        f"VERIFY-LIVE PASS: {len(verified)}/{len(verified)} entries verified "
+        "against registry.ollama.ai and huggingface.co"
+    )
+    return "\n".join(lines) + "\n"
+
+
+
