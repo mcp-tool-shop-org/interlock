@@ -83,7 +83,7 @@ def test_a_healthy_preflight_returns_what_it_read(tmp_path: Path):
     [
         (None, {}, "no grant"),
         ("g", {"heartbeat": 10_000.0}, "heartbeat"),
-        ("g", {"heartbeat": float("inf")}, "heartbeat"),
+        ("g", {"heartbeat": float("inf")}, r"REFUSED: no watchdog heartbeat: set WATCHDOG_HEARTBEAT .*--no-watchdog"),
         ("g", {"environ": {"OTEL_SERVICE_NAME": "x"}}, "OTEL"),
         ("g", {"nemo-relay": None}, "nemo-relay is None"),
         ("g", {"config_paths": ["user/plugins.toml"]}, "layer in"),

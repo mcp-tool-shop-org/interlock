@@ -68,6 +68,17 @@ def heartbeat_age_s(path: Path | None, now: float) -> float:
     return now - modified
 
 
+def heartbeat_problem(age: float) -> str:
+    """Why a heartbeat of this age is refused. An infinite age is nothing to read (unset, or no file), not a time."""
+
+    if age == float("inf"):
+        return (
+            f"no watchdog heartbeat: set {HEARTBEAT_ENV} (or [paths] heartbeat) to the watchdog's heartbeat file, "
+            "or pass --no-watchdog if you run no watchdog"
+        )
+    return f"watchdog heartbeat is {age:.0f}s old"
+
+
 def require_heartbeat(
     path: Path | WatchdogOptOut | None, now: float, *, max_age_s: float = HEARTBEAT_MAX_AGE_S
 ) -> float:
@@ -79,14 +90,10 @@ def require_heartbeat(
     if path is NO_WATCHDOG:
         return 0.0
     if path is None:
-        raise GuardError(
-            f"REFUSED: no watchdog heartbeat is configured; set {HEARTBEAT_ENV} (or [paths] heartbeat in "
-            "interlock.toml) to the watchdog's heartbeat file, or pass --no-watchdog if you run no watchdog"
-        )
+        raise GuardError(f"REFUSED: {heartbeat_problem(float('inf'))}")
     age = heartbeat_age_s(path, now)
     if age > max_age_s:
-        shown = "missing" if age == float("inf") else f"{age:.0f}s"
-        raise GuardError(f"REFUSED: watchdog heartbeat is {shown} old")
+        raise GuardError(f"REFUSED: {heartbeat_problem(age)}")
     return age
 
 

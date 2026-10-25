@@ -25,6 +25,7 @@
 - A key under `[paths]` in `interlock.toml` that interlock does not know is refused, naming the valid keys, like `[import.sources]`.
 - `--no-watchdog` is also written into the header of an E4b block receipt (finished or aborted), and into a fill-card receipt row written when its preflight fails.
 - `heartbeat_age_s(None, now)` is infinity (stale) instead of an error, so `scripts/relay_s1.py` refuses with `WATCHDOG_HEARTBEAT` unset instead of crashing.
+- A heartbeat that is unset or has no file is refused with `REFUSED: no watchdog heartbeat: set WATCHDOG_HEARTBEAT (or [paths] heartbeat) to the watchdog's heartbeat file, or pass --no-watchdog if you run no watchdog`, in the guard and in `scripts/relay_s1.py`; the old "missing old" wording is gone.
 
 ### Removed
 

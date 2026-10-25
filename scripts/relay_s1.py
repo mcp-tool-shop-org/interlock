@@ -174,7 +174,7 @@ def preflight(root: Path, grant: str | None, seams: Seams, *, first: bool = True
     Before the first step the whole tree must be clean. Before a later step, everything but ``receipts/`` and
     ``table/`` must be, since the steps before it wrote their receipts there."""
 
-    from interlock.guards import HEARTBEAT_MAX_AGE_S
+    from interlock.guards import HEARTBEAT_MAX_AGE_S, heartbeat_problem
 
     facts: dict = {}
 
@@ -189,7 +189,7 @@ def preflight(root: Path, grant: str | None, seams: Seams, *, first: bool = True
          f"the interpreter {python} is inside the checkout; set UV_PROJECT_ENVIRONMENT to the pinned environment")
     facts["python"] = str(python)
     age = seams.heartbeat_age_s()
-    need(age <= HEARTBEAT_MAX_AGE_S, f"the watchdog heartbeat is {age:.0f}s old")
+    need(age <= HEARTBEAT_MAX_AGE_S, heartbeat_problem(age))
     facts["heartbeat_age_s"] = round(age, 1)
     otel = sorted(k for k in seams.environ() if k.startswith("OTEL_"))
     need(not otel, f"OTEL variables are set: {', '.join(otel)}")
@@ -503,14 +503,14 @@ def drive(root: Path, grant: str, prefix: str, steps: tuple[str, ...], *, seams:
                 def recheck(card=card):
                     """Before each child: the heartbeat, and the VRAM watch (a breach stops the check at once)."""
 
-                    from interlock.guards import HEARTBEAT_MAX_AGE_S
+                    from interlock.guards import HEARTBEAT_MAX_AGE_S, heartbeat_problem
 
                     if card.breached:
                         raise PreflightError(f"REFUSED: VRAM passed {VRAM_CEILING_MIB} MiB in the import check")
                     remaining()  # no child starts past the grant's cap
                     age = seams.heartbeat_age_s()
                     if age > HEARTBEAT_MAX_AGE_S:
-                        raise PreflightError(f"REFUSED: the watchdog heartbeat is {age:.0f}s old")
+                        raise PreflightError(f"REFUSED: {heartbeat_problem(age)}")
 
                 with card:
                     out["steps"][name] = imports(prefix, root, between=recheck)

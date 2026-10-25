@@ -45,6 +45,23 @@ def test_an_unset_heartbeat_reads_as_infinitely_stale_instead_of_crashing():
     assert heartbeat_age_s(None, 1_000.0) == float("inf")
 
 
+def test_an_unreadable_heartbeat_is_refused_with_how_to_set_one_and_never_as_an_infinite_age(tmp_path: Path):
+    wanted = (
+        "REFUSED: no watchdog heartbeat: set WATCHDOG_HEARTBEAT (or [paths] heartbeat) to the watchdog's "
+        "heartbeat file, or pass --no-watchdog if you run no watchdog"
+    )
+    for unreadable in (None, tmp_path / "absent"):
+        with pytest.raises(GuardError) as caught:
+            require_heartbeat(unreadable, 1_000.0)
+        assert str(caught.value) == wanted
+        assert "inf" not in str(caught.value)
+    path = tmp_path / "hb"
+    path.write_text("pulse", encoding="utf-8")
+    os.utime(path, (0, 0))
+    with pytest.raises(GuardError, match=r"REFUSED: watchdog heartbeat is 1000s old"):
+        require_heartbeat(path, 1_000.0)
+
+
 def test_heartbeat_uses_mtime_and_refuses_a_stale_or_missing_file(tmp_path: Path):
     path = tmp_path / "_watchdog_HEARTBEAT"
     path.write_text("do not read this", encoding="utf-8")
@@ -55,7 +72,7 @@ def test_heartbeat_uses_mtime_and_refuses_a_stale_or_missing_file(tmp_path: Path
 
     with pytest.raises(GuardError, match="61s"):
         require_heartbeat(path, now + 1)
-    with pytest.raises(GuardError, match="missing"):
+    with pytest.raises(GuardError, match="no watchdog heartbeat"):
         require_heartbeat(tmp_path / "absent", now)
 
 

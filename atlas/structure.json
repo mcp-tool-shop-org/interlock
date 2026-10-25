@@ -584,7 +584,7 @@
           "path": ".python-version"
         },
         {
-          "hash": "5d6b2448884454ffba26c6007920a846518269bcd5484f1212e40a4be6604ea0",
+          "hash": "2c55c6cc310a83afc68ca9befb66e50b0688affdc9c594455d1c84e94dbeb08f",
           "path": "CHANGELOG.md"
         },
         {
@@ -827,7 +827,7 @@
               "line": 556
             }
           ],
-          "hash": "a9517b1da274b5f2079a34faf235685124b2f60ad350c00ac6ba050550e4fe6a",
+          "hash": "72a154805f70e0f1fefbaa3dcea25625c80872a82777dacec3db0b9a2ae0afeb",
           "importOrder": [
             "src/interlock/ollama_supervisor.py",
             "src/interlock/guards.py",
@@ -2794,6 +2794,7 @@
           "exports": [
             "assess_step",
             "heartbeat_age_s",
+            "heartbeat_problem",
             "require_card_empty",
             "require_cpu_window",
             "require_grant",
@@ -2824,25 +2825,25 @@
             {
               "in": "require_heartbeat",
               "kind": "raise",
-              "line": 82
+              "line": 93
             },
             {
               "in": "require_heartbeat",
               "kind": "raise",
-              "line": 89
+              "line": 96
             },
             {
               "in": "require_card_empty",
               "kind": "raise",
-              "line": 96
+              "line": 103
             },
             {
               "in": "assess_step",
               "kind": "raise",
-              "line": 127
+              "line": 134
             }
           ],
-          "hash": "0a310dbb911b779200a4f63c48576b6523cf5b0b42a0555a29c8d1bda1dce616",
+          "hash": "5a03b0a168ab9d5fc7ed03632cc4e149ecfdc87ab111f727c909d32bbd15f620",
           "importsFiles": [
             "src/interlock/devices.py"
           ],
@@ -14196,6 +14197,7 @@
         },
         {
           "exports": [
+            "test_an_unreadable_heartbeat_is_refused_with_how_to_set_one_and_never_as_an_infinite_age",
             "test_an_unset_heartbeat_reads_as_infinitely_stale_instead_of_crashing",
             "test_assess_step_refuses_the_wrong_flag_and_unknown_devices",
             "test_card_must_be_empty",
@@ -14204,7 +14206,7 @@
             "test_heartbeat_uses_mtime_and_refuses_a_stale_or_missing_file",
             "test_npu_session_covers_npu_and_igpu_only"
           ],
-          "hash": "9599a58597bd16fc87c8291ad191be692f60664a64babd24c129e489d566464f",
+          "hash": "60ab1629f5b9c35dc34a0a727bce95f2d5c88c07f4a418fcc15491b5503d6411",
           "importsFiles": [
             "src/interlock/guards.py"
           ],
@@ -15046,7 +15048,7 @@
             "test_the_vram_watch_writes_the_stop_file_once_over_the_ceiling",
             "test_unload_all_and_wait_idle"
           ],
-          "hash": "415d762861464b942ea5bdc6c1fc283372a9d83f932d457adc44e587c2ee14fc",
+          "hash": "d21037753afe08572ef60824d0c0fc5f545573ebd1f2b25dee4e66533986f32e",
           "importsFiles": [
             "scripts/relay_s1.py"
           ],
@@ -16110,7 +16112,7 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "699ab09342a15023299de9e468059d518d31c694",
+    "commit": "fc864e402f5ce1ae717f39128a3dbb24229ddd86",
     "tracked": 292
   },
   "landings": [
