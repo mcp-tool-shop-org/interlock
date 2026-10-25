@@ -1,11 +1,11 @@
 ---
 title: Usage
-description: interlock route, run, runs, table, and check.
+description: interlock route, table, check, import, run, runs, ollama-health, and c2-sources.
 sidebar:
   order: 2
 ---
 
-Six commands. `route`, `table`, `check`, `import`, and `runs` do not start a device. `run` does, unless you pass `--dry-run`.
+Eight commands. `route`, `table`, `check`, `import`, `runs`, `ollama-health`, and `c2-sources` do not start a device. `ollama-health` asks the local Ollama ports for their version. `run` starts a device, unless you pass `--dry-run`.
 
 ## interlock route
 
@@ -78,11 +78,12 @@ interlock import --remote-window receipts/c2-l4-window-01.json
 
 ## interlock run
 
-Runs a committed spec. The spec path is the one argument.
+Runs a committed spec. The spec path is the one argument. A `platform: linux-cuda` spec (the C2 specs) runs on a remote Colab VM, not on the rig.
 
 ```bash
 interlock run experiments/e4/spec.yaml --dry-run
 interlock run experiments/e4/spec.yaml --grant "<grant text>" --npu-session "<session>"
+interlock run experiments/c2-fill-card/spec.yaml --dry-run
 ```
 
 | Flag | What it does |
@@ -94,6 +95,8 @@ interlock run experiments/e4/spec.yaml --grant "<grant text>" --npu-session "<se
 | `--run-id` | Use this id. An id already in use is refused. |
 | `--pilot` | For E4b, write the clock pilot and do not write receipts or the routing table. |
 | `--pairs` | Comma-separated E4b pair ids, a subset of the spec. The receipt records them. |
+| `--models` | Comma-separated fill-card model names, a subset of the spec. The receipt records them. |
+| `--trace` | `off` (the default), `events` or `relay`: log every model call in order under `logs/`. `relay` needs the `relay` extra. A traced run is debug-only and its rows never reach the routing table. |
 | `--notes` | A note stored with the run. The default is empty. |
 | `--quarantine` | Where a stopped run is set aside. The default is `aborted/` under `--root`. |
 | `--root` | Project root. The default is the current directory. |
@@ -116,6 +119,18 @@ interlock runs quarantine <run-id>
 ## interlock ollama-health
 
 Prints one line per local Ollama port the supervisor knows, and exits 1 if either is down. A port is healthy when `GET /api/version` answers within 5 seconds. `--dry-run` on `interlock run` prints the restart policy and does not contact either port.
+
+## interlock c2-sources
+
+Prints the resolved source, the pull or create command, and the expected digest for each entry in a C2 spec (`experiments/c2-*/spec.yaml`). It does not start a device.
+
+```bash
+interlock c2-sources experiments/c2-fill-card/spec.yaml
+interlock c2-sources experiments/c2-fill-card/spec.yaml --json
+interlock c2-sources experiments/c2-fill-card/spec.yaml --verify-live
+```
+
+Without `--verify-live`, it reads only local files. `--json` prints the resolved entries as JSON. `--verify-live` sends read-only HTTPS requests to `registry.ollama.ai` and `huggingface.co` to check every source, manifest or file digest, quant label, refusal reason, and throughput tokenizer digest. It downloads no model weights.
 
 ## Exit codes
 

@@ -14,7 +14,7 @@ This is a prototype, version 0.3.x. The CLI, the receipt format, and the experim
 ## Read next
 
 - [Getting started](./getting-started/) installs from a clone.
-- [Usage](./usage/) covers `route`, `run`, `runs`, `table`, and `check`.
+- [Usage](./usage/) covers `route`, `table`, `check`, `import`, `run`, `runs`, `ollama-health`, and `c2-sources`.
 - [Experiments and receipts](./experiments/) is the spec model, the run lifecycle, and the E4b result.
 - [Configuration](./configuration/) is the `INTERLOCK_*` variables.
 - [Architecture](./architecture/) is how a route is chosen.
