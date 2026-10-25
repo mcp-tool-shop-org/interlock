@@ -915,7 +915,9 @@ def test_import_remote_window_records_all_repeat_slots_and_cli_imports_remote_wi
         return rows, []
 
     monkeypatch.setattr("interlock.importers.assemble.import_receipts", fake_import_receipts)
-    assert main(["import", "--root", str(tmp_path), "--remote-window", str(window_file)]) == 0
+    offers_file = tmp_path / "offers.json"
+    argv = ["import", "--root", str(tmp_path), "--offers", str(offers_file), "--remote-window", str(window_file)]
+    assert main(argv) == 0
     assert captured_kwargs.get("remote_windows") == [window_file]
 
 

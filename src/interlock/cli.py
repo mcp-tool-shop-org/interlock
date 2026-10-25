@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from datetime import date
 from pathlib import Path
@@ -92,6 +93,11 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         default=None,
         help="remote window JSON file to import (repeatable)",
+    )
+    importer.add_argument(
+        "--allow-shrink",
+        action="store_true",
+        help="let a full rebuild drop the rows it owns but no longer produces; every dropped id is printed",
     )
     importer.set_defaults(func=_cmd_import)
 
@@ -263,34 +269,132 @@ def _cmd_table(args: argparse.Namespace) -> int:
     return 0
 
 
+def _rebuild_owns(row: dict) -> bool:
+    """A full rebuild owns the rows its own sources produce: the pinned imports and the E1 rerun.
+
+    Every other row (E2-E4, remote windows, any other branch-2 row) is the table's, not the rebuild's, and a
+    rebuild leaves it as it is.
+    """
+
+    if str(row.get("device", "")).startswith("colab:"):
+        return False
+    provenance = row.get("provenance") or {}
+    return "source_receipt_path" in provenance or str(row.get("id", "")).startswith("E1/")
+
+
+def _refuse_duplicate_ids(existing: list[dict], path: Path) -> None:
+    from interlock.importers.common import ImportError_
+
+    seen: set[str] = set()
+    repeated: list[str] = []
+    for row in existing:
+        if row["id"] in seen and row["id"] not in repeated:
+            repeated.append(row["id"])
+        seen.add(row["id"])
+    if repeated:
+        raise ImportError_(
+            f"REFUSED: {path.name} holds duplicate row id(s): {', '.join(repeated[:5])}"
+            + (f" and {len(repeated) - 5} more" if len(repeated) > 5 else "")
+            + ". Fix the table before importing"
+        )
+
+
+def _merge_rebuild(path: Path, rebuilt: list[dict], *, allow_shrink: bool) -> tuple[list[dict], list[str]]:
+    """The table a full rebuild writes: the rebuilt rows plus every existing row the rebuild does not own.
+
+    Returns ``(rows, dropped_ids)``. A row the rebuild owns and no longer produces is dropped only with
+    ``allow_shrink``; without it the rebuild is refused and the table stays as it was.
+    """
+
+    from interlock.importers.assemble import _unique
+    from interlock.importers.common import ImportError_
+    from interlock.receipt import load_jsonl
+
+    existing = load_jsonl(path)
+    _refuse_duplicate_ids(existing, path)
+    produced = {row["id"] for row in rebuilt}
+    dropped = [row["id"] for row in existing if _rebuild_owns(row) and row["id"] not in produced]
+    if dropped and not allow_shrink:
+        raise ImportError_(
+            f"REFUSED: the rebuild no longer produces {len(dropped)} of the {sum(map(_rebuild_owns, existing))} "
+            f"row(s) it owns in {path.name}; first missing: {', '.join(dropped[:5])}. "
+            "Pass --allow-shrink to drop them (every dropped id is printed), "
+            "or import remote windows alone with --remote-window to merge them into the table"
+        )
+    kept = [row for row in existing if not _rebuild_owns(row)]
+    merged = [*rebuilt, *kept]
+    _unique(merged)
+    merged.sort(key=lambda row: row["id"])
+    return merged, dropped
+
+
+def _import_remote_windows(root: Path, windows: list[Path]) -> int:
+    """Merge remote window receipts into the existing table. Nothing is rebuilt, and nothing is dropped."""
+
+    from interlock.importers.assemble import _unique
+    from interlock.importers.remote import import_remote_window
+    from interlock.receipt import load_jsonl
+
+    table = root / "table"
+    path = table / "routing.jsonl"
+    existing = load_jsonl(path)
+    added: list[dict] = []
+    for window in windows:
+        added.extend(import_remote_window(Path(window).read_bytes(), source_path=Path(window).as_posix()))
+    rows = [*existing, *added]
+    _refuse_duplicate_ids(existing, path)
+    _unique(rows)
+    rows.sort(key=lambda row: row["id"])
+    table.mkdir(exist_ok=True)
+    scratch = path.with_name(path.name + ".tmp")
+    scratch.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in rows), encoding="utf-8")
+    os.replace(scratch, path)
+    print(f"interlock import: {len(added)} remote row(s) added, {len(rows)} in the table")
+    return 0
+
+
 def _cmd_import(args: argparse.Namespace) -> int:
+    from interlock.harness.receipts import write_atomic
     from interlock.importers.assemble import import_receipts
+    from interlock.importers.common import ImportError_
     from interlock.importers.gaps import load_candidates, render_gaps
     from interlock.importers.pins import ASPIRE_COMMIT
+    from interlock.receipt import ReceiptError
 
     root = args.root.resolve()
-    rows, skipped = import_receipts(
-        offers_path=args.offers,
-        local_root=root,
-        remote_windows=args.remote_window,
-    )
     table = root / "table"
-    table.mkdir(exist_ok=True)
-    lines = [json.dumps(row, sort_keys=True) for row in rows]
-    (table / "routing.jsonl").write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
-    candidates = load_candidates(table / "candidates.json")
-    note = (
-        "Ladder rows are imported from rnd at 08ca419f647a3ed69ee645610eaa1c7f35f40f91. "
-        "Difficulty length quartiles are not imported. Tier rows are. "
-        "Chain and ladder rows with no pins.quote_rule are quote rule 1 by the pre-#47 inference. "
-        f"B's planted-error judge row is imported from aspire-si at {ASPIRE_COMMIT}. "
-        "That commit has B's receipts only. The 3b judge-control receipts are a later pin."
-    )
-    (table / "gaps.md").write_text(
-        render_gaps(rows, candidates, ladder_note=note, skipped=skipped),
-        encoding="utf-8",
-    )
-    print(f"interlock import: {len(rows)} row(s), {len(skipped)} skipped")
+    try:
+        if args.remote_window and args.offers is None:
+            return _import_remote_windows(root, args.remote_window)
+        rebuilt, skipped = import_receipts(
+            offers_path=args.offers,
+            local_root=root,
+            remote_windows=args.remote_window,
+        )
+        rows, dropped = _merge_rebuild(table / "routing.jsonl", rebuilt, allow_shrink=args.allow_shrink)
+        # Everything that can fail is done before anything is written: the candidates are read and the gaps page is
+        # rendered first, then each file is replaced atomically, so a failed import leaves the table as it was.
+        candidates = load_candidates(table / "candidates.json")
+        note = (
+            "Ladder rows are imported from rnd at 08ca419f647a3ed69ee645610eaa1c7f35f40f91. "
+            "Difficulty length quartiles are not imported. Tier rows are. "
+            "Chain and ladder rows with no pins.quote_rule are quote rule 1 by the pre-#47 inference. "
+            f"B's planted-error judge row is imported from aspire-si at {ASPIRE_COMMIT}. "
+            "That commit has B's receipts only. The 3b judge-control receipts are a later pin."
+        )
+        gaps_text = render_gaps(rebuilt, candidates, ladder_note=note, skipped=skipped)
+        lines = [json.dumps(row, sort_keys=True) for row in rows]
+        table.mkdir(exist_ok=True)
+        for row_id in dropped:
+            print(f"dropped {row_id}")
+        if dropped:
+            write_atomic(table / "import-dropped.txt", "\n".join(dropped) + "\n")
+        write_atomic(table / "routing.jsonl", "\n".join(lines) + ("\n" if lines else ""))
+        write_atomic(table / "gaps.md", gaps_text)
+    except (ImportError_, ReceiptError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    print(f"interlock import: {len(rows)} row(s), {len(skipped)} skipped, {len(dropped)} dropped")
     return 0
 
 
