@@ -30,7 +30,7 @@ A bare single-label host and port, such as `myrig:11434`, is a known limit of th
 
 ## Supported versions
 
-0.3.x.
+Only the latest 0.x release receives security fixes.
 
 ## Reporting a vulnerability
 
