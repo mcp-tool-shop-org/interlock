@@ -354,6 +354,7 @@ def _import_remote_windows(root: Path, windows: list[Path]) -> int:
 
 
 def _cmd_import(args: argparse.Namespace) -> int:
+    from interlock.harness.receipts import write_atomic
     from interlock.importers.assemble import import_receipts
     from interlock.importers.common import ImportError_
     from interlock.importers.gaps import load_candidates, render_gaps
@@ -371,13 +372,8 @@ def _cmd_import(args: argparse.Namespace) -> int:
             remote_windows=args.remote_window,
         )
         rows, dropped = _merge_rebuild(table / "routing.jsonl", rebuilt, allow_shrink=args.allow_shrink)
-        table.mkdir(exist_ok=True)
-        if dropped:
-            for row_id in dropped:
-                print(f"dropped {row_id}")
-            (table / "import-dropped.txt").write_text("\n".join(dropped) + "\n", encoding="utf-8")
-        lines = [json.dumps(row, sort_keys=True) for row in rows]
-        (table / "routing.jsonl").write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+        # Everything that can fail is done before anything is written: the candidates are read and the gaps page is
+        # rendered first, then each file is replaced atomically, so a failed import leaves the table as it was.
         candidates = load_candidates(table / "candidates.json")
         note = (
             "Ladder rows are imported from rnd at 08ca419f647a3ed69ee645610eaa1c7f35f40f91. "
@@ -386,10 +382,15 @@ def _cmd_import(args: argparse.Namespace) -> int:
             f"B's planted-error judge row is imported from aspire-si at {ASPIRE_COMMIT}. "
             "That commit has B's receipts only. The 3b judge-control receipts are a later pin."
         )
-        (table / "gaps.md").write_text(
-            render_gaps(rebuilt, candidates, ladder_note=note, skipped=skipped),
-            encoding="utf-8",
-        )
+        gaps_text = render_gaps(rebuilt, candidates, ladder_note=note, skipped=skipped)
+        lines = [json.dumps(row, sort_keys=True) for row in rows]
+        table.mkdir(exist_ok=True)
+        for row_id in dropped:
+            print(f"dropped {row_id}")
+        if dropped:
+            write_atomic(table / "import-dropped.txt", "\n".join(dropped) + "\n")
+        write_atomic(table / "routing.jsonl", "\n".join(lines) + ("\n" if lines else ""))
+        write_atomic(table / "gaps.md", gaps_text)
     except (ImportError_, ReceiptError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         print(str(exc), file=sys.stderr)
         return 1

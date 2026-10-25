@@ -330,3 +330,23 @@ def test_a_missing_window_file_and_an_unreadable_table_are_messages_not_tracebac
     window.write_bytes(b"{}\n")
     assert main(["import", "--root", str(tmp_path), "--remote-window", str(window)]) == 1
     assert "Traceback" not in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("candidates", [None, "{not json"], ids=["missing", "invalid"])
+def test_a_rebuild_whose_candidates_file_is_bad_writes_nothing(tmp_path, monkeypatch, capsys, candidates):
+    _write_table(tmp_path, [_owned("ladder/a"), _owned("ladder/b")])
+    table = tmp_path / "table"
+    if candidates is None:
+        (table / "candidates.json").unlink()
+    else:
+        (table / "candidates.json").write_text(candidates, encoding="utf-8")
+    (table / "import-dropped.txt").write_text("earlier\n", encoding="utf-8")
+    before = {name: (table / name).read_bytes() for name in ("routing.jsonl", "import-dropped.txt")}
+    _rebuild_returns(monkeypatch, [_owned("ladder/a")])
+
+    assert main(["import", "--root", str(tmp_path), *_offers(tmp_path), "--allow-shrink"]) == 1
+    err = capsys.readouterr().err
+    assert "Traceback" not in err
+    assert {name: (table / name).read_bytes() for name in before} == before
+    assert not (table / "gaps.md").exists()
+    assert not list(table.glob("*.tmp"))

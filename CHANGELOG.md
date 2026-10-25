@@ -13,6 +13,7 @@
 - A full `interlock import` rebuild replaces only the rows its own sources produce (the pinned imports and the E1 rerun) and leaves every other row in `table/routing.jsonl` as it is (E2-E4, remote windows, any other harness row). A rebuild that no longer produces a row it owns is refused (exit 1, the first missing ids, the table untouched) unless `--allow-shrink` is passed.
 - A table that holds a duplicate row id is refused, naming the ids, by both the rebuild and the `--remote-window` merge.
 - A missing or unreadable file, a non-UTF-8 table, or a bad JSON file in `interlock import` is a message on stderr and exit 1, not a traceback.
+- A full rebuild reads `candidates.json` and renders `gaps.md` before it writes anything, then replaces `import-dropped.txt`, `routing.jsonl` and `gaps.md` atomically; a missing or invalid `candidates.json` exits 1 with the table and `import-dropped.txt` byte-identical.
 
 ### Fixed
 
