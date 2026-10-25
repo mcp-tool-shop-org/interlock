@@ -15,7 +15,7 @@ from interlock.devices import (
     RemoteDeviceIdentity,
     partition_rows_by_pool,
 )
-from interlock.families import stamp_family
+from interlock.families import FamilyError, stamp_family
 from interlock.harness.linux_cuda import FAILURE_CLASSES
 from interlock.importers.common import UNRECORDED, ImportError_, blank_latency, blank_settings, source_provenance
 from interlock.receipt import ReceiptError, validate_row
@@ -110,11 +110,15 @@ def _routing_rows(docs: list[Any], source_path: str) -> list[dict[str, Any]]:
         for flag in ("descriptive", "aborted"):
             if row.get(flag):
                 raise ImportError_(f"{where}: a {flag} row does not route and is not imported")
-        stamp_family(row)
         try:
+            model = row.get("model")
+            if isinstance(model, Mapping) and isinstance(model.get("repo_or_tag"), str):
+                stamp_family(row)
+            if not isinstance(row.get("id"), str) or not row["id"]:
+                raise ReceiptError("id: required non-empty string")
             validate_row(row)
-        except ReceiptError as exc:
-            raise ImportError_(f"{where}: {exc}") from exc
+        except (ReceiptError, FamilyError, KeyError, TypeError) as exc:
+            raise ImportError_(f"{where}: {exc!s}") from exc
         rows.append(row)
     return rows
 

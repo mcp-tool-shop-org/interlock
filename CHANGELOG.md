@@ -4,12 +4,15 @@
 
 ### Added
 
-- `interlock import --remote-window <file>` takes the routing-row JSONL that `interlock run` writes on Linux (one row per line, or one row object) as well as the `{run_id, date, remote_device, records}` envelope. The rows keep their `provenance`, `settings` and `notes` as written. A row that is not a `colab:` device, or is `descriptive` or `aborted`, or fails the schema, is refused with the file name.
+- `interlock import --remote-window <file>` takes the routing-row JSONL that `interlock run` writes on Linux (one row per line, or one row object) as well as the `{run_id, date, remote_device, records}` envelope. The rows keep their `provenance`, `settings` and `notes` as written. A row that is not a `colab:` device, or is `descriptive` or `aborted`, or has a missing or malformed `id` or `model`, or fails the schema, is refused with the file name and the row (`file[1]`); a line that is not JSON is refused with the file and line (`file:2`).
 - With `--remote-window` and no `--offers`, the window rows are merged into the existing `table/routing.jsonl`: duplicates are refused (`duplicate row id ...`), the table is sorted by id and replaced atomically. `import_receipts` is not called, so no sibling repo is needed.
+- `interlock import --allow-shrink`: lets a full rebuild drop the rows it owns but no longer produces. Every dropped id is printed and written to `table/import-dropped.txt` before the table is written.
 
 ### Changed
 
-- A full `interlock import` rebuild (with `--offers`) that would write fewer rows than `table/routing.jsonl` holds, or drop any existing row id, is refused: exit 1, `REFUSED: the rebuild would write N row(s) and drop M of the K ...` with the first missing ids, and the table is left as it was. An import error from `--remote-window` or the rebuild is a message and exit 1, not a traceback.
+- A full `interlock import` rebuild replaces only the rows its own sources produce (the pinned imports and the E1 rerun) and leaves every other row in `table/routing.jsonl` as it is (E2-E4, remote windows, any other harness row). A rebuild that no longer produces a row it owns is refused (exit 1, the first missing ids, the table untouched) unless `--allow-shrink` is passed.
+- A table that holds a duplicate row id is refused, naming the ids, by both the rebuild and the `--remote-window` merge.
+- A missing or unreadable file, a non-UTF-8 table, or a bad JSON file in `interlock import` is a message on stderr and exit 1, not a traceback.
 
 ## [1.0.1] - 2026-10-25
 
