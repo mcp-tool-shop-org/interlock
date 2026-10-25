@@ -20,7 +20,10 @@ from interlock.harness.linux_cuda import (
     GENERATE_CONCURRENCIES,
     GENERATE_PROMPT_LENGTHS,
     THROUGHPUT_BATCH_SIZES,
+    THROUGHPUT_INPUTS_REL,
+    THROUGHPUT_INPUTS_SHA256,
     THROUGHPUT_TASKS,
+    THROUGHPUT_TOKEN_LENGTHS,
 )
 from interlock.tasks import TASKS
 
@@ -357,6 +360,83 @@ def _require_linux_abort_fraction(data: dict) -> None:
         raise SpecError("linux-cuda spec requires abort_fraction in [0.50, 1.0)")
 
 
+def _require_remote_model_source(model: dict) -> None:
+    has_tag = bool(model.get("ollama_tag"))
+    has_gguf = model.get("gguf") is not None
+    expected_outcome = model.get("expected_outcome")
+    failure_reason = str(model.get("failure_reason") or "").strip()
+    is_declared_refusal = expected_outcome == "load_refused" and (
+        failure_reason.startswith("no published ") or "out of scope" in failure_reason.lower()
+    )
+
+    if expected_outcome == "load_refused":
+        if not failure_reason or not (
+            failure_reason.startswith("no published ")
+            or "out of scope" in failure_reason.lower()
+            or "mib" in failure_reason.lower()
+        ):
+            raise SpecError(
+                f"roster entry {model.get('model')!r} ({model.get('quant')!r}) on {model.get('device')!r} "
+                "with expected_outcome: load_refused must state a measured failure_reason "
+                "(weight MiB vs card VRAM/abort ceiling, 'no published <quant> build', or 'out of scope')"
+            )
+
+    if has_tag and has_gguf:
+        raise SpecError(f"roster entry {model.get('model')!r} cannot name both ollama_tag and gguf")
+    if has_tag:
+        tag = model.get("ollama_tag")
+        if not isinstance(tag, str) or not tag.strip():
+            raise SpecError(f"roster entry {model.get('model')!r} has an invalid ollama_tag")
+        tag_lower = tag.strip().lower()
+        quant_val = str(model.get("quant") or "")
+        if tag_lower.endswith(("-fp16", "-f16")) and quant_val != "FP16":
+            raise SpecError(
+                f"roster entry {model.get('model')!r} pulls fp16 tag {tag!r} so quant must be 'FP16', not {quant_val!r}"
+            )
+        if tag_lower.endswith("-bf16") and quant_val != "BF16":
+            raise SpecError(
+                f"roster entry {model.get('model')!r} pulls bf16 tag {tag!r} so quant must be 'BF16', not {quant_val!r}"
+            )
+        return
+    if has_gguf:
+        gguf = model.get("gguf")
+        if not isinstance(gguf, dict):
+            raise SpecError(f"roster entry {model.get('model')!r} gguf must be a mapping")
+        for req_key in ("repo", "revision", "file", "sha256"):
+            val = gguf.get(req_key)
+            if not isinstance(val, str) or not val.strip():
+                raise SpecError(f"roster entry {model.get('model')!r} gguf is missing {req_key}")
+        repo = gguf["repo"].strip()
+        if repo.startswith("sha256:") or "/" not in repo:
+            raise SpecError(
+                f"roster entry {model.get('model')!r} gguf.repo must be an 'owner/name' Hugging Face repo id"
+            )
+        if len(gguf["revision"].strip()) != 40:
+            raise SpecError(f"roster entry {model.get('model')!r} gguf.revision must be a 40-hex commit sha")
+        if len(gguf["sha256"].strip()) != 64:
+            raise SpecError(f"roster entry {model.get('model')!r} gguf.sha256 must be a 64-hex sha256")
+        file_lower = gguf["file"].strip().lower()
+        quant_val = str(model.get("quant") or "")
+        if file_lower.endswith(("-f16.gguf", "-fp16.gguf")) and quant_val != "FP16":
+            raise SpecError(
+                f"roster entry {model.get('model')!r} pulls fp16 GGUF {gguf['file']!r} "
+                f"so quant must be 'FP16', not {quant_val!r}"
+            )
+        if file_lower.endswith("-bf16.gguf") and quant_val != "BF16":
+            raise SpecError(
+                f"roster entry {model.get('model')!r} pulls bf16 GGUF {gguf['file']!r} "
+                f"so quant must be 'BF16', not {quant_val!r}"
+            )
+        return
+    if is_declared_refusal:
+        return
+    raise SpecError(
+        f"linux-cuda roster entry {model.get('model')!r} ({model.get('quant')!r}) must name exactly one source "
+        "(ollama_tag or gguf), or be a pre-registered load_refused row with failure_reason "
+        "'no published <quant> build' or 'out of scope'"
+    )
+
+
 def _require_remote_models(data: dict) -> None:
     replication = data.get("replication")
     if replication is not None:
@@ -380,6 +460,7 @@ def _require_remote_models(data: dict) -> None:
         expected_outcome = model.get("expected_outcome")
         if expected_outcome is not None and expected_outcome not in FAILURE_CLASSES:
             raise SpecError(f"unsupported expected_outcome {expected_outcome!r}")
+        _require_remote_model_source(model)
 
 
 def _linux_fill_card(data: dict) -> None:
@@ -411,9 +492,17 @@ def _linux_batch_ladder(data: dict) -> None:
     tasks = data.get("tasks")
     if not isinstance(tasks, list) or tuple(tasks) != THROUGHPUT_TASKS:
         raise SpecError(f"batch-ladder tasks must be {list(THROUGHPUT_TASKS)}")
+    token_lengths = data.get("token_lengths")
+    if not isinstance(token_lengths, list) or tuple(token_lengths) != THROUGHPUT_TOKEN_LENGTHS:
+        raise SpecError(f"batch-ladder token_lengths must be {list(THROUGHPUT_TOKEN_LENGTHS)}")
     batches = data.get("batch_sizes")
     if not isinstance(batches, list) or tuple(batches) != THROUGHPUT_BATCH_SIZES:
         raise SpecError(f"batch-ladder batch_sizes must be {list(THROUGHPUT_BATCH_SIZES)}")
+    dataset = data.get("dataset")
+    if not isinstance(dataset, dict) or dataset.get("fixture") != THROUGHPUT_INPUTS_REL:
+        raise SpecError(f"batch-ladder dataset.fixture must be {THROUGHPUT_INPUTS_REL!r}")
+    if dataset.get("sha256") != THROUGHPUT_INPUTS_SHA256:
+        raise SpecError(f"batch-ladder dataset.sha256 must be {THROUGHPUT_INPUTS_SHA256!r}")
     _require_remote_models(data)
 
 

@@ -12,6 +12,7 @@ recorded as validated routing rows, never silently skipped.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
@@ -36,6 +37,66 @@ GENERATE_PROMPT_LENGTHS = (512, 1024, 2048, 4096, 8192, 16384, 32768)
 GENERATE_CONCURRENCIES = (1, 4, 8)
 THROUGHPUT_TASKS = ("embed", "rerank", "nli")
 THROUGHPUT_BATCH_SIZES = (1, 8, 32)
+THROUGHPUT_TOKEN_LENGTHS = (128, 510)
+THROUGHPUT_SEED = "The switchyard parity check measures every batch on the same text. "
+THROUGHPUT_INPUTS_REL = "experiments/c2-throughput/inputs.json"
+THROUGHPUT_INPUTS_SHA256 = "48f5905ddcb24f66d9a6cd59ff2376e8766db3f8ebd4aa1e141f2fb290332966"
+THROUGHPUT_INPUTS_PATH = Path(__file__).resolve().parents[3] / "experiments" / "c2-throughput" / "inputs.json"
+_THROUGHPUT_MODEL_ALIASES: dict[str, str] = {
+    "nomic-ai/nomic-embed-text-v1.5": "nomic-ai/nomic-embed-text-v1.5",
+    "nomic-embed-text:137m-v1.5-fp16": "nomic-ai/nomic-embed-text-v1.5",
+    "nomic-ai-nomic-embed-text-v1.5-fp16": "nomic-ai/nomic-embed-text-v1.5",
+    "BAAI/bge-base-en-v1.5": "BAAI/bge-base-en-v1.5",
+    "baai-bge-base-en-v1.5-fp16": "BAAI/bge-base-en-v1.5",
+    "baai-bge-base-en-v1.5": "BAAI/bge-base-en-v1.5",
+    "Qwen/Qwen3-Embedding-0.6B": "Qwen/Qwen3-Embedding-0.6B",
+    "qwen3-embedding:0.6b-fp16": "Qwen/Qwen3-Embedding-0.6B",
+    "qwen-qwen3-embedding-0.6b-fp16": "Qwen/Qwen3-Embedding-0.6B",
+    "BAAI/bge-reranker-v2-m3": "BAAI/bge-reranker-v2-m3",
+    "baai-bge-reranker-v2-m3-fp16": "BAAI/bge-reranker-v2-m3",
+    "cross-encoder/nli-deberta-v3-base": "cross-encoder/nli-deberta-v3-base",
+    "cross-encoder-nli-deberta-v3-base-fp16": "cross-encoder/nli-deberta-v3-base",
+}
+_CACHED_THROUGHPUT_FIXTURE: dict[str, Any] | None = None
+
+
+def load_throughput_inputs_fixture(fixture_path: Path | None = None) -> dict[str, Any]:
+    """Load and verify the committed per-model throughput inputs fixture."""
+
+    global _CACHED_THROUGHPUT_FIXTURE
+    target = fixture_path or THROUGHPUT_INPUTS_PATH
+    if fixture_path is None and _CACHED_THROUGHPUT_FIXTURE is not None:
+        return _CACHED_THROUGHPUT_FIXTURE
+    raw = target.read_bytes()
+    actual_sha = hashlib.sha256(raw).hexdigest()
+    if fixture_path is None and actual_sha != THROUGHPUT_INPUTS_SHA256:
+        raise LinuxCudaError(
+            f"throughput inputs fixture {target} sha256 mismatch: expected {THROUGHPUT_INPUTS_SHA256}, got {actual_sha}"
+        )
+    parsed = json.loads(raw.decode("utf-8"))
+    if fixture_path is None:
+        _CACHED_THROUGHPUT_FIXTURE = parsed
+    return parsed
+
+
+def get_throughput_input_spec(model: str, token_length: int) -> dict[str, Any] | None:
+    """Return the exact tokenized input record for ``(model, token_length)`` when present in the committed fixture."""
+
+    fixture = load_throughput_inputs_fixture()
+    canonical = _THROUGHPUT_MODEL_ALIASES.get(model, model)
+    model_entry = (fixture.get("models") or {}).get(canonical)
+    if not isinstance(model_entry, Mapping):
+        return None
+    inp = (model_entry.get("inputs") or {}).get(str(token_length))
+    if not isinstance(inp, Mapping):
+        return None
+    return {
+        "text": str(inp["text"]),
+        "prompt_tokens": int(inp["tokens"]),
+        "prompt_tokens_with_special": int(inp["tokens_with_special"]),
+        "prompt_token_method": "tokenizer_exact",
+        "input_fixture_sha256": THROUGHPUT_INPUTS_SHA256,
+    }
 FORBIDDEN_SHARED_PORTS = frozenset({11434, 11490})
 COLAB_CARD_VRAM_MIB_RANGES: dict[str, tuple[int, int]] = {
     "T4": (14000, 17000),
@@ -364,6 +425,7 @@ def build_linux_failure_row(
     num_predict: int | None = None,
     batch: int | None = None,
     prompt_tokens: int | None = None,
+    token_length: int | None = None,
     concurrency: int | None = None,
     peak_mib: int | None = None,
     abort_mib: int | None = None,
@@ -376,27 +438,44 @@ def build_linux_failure_row(
         raise LinuxCudaError("failure row requires a non-empty measured reason")
     clean_reason = reason.strip()
     note = clean_reason if clean_reason.startswith(f"{failure_class}:") else f"{failure_class}: {clean_reason}"
-    shape_tag = _shape_suffix(num_ctx=num_ctx, prompt_tokens=prompt_tokens, concurrency=concurrency, batch=batch)
+    shape_tag = _shape_suffix(
+        num_ctx=num_ctx,
+        prompt_tokens=prompt_tokens,
+        token_length=token_length,
+        concurrency=concurrency,
+        batch=batch,
+    )
     settings: dict[str, Any] = {
-        "thinking_level": "off",
+        "thinking_level": "off" if task == "generate" else None,
         "num_predict": num_predict,
         "num_ctx": num_ctx,
         "batch": batch,
-        "static_shape": None,
+        "static_shape": f"{batch}x{token_length}" if (batch is not None and token_length is not None) else None,
         "precision": None,
         "failure_class": failure_class,
         "failure_reason": clean_reason,
     }
     if prompt_tokens is not None:
         settings["prompt_tokens"] = prompt_tokens
+    elif token_length is not None:
+        input_spec = get_throughput_input_spec(model, token_length)
+        if input_spec is not None:
+            settings["prompt_tokens"] = input_spec["prompt_tokens"]
+            settings["prompt_tokens_with_special"] = input_spec["prompt_tokens_with_special"]
+            settings["prompt_token_method"] = input_spec["prompt_token_method"]
+            settings["input_fixture_sha256"] = input_spec["input_fixture_sha256"]
+        else:
+            settings["prompt_tokens"] = token_length
+            settings["prompt_token_method"] = "word_approx_1to1"  # noqa: S105
     if concurrency is not None:
         settings["concurrency"] = concurrency
     if peak_mib is not None:
         settings["peak_mib"] = peak_mib
     if abort_mib is not None:
         settings["abort_mib"] = abort_mib
+    row_prefix = f"{spec_id}/{task}/{model}" if task != "generate" else f"{spec_id}/{model}"
     row: dict[str, Any] = {
-        "id": f"{spec_id}/{model}/{quant}/{remote_device.card}{shape_tag}/{run_id}",
+        "id": f"{row_prefix}/{quant}/{remote_device.card}{shape_tag}/{run_id}",
         "task": task,
         "model": {
             "repo_or_tag": model,
@@ -435,12 +514,15 @@ def _shape_suffix(
     prompt_tokens: int | None,
     concurrency: int | None,
     batch: int | None,
+    token_length: int | None = None,
 ) -> str:
     parts: list[str] = []
     if num_ctx is not None:
         parts.append(f"ctx{num_ctx}")
     if prompt_tokens is not None:
         parts.append(f"p{prompt_tokens}")
+    if token_length is not None:
+        parts.append(f"l{token_length}")
     if concurrency is not None:
         parts.append(f"c{concurrency}")
     if batch is not None:
@@ -812,135 +894,153 @@ def run_linux_throughput_ladder(
     date: str,
     remote_device: RemoteDeviceIdentity,
     models_by_task: Mapping[str, tuple[str, str]],
-    measure_batch: Callable[[str, int], Mapping[str, Any]],
+    measure_batch: Callable[..., Mapping[str, Any]],
     tasks: tuple[str, ...] = THROUGHPUT_TASKS,
     batch_sizes: tuple[int, ...] = THROUGHPUT_BATCH_SIZES,
+    token_lengths: tuple[int, ...] = (510,),
     abort_fraction: float = 0.90,
     engine_version: str = UNRECORDED,
     quant: str = UNRECORDED,
     licence: str = UNRECORDED,
     meta_by_task: Mapping[str, tuple[str, str]] | None = None,
 ) -> list[dict[str, Any]]:
-    """Sweep embed, rerank, and NLI throughput across batch sizes 1, 8, and 32 on Linux CUDA."""
+    """Sweep embed, rerank, and NLI throughput across token lengths and batch sizes 1, 8, and 32 on Linux CUDA."""
 
     abort_mib = compute_abort_mib(remote_device.vram_mib, abort_fraction)
     rows: list[dict[str, Any]] = []
     for task in tasks:
         model, digest = models_by_task[task]
         task_quant, task_licence = meta_by_task.get(task, (quant, licence)) if meta_by_task else (quant, licence)
-        for batch in batch_sizes:
-            try:
-                measured = measure_batch(task, batch)
-            except LinuxShapeFailure as exc:
-                rows.append(
-                    build_linux_failure_row(
-                        spec_id=spec_id,
-                        spec_rel=spec_rel,
-                        run_id=run_id,
-                        date=date,
-                        task=task,
-                        model=model,
-                        revision_or_digest=digest,
-                        remote_device=remote_device,
-                        failure_class=exc.failure_class,
-                        reason=exc.reason,
-                        batch=batch,
-                        peak_mib=exc.peak_mib,
-                        abort_mib=abort_mib,
-                        engine_version=engine_version,
-                        quant=task_quant,
-                        licence=task_licence,
+        for token_len in token_lengths:
+            for batch in batch_sizes:
+                try:
+                    try:
+                        measured = measure_batch(task, batch, token_length=token_len)
+                    except TypeError:
+                        measured = measure_batch(task, batch)
+                except LinuxShapeFailure as exc:
+                    rows.append(
+                        build_linux_failure_row(
+                            spec_id=spec_id,
+                            spec_rel=spec_rel,
+                            run_id=run_id,
+                            date=date,
+                            task=task,
+                            model=model,
+                            revision_or_digest=digest,
+                            remote_device=remote_device,
+                            failure_class=exc.failure_class,
+                            reason=exc.reason,
+                            batch=batch,
+                            token_length=token_len,
+                            peak_mib=exc.peak_mib,
+                            abort_mib=abort_mib,
+                            engine_version=engine_version,
+                            quant=task_quant,
+                            licence=task_licence,
+                        )
                     )
-                )
-                continue
+                    continue
 
-            tput = float(measured["throughput"])
-            p50 = float(measured["warm_p50_ms"])
-            p95 = float(measured.get("warm_p95_ms", p50))
-            peak_mib = int(measured["peak_mib"])
-            size = int(measured["size"])
-            size_vram = int(measured["size_vram"])
-            if size_vram < size or peak_mib >= abort_mib:
-                reason = (
-                    f"partial offload ({size_vram} < {size})"
-                    if size_vram < size
-                    else f"peak {peak_mib} MiB >= abort_mib {abort_mib} MiB"
-                )
-                rows.append(
-                    build_linux_failure_row(
-                        spec_id=spec_id,
-                        spec_rel=spec_rel,
-                        run_id=run_id,
-                        date=date,
-                        task=task,
-                        model=model,
-                        revision_or_digest=digest,
-                        remote_device=remote_device,
-                        failure_class="oom",
-                        reason=reason,
-                        batch=batch,
-                        peak_mib=peak_mib,
-                        abort_mib=abort_mib,
-                        engine_version=engine_version,
-                        quant=task_quant,
-                        licence=task_licence,
+                tput = float(measured["throughput"])
+                p50 = float(measured["warm_p50_ms"])
+                p95 = float(measured.get("warm_p95_ms", p50))
+                peak_mib = int(measured["peak_mib"])
+                size = int(measured["size"])
+                size_vram = int(measured["size_vram"])
+                if size_vram < size or peak_mib >= abort_mib:
+                    reason = (
+                        f"partial offload ({size_vram} < {size})"
+                        if size_vram < size
+                        else f"peak {peak_mib} MiB >= abort_mib {abort_mib} MiB"
                     )
-                )
-                continue
+                    rows.append(
+                        build_linux_failure_row(
+                            spec_id=spec_id,
+                            spec_rel=spec_rel,
+                            run_id=run_id,
+                            date=date,
+                            task=task,
+                            model=model,
+                            revision_or_digest=digest,
+                            remote_device=remote_device,
+                            failure_class="oom",
+                            reason=reason,
+                            batch=batch,
+                            token_length=token_len,
+                            peak_mib=peak_mib,
+                            abort_mib=abort_mib,
+                            engine_version=engine_version,
+                            quant=task_quant,
+                            licence=task_licence,
+                        )
+                    )
+                    continue
 
-            raw_slots = measured.get("slots")
-            slots = (
-                list(raw_slots)
-                if isinstance(raw_slots, list) and len(raw_slots) >= 2
-                else [
-                    {"phase": "warmup", "throughput": tput, "latency_ms": p50},
-                    {"phase": "repeat", "throughput": tput, "latency_ms": p50},
-                ]
-            )
-            repeats = sum(1 for s in slots if isinstance(s, Mapping) and s.get("phase") == "repeat") or 1
-            row: dict[str, Any] = {
-                "id": f"{spec_id}/{task}/{model}/{task_quant}/{remote_device.card}/b{batch}/{run_id}",
-                "task": task,
-                "model": {
-                    "repo_or_tag": model,
-                    "revision_or_digest": digest,
-                    "quant": task_quant,
-                    "licence": task_licence,
-                    "size": size,
-                    "size_vram": size_vram,
-                },
-                "engine": {"name": "ollama", "version": engine_version},
-                "device": remote_device.logical_device,
-                "remote_device": remote_device.to_dict(),
-                "gpu_resident": True,
-                "settings": {
+                raw_slots = measured.get("slots")
+                slots = (
+                    list(raw_slots)
+                    if isinstance(raw_slots, list) and len(raw_slots) >= 2
+                    else [
+                        {"phase": "warmup", "throughput": tput, "latency_ms": p50},
+                        {"phase": "repeat", "throughput": tput, "latency_ms": p50},
+                    ]
+                )
+                repeats = sum(1 for s in slots if isinstance(s, Mapping) and s.get("phase") == "repeat") or 1
+                input_spec = get_throughput_input_spec(model, token_len)
+                row_settings: dict[str, Any] = {
                     "thinking_level": None,
                     "num_predict": None,
                     "num_ctx": None,
                     "batch": batch,
-                    "static_shape": f"{batch}x512",
+                    "static_shape": f"{batch}x{token_len}",
                     "precision": "fp16",
+                    "prompt_tokens": input_spec["prompt_tokens"] if input_spec is not None else token_len,
+                    "prompt_token_method": (
+                        input_spec["prompt_token_method"]
+                        if input_spec is not None
+                        else "word_approx_1to1"  # noqa: S105
+                    ),
                     "peak_mib": peak_mib,
                     "abort_mib": abort_mib,
-                },
-                "quality": [],
-                "latency": {
-                    "cold_ms": None,
-                    "warm_p50_ms": p50,
-                    "warm_p95_ms": p95,
-                    "throughput": tput,
-                    "throughput_unit": "items/s",
-                    "compile_ms": None,
-                },
-                "artifacts": {"slots": slots},
-                "date": date,
-                "repeats": repeats,
-                "provisional": False,
-                "provenance": {"experiment_spec": spec_rel, "run_id": run_id},
-            }
-            stamp_family(row)
-            validate_row(row)
-            rows.append(row)
+                }
+                if input_spec is not None:
+                    row_settings["prompt_tokens_with_special"] = input_spec["prompt_tokens_with_special"]
+                    row_settings["input_fixture_sha256"] = input_spec["input_fixture_sha256"]
+                row: dict[str, Any] = {
+                    "id": f"{spec_id}/{task}/{model}/{task_quant}/{remote_device.card}/l{token_len}-b{batch}/{run_id}",
+                    "task": task,
+                    "model": {
+                        "repo_or_tag": model,
+                        "revision_or_digest": digest,
+                        "quant": task_quant,
+                        "licence": task_licence,
+                        "size": size,
+                        "size_vram": size_vram,
+                    },
+                    "engine": {"name": "ollama", "version": engine_version},
+                    "device": remote_device.logical_device,
+                    "remote_device": remote_device.to_dict(),
+                    "gpu_resident": True,
+                    "settings": row_settings,
+                    "quality": [],
+                    "latency": {
+                        "cold_ms": None,
+                        "warm_p50_ms": p50,
+                        "warm_p95_ms": p95,
+                        "throughput": tput,
+                        "throughput_unit": "items/s",
+                        "compile_ms": None,
+                    },
+                    "artifacts": {"slots": slots},
+                    "date": date,
+                    "repeats": repeats,
+                    "provisional": False,
+                    "provenance": {"experiment_spec": spec_rel, "run_id": run_id},
+                }
+                stamp_family(row)
+                validate_row(row)
+                rows.append(row)
     return rows
 
 
@@ -1144,27 +1244,38 @@ def measure_linux_ollama_generate(
     }
 
 
-def _batch_endpoint_and_payload(model: str, task: str, batch: int) -> tuple[str, dict[str, Any]]:
+def _build_fixed_token_item(
+    token_length: int,
+    item_index: int = 0,
+    seed: str = THROUGHPUT_SEED,
+    *,
+    model: str | None = None,
+) -> str:
+    if isinstance(token_length, bool) or not isinstance(token_length, int) or token_length < 1:
+        raise LinuxCudaError(f"token_length must be a positive integer, got {token_length!r}")
+    if model is not None:
+        input_spec = get_throughput_input_spec(model, token_length)
+        if input_spec is not None:
+            return str(input_spec["text"])
+    words = [w for w in seed.split() if w] or ["token"]
+    chosen = [words[(item_index + i) % len(words)] for i in range(token_length)]
+    return " ".join(chosen)
+
+
+def _batch_endpoint_and_payload(
+    model: str,
+    task: str,
+    batch: int,
+    *,
+    token_length: int = 510,
+) -> tuple[str, dict[str, Any]]:
     if task == "embed":
-        return "/api/embed", {"model": model, "input": [f"item-{idx}" for idx in range(batch)]}
-    if task == "rerank":
-        return (
-            "/api/rerank",
-            {
-                "model": model,
-                "query": "interlock rerank query",
-                "documents": [f"doc-{idx}" for idx in range(batch)],
-            },
-        )
-    if task == "nli":
-        return (
-            "/api/nli",
-            {
-                "model": model,
-                "pairs": [
-                    {"premise": f"premise-{idx}", "hypothesis": f"hypothesis-{idx}"} for idx in range(batch)
-                ],
-            },
+        items = [_build_fixed_token_item(token_length, idx, model=model) for idx in range(batch)]
+        return "/api/embed", {"model": model, "input": items}
+    if task in ("rerank", "nli"):
+        raise LinuxCudaError(
+            f"out of scope: stock Ollama does not serve {task!r} (/api/{task}); "
+            "declare the entry as a pre-registered load_refused row"
         )
     raise LinuxCudaError(f"unsupported batch task: {task!r}")
 
@@ -1176,11 +1287,12 @@ def measure_linux_ollama_batch(
     model: str,
     task: str,
     batch: int,
+    token_length: int = 510,
     repeats: int = 3,
 ) -> dict[str, Any]:
-    """Measure one ``(task, batch)`` cell on a running ``LinuxOllamaServer``."""
+    """Measure one ``(task, token_length, batch)`` cell on a running ``LinuxOllamaServer``."""
 
-    endpoint, payload = _batch_endpoint_and_payload(model, task, batch)
+    endpoint, payload = _batch_endpoint_and_payload(model, task, batch, token_length=token_length)
     used_before, _ = sample_vram_mib()
     peak_mib = used_before
     passes = ("warmup", *("repeat" for _ in range(max(1, repeats))))
@@ -1218,9 +1330,14 @@ def measure_linux_ollama_batch(
 def _ollama_model_tag(model_tag: str, quant: str, explicit_tag: Any = None) -> str:
     if isinstance(explicit_tag, str) and explicit_tag.strip():
         return explicit_tag.strip()
+    base = model_tag
+    if base.startswith("sha256:") and len(base) >= len("sha256:") + 12:
+        base = f"c2-sha256-{base.removeprefix('sha256:')[:12]}"
+    elif "/" in base:
+        base = re.sub(r"[^a-zA-Z0-9._-]+", "-", base).strip("-").lower()
     if quant and quant != UNRECORDED:
-        return f"{model_tag}-{quant.lower()}"
-    return model_tag
+        return f"{base}-{quant.lower()}"
+    return base
 
 
 def _relative_spec_posix(spec_path: Path, spec_rel: str | None) -> str:
@@ -1405,6 +1522,7 @@ def run_linux_spec(
         if mode == "batch-ladder":
             tasks = tuple(str(t) for t in (spec.get("tasks") or THROUGHPUT_TASKS))
             batch_sizes = tuple(int(b) for b in (spec.get("batch_sizes") or THROUGHPUT_BATCH_SIZES))
+            token_lengths = tuple(int(tl) for tl in (spec.get("token_lengths") or THROUGHPUT_TOKEN_LENGTHS))
             for task in tasks:
                 task_entries = [
                     e
@@ -1420,6 +1538,37 @@ def run_linux_spec(
                     digest = str(entry.get("revision_or_digest", UNRECORDED))
                     quant = str(entry.get("quant", UNRECORDED))
                     licence = str(entry.get("licence", UNRECORDED))
+                    expected_outcome = entry.get("expected_outcome")
+                    if isinstance(expected_outcome, str) and expected_outcome in FAILURE_CLASSES:
+                        dev_desc = f"{remote_device.logical_device} ({remote_device.vram_mib} MiB)"
+                        reason = str(
+                            entry.get("failure_reason")
+                            or f"pre-registered {expected_outcome}: {model_tag} ({quant}) on {dev_desc}"
+                        )
+                        for token_len in token_lengths:
+                            for batch in batch_sizes:
+                                rows.append(
+                                    build_linux_failure_row(
+                                        spec_id=spec_id,
+                                        spec_rel=resolved_spec_rel,
+                                        run_id=run_id,
+                                        date=date,
+                                        task=task,
+                                        model=model_tag,
+                                        revision_or_digest=digest,
+                                        remote_device=remote_device,
+                                        failure_class=expected_outcome,
+                                        reason=reason,
+                                        batch=batch,
+                                        token_length=token_len,
+                                        abort_mib=abort_mib,
+                                        engine_version=engine_version,
+                                        quant=quant,
+                                        licence=licence,
+                                    )
+                                )
+                        continue
+                    ollama_tag = _ollama_model_tag(model_tag, quant, entry.get("ollama_tag"))
                     rows.extend(
                         run_linux_throughput_ladder(
                             spec_id=spec_id,
@@ -1430,12 +1579,18 @@ def run_linux_spec(
                             models_by_task={task: (model_tag, digest)},
                             tasks=(task,),
                             batch_sizes=batch_sizes,
+                            token_lengths=token_lengths,
                             abort_fraction=abort_fraction,
                             engine_version=engine_version,
                             quant=quant,
                             licence=licence,
-                            measure_batch=lambda t, b, m=model_tag: measure_linux_ollama_batch(
-                                active_server, sample_vram_mib, model=m, task=t, batch=b
+                            measure_batch=lambda t, b, token_length=510, m=ollama_tag: measure_linux_ollama_batch(
+                                active_server,
+                                sample_vram_mib,
+                                model=m,
+                                task=t,
+                                batch=b,
+                                token_length=token_length,
                             ),
                         )
                     )
@@ -1445,4 +1600,376 @@ def run_linux_spec(
     finally:
         if owns_server:
             active_server.stop()
+
+
+def resolve_c2_sources(spec: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Resolve every model entry in a C2 ``linux-cuda`` spec to its single source, served tag, digest, and command."""
+
+    if spec.get("platform") != "linux-cuda":
+        raise LinuxCudaError("resolve_c2_sources requires a spec with platform: linux-cuda")
+    models = spec.get("models")
+    if not isinstance(models, list) or not models:
+        raise LinuxCudaError("resolve_c2_sources requires a non-empty models roster")
+
+    resolved: list[dict[str, Any]] = []
+    for entry in models:
+        device = str(entry.get("device") or entry.get("card") or UNRECORDED)
+        model = str(entry.get("repo_or_tag") or entry.get("model") or UNRECORDED)
+        quant = str(entry.get("quant") or UNRECORDED)
+        task = str(entry.get("task") or "generate")
+        digest = str(entry.get("revision_or_digest") or UNRECORDED)
+        expected_outcome = entry.get("expected_outcome")
+        failure_reason = str(entry.get("failure_reason") or "").strip() or None
+
+        has_tag = bool(entry.get("ollama_tag"))
+        has_gguf = entry.get("gguf") is not None
+        is_declared_refusal = expected_outcome == "load_refused" and bool(
+            failure_reason
+            and (failure_reason.startswith("no published ") or "out of scope" in failure_reason.lower())
+        )
+
+        if has_tag and has_gguf:
+            raise LinuxCudaError(f"entry {model!r} ({quant!r}) on {device} cannot name both ollama_tag and gguf")
+        if has_tag:
+            served_tag = str(entry["ollama_tag"]).strip()
+            tag_lower = served_tag.lower()
+            if tag_lower.endswith(("-fp16", "-f16")) and quant != "FP16":
+                raise LinuxCudaError(
+                    f"entry {model!r} on {device} pulls fp16 tag {served_tag!r} so quant must be 'FP16', not {quant!r}"
+                )
+            if tag_lower.endswith("-bf16") and quant != "BF16":
+                raise LinuxCudaError(
+                    f"entry {model!r} on {device} pulls bf16 tag {served_tag!r} so quant must be 'BF16', not {quant!r}"
+                )
+            resolved.append(
+                {
+                    "device": device,
+                    "task": task,
+                    "model": model,
+                    "quant": quant,
+                    "source_kind": "ollama_tag",
+                    "served_tag": served_tag,
+                    "expected_digest": digest,
+                    "command": f"ollama pull {served_tag}",
+                    "expected_outcome": expected_outcome,
+                    "failure_reason": failure_reason,
+                }
+            )
+            continue
+        if has_gguf:
+            gguf = entry["gguf"]
+            served_tag = _ollama_model_tag(model, quant)
+            repo = str(gguf["repo"]).strip()
+            rev = str(gguf["revision"]).strip()
+            file = str(gguf["file"]).strip()
+            sha256 = str(gguf["sha256"]).strip()
+            file_lower = file.lower()
+            if file_lower.endswith(("-f16.gguf", "-fp16.gguf")) and quant != "FP16":
+                raise LinuxCudaError(
+                    f"entry {model!r} on {device} pulls fp16 GGUF {file!r} so quant must be 'FP16', not {quant!r}"
+                )
+            if file_lower.endswith("-bf16.gguf") and quant != "BF16":
+                raise LinuxCudaError(
+                    f"entry {model!r} on {device} pulls bf16 GGUF {file!r} so quant must be 'BF16', not {quant!r}"
+                )
+            resolved.append(
+                {
+                    "device": device,
+                    "task": task,
+                    "model": model,
+                    "quant": quant,
+                    "source_kind": "gguf",
+                    "served_tag": served_tag,
+                    "repo": repo,
+                    "revision": rev,
+                    "file": file,
+                    "expected_digest": sha256,
+                    "command": f"hf download {repo} {file} --revision {rev} && ollama create {served_tag} -f Modelfile",
+                    "expected_outcome": expected_outcome,
+                    "failure_reason": failure_reason,
+                }
+            )
+            continue
+        if is_declared_refusal:
+            resolved.append(
+                {
+                    "device": device,
+                    "task": task,
+                    "model": model,
+                    "quant": quant,
+                    "source_kind": "load_refused",
+                    "served_tag": None,
+                    "expected_digest": digest,
+                    "command": f"skip-pull ({failure_reason})",
+                    "expected_outcome": expected_outcome,
+                    "failure_reason": failure_reason,
+                }
+            )
+            continue
+        raise LinuxCudaError(f"entry {model!r} ({quant!r}) on {device} must name exactly one source")
+
+    return resolved
+
+
+def format_c2_sources(spec: Mapping[str, Any]) -> str:
+    """Format resolved C2 model sources as tab-separated lines for the window launcher."""
+
+    items = resolve_c2_sources(spec)
+    lines = [
+        f"{item['device']}\t{item['model']}\t{item['quant']}\t{item['source_kind']}\t"
+        f"{item['served_tag'] or '-'}\t{item['expected_digest']}\t{item['command']}"
+        for item in items
+    ]
+    return "\n".join(lines) + ("\n" if lines else "")
+
+
+_CANONICAL_CARD_VRAM_MIB: dict[str, int] = {
+    "colab:T4": 15360,
+    "colab:L4": 23034,
+    "colab:A100-40": 40960,
+    "colab:A100-80": 81920,
+    "colab:G4": 98304,
+}
+
+
+def _default_live_fetch(url: str) -> tuple[int, bytes]:
+    if not url.startswith("https://"):
+        raise LinuxCudaError(f"verify_c2_sources_live only permits https:// URLs, got {url!r}")
+    headers = {"User-Agent": "interlock-c2-sources/0.3.0"}
+    if "registry.ollama.ai" in url and "/manifests/" in url:
+        headers["Accept"] = "application/vnd.docker.distribution.manifest.v2+json"
+    req = urllib.request.Request(url, headers=headers)  # noqa: S310
+    try:
+        with urllib.request.urlopen(req, timeout=30.0) as resp:  # noqa: S310
+            return int(resp.status), resp.read()
+    except urllib.error.HTTPError as exc:
+        return int(exc.code), b""
+    except OSError as exc:
+        raise LinuxCudaError(f"network error fetching {url}: {exc}") from exc
+
+
+def _canonical_quant_from_file_type(file_type: str) -> str:
+    upper = file_type.strip().upper()
+    if upper in ("F16", "FP16"):
+        return "FP16"
+    if upper == "BF16":
+        return "BF16"
+    return upper
+
+
+def verify_c2_sources_live(
+    spec: Mapping[str, Any],
+    *,
+    fetch: Callable[[str], tuple[int, bytes]] | None = None,
+) -> list[dict[str, Any]]:
+    """Query the live Ollama registry and Hugging Face for every entry in ``spec``."""
+
+    items = resolve_c2_sources(spec)
+    raw_fetch = fetch or _default_live_fetch
+    cache: dict[str, tuple[int, bytes]] = {}
+
+    def get_url(url: str) -> tuple[int, bytes]:
+        if url not in cache:
+            cache[url] = raw_fetch(url)
+        return cache[url]
+
+    verified: list[dict[str, Any]] = []
+    for item in items:
+        source_kind = item["source_kind"]
+        quant = item["quant"]
+        device = item["device"]
+        model = item["model"]
+        expected_digest = item["expected_digest"]
+        expected_outcome = item.get("expected_outcome")
+        failure_reason = str(item.get("failure_reason") or "")
+
+        if source_kind == "ollama_tag":
+            served_tag = str(item["served_tag"])
+            repo, tag = served_tag.split(":", 1) if ":" in served_tag else ("library", served_tag)
+            manifest_url = f"https://registry.ollama.ai/v2/library/{repo}/manifests/{tag}"
+            status, manifest_bytes = get_url(manifest_url)
+            if status != 200:
+                raise LinuxCudaError(f"live check failed for {served_tag} ({manifest_url}): HTTP {status}")
+            actual_digest = hashlib.sha256(manifest_bytes).hexdigest()
+            if actual_digest != expected_digest:
+                raise LinuxCudaError(
+                    f"live digest mismatch for {served_tag}: expected {expected_digest}, got {actual_digest}"
+                )
+            manifest_doc = json.loads(manifest_bytes.decode("utf-8"))
+            config_digest = str((manifest_doc.get("config") or {}).get("digest") or "")
+            blob_url = f"https://registry.ollama.ai/v2/library/{repo}/blobs/{config_digest}"
+            c_status, config_bytes = get_url(blob_url)
+            if c_status != 200:
+                raise LinuxCudaError(f"live config check failed for {served_tag} ({blob_url}): HTTP {c_status}")
+            config_doc = json.loads(config_bytes.decode("utf-8"))
+            file_type = str(config_doc.get("file_type") or "")
+            expected_quant = _canonical_quant_from_file_type(file_type)
+            if expected_quant != quant:
+                raise LinuxCudaError(
+                    f"live label mismatch for {served_tag} on {device}: "
+                    f"config file_type is {file_type!r} ({expected_quant}), but spec declares quant={quant!r}"
+                )
+            model_bytes = 0
+            for layer in manifest_doc.get("layers") or []:
+                if isinstance(layer, Mapping) and layer.get("mediaType") == "application/vnd.ollama.image.model":
+                    model_bytes = int(layer.get("size") or 0)
+                    break
+            model_mib = round(model_bytes / (1024 * 1024)) if model_bytes else 0
+            card_vram = _CANONICAL_CARD_VRAM_MIB.get(device)
+            if expected_outcome == "load_refused" and card_vram is not None and "MiB" in failure_reason:
+                abort_ceiling = compute_abort_mib(card_vram, float(spec.get("abort_fraction", 0.90)))
+                if model_mib < abort_ceiling:
+                    raise LinuxCudaError(
+                        f"live size check failed for {served_tag} on {device}: "
+                        f"model layer is {model_mib} MiB < abort ceiling {abort_ceiling} MiB, so refusal is stale"
+                    )
+            verified.append(
+                {
+                    **item,
+                    "live_status": "PASS",
+                    "live_digest": actual_digest,
+                    "live_file_type": file_type,
+                    "live_model_bytes": model_bytes,
+                    "live_model_mib": model_mib,
+                }
+            )
+            continue
+
+        if source_kind == "gguf":
+            repo = str(item["repo"])
+            rev = str(item["revision"])
+            file = str(item["file"])
+            tree_url = f"https://huggingface.co/api/models/{repo}/tree/{rev}"
+            status, tree_bytes = get_url(tree_url)
+            if status != 200:
+                raise LinuxCudaError(f"live check failed for HF GGUF {repo}@{rev} ({tree_url}): HTTP {status}")
+            tree_doc = json.loads(tree_bytes.decode("utf-8"))
+            matched_entry = next(
+                (e for e in tree_doc if isinstance(e, Mapping) and e.get("path") == file),
+                None,
+            )
+            if matched_entry is None:
+                raise LinuxCudaError(f"live check failed for {repo}@{rev}: file {file!r} not found in tree")
+            lfs = matched_entry.get("lfs") if isinstance(matched_entry.get("lfs"), Mapping) else {}
+            actual_sha = str(lfs.get("oid") or matched_entry.get("oid") or "")
+            if actual_sha != expected_digest:
+                raise LinuxCudaError(
+                    f"live digest mismatch for {repo}/{file}@{rev}: expected {expected_digest}, got {actual_sha}"
+                )
+            file_size = int(lfs.get("size") or matched_entry.get("size") or 0)
+            verified.append(
+                {
+                    **item,
+                    "live_status": "PASS",
+                    "live_digest": actual_sha,
+                    "live_file_type": quant,
+                    "live_model_bytes": file_size,
+                    "live_model_mib": round(file_size / (1024 * 1024)) if file_size else 0,
+                }
+            )
+            continue
+
+        if source_kind == "load_refused":
+            if failure_reason == "no published Q6_K build":
+                if model.startswith("sha256:"):
+                    ollama_repo, base_tag = "gemma4", "31b"
+                    cand_tags = ("31b-it-q6_K", "31b-q6_K")
+                else:
+                    ollama_repo, base_tag = model.split(":", 1) if ":" in model else (model, "latest")
+                    cand_tags = (f"{base_tag}-q6_K", f"{base_tag}-it-q6_K")
+                base_url = f"https://registry.ollama.ai/v2/library/{ollama_repo}/manifests/{base_tag}"
+                b_status, b_bytes = get_url(base_url)
+                if b_status != 200:
+                    raise LinuxCudaError(f"live check failed for base tag {ollama_repo}:{base_tag}: HTTP {b_status}")
+                b_digest = hashlib.sha256(b_bytes).hexdigest()
+                if b_digest != expected_digest:
+                    raise LinuxCudaError(
+                        f"live base digest mismatch for {ollama_repo}:{base_tag}: "
+                        f"expected {expected_digest}, got {b_digest}"
+                    )
+                for c_tag in cand_tags:
+                    c_url = f"https://registry.ollama.ai/v2/library/{ollama_repo}/manifests/{c_tag}"
+                    c_status, _ = get_url(c_url)
+                    if c_status == 200:
+                        raise LinuxCudaError(
+                            f"live check failed: {ollama_repo}:{c_tag} now resolves (HTTP 200), "
+                            "so 'no published Q6_K build' is stale"
+                        )
+                verified.append(
+                    {
+                        **item,
+                        "live_status": "PASS",
+                        "live_digest": b_digest,
+                        "live_file_type": "unpublished_404_verified",
+                        "live_model_bytes": 0,
+                        "live_model_mib": 0,
+                    }
+                )
+                continue
+
+            if "out of scope" in failure_reason.lower():
+                tree_url = f"https://huggingface.co/api/models/{model}/tree/{expected_digest}"
+                status, _ = get_url(tree_url)
+                if status != 200:
+                    raise LinuxCudaError(
+                        f"live check failed for HF revision {model}@{expected_digest} ({tree_url}): HTTP {status}"
+                    )
+                verified.append(
+                    {
+                        **item,
+                        "live_status": "PASS",
+                        "live_digest": expected_digest,
+                        "live_file_type": "hf_revision_verified",
+                        "live_model_bytes": 0,
+                        "live_model_mib": 0,
+                    }
+                )
+                continue
+
+    if str(spec.get("procedure") or "") == "batch-ladder":
+        fixture = load_throughput_inputs_fixture()
+        seen_models: set[str] = set()
+        for item in verified:
+            m_name = item["model"]
+            if m_name in seen_models:
+                continue
+            seen_models.add(m_name)
+            m_fix = (fixture.get("models") or {})[m_name]
+            hf_repo = str(m_fix["hf_repo"])
+            hf_rev = str(m_fix["hf_revision"])
+            tok_url = f"https://huggingface.co/{hf_repo}/resolve/{hf_rev}/tokenizer.json"
+            t_status, t_bytes = get_url(tok_url)
+            if t_status != 200:
+                raise LinuxCudaError(f"live tokenizer check failed for {hf_repo}@{hf_rev}: HTTP {t_status}")
+            actual_tok_sha = hashlib.sha256(t_bytes).hexdigest()
+            if actual_tok_sha != m_fix["tokenizer_sha256"]:
+                raise LinuxCudaError(
+                    f"live tokenizer.json sha256 mismatch for {hf_repo}@{hf_rev}: "
+                    f"expected {m_fix['tokenizer_sha256']}, got {actual_tok_sha}"
+                )
+
+    return verified
+
+
+def format_c2_sources_live(
+    spec: Mapping[str, Any],
+    *,
+    fetch: Callable[[str], tuple[int, bytes]] | None = None,
+) -> str:
+    """Verify every C2 spec entry live and format the evidence table."""
+
+    verified = verify_c2_sources_live(spec, fetch=fetch)
+    lines = [
+        f"{item['device']}\t{item['model']}\t{item['quant']}\t{item['source_kind']}\t"
+        f"{item['served_tag'] or '-'}\t{item['live_digest']}\t{item['live_file_type']}\t"
+        f"{item['live_model_mib']}MiB\t{item['live_status']}"
+        for item in verified
+    ]
+    lines.append(
+        f"VERIFY-LIVE PASS: {len(verified)}/{len(verified)} entries verified "
+        "against registry.ollama.ai and huggingface.co"
+    )
+    return "\n".join(lines) + "\n"
+
+
 

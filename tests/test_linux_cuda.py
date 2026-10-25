@@ -802,7 +802,7 @@ def test_interlock_run_dry_run_and_offline_execution_produce_validated_linux_cud
             "http_post": lambda _url, _payload: {"total_duration": 25_000_000},
         },
     )
-    assert len(tput_rows) == 9
+    assert len(tput_rows) == 18
 
 
 def test_c2_specs_cover_sweep_plan_matrix_quants_and_hashed_gemma_repo():
@@ -1043,7 +1043,7 @@ def test_c2_multi_quant_row_ids_never_collide_and_load_refused_cells_are_honoure
     refused_rows = [r for r in t4_rows if r.get("outcome") == "load_refused"]
     assert len(refused_rows) >= 2
     assert not any(m.startswith("sha256:") for m in queried_models)
-    assert "qwen3:8b-q4_k_m" in queried_models
+    assert "qwen3:8b-q4_K_M" in queried_models
     assert "qwen3:8b-q8_0" in queried_models
 
 
@@ -1242,18 +1242,17 @@ def test_measure_linux_ollama_batch_dispatches_per_task_and_throughput_ladder_pr
     )
     srv.start()
 
-    for task, expected_path in (("rerank", "/api/rerank"), ("nli", "/api/nli"), ("embed", "/api/embed")):
-        called_paths.clear()
-        res = measure_linux_ollama_batch(
-            srv,
-            lambda: (2000, 23034),
-            model="m",
-            task=task,
-            batch=8,
-        )
-        assert called_paths[0] == expected_path
-        assert called_paths == [expected_path] * 4
-        assert len([s for s in res["slots"] if s["phase"] == "repeat"]) == 3
+    called_paths.clear()
+    res = measure_linux_ollama_batch(
+        srv,
+        lambda: (2000, 23034),
+        model="m",
+        task="embed",
+        batch=8,
+    )
+    assert called_paths[0] == "/api/embed"
+    assert called_paths == ["/api/embed"] * 4
+    assert len([s for s in res["slots"] if s["phase"] == "repeat"]) == 3
 
     l4 = _remote_ident("L4", 23034)
     tput_rows = run_linux_throughput_ladder(
@@ -1279,6 +1278,1087 @@ def test_measure_linux_ollama_batch_dispatches_per_task_and_throughput_ladder_pr
     assert tput_rows[0]["model"]["quant"] == "FP16"
     assert tput_rows[0]["model"]["licence"] == "mit"
     assert tput_rows[0]["repeats"] == 1
+
+
+def test_part_a_c2_spec_entries_each_have_one_source_verified_digests_and_unpublished_quant_refusals():
+    from interlock.harness.linux_cuda import _ollama_model_tag
+
+    fill_spec = load_spec(ROOT / "experiments" / "c2-fill-card" / "spec.yaml")
+    gen_spec = load_spec(ROOT / "experiments" / "c2-generate" / "spec.yaml")
+    tput_spec = load_spec(ROOT / "experiments" / "c2-throughput" / "spec.yaml")
+
+    confirmed_ollama_digests = {
+        "qwen3:8b-q4_K_M": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+        "qwen3:8b-q8_0": "e56358ca25dd14db6853a9f68a92d717aaa6f0a94250a72d1a0f3d86a9f30130",
+        "qwen3:8b-fp16": "0b358e6e9d8cb39eaa4aa6b78136d09b91acb4be08c01bb707367811caed69ae",
+        "phi3.5:3.8b-mini-instruct-q4_K_M": "57096159698481b47ea17995d1a71f28eea1e26fc801df39a841b29badb4aa63",
+        "phi3.5:3.8b-mini-instruct-q6_K": "64777e5c68030bbf6eba5761cc6efe22a69b2f9a46fdce942d2b50181dff787a",
+        "phi3.5:3.8b-mini-instruct-q8_0": "8b50e8e1e21653ad0085ed8209f4f0cf7f9af78e0352ebd2d303f7b604d313be",
+        "phi3.5:3.8b-mini-instruct-fp16": "4611ed13d4961f1ae0dab1b2e1c50f70777e21bdf97be507cc27312aa412d15a",
+        "gemma4:31b-it-q4_K_M": "17ba34c06c801ba22f6047bab21ced9429c6d43e0e42ecf339b0f3e5a61e8d97",
+        "gemma4:31b-it-q8_0": "ac97b596ee1f1eca8cc5e35b7aab3226051c0204cd8324f3de4e0bb46b00c533",
+        "gemma4:31b-it-bf16": "df1661a2a6aaa94faf24bbaf23a691877a27d0e6052598f105a225618a079e76",
+        "muse-glimmer:30b-q4_K_M": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+        "muse-glimmer:30b-q8_0": "6ffafcdbd728b7d7ce94ad7db12c2b8a5ba4a1fdaad20c0d4b45a1257458485a",
+        "muse-glimmer:30b-bf16": "318fb1b9b81696d14f4f2784b3bda2e4e633046a52fcc9fe0b94e74f889f5efe",
+        "nomic-embed-text:137m-v1.5-fp16": "0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f",
+        "qwen3-embedding:0.6b-fp16": "67a7592a8852b7b36f6328cdec193cfb7639769f5edf344ba709b088b2a51042",
+    }
+
+    for spec in (fill_spec, gen_spec, tput_spec):
+        for entry in spec["models"]:
+            has_tag = bool(entry.get("ollama_tag"))
+            has_gguf = isinstance(entry.get("gguf"), dict)
+            is_declared_refusal = entry.get("expected_outcome") == "load_refused" and (
+                str(entry.get("failure_reason") or "").startswith("no published ")
+                or "out of scope" in str(entry.get("failure_reason") or "").lower()
+            )
+            if has_tag or has_gguf:
+                assert has_tag != has_gguf, f"entry {entry} must name at most one of ollama_tag or gguf"
+                if has_tag:
+                    tag = entry["ollama_tag"]
+                    assert tag in confirmed_ollama_digests, f"unverified ollama_tag {tag!r}"
+                    assert entry["revision_or_digest"] == confirmed_ollama_digests[tag]
+                if has_gguf:
+                    gguf = entry["gguf"]
+                    assert set(gguf) >= {"repo", "revision", "file", "sha256"}
+                    assert len(str(gguf["revision"])) == 40
+                    assert len(str(gguf["sha256"])) == 64
+            else:
+                assert is_declared_refusal, (
+                    f"entry {entry['model']} ({entry.get('quant')}) on {entry['device']} lacks a source"
+                )
+
+    gemma_hash = "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
+    for spec in (fill_spec, gen_spec):
+        for entry in spec["models"]:
+            if entry["model"] == gemma_hash and entry["quant"] == "Q4_K_M":
+                assert entry["ollama_tag"] == "gemma4:31b-it-q4_K_M"
+                derived_tag = _ollama_model_tag(entry["model"], entry["quant"], entry.get("ollama_tag"))
+                assert derived_tag == "gemma4:31b-it-q4_K_M"
+            if entry["model"] == gemma_hash and entry["quant"] == "Q6_K":
+                assert entry.get("expected_outcome") == "load_refused"
+                assert entry.get("failure_reason") == "no published Q6_K build"
+            if entry["model"] == "muse-glimmer:30b" and entry["quant"] == "Q6_K":
+                assert entry.get("expected_outcome") == "load_refused"
+                assert entry.get("failure_reason") == "no published Q6_K build"
+
+    base_linux = yaml.safe_load((ROOT / "experiments" / "c2-fill-card" / "spec.yaml").read_text(encoding="utf-8"))
+    with pytest.raises(SpecError, match="cannot name both"):
+        validate_spec(
+            {
+                **base_linux,
+                "models": [
+                    {
+                        **base_linux["models"][0],
+                        "ollama_tag": "qwen3:8b-q4_K_M",
+                        "gguf": {
+                            "repo": "Qwen/Qwen3-8B-GGUF",
+                            "revision": "7c41481f57cb95916b40956ab2f0b139b296d974",
+                            "file": "Qwen3-8B-Q6_K.gguf",
+                            "sha256": "cb042ccd76795a8830d6be6bd4165245847cc68e41797b13bd61aed4c2cfbce6",
+                        },
+                    }
+                ],
+            }
+        )
+    with pytest.raises(SpecError, match="must name exactly one source"):
+        validate_spec(
+            {
+                **base_linux,
+                "models": [
+                    {
+                        "model": "qwen3:8b",
+                        "revision_or_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+                        "quant": "Q4_K_M",
+                        "licence": "apache-2.0",
+                        "engine": "ollama",
+                        "device": "colab:T4",
+                    }
+                ],
+            }
+        )
+    with pytest.raises(SpecError, match="40-hex"):
+        validate_spec(
+            {
+                **base_linux,
+                "models": [
+                    {
+                        "model": "qwen3:8b",
+                        "revision_or_digest": "cb042ccd76795a8830d6be6bd4165245847cc68e41797b13bd61aed4c2cfbce6",
+                        "quant": "Q6_K",
+                        "licence": "apache-2.0",
+                        "engine": "ollama",
+                        "device": "colab:T4",
+                        "gguf": {
+                            "repo": "Qwen/Qwen3-8B-GGUF",
+                            "revision": "main",
+                            "file": "Qwen3-8B-Q6_K.gguf",
+                            "sha256": "cb042ccd76795a8830d6be6bd4165245847cc68e41797b13bd61aed4c2cfbce6",
+                        },
+                    }
+                ],
+            }
+        )
+    with pytest.raises(SpecError, match="64-hex"):
+        validate_spec(
+            {
+                **base_linux,
+                "models": [
+                    {
+                        "model": "qwen3:8b",
+                        "revision_or_digest": "cb042ccd76795a8830d6be6bd4165245847cc68e41797b13bd61aed4c2cfbce6",
+                        "quant": "Q6_K",
+                        "licence": "apache-2.0",
+                        "engine": "ollama",
+                        "device": "colab:T4",
+                        "gguf": {
+                            "repo": "Qwen/Qwen3-8B-GGUF",
+                            "revision": "7c41481f57cb95916b40956ab2f0b139b296d974",
+                            "file": "Qwen3-8B-Q6_K.gguf",
+                            "sha256": "short",
+                        },
+                    }
+                ],
+            }
+        )
+    with pytest.raises(SpecError, match="invalid ollama_tag"):
+        validate_spec(
+            {
+                **base_linux,
+                "models": [
+                    {
+                        "model": "qwen3:8b",
+                        "revision_or_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+                        "quant": "Q4_K_M",
+                        "licence": "apache-2.0",
+                        "engine": "ollama",
+                        "device": "colab:T4",
+                        "ollama_tag": "   ",
+                    }
+                ],
+            }
+        )
+    with pytest.raises(SpecError, match="gguf must be a mapping"):
+        validate_spec(
+            {
+                **base_linux,
+                "models": [
+                    {
+                        "model": "qwen3:8b",
+                        "revision_or_digest": "cb042ccd76795a8830d6be6bd4165245847cc68e41797b13bd61aed4c2cfbce6",
+                        "quant": "Q6_K",
+                        "licence": "apache-2.0",
+                        "engine": "ollama",
+                        "device": "colab:T4",
+                        "gguf": "not-a-dict",
+                    }
+                ],
+            }
+        )
+    with pytest.raises(SpecError, match="gguf is missing file"):
+        validate_spec(
+            {
+                **base_linux,
+                "models": [
+                    {
+                        "model": "qwen3:8b",
+                        "revision_or_digest": "cb042ccd76795a8830d6be6bd4165245847cc68e41797b13bd61aed4c2cfbce6",
+                        "quant": "Q6_K",
+                        "licence": "apache-2.0",
+                        "engine": "ollama",
+                        "device": "colab:T4",
+                        "gguf": {
+                            "repo": "Qwen/Qwen3-8B-GGUF",
+                            "revision": "7c41481f57cb95916b40956ab2f0b139b296d974",
+                            "sha256": "cb042ccd76795a8830d6be6bd4165245847cc68e41797b13bd61aed4c2cfbce6",
+                        },
+                    }
+                ],
+            }
+        )
+
+
+def test_part_b_c2_rerank_and_nli_are_declared_out_of_scope_rows_and_ollama_batch_refuses_non_embed():
+    from interlock.harness.linux_cuda import (
+        LinuxCudaError,
+        LinuxOllamaServer,
+        _batch_endpoint_and_payload,
+        run_linux_spec,
+    )
+
+    tput_spec = load_spec(ROOT / "experiments" / "c2-throughput" / "spec.yaml")
+    for entry in tput_spec["models"]:
+        if entry["task"] in ("rerank", "nli"):
+            assert entry.get("expected_outcome") == "load_refused"
+            reason = str(entry.get("failure_reason") or "")
+            assert "out of scope" in reason.lower()
+
+    for bad_task in ("rerank", "nli"):
+        with pytest.raises(LinuxCudaError, match="does not serve"):
+            _batch_endpoint_and_payload("m", bad_task, 8)
+
+    class DummyProc:
+        pid = 9999
+
+        def poll(self):
+            return None
+
+        def terminate(self):
+            return None
+
+        def wait(self, timeout=None):
+            return 0
+
+    called_urls: list[str] = []
+
+    def fake_get(url: str) -> dict[str, Any]:
+        if url.endswith("/api/version"):
+            return {"version": "0.6.2"}
+        if url.endswith("/api/ps"):
+            return {"models": [{"name": "m", "size": 500, "size_vram": 500}]}
+        return {}
+
+    def fake_post(url: str, _payload: dict[str, Any]) -> dict[str, Any]:
+        called_urls.append(url)
+        return {"total_duration": 10_000_000}
+
+    srv = LinuxOllamaServer(
+        popen=lambda *_a, **_kw: DummyProc(),
+        http_get=fake_get,
+        http_post=fake_post,
+    )
+    srv.start()
+    l4 = _remote_ident("L4", 23034)
+    rows = run_linux_spec(
+        tput_spec,
+        spec_path=ROOT / "experiments" / "c2-throughput" / "spec.yaml",
+        spec_rel="experiments/c2-throughput/spec.yaml",
+        run_id="r-part-b",
+        date="2026-10-24",
+        remote_device=l4,
+        sample_vram_mib=lambda: (2000, 23034),
+        server=srv,
+    )
+    assert not any("/api/rerank" in u or "/api/nli" in u for u in called_urls)
+    rerank_nli_rows = [r for r in rows if r["task"] in ("rerank", "nli")]
+    assert len(rerank_nli_rows) >= 6
+    for r in rerank_nli_rows:
+        validate_row(r)
+        assert r["outcome"] == "load_refused"
+        assert "out of scope" in r["settings"]["failure_reason"].lower()
+
+
+def test_part_c_throughput_inputs_use_fixed_token_lengths_128_and_512_with_distinct_row_ids():
+    from interlock.harness.linux_cuda import (
+        THROUGHPUT_TOKEN_LENGTHS,
+        LinuxCudaError,
+        LinuxOllamaServer,
+        _batch_endpoint_and_payload,
+        _build_fixed_token_item,
+        _ollama_model_tag,
+        measure_linux_ollama_batch,
+        run_linux_throughput_ladder,
+    )
+
+    assert THROUGHPUT_TOKEN_LENGTHS == (128, 510)
+    tput_spec = load_spec(ROOT / "experiments" / "c2-throughput" / "spec.yaml")
+    assert tuple(tput_spec.get("token_lengths") or ()) == (128, 510)
+    with pytest.raises(SpecError, match="token_lengths"):
+        validate_spec({**tput_spec, "token_lengths": [512]})
+    with pytest.raises(LinuxCudaError, match="positive integer"):
+        _build_fixed_token_item(0)
+    with pytest.raises(LinuxCudaError, match="unsupported batch task"):
+        _batch_endpoint_and_payload("m", "generate", 1)
+    assert _ollama_model_tag("BAAI/bge-base-en-v1.5", "unrecorded") == "baai-bge-base-en-v1.5"
+
+    ep_128, payload_128 = _batch_endpoint_and_payload("m", "embed", 4, token_length=128)
+    ep_510, payload_510 = _batch_endpoint_and_payload("m", "embed", 4, token_length=510)
+    assert ep_128 == "/api/embed" and ep_510 == "/api/embed"
+    assert len(payload_128["input"]) == 4 and len(payload_510["input"]) == 4
+    assert len(payload_128["input"][0].split()) == 128
+    assert len(payload_510["input"][0].split()) == 510
+    assert payload_128["input"][0] != "item-0"
+
+    l4 = _remote_ident("L4", 23034)
+    nomic_sha = "0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f"
+    rows = run_linux_throughput_ladder(
+        spec_id="C2-THROUGHPUT",
+        spec_rel="experiments/c2-throughput/spec.yaml",
+        run_id="r-len",
+        date="2026-10-24",
+        remote_device=l4,
+        models_by_task={"embed": ("nomic-ai/nomic-embed-text-v1.5", nomic_sha)},
+        tasks=("embed",),
+        batch_sizes=(8,),
+        token_lengths=(128, 510),
+        quant="FP16",
+        licence="apache-2.0",
+        measure_batch=lambda _t, _b, **_kw: {
+            "throughput": 250.0,
+            "warm_p50_ms": 32.0,
+            "warm_p95_ms": 35.0,
+            "peak_mib": 1800,
+            "size": 550,
+            "size_vram": 550,
+        },
+    )
+    assert len(rows) == 2
+    row_128, row_510 = rows[0], rows[1]
+    assert row_128["id"] != row_510["id"]
+    assert "/l128-b8/" in row_128["id"]
+    assert "/l510-b8/" in row_510["id"]
+    assert row_128["settings"]["prompt_tokens"] == 128
+    assert row_510["settings"]["prompt_tokens"] == 510
+    assert row_128["settings"]["static_shape"] == "8x128"
+    assert row_510["settings"]["static_shape"] == "8x510"
+
+    # Also verify measure_linux_ollama_batch forwards token_length to payload generation:
+    class DummyProc:
+        pid = 4321
+
+        def poll(self):
+            return None
+
+        def terminate(self):
+            return None
+
+        def wait(self, timeout=None):
+            return 0
+
+    seen_inputs: list[list[str]] = []
+    srv = LinuxOllamaServer(
+        popen=lambda *_a, **_kw: DummyProc(),
+        http_get=lambda url: {"version": "0.6.2"}
+        if url.endswith("/api/version")
+        else {"models": [{"name": "m", "size": 500, "size_vram": 500}]},
+        http_post=lambda _url, payload: (seen_inputs.append(list(payload["input"])), {"total_duration": 10_000_000})[1],
+    )
+    srv.start()
+    measure_linux_ollama_batch(srv, lambda: (1500, 23034), model="m", task="embed", batch=2, token_length=128)
+    assert len(seen_inputs[-1][0].split()) == 128
+
+
+def test_part_d_c2_sources_cli_resolves_every_c2_entry_to_one_source_and_command(capsys, tmp_path):
+    import json
+
+    from interlock.cli import main as cli_main
+    from interlock.harness.linux_cuda import LinuxCudaError, format_c2_sources, resolve_c2_sources
+
+    for spec_rel in (
+        "experiments/c2-fill-card/spec.yaml",
+        "experiments/c2-generate/spec.yaml",
+        "experiments/c2-throughput/spec.yaml",
+    ):
+        spec_path = ROOT / spec_rel
+        spec = load_spec(spec_path)
+        resolved = resolve_c2_sources(spec)
+        assert len(resolved) == len(spec["models"])
+        for entry, item in zip(spec["models"], resolved, strict=True):
+            assert item["device"] == entry["device"]
+            assert item["model"] == entry["model"]
+            assert item["source_kind"] in ("ollama_tag", "gguf", "load_refused")
+            if item["source_kind"] == "ollama_tag":
+                assert item["expected_digest"] == entry["revision_or_digest"]
+                assert item["served_tag"] == entry["ollama_tag"]
+                assert item["command"] == f"ollama pull {entry['ollama_tag']}"
+            elif item["source_kind"] == "gguf":
+                gguf = entry["gguf"]
+                assert item["expected_digest"] == gguf["sha256"]
+                served = item["served_tag"]
+                assert served and not served.startswith("sha256:") and "/" not in served
+                assert f"hf download {gguf['repo']} {gguf['file']} --revision {gguf['revision']}" in item["command"]
+                assert f"ollama create {served} -f Modelfile" in item["command"]
+            else:
+                assert item["expected_digest"] == entry["revision_or_digest"]
+                assert item["served_tag"] is None
+                assert item["command"].startswith("skip-pull (")
+
+        text_out = format_c2_sources(spec)
+        assert len(text_out.strip().splitlines()) == len(spec["models"])
+
+        rc = cli_main(["c2-sources", str(spec_path)])
+        assert rc == 0
+        captured = capsys.readouterr()
+        assert len(captured.out.strip().splitlines()) == len(spec["models"])
+
+        rc_json = cli_main(["c2-sources", str(spec_path), "--json"])
+        assert rc_json == 0
+        parsed_json = json.loads(capsys.readouterr().out)
+        assert len(parsed_json) == len(spec["models"])
+
+    # Invalid / non-linux-cuda spec or malformed entry refuses cleanly:
+    with pytest.raises(LinuxCudaError, match="linux-cuda"):
+        resolve_c2_sources({"platform": "windows", "models": []})
+    with pytest.raises(LinuxCudaError, match="non-empty"):
+        resolve_c2_sources({"platform": "linux-cuda", "models": []})
+    with pytest.raises(LinuxCudaError, match="cannot name both"):
+        resolve_c2_sources(
+            {
+                "platform": "linux-cuda",
+                "models": [
+                    {
+                        "device": "colab:T4",
+                        "model": "qwen3:8b",
+                        "quant": "Q4_K_M",
+                        "ollama_tag": "qwen3:8b-q4_K_M",
+                        "gguf": {"repo": "r", "revision": "a" * 40, "file": "f", "sha256": "b" * 64},
+                        "revision_or_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+                    }
+                ],
+            }
+        )
+    with pytest.raises(LinuxCudaError, match="exactly one source"):
+        resolve_c2_sources(
+            {
+                "platform": "linux-cuda",
+                "models": [
+                    {
+                        "device": "colab:T4",
+                        "model": "qwen3:8b",
+                        "quant": "Q4_K_M",
+                        "revision_or_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+                    }
+                ],
+            }
+        )
+    bad_spec = tmp_path / "bad.yaml"
+    bad_spec.write_text("not: a: valid: spec\n", encoding="utf-8")
+    assert cli_main(["c2-sources", str(bad_spec)]) == 1
+    capsys.readouterr()
+
+
+def test_fix1_gemma4_31b_real_ollama_sources_and_measured_refusal_reasons():
+    fill_spec = load_spec(ROOT / "experiments" / "c2-fill-card" / "spec.yaml")
+    gen_spec = load_spec(ROOT / "experiments" / "c2-generate" / "spec.yaml")
+    gemma_hash = "sha256:6316f0629137b426c9d9b853ffc4c8209589f30ee39aebede6285096c0ff47e7"
+
+    for spec in (fill_spec, gen_spec):
+        gemma_entries = [e for e in spec["models"] if e["model"] == gemma_hash]
+        assert len(gemma_entries) == 20
+        for entry in gemma_entries:
+            q = entry["quant"]
+            card = entry["device"]
+            assert "gguf" not in entry, f"Gemma 4 31B {q} on {card} still uses gguf={entry.get('gguf')}"
+            if q == "Q4_K_M":
+                assert entry.get("ollama_tag") == "gemma4:31b-it-q4_K_M"
+                assert (
+                    entry["revision_or_digest"]
+                    == "17ba34c06c801ba22f6047bab21ced9429c6d43e0e42ecf339b0f3e5a61e8d97"
+                )
+                if card == "colab:T4":
+                    assert entry.get("expected_outcome") == "load_refused"
+                    assert "17805 MiB" in str(entry.get("failure_reason"))
+                else:
+                    assert entry.get("expected_outcome") is None
+            elif q == "Q6_K":
+                assert entry.get("expected_outcome") == "load_refused"
+                assert entry.get("failure_reason") == "no published Q6_K build"
+                assert (
+                    entry["revision_or_digest"]
+                    == "17ba34c06c801ba22f6047bab21ced9429c6d43e0e42ecf339b0f3e5a61e8d97"
+                )
+            elif q == "Q8_0":
+                assert entry.get("ollama_tag") == "gemma4:31b-it-q8_0"
+                assert (
+                    entry["revision_or_digest"]
+                    == "ac97b596ee1f1eca8cc5e35b7aab3226051c0204cd8324f3de4e0bb46b00c533"
+                )
+                if card in ("colab:T4", "colab:L4"):
+                    assert entry.get("expected_outcome") == "load_refused"
+                    assert "31124 MiB" in str(entry.get("failure_reason"))
+                else:
+                    assert entry.get("expected_outcome") is None
+                    assert entry.get("failure_reason") is None
+            elif q == "BF16":
+                assert entry.get("ollama_tag") == "gemma4:31b-it-bf16"
+                assert (
+                    entry["revision_or_digest"]
+                    == "df1661a2a6aaa94faf24bbaf23a691877a27d0e6052598f105a225618a079e76"
+                )
+                if card in ("colab:T4", "colab:L4", "colab:A100-40"):
+                    assert entry.get("expected_outcome") == "load_refused"
+                    assert "58568 MiB" in str(entry.get("failure_reason"))
+                else:
+                    assert entry.get("expected_outcome") is None
+                    assert entry.get("failure_reason") is None
+
+        refused_by_card: dict[str, list[dict[str, Any]]] = {
+            "colab:A100-40": [],
+            "colab:A100-80": [],
+            "colab:G4": [],
+            "colab:L4": [],
+            "colab:T4": [],
+        }
+        for entry in spec["models"]:
+            if isinstance(entry.get("gguf"), dict):
+                assert not str(entry["gguf"]["repo"]).startswith("sha256:")
+                assert "/" in str(entry["gguf"]["repo"])
+            if entry.get("expected_outcome") == "load_refused":
+                reason = str(entry.get("failure_reason") or "").strip()
+                assert reason, f"missing failure_reason on {entry['device']} {entry['model']} {entry['quant']}"
+                assert "no published " in reason or "MiB" in reason or "out of scope" in reason.lower()
+                refused_by_card[entry["device"]].append(entry)
+
+        assert len(refused_by_card["colab:T4"]) == 9
+        assert len(refused_by_card["colab:L4"]) == 6
+        assert len(refused_by_card["colab:A100-40"]) == 4
+        assert len(refused_by_card["colab:A100-80"]) == 2
+        assert len(refused_by_card["colab:G4"]) == 2
+
+    base_linux = yaml.safe_load((ROOT / "experiments" / "c2-fill-card" / "spec.yaml").read_text(encoding="utf-8"))
+    with pytest.raises(SpecError, match="gguf.repo"):
+        validate_spec(
+            {
+                **base_linux,
+                "models": [
+                    {
+                        "model": gemma_hash,
+                        "revision_or_digest": "280af6832eca23cb322c4dcc65edfea98a21b8f8ab07dc7553bd6f7e6e7a3313",
+                        "quant": "Q4_K_M",
+                        "licence": "apache-2.0",
+                        "engine": "ollama",
+                        "device": "colab:L4",
+                        "gguf": {
+                            "repo": gemma_hash,
+                            "revision": "c9f3b814e2076d51a48c920b1e73f60d5a4219e8",
+                            "file": "gemma-4-31B-it-Q4_K_M.gguf",
+                            "sha256": "280af6832eca23cb322c4dcc65edfea98a21b8f8ab07dc7553bd6f7e6e7a3313",
+                        },
+                    }
+                ],
+            }
+        )
+    with pytest.raises(SpecError, match="failure_reason"):
+        validate_spec(
+            {
+                **base_linux,
+                "models": [
+                    {
+                        "model": "qwen3:8b",
+                        "ollama_tag": "qwen3:8b-fp16",
+                        "revision_or_digest": "0b358e6e9d8cb39eaa4aa6b78136d09b91acb4be08c01bb707367811caed69ae",
+                        "quant": "FP16",
+                        "licence": "apache-2.0",
+                        "engine": "ollama",
+                        "device": "colab:T4",
+                        "expected_outcome": "load_refused",
+                    }
+                ],
+            }
+        )
+
+
+def test_fix2_labels_name_what_is_pulled_fp16_vs_bf16():
+    from interlock.harness.linux_cuda import LinuxCudaError, resolve_c2_sources
+
+    fill_spec = load_spec(ROOT / "experiments" / "c2-fill-card" / "spec.yaml")
+    gen_spec = load_spec(ROOT / "experiments" / "c2-generate" / "spec.yaml")
+    tput_spec = load_spec(ROOT / "experiments" / "c2-throughput" / "spec.yaml")
+
+    for spec in (fill_spec, gen_spec):
+        for entry in spec["models"]:
+            tag = str(entry.get("ollama_tag") or "")
+            if tag in ("qwen3:8b-fp16", "phi3.5:3.8b-mini-instruct-fp16"):
+                assert entry["quant"] == "FP16", (
+                    f"{entry['device']} {entry['model']} pulls {tag!r} but declares quant={entry['quant']!r}"
+                )
+            if tag in ("gemma4:31b-it-bf16", "muse-glimmer:30b-bf16"):
+                assert entry["quant"] == "BF16"
+
+    for entry in tput_spec["models"]:
+        assert entry["quant"] == "FP16"
+
+    base_linux = yaml.safe_load((ROOT / "experiments" / "c2-fill-card" / "spec.yaml").read_text(encoding="utf-8"))
+    for bad_entry, msg in (
+        (
+            {
+                "model": "qwen3:8b",
+                "ollama_tag": "qwen3:8b-fp16",
+                "revision_or_digest": "0b358e6e9d8cb39eaa4aa6b78136d09b91acb4be08c01bb707367811caed69ae",
+                "quant": "BF16",
+                "licence": "apache-2.0",
+                "engine": "ollama",
+                "device": "colab:L4",
+            },
+            "FP16",
+        ),
+        (
+            {
+                "model": "muse-glimmer:30b",
+                "ollama_tag": "muse-glimmer:30b-bf16",
+                "revision_or_digest": "318fb1b9b81696d14f4f2784b3bda2e4e633046a52fcc9fe0b94e74f889f5efe",
+                "quant": "FP16",
+                "licence": "apache-2.0",
+                "engine": "ollama",
+                "device": "colab:A100-80",
+            },
+            "BF16",
+        ),
+        (
+            {
+                "model": "BAAI/bge-base-en-v1.5",
+                "revision_or_digest": "88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2",
+                "quant": "BF16",
+                "licence": "mit",
+                "engine": "ollama",
+                "device": "colab:L4",
+                "gguf": {
+                    "repo": "CompendiumLabs/bge-base-en-v1.5-gguf",
+                    "revision": "24914efdfa9ee54e815c3fcaa78a617031251c5c",
+                    "file": "bge-base-en-v1.5-f16.gguf",
+                    "sha256": "88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2",
+                },
+            },
+            "FP16",
+        ),
+        (
+            {
+                "model": "example/model",
+                "revision_or_digest": "88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2",
+                "quant": "FP16",
+                "licence": "mit",
+                "engine": "ollama",
+                "device": "colab:L4",
+                "gguf": {
+                    "repo": "example/model-gguf",
+                    "revision": "24914efdfa9ee54e815c3fcaa78a617031251c5c",
+                    "file": "model-bf16.gguf",
+                    "sha256": "88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2",
+                },
+            },
+            "BF16",
+        ),
+    ):
+        with pytest.raises(SpecError, match=msg):
+            validate_spec({**base_linux, "models": [bad_entry]})
+        with pytest.raises(LinuxCudaError, match=msg):
+            resolve_c2_sources({"platform": "linux-cuda", "models": [bad_entry]})
+
+
+def test_fix3_throughput_inputs_exact_tokenized_lengths_and_committed_fixture(monkeypatch):
+    import hashlib
+
+    from tokenizers import Tokenizer
+
+    import interlock.harness.linux_cuda as lc
+    from interlock.harness.linux_cuda import (
+        THROUGHPUT_INPUTS_PATH,
+        THROUGHPUT_INPUTS_REL,
+        THROUGHPUT_INPUTS_SHA256,
+        THROUGHPUT_TOKEN_LENGTHS,
+        LinuxCudaError,
+        _batch_endpoint_and_payload,
+        _build_fixed_token_item,
+        build_linux_failure_row,
+        get_throughput_input_spec,
+        load_throughput_inputs_fixture,
+        run_linux_throughput_ladder,
+    )
+
+    assert THROUGHPUT_TOKEN_LENGTHS == (128, 510)
+    assert THROUGHPUT_INPUTS_PATH.is_file()
+    assert hashlib.sha256(THROUGHPUT_INPUTS_PATH.read_bytes()).hexdigest() == THROUGHPUT_INPUTS_SHA256
+
+    tput_spec = load_spec(ROOT / "experiments" / "c2-throughput" / "spec.yaml")
+    assert tput_spec["token_lengths"] == [128, 510]
+    assert tput_spec["dataset"]["fixture"] == THROUGHPUT_INPUTS_REL
+    assert tput_spec["dataset"]["sha256"] == THROUGHPUT_INPUTS_SHA256
+
+    fixture = load_throughput_inputs_fixture()
+    assert fixture["token_lengths"] == [128, 510]
+    spec_models = {entry["model"] for entry in tput_spec["models"]}
+    assert set(fixture["models"].keys()) == spec_models
+
+    for model_name in sorted(spec_models):
+        m_entry = fixture["models"][model_name]
+        assert len(m_entry["hf_revision"]) == 40
+        assert len(m_entry["tokenizer_sha256"]) == 64
+        max_pos = int(m_entry["max_position_embeddings"])
+        tok = Tokenizer.from_str(m_entry["tokenizer_json"])
+        tok.no_truncation()
+        tok.no_padding()
+        for target_len in (128, 510):
+            inp = m_entry["inputs"][str(target_len)]
+            text = inp["text"]
+            assert hashlib.sha256(text.encode("utf-8")).hexdigest() == inp["text_sha256"]
+            ids_no_special = tok.encode(text, add_special_tokens=False).ids
+            ids_with_special = tok.encode(text, add_special_tokens=True).ids
+            assert len(ids_no_special) == target_len
+            assert len(ids_with_special) == inp["tokens_with_special"]
+            assert len(ids_with_special) <= max_pos
+            assert _build_fixed_token_item(target_len, model=model_name) == text
+
+    # Specifically verify bge-base-en-v1.5 and nli-deberta-v3-base fit inside max_position_embeddings=512:
+    assert fixture["models"]["BAAI/bge-base-en-v1.5"]["max_position_embeddings"] == 512
+    assert fixture["models"]["BAAI/bge-base-en-v1.5"]["inputs"]["510"]["tokens_with_special"] == 512
+    assert fixture["models"]["cross-encoder/nli-deberta-v3-base"]["max_position_embeddings"] == 512
+    assert fixture["models"]["cross-encoder/nli-deberta-v3-base"]["inputs"]["510"]["tokens_with_special"] == 512
+
+    # Verify served Ollama tags also resolve to the exact tokenized input:
+    _, nomic_payload = _batch_endpoint_and_payload(
+        "nomic-embed-text:137m-v1.5-fp16", "embed", 2, token_length=510
+    )
+    assert nomic_payload["input"][0] == fixture["models"]["nomic-ai/nomic-embed-text-v1.5"]["inputs"]["510"]["text"]
+
+    # Verify throughput rows and failure rows record exact token counts and fixture sha256:
+    l4 = _remote_ident("L4", 23034)
+    bge_sha = "88360fdf8521af0ac08d43818bd272da679ab97c685d9b273c48efd01a4187c2"
+    rows = run_linux_throughput_ladder(
+        spec_id="C2-THROUGHPUT",
+        spec_rel="experiments/c2-throughput/spec.yaml",
+        run_id="r-fix3",
+        date="2026-10-25",
+        remote_device=l4,
+        models_by_task={"embed": ("BAAI/bge-base-en-v1.5", bge_sha)},
+        tasks=("embed",),
+        batch_sizes=(1,),
+        token_lengths=(128, 510),
+        quant="FP16",
+        licence="mit",
+        measure_batch=lambda _t, _b, **_kw: {
+            "throughput": 300.0,
+            "warm_p50_ms": 10.0,
+            "warm_p95_ms": 11.0,
+            "peak_mib": 1500,
+            "size": 500,
+            "size_vram": 500,
+        },
+    )
+    assert rows[0]["settings"]["prompt_tokens"] == 128
+    assert rows[0]["settings"]["prompt_tokens_with_special"] == 130
+    assert rows[0]["settings"]["prompt_token_method"] == "tokenizer_exact"  # noqa: S105
+    assert rows[0]["settings"]["input_fixture_sha256"] == THROUGHPUT_INPUTS_SHA256
+    assert rows[1]["settings"]["prompt_tokens"] == 510
+    assert rows[1]["settings"]["prompt_tokens_with_special"] == 512
+    assert rows[1]["settings"]["prompt_token_method"] == "tokenizer_exact"  # noqa: S105
+    assert rows[1]["settings"]["input_fixture_sha256"] == THROUGHPUT_INPUTS_SHA256
+
+    fail_row = build_linux_failure_row(
+        spec_id="C2-THROUGHPUT",
+        spec_rel="experiments/c2-throughput/spec.yaml",
+        run_id="r-fix3-fail",
+        date="2026-10-25",
+        task="rerank",
+        model="BAAI/bge-reranker-v2-m3",
+        revision_or_digest="953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+        remote_device=l4,
+        failure_class="load_refused",
+        reason="out of scope: stock Ollama does not serve rerank",
+        batch=8,
+        token_length=510,
+        quant="FP16",
+        licence="apache-2.0",
+    )
+    validate_row(fail_row)
+    assert fail_row["settings"]["prompt_tokens"] == 510
+    assert fail_row["settings"]["prompt_tokens_with_special"] == 512
+    assert fail_row["settings"]["prompt_token_method"] == "tokenizer_exact"  # noqa: S105
+    assert fail_row["settings"]["input_fixture_sha256"] == THROUGHPUT_INPUTS_SHA256
+
+    assert get_throughput_input_spec("BAAI/bge-base-en-v1.5", 999) is None
+
+    with pytest.raises(SpecError, match="dataset.fixture"):
+        validate_spec({**tput_spec, "dataset": {**tput_spec["dataset"], "fixture": "wrong.json"}})
+    with pytest.raises(SpecError, match="dataset.sha256"):
+        validate_spec({**tput_spec, "dataset": {**tput_spec["dataset"], "sha256": "0" * 64}})
+
+    monkeypatch.setattr(lc, "_CACHED_THROUGHPUT_FIXTURE", None)
+    monkeypatch.setattr(lc, "THROUGHPUT_INPUTS_SHA256", "0" * 64)
+    with pytest.raises(LinuxCudaError, match="sha256 mismatch"):
+        load_throughput_inputs_fixture()
+
+
+def test_fix4_c2_sources_verify_live_checks_ollama_registry_and_huggingface(monkeypatch, capsys):
+    import hashlib
+    import json
+    import urllib.error
+
+    import interlock.harness.linux_cuda as lc
+    from interlock.cli import main as cli_main
+    from interlock.harness.linux_cuda import (
+        LinuxCudaError,
+        _default_live_fetch,
+        format_c2_sources_live,
+        load_throughput_inputs_fixture,
+        verify_c2_sources_live,
+    )
+
+    fixture = load_throughput_inputs_fixture()
+
+    # Build a deterministic mock fetcher that serves exact-digest manifests, config blobs, HF trees, and tokenizers:
+    def make_manifest_and_config(s_tag: str, file_type: str, size_bytes: int) -> tuple[bytes, str, bytes]:
+        cfg_bytes = json.dumps({"file_type": file_type, "_tag": s_tag}).encode("utf-8")
+        cfg_digest = "sha256:" + hashlib.sha256(cfg_bytes).hexdigest()
+        base_doc = {
+            "schemaVersion": 2,
+            "_tag": s_tag,
+            "config": {"digest": cfg_digest},
+            "layers": [{"mediaType": "application/vnd.ollama.image.model", "size": size_bytes}],
+        }
+        return json.dumps(base_doc).encode("utf-8"), cfg_digest, cfg_bytes
+
+    def build_mock_fetch(
+        spec_list: list[dict[str, Any]],
+        *,
+        override_status: dict[str, int] | None = None,
+        override_file_type: dict[str, str] | None = None,
+        tamper_digest_tag: str | None = None,
+        tamper_gguf_repo: str | None = None,
+        tamper_tok_repo: str | None = None,
+        override_size_bytes: dict[str, int] | None = None,
+    ):
+        url_map: dict[str, tuple[int, bytes]] = {}
+        sha_overrides: dict[bytes, str] = {}
+
+        real_sha256 = hashlib.sha256
+
+        class FakeHash:
+            def __init__(self, data: bytes = b"") -> None:
+                self._data = data
+                self._h = real_sha256(data)
+
+            def hexdigest(self) -> str:
+                if self._data in sha_overrides:
+                    return sha_overrides[self._data]
+                return self._h.hexdigest()
+
+        monkeypatch.setattr(lc.hashlib, "sha256", FakeHash)
+
+        tag_file_types = {
+            "qwen3:8b-q4_K_M": ("Q4_K_M", 5225000000),
+            "qwen3:8b-q8_0": ("Q8_0", 8850000000),
+            "qwen3:8b-fp16": ("F16", 16388043552),
+            "phi3.5:3.8b-mini-instruct-q4_K_M": ("Q4_K_M", 2390000000),
+            "phi3.5:3.8b-mini-instruct-q6_K": ("Q6_K", 3140000000),
+            "phi3.5:3.8b-mini-instruct-q8_0": ("Q8_0", 4060000000),
+            "phi3.5:3.8b-mini-instruct-fp16": ("F16", 7640000000),
+            "gemma4:31b-it-q4_K_M": ("Q4_K_M", 18670033120),
+            "gemma4:31b-it-q8_0": ("Q8_0", 32635676896),
+            "gemma4:31b-it-bf16": ("BF16", 61413189856),
+            "gemma4:31b": ("Q4_K_M", 18670033120),
+            "muse-glimmer:30b-q4_K_M": ("Q4_K_M", 16756681056),
+            "muse-glimmer:30b-q8_0": ("Q8_0", 29612958048),
+            "muse-glimmer:30b-bf16": ("BF16", 55725511008),
+            "muse-glimmer:30b": ("Q4_K_M", 16756681056),
+            "nomic-embed-text:137m-v1.5-fp16": ("F16", 274000000),
+            "qwen3-embedding:0.6b-fp16": ("F16", 1197000000),
+        }
+
+        for sp in spec_list:
+            for entry in sp["models"]:
+                if entry.get("ollama_tag"):
+                    s_tag = entry["ollama_tag"]
+                    repo, tag = s_tag.split(":", 1)
+                    ft, sz = tag_file_types[s_tag]
+                    if override_file_type and s_tag in override_file_type:
+                        ft = override_file_type[s_tag]
+                    if override_size_bytes and s_tag in override_size_bytes:
+                        sz = override_size_bytes[s_tag]
+                    m_bytes, c_dig, c_bytes = make_manifest_and_config(s_tag, ft, sz)
+                    sha_overrides[m_bytes] = (
+                        "0" * 64 if tamper_digest_tag == s_tag else str(entry["revision_or_digest"])
+                    )
+                    m_url = f"https://registry.ollama.ai/v2/library/{repo}/manifests/{tag}"
+                    b_url = f"https://registry.ollama.ai/v2/library/{repo}/blobs/{c_dig}"
+                    url_map[m_url] = (200, m_bytes)
+                    url_map[b_url] = (200, c_bytes)
+                elif isinstance(entry.get("gguf"), dict):
+                    g = entry["gguf"]
+                    t_url = f"https://huggingface.co/api/models/{g['repo']}/tree/{g['revision']}"
+                    oid = "0" * 64 if tamper_gguf_repo == g["repo"] else g["sha256"]
+                    tree = [{"path": g["file"], "lfs": {"oid": oid, "size": 6725812480}}]
+                    url_map[t_url] = (200, json.dumps(tree).encode("utf-8"))
+                else:
+                    reason = str(entry.get("failure_reason") or "")
+                    if reason == "no published Q6_K build":
+                        m_name = entry["model"]
+                        o_repo, b_tag = ("gemma4", "31b") if m_name.startswith("sha256:") else m_name.split(":", 1)
+                        b_url = f"https://registry.ollama.ai/v2/library/{o_repo}/manifests/{b_tag}"
+                        b_bytes = b"base-" + o_repo.encode("utf-8")
+                        sha_overrides[b_bytes] = str(entry["revision_or_digest"])
+                        url_map[b_url] = (200, b_bytes)
+                    elif "out of scope" in reason.lower():
+                        t_url = f"https://huggingface.co/api/models/{entry['model']}/tree/{entry['revision_or_digest']}"
+                        url_map[t_url] = (200, b"[]")
+
+        for m_name, m_fix in fixture["models"].items():
+            tok_url = f"https://huggingface.co/{m_fix['hf_repo']}/resolve/{m_fix['hf_revision']}/tokenizer.json"
+            tok_bytes = b"tok-" + m_name.encode("utf-8")
+            sha_overrides[tok_bytes] = "0" * 64 if tamper_tok_repo == m_name else m_fix["tokenizer_sha256"]
+            url_map[tok_url] = (200, tok_bytes)
+
+        def fake_fetch(url: str) -> tuple[int, bytes]:
+            if override_status and url in override_status:
+                return override_status[url], b""
+            return url_map.get(url, (404, b""))
+
+        return fake_fetch
+
+    fill_spec = load_spec(ROOT / "experiments" / "c2-fill-card" / "spec.yaml")
+    gen_spec = load_spec(ROOT / "experiments" / "c2-generate" / "spec.yaml")
+    tput_spec = load_spec(ROOT / "experiments" / "c2-throughput" / "spec.yaml")
+
+    fetch_fn = build_mock_fetch([fill_spec, gen_spec, tput_spec])
+    for sp, expected_count in ((fill_spec, 80), (gen_spec, 80), (tput_spec, 25)):
+        verified = verify_c2_sources_live(sp, fetch=fetch_fn)
+        assert len(verified) == expected_count
+        assert all(item["live_status"] == "PASS" for item in verified)
+        text = format_c2_sources_live(sp, fetch=fetch_fn)
+        assert f"VERIFY-LIVE PASS: {expected_count}/{expected_count}" in text
+
+    # Verify CLI --verify-live and --verify-live --json:
+    monkeypatch.setattr(lc, "_default_live_fetch", fetch_fn)
+    fill_path = str(ROOT / "experiments" / "c2-fill-card" / "spec.yaml")
+    assert cli_main(["c2-sources", fill_path, "--verify-live"]) == 0
+    assert "VERIFY-LIVE PASS: 80/80" in capsys.readouterr().out
+    assert cli_main(["c2-sources", fill_path, "--verify-live", "--json"]) == 0
+    parsed = json.loads(capsys.readouterr().out)
+    assert len(parsed) == 80
+
+    # Failure cases:
+    # 1. Unresolvable Ollama tag (404)
+    f_404 = build_mock_fetch(
+        [fill_spec],
+        override_status={"https://registry.ollama.ai/v2/library/qwen3/manifests/8b-q4_K_M": 404},
+    )
+    with pytest.raises(LinuxCudaError, match="HTTP 404"):
+        verify_c2_sources_live(fill_spec, fetch=f_404)
+
+    # 2. Digest mismatch on Ollama manifest
+    f_dig = build_mock_fetch([fill_spec], tamper_digest_tag="qwen3:8b-q4_K_M")
+    with pytest.raises(LinuxCudaError, match="live digest mismatch"):
+        verify_c2_sources_live(fill_spec, fetch=f_dig)
+
+    # 3. Label mismatch (config file_type is F16 vs BF16)
+    f_lbl = build_mock_fetch([fill_spec], override_file_type={"qwen3:8b-fp16": "BF16"})
+    with pytest.raises(LinuxCudaError, match="live label mismatch"):
+        verify_c2_sources_live(fill_spec, fetch=f_lbl)
+
+    # 4. Stale size-based refusal (model layer smaller than abort ceiling)
+    f_sz = build_mock_fetch([fill_spec], override_size_bytes={"qwen3:8b-fp16": 2000 * 1024 * 1024})
+    with pytest.raises(LinuxCudaError, match="live size check failed"):
+        verify_c2_sources_live(fill_spec, fetch=f_sz)
+
+    # 5. GGUF digest mismatch
+    f_gguf = build_mock_fetch([fill_spec], tamper_gguf_repo="Qwen/Qwen3-8B-GGUF")
+    with pytest.raises(LinuxCudaError, match="live digest mismatch"):
+        verify_c2_sources_live(fill_spec, fetch=f_gguf)
+
+    # 6. Stale 'no published Q6_K build' (candidate returns 200)
+    f_pub = build_mock_fetch(
+        [fill_spec],
+        override_status={"https://registry.ollama.ai/v2/library/gemma4/manifests/31b-it-q6_K": 200},
+    )
+    with pytest.raises(LinuxCudaError, match="no published Q6_K build"):
+        verify_c2_sources_live(fill_spec, fetch=f_pub)
+
+    # 7. Tokenizer sha256 mismatch on throughput spec
+    f_tok = build_mock_fetch([tput_spec], tamper_tok_repo="BAAI/bge-base-en-v1.5")
+    with pytest.raises(LinuxCudaError, match="tokenizer.json sha256 mismatch"):
+        verify_c2_sources_live(tput_spec, fetch=f_tok)
+
+    # Additional HTTP / missing-file error branches:
+    f_cfg_404 = build_mock_fetch(
+        [fill_spec],
+        override_status={
+            "https://registry.ollama.ai/v2/library/qwen3/blobs/"
+            + make_manifest_and_config("qwen3:8b-q4_K_M", "Q4_K_M", 5225000000)[1]: 404
+        },
+    )
+    with pytest.raises(LinuxCudaError, match="live config check failed"):
+        verify_c2_sources_live(fill_spec, fetch=f_cfg_404)
+
+    f_gguf_404 = build_mock_fetch(
+        [fill_spec],
+        override_status={
+            "https://huggingface.co/api/models/Qwen/Qwen3-8B-GGUF/tree/7c41481f57cb95916b40956ab2f0b139b296d974": 404
+        },
+    )
+    with pytest.raises(LinuxCudaError, match="live check failed for HF GGUF"):
+        verify_c2_sources_live(fill_spec, fetch=f_gguf_404)
+
+    def fetch_empty_tree(url: str) -> tuple[int, bytes]:
+        if "Qwen3-8B-GGUF" in url:
+            return 200, b"[]"
+        return fetch_fn(url)
+
+    with pytest.raises(LinuxCudaError, match="not found in tree"):
+        verify_c2_sources_live(fill_spec, fetch=fetch_empty_tree)
+
+    f_base_404 = build_mock_fetch(
+        [fill_spec],
+        override_status={"https://registry.ollama.ai/v2/library/gemma4/manifests/31b": 404},
+    )
+    with pytest.raises(LinuxCudaError, match="live check failed for base tag"):
+        verify_c2_sources_live(fill_spec, fetch=f_base_404)
+
+    def fetch_bad_base_digest(url: str) -> tuple[int, bytes]:
+        if url == "https://registry.ollama.ai/v2/library/gemma4/manifests/31b":
+            return 200, b"tampered-base"
+        return fetch_fn(url)
+
+    with pytest.raises(LinuxCudaError, match="live base digest mismatch"):
+        verify_c2_sources_live(fill_spec, fetch=fetch_bad_base_digest)
+
+    oos_url = (
+        "https://huggingface.co/api/models/BAAI/bge-reranker-v2-m3/tree/"
+        "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
+    )
+    f_oos_404 = build_mock_fetch([tput_spec], override_status={oos_url: 404})
+    with pytest.raises(LinuxCudaError, match="live check failed for HF revision"):
+        verify_c2_sources_live(tput_spec, fetch=f_oos_404)
+
+    tok_url = (
+        "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5/resolve/"
+        "e9b6763023c676ca8431644204f50c2b100d9aab/tokenizer.json"
+    )
+    f_tok_404 = build_mock_fetch([tput_spec], override_status={tok_url: 404})
+    with pytest.raises(LinuxCudaError, match="live tokenizer check failed"):
+        verify_c2_sources_live(tput_spec, fetch=f_tok_404)
+
+    # 8. _default_live_fetch scheme & error handling
+    with pytest.raises(LinuxCudaError, match="https://"):
+        _default_live_fetch("http://example.com")
+
+    class FakeResp:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return None
+
+        def read(self) -> bytes:
+            return b"ok"
+
+    monkeypatch.setattr(lc.urllib.request, "urlopen", lambda *_a, **_kw: FakeResp())
+    assert _default_live_fetch("https://registry.ollama.ai/v2/library/qwen3/manifests/8b") == (200, b"ok")
+
+    def raise_404(*_a, **_kw):
+        raise urllib.error.HTTPError("https://registry.ollama.ai", 404, "Not Found", {}, None)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(lc.urllib.request, "urlopen", raise_404)
+    assert _default_live_fetch("https://registry.ollama.ai/v2/library/qwen3/manifests/none") == (404, b"")
+
+    def raise_os(*_a, **_kw):
+        raise OSError("conn refused")
+
+    monkeypatch.setattr(lc.urllib.request, "urlopen", raise_os)
+    with pytest.raises(LinuxCudaError, match="network error"):
+        _default_live_fetch("https://registry.ollama.ai/v2/library/qwen3/manifests/8b")
+
+
+
+
+
+
+
+
+
+
+
 
 
 

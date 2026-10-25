@@ -322,6 +322,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "ruff" },
+    { name = "tokenizers" },
 ]
 fuzz = [
     { name = "atheris" },
@@ -347,6 +348,7 @@ dev = [
     { name = "pytest", specifier = "==9.0.3" },
     { name = "pytest-cov", specifier = "==7.0.0" },
     { name = "ruff", specifier = "==0.17.0" },
+    { name = "tokenizers", specifier = "==0.22.2" },
 ]
 fuzz = [{ name = "atheris", specifier = "==3.1.0" }]
 
