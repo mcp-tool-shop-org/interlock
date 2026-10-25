@@ -22,6 +22,9 @@
 - The NPU pin's comment names the rnd tag `data/npu-buildout-275e511`.
 - With `WATCHDOG_HEARTBEAT` (or `[paths] heartbeat`) unset, a run that uses the 5090 refuses before any device is touched, with a message that names `WATCHDOG_HEARTBEAT` and `--no-watchdog`. The same holds for the E4b block and pilot, and for an Ollama restart between steps. Before, an unset variable fell back to a heartbeat file at a fixed path on the author's rig.
 - The `--dry-run` line for an `hf_cache: hot` arm names the setting instead of a drive path.
+- A key under `[paths]` in `interlock.toml` that interlock does not know is refused, naming the valid keys, like `[import.sources]`.
+- `--no-watchdog` is also written into the header of an E4b block receipt (finished or aborted), and into a fill-card receipt row written when its preflight fails.
+- `heartbeat_age_s(None, now)` is infinity (stale) instead of an error, so `scripts/relay_s1.py` refuses with `WATCHDOG_HEARTBEAT` unset instead of crashing.
 
 ### Removed
 

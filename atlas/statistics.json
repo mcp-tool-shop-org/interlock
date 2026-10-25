@@ -169,7 +169,7 @@
       "confidence": "full",
       "highWater": null,
       "name": "tests",
-      "qualifyingSourceCommits": 88,
+      "qualifyingSourceCommits": 89,
       "rebaseline": null
     }
   ],
@@ -377,8 +377,8 @@
         "path": "assets/logo/switchyard_64.png"
       },
       {
-        "commits": 39,
-        "lines": 825,
+        "commits": 40,
+        "lines": 865,
         "path": "atlas/README.md"
       },
       {
@@ -387,18 +387,18 @@
         "path": "atlas/boundaries.yaml"
       },
       {
-        "commits": 39,
-        "lines": 2643,
+        "commits": 40,
+        "lines": 2803,
         "path": "atlas/page.json"
       },
       {
-        "commits": 39,
-        "lines": 6876,
+        "commits": 40,
+        "lines": 7607,
         "path": "atlas/statistics.json"
       },
       {
-        "commits": 39,
-        "lines": 36548,
+        "commits": 40,
+        "lines": 46835,
         "path": "atlas/structure.json"
       },
       {
@@ -2127,8 +2127,8 @@
         "path": "tests/test_phi_storage.py"
       },
       {
-        "commits": 2,
-        "lines": 223,
+        "commits": 3,
+        "lines": 247,
         "path": "tests/test_portable_defaults.py"
       },
       {
@@ -2212,9 +2212,9 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-10-25T17:47:57.454Z",
+  "generatedAt": "2026-10-25T18:24:00.296Z",
   "generatedFrom": {
-    "commit": "266b83103bc8b8aa0302366bbbe5c6d9bd5a95f9"
+    "commit": "699ab09342a15023299de9e468059d518d31c694"
   },
   "pairs": [
     {
@@ -2458,43 +2458,43 @@
     {
       "a": "atlas/README.md",
       "b": "atlas/page.json",
-      "either": 35,
-      "shared": 35,
+      "either": 36,
+      "shared": 36,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/statistics.json",
-      "either": 35,
-      "shared": 35,
+      "either": 36,
+      "shared": 36,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/structure.json",
-      "either": 35,
-      "shared": 35,
+      "either": 36,
+      "shared": 36,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/statistics.json",
-      "either": 35,
-      "shared": 35,
+      "either": 36,
+      "shared": 36,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/structure.json",
-      "either": 35,
-      "shared": 35,
+      "either": 36,
+      "shared": 36,
       "strength": 1
     },
     {
       "a": "atlas/statistics.json",
       "b": "atlas/structure.json",
-      "either": 35,
-      "shared": 35,
+      "either": 36,
+      "shared": 36,
       "strength": 1
     },
     {
@@ -2634,16 +2634,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-10-25T13:47:18-04:00",
+    "headDate": "2026-10-25T13:56:04-04:00",
     "inScopeFiles": 297,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 136,
+    "qualifyingCommits": 138,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-04-28T17:47:18.000Z",
+    "since": "2026-04-28T17:56:04.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",

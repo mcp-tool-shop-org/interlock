@@ -34,70 +34,24 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 27,
-      "changed": 54,
+      "added": 0,
+      "changed": 11,
       "moved": 0,
-      "parts": 6,
+      "parts": 3,
       "removed": 0
     },
     "items": [
       {
-        "kind": "door",
-        "sentence": "CI now also runs src/interlock/cli.py.",
-        "subjects": [
-          ".github/workflows/ci.yml",
-          "src/interlock/cli.py"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": "SECURITY.md is now read by tests/test_route_cli.py.",
-        "subjects": [
-          "SECURITY.md",
-          "tests/test_route_cli.py"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": "experiments/c2-fill-card/spec.yaml is now read by tests/test_import_remote_jsonl.py, tests/test_linux_cuda.py, tests/test_linux_cuda_harness_fixes.py and tests/test_linux_cuda_sampler_error.py.",
-        "subjects": [
-          "experiments/c2-fill-card/spec.yaml",
-          "tests/test_import_remote_jsonl.py",
-          "tests/test_linux_cuda.py",
-          "tests/test_linux_cuda_harness_fixes.py",
-          "tests/test_linux_cuda_sampler_error.py"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": "experiments/c2-generate/spec.yaml is now read by tests/test_import_remote_jsonl.py, tests/test_importers.py, tests/test_linux_cuda.py, tests/test_linux_cuda_harness_fixes.py, tests/test_linux_cuda_sampler_error.py, tests/test_receipt.py and tests/test_router_policy.py.",
-        "subjects": [
-          "experiments/c2-generate/spec.yaml",
-          "tests/test_import_remote_jsonl.py",
-          "tests/test_importers.py",
-          "tests/test_linux_cuda.py",
-          "tests/test_linux_cuda_harness_fixes.py",
-          "tests/test_linux_cuda_sampler_error.py",
-          "tests/test_receipt.py",
-          "tests/test_router_policy.py"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": "And 7 more new writers and readers of places.",
-        "subjects": []
-      },
-      {
         "kind": "counts",
-        "sentence": "27 files added and 54 changed content, across 6 parts.",
+        "sentence": "Nothing structural changed since 2026-10-25; 11 files changed content.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "0deac11d46af4fa1c35d96c42591e7d3e3423c31",
-      "generatedAt": "2026-10-14T05:02:40.059Z"
+      "commit": "266b83103bc8b8aa0302366bbbe5c6d9bd5a95f9",
+      "generatedAt": "2026-10-25T17:47:57.454Z"
     },
-    "unchanged": false
+    "unchanged": true
   },
   "changesTogether": [
     {
@@ -167,7 +121,7 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 14 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 1,
-  "commit": "266b83103bc8b8aa0302366bbbe5c6d9bd5a95f9",
+  "commit": "699ab09342a15023299de9e468059d518d31c694",
   "defaultBranch": "main",
   "derived": "10 parts, mostly Python (106 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
   "doors": [
@@ -332,7 +286,7 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-25T17:47:57.454Z",
+  "generatedAt": "2026-10-25T18:24:00.296Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "5 writes and 6 reads use paths built at run time and are not named here.",

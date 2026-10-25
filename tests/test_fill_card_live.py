@@ -2109,6 +2109,34 @@ def test_a_dirty_start_is_recorded_false_on_the_aborted_receipt(tmp_path: Path, 
     assert str(install["exe"]) not in text
 
 
+def test_no_watchdog_survives_an_aborted_preflight_row(tmp_path: Path, monkeypatch):
+    from interlock.guards import NO_WATCHDOG, NO_WATCHDOG_NOTE
+
+    _clear_fill_env(monkeypatch)
+    install = _install_tree(tmp_path)
+    monkeypatch.setenv("INTERLOCK_OLLAMA_LOG", str(install["log"]))
+    monkeypatch.setenv("INTERLOCK_OLLAMA_EXE", str(install["exe"]))
+    repo, spec_path = _committed_repo(tmp_path, _spec([_model()]), dirty=True, folder="dirty-nw")
+    run, read_counter, _seen = _live_commands(install, "ok")
+    transport = _Probe()
+    adapter = OllamaAdapter(transport=transport)
+    seams = real_fill_seams(adapter, run=run, read_counter=read_counter)
+    with pytest.raises(RunnerError, match="git porcelain is not empty"):
+        run_spec(
+            spec_path,
+            root=repo,
+            grant="g",
+            adapters={"ollama": adapter},
+            heartbeat=NO_WATCHDOG,
+            date="2026-10-12",
+            run_id="fill-dirty-nw",
+            seams=seams,
+        )
+    row = load_jsonl(repo / "receipts" / "fill-dirty-nw.jsonl")[0]
+    assert "git porcelain is not empty" in row["notes"]
+    assert NO_WATCHDOG_NOTE in row["notes"]
+
+
 def _recorded_log(name: str) -> str:
     return (ROOT / "tests" / "fixtures" / "e5" / name).read_text(encoding="utf-8")
 

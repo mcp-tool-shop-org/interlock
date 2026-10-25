@@ -56,9 +56,11 @@ def require_cpu_window(window: str | None, *, required: bool) -> str | None:
     return window.strip()
 
 
-def heartbeat_age_s(path: Path, now: float) -> float:
-    """Age of the heartbeat from its modified time. The file is not opened."""
+def heartbeat_age_s(path: Path | None, now: float) -> float:
+    """Age of the heartbeat from its modified time. The file is not opened. No path reads as infinitely stale."""
 
+    if path is None:
+        return float("inf")
     try:
         modified = path.stat().st_mtime
     except OSError:

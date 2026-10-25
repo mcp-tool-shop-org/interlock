@@ -12,6 +12,7 @@ import tomllib
 from pathlib import Path
 
 CONFIG_NAME = "interlock.toml"
+PATH_KEYS = frozenset({"scratch_root", "weights_hot", "heartbeat"})
 
 
 class PathsConfigError(Exception):
@@ -34,6 +35,11 @@ def configured(env_name: str, key: str) -> str | None:
     table = document.get("paths", {})
     if not isinstance(table, dict):
         raise PathsConfigError(f"{CONFIG_NAME}: [paths] must be a table")
+    for name in table:
+        if name not in PATH_KEYS:
+            raise PathsConfigError(
+                f"{CONFIG_NAME}: unknown path {name!r}; the paths are {', '.join(sorted(PATH_KEYS))}"
+            )
     found = table.get(key)
     if found is None:
         return None

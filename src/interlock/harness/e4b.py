@@ -1714,6 +1714,8 @@ def _header(spec, seams, repo, running, caches, prompt, *, aborted: bool, git: d
     header.update(_sample_note(seams))
     if pairs is not None:
         header["pairs"] = list(pairs)
+    if getattr(seams, "heartbeat", None) is NO_WATCHDOG:
+        header["watchdog"] = NO_WATCHDOG_NOTE
     return header
 
 

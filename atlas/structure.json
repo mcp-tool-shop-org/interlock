@@ -584,7 +584,7 @@
           "path": ".python-version"
         },
         {
-          "hash": "2b50221517f731483368317e98ea4d6b58d051ba888e49dc494d679116e41de4",
+          "hash": "5d6b2448884454ffba26c6007920a846518269bcd5484f1212e40a4be6604ea0",
           "path": "CHANGELOG.md"
         },
         {
@@ -2819,30 +2819,30 @@
             {
               "in": "heartbeat_age_s",
               "kind": "except",
-              "line": 64
+              "line": 66
             },
             {
               "in": "require_heartbeat",
               "kind": "raise",
-              "line": 80
+              "line": 82
             },
             {
               "in": "require_heartbeat",
               "kind": "raise",
-              "line": 87
+              "line": 89
             },
             {
               "in": "require_card_empty",
               "kind": "raise",
-              "line": 94
+              "line": 96
             },
             {
               "in": "assess_step",
               "kind": "raise",
-              "line": 125
+              "line": 127
             }
           ],
-          "hash": "12370c7c51b1c9512fe74a3fb9392611904445fd726a2bf6a72c35ac5e5a9890",
+          "hash": "0a310dbb911b779200a4f63c48576b6523cf5b0b42a0555a29c8d1bda1dce616",
           "importsFiles": [
             "src/interlock/devices.py"
           ],
@@ -3204,27 +3204,22 @@
             {
               "in": "_park",
               "kind": "except",
-              "line": 1757
+              "line": 1759
             },
             {
               "in": "run_block",
               "kind": "except",
-              "line": 1810
-            },
-            {
-              "in": "run_block",
-              "kind": "raise",
               "line": 1812
             },
             {
               "in": "run_block",
-              "kind": "except",
-              "line": 1823
+              "kind": "raise",
+              "line": 1814
             },
             {
               "in": "run_block",
               "kind": "except",
-              "line": 1827
+              "line": 1825
             },
             {
               "in": "run_block",
@@ -3234,72 +3229,72 @@
             {
               "in": "run_block",
               "kind": "except",
-              "line": 1847
+              "line": 1831
             },
             {
               "in": "run_block",
-              "kind": "raise",
+              "kind": "except",
               "line": 1849
             },
             {
               "in": "run_block",
               "kind": "raise",
-              "line": 1858
+              "line": 1851
+            },
+            {
+              "in": "run_block",
+              "kind": "raise",
+              "line": 1860
             },
             {
               "in": "run_pilot",
               "kind": "raise",
-              "line": 1893
+              "line": 1895
             },
             {
               "in": "run_pilot",
               "kind": "except",
-              "line": 1920
-            },
-            {
-              "in": "run_pilot",
-              "kind": "raise",
               "line": 1922
             },
             {
               "in": "run_pilot",
-              "kind": "except",
-              "line": 1934
+              "kind": "raise",
+              "line": 1924
             },
             {
               "in": "run_pilot",
-              "kind": "raise",
+              "kind": "except",
               "line": 1936
             },
             {
               "in": "run_pilot",
-              "kind": "except",
-              "line": 1957
+              "kind": "raise",
+              "line": 1938
             },
             {
               "in": "run_pilot",
               "kind": "except",
-              "line": 1964
+              "line": 1959
+            },
+            {
+              "in": "run_pilot",
+              "kind": "except",
+              "line": 1966
             },
             {
               "in": "run_pilot",
               "kind": "raise",
-              "line": 1990
+              "line": 1992
             },
             {
               "in": "run_pilot",
               "kind": "raise",
-              "line": 1993
+              "line": 1995
             },
             {
               "in": "run_from_cli",
               "kind": "raise",
-              "line": 2060
-            },
-            {
-              "in": "_refuse_base",
-              "kind": "raise",
-              "line": 2096
+              "line": 2062
             },
             {
               "in": "_refuse_base",
@@ -3307,44 +3302,44 @@
               "line": 2098
             },
             {
+              "in": "_refuse_base",
+              "kind": "raise",
+              "line": 2100
+            },
+            {
               "in": "owned_generate",
               "kind": "raise",
-              "line": 2118
+              "line": 2120
             },
             {
               "in": "unload_owned",
               "kind": "raise",
-              "line": 2129
+              "line": 2131
             },
             {
               "in": "count_owned",
               "kind": "raise",
-              "line": 2148
+              "line": 2150
             },
             {
               "in": "urllib_exchange",
               "kind": "except",
-              "line": 2331
-            },
-            {
-              "in": "urllib_exchange",
-              "kind": "raise",
               "line": 2333
             },
             {
               "in": "urllib_exchange",
+              "kind": "raise",
+              "line": 2335
+            },
+            {
+              "in": "urllib_exchange",
               "kind": "except",
-              "line": 2334
+              "line": 2336
             },
             {
               "in": "urllib_exchange",
               "kind": "raise",
-              "line": 2339
-            },
-            {
-              "in": "urllib_exchange",
-              "kind": "raise",
-              "line": 2343
+              "line": 2341
             },
             {
               "in": "urllib_exchange",
@@ -3352,47 +3347,52 @@
               "line": 2345
             },
             {
+              "in": "urllib_exchange",
+              "kind": "raise",
+              "line": 2347
+            },
+            {
               "in": "owned_probe",
               "kind": "raise",
-              "line": 2358
+              "line": 2360
             },
             {
               "in": "call",
               "kind": "raise",
-              "line": 2407
+              "line": 2409
             },
             {
               "in": "run",
               "kind": "except",
-              "line": 2545
+              "line": 2547
             },
             {
               "in": "await_sustained_companion",
               "kind": "raise",
-              "line": 2564
+              "line": 2566
             },
             {
               "in": "await_sustained_companion",
               "kind": "raise",
-              "line": 2567
+              "line": 2569
             },
             {
               "in": "stop_companion",
               "kind": "raise",
-              "line": 2582
-            },
-            {
-              "in": "companion_report",
-              "kind": "raise",
-              "line": 2595
+              "line": 2584
             },
             {
               "in": "companion_report",
               "kind": "raise",
               "line": 2597
+            },
+            {
+              "in": "companion_report",
+              "kind": "raise",
+              "line": 2599
             }
           ],
-          "hash": "b3a7ff3ce3c0cd4f06443cc7f09530cfc892ca89122dc7d4d37037ecd198333f",
+          "hash": "d611446c2cbc14a3ee58b236e148ea84a04ddd72c4a0839b4c9e3e71ba611a90",
           "importsFiles": [
             "src/interlock/adapters/base.py",
             "src/interlock/adapters/openvino.py",
@@ -3699,7 +3699,7 @@
                   "target": null
                 },
                 {
-                  "line": 1729,
+                  "line": 1731,
                   "name": "write_text",
                   "target": null,
                   "via": "_write_jsonl"
@@ -4191,7 +4191,7 @@
             {
               "calls": [
                 {
-                  "line": 1729,
+                  "line": 1731,
                   "name": "write_text",
                   "target": null
                 }
@@ -4204,14 +4204,14 @@
             {
               "calls": [
                 {
-                  "line": 1750,
+                  "line": 1752,
                   "name": "utc_now",
                   "target": {
                     "file": "src/interlock/harness/lifecycle.py"
                   }
                 },
                 {
-                  "line": 1745,
+                  "line": 1747,
                   "name": "move_aside",
                   "target": {
                     "file": "src/interlock/harness/lifecycle.py"
@@ -4226,21 +4226,21 @@
             {
               "calls": [
                 {
-                  "line": 1779,
+                  "line": 1781,
                   "name": "require_free",
                   "target": {
                     "file": "src/interlock/harness/lifecycle.py"
                   }
                 },
                 {
-                  "line": 1780,
+                  "line": 1782,
                   "name": "refuse_strays",
                   "target": {
                     "file": "src/interlock/harness/lifecycle.py"
                   }
                 },
                 {
-                  "line": 1785,
+                  "line": 1787,
                   "name": "utc_now",
                   "target": {
                     "file": "src/interlock/harness/lifecycle.py"
@@ -4277,7 +4277,7 @@
                   "via": "_probe"
                 },
                 {
-                  "line": 1804,
+                  "line": 1806,
                   "name": "load_resident",
                   "target": null
                 },
@@ -4377,7 +4377,7 @@
                   "via": "_analyze"
                 },
                 {
-                  "line": 1816,
+                  "line": 1818,
                   "name": "unload_resident",
                   "target": null
                 },
@@ -4399,21 +4399,21 @@
             {
               "calls": [
                 {
-                  "line": 1888,
+                  "line": 1890,
                   "name": "require_free",
                   "target": {
                     "file": "src/interlock/harness/lifecycle.py"
                   }
                 },
                 {
-                  "line": 1889,
+                  "line": 1891,
                   "name": "refuse_strays",
                   "target": {
                     "file": "src/interlock/harness/lifecycle.py"
                   }
                 },
                 {
-                  "line": 1904,
+                  "line": 1906,
                   "name": "utc_now",
                   "target": {
                     "file": "src/interlock/harness/lifecycle.py"
@@ -4450,7 +4450,7 @@
                   "via": "_probe"
                 },
                 {
-                  "line": 1912,
+                  "line": 1914,
                   "name": "load_resident",
                   "target": null
                 },
@@ -4483,13 +4483,13 @@
                   "via": "_load_facts"
                 },
                 {
-                  "line": 1963,
+                  "line": 1965,
                   "name": "unload_resident",
                   "target": null
                 },
                 {
                   "branch": "stopped",
-                  "line": 1750,
+                  "line": 1752,
                   "name": "utc_now",
                   "target": {
                     "file": "src/interlock/harness/lifecycle.py"
@@ -4498,7 +4498,7 @@
                 },
                 {
                   "branch": "stopped",
-                  "line": 1745,
+                  "line": 1747,
                   "name": "move_aside",
                   "target": {
                     "file": "src/interlock/harness/lifecycle.py"
@@ -4514,7 +4514,7 @@
                   "via": "pilot_summary"
                 },
                 {
-                  "line": 2010,
+                  "line": 2012,
                   "name": "receipt_environment",
                   "target": {
                     "file": "src/interlock/harness/ollama_serve.py"
@@ -4529,35 +4529,35 @@
             {
               "calls": [
                 {
-                  "line": 2057,
+                  "line": 2059,
                   "name": "require_unmodified",
                   "target": {
                     "file": "src/interlock/harness/lock.py"
                   }
                 },
                 {
-                  "line": 2062,
+                  "line": 2064,
                   "name": "require_grant",
                   "target": {
                     "file": "src/interlock/guards.py"
                   }
                 },
                 {
-                  "line": 2064,
+                  "line": 2066,
                   "name": "require_npu_session",
                   "target": {
                     "file": "src/interlock/guards.py"
                   }
                 },
                 {
-                  "line": 2068,
+                  "line": 2070,
                   "name": "resolve_run_id",
                   "target": {
                     "file": "src/interlock/harness/lifecycle.py"
                   }
                 },
                 {
-                  "line": 2454,
+                  "line": 2456,
                   "name": "resolve_pin",
                   "target": {
                     "file": "src/interlock/harness/ollama_serve.py"
@@ -4565,7 +4565,7 @@
                   "via": "build_live_seams"
                 },
                 {
-                  "line": 2462,
+                  "line": 2464,
                   "name": "Server",
                   "target": {
                     "file": "src/interlock/harness/ollama_serve.py"
@@ -4573,13 +4573,13 @@
                   "via": "build_live_seams"
                 },
                 {
-                  "line": 2292,
+                  "line": 2294,
                   "name": "open",
                   "target": null,
                   "via": "spawn_ollama"
                 },
                 {
-                  "line": 2468,
+                  "line": 2470,
                   "name": "stop_process_tree",
                   "target": {
                     "file": "src/interlock/harness/ollama_serve.py"
@@ -4587,7 +4587,7 @@
                   "via": "build_live_seams"
                 },
                 {
-                  "line": 2624,
+                  "line": 2626,
                   "name": "heartbeat_path",
                   "target": {
                     "file": "src/interlock/harness/runner.py"
@@ -4595,13 +4595,13 @@
                   "via": "build_live_seams"
                 },
                 {
-                  "line": 2077,
+                  "line": 2079,
                   "name": "git",
                   "target": null
                 },
                 {
                   "branch": "pilot",
-                  "line": 1888,
+                  "line": 1890,
                   "name": "require_free",
                   "target": {
                     "file": "src/interlock/harness/lifecycle.py"
@@ -4610,7 +4610,7 @@
                 },
                 {
                   "branch": "pilot",
-                  "line": 1889,
+                  "line": 1891,
                   "name": "refuse_strays",
                   "target": {
                     "file": "src/interlock/harness/lifecycle.py"
@@ -4619,7 +4619,7 @@
                 },
                 {
                   "branch": "pilot",
-                  "line": 1904,
+                  "line": 1906,
                   "name": "utc_now",
                   "target": {
                     "file": "src/interlock/harness/lifecycle.py"
@@ -4662,7 +4662,7 @@
                 },
                 {
                   "branch": "pilot",
-                  "line": 1912,
+                  "line": 1914,
                   "name": "load_resident",
                   "target": null,
                   "via": "run_pilot"
@@ -4701,14 +4701,14 @@
                 },
                 {
                   "branch": "pilot",
-                  "line": 1963,
+                  "line": 1965,
                   "name": "unload_resident",
                   "target": null,
                   "via": "run_pilot"
                 },
                 {
                   "branch": "pilot",
-                  "line": 1750,
+                  "line": 1752,
                   "name": "utc_now",
                   "target": {
                     "file": "src/interlock/harness/lifecycle.py"
@@ -4725,7 +4725,7 @@
             {
               "calls": [
                 {
-                  "line": 2223,
+                  "line": 2225,
                   "name": "is_set",
                   "target": null
                 }
@@ -4738,7 +4738,7 @@
             {
               "calls": [
                 {
-                  "line": 2223,
+                  "line": 2225,
                   "name": "is_set",
                   "target": null,
                   "via": "generate_loop"
@@ -4752,7 +4752,7 @@
             {
               "calls": [
                 {
-                  "line": 2292,
+                  "line": 2294,
                   "name": "open",
                   "target": null
                 }
@@ -4765,7 +4765,7 @@
             {
               "calls": [
                 {
-                  "line": 2359,
+                  "line": 2361,
                   "name": "get_json",
                   "target": {
                     "file": "src/interlock/harness/ollama_serve.py"
@@ -4780,34 +4780,34 @@
             {
               "calls": [
                 {
-                  "line": 2454,
+                  "line": 2456,
                   "name": "resolve_pin",
                   "target": {
                     "file": "src/interlock/harness/ollama_serve.py"
                   }
                 },
                 {
-                  "line": 2462,
+                  "line": 2464,
                   "name": "Server",
                   "target": {
                     "file": "src/interlock/harness/ollama_serve.py"
                   }
                 },
                 {
-                  "line": 2292,
+                  "line": 2294,
                   "name": "open",
                   "target": null,
                   "via": "spawn_ollama"
                 },
                 {
-                  "line": 2468,
+                  "line": 2470,
                   "name": "stop_process_tree",
                   "target": {
                     "file": "src/interlock/harness/ollama_serve.py"
                   }
                 },
                 {
-                  "line": 2624,
+                  "line": 2626,
                   "name": "heartbeat_path",
                   "target": {
                     "file": "src/interlock/harness/runner.py"
@@ -5435,7 +5435,7 @@
               "line": 2380
             }
           ],
-          "hash": "e6aa9ceb699a043bf9b0c786b0e59ec1f6b0f46cc8ad0a8dc2b1f95287264f48",
+          "hash": "20333db4ebc7ad4fea6652c99668f9cc462594cc14803fc5eb1fd7e261d1bbe3",
           "importOrder": [
             "src/interlock/adapters/base.py",
             "src/interlock/adapters/ollama.py",
@@ -12521,25 +12521,30 @@
             {
               "in": "configured",
               "kind": "except",
-              "line": 32
-            },
-            {
-              "in": "configured",
-              "kind": "raise",
               "line": 33
             },
             {
               "in": "configured",
               "kind": "raise",
-              "line": 36
+              "line": 34
             },
             {
               "in": "configured",
               "kind": "raise",
-              "line": 41
+              "line": 37
+            },
+            {
+              "in": "configured",
+              "kind": "raise",
+              "line": 40
+            },
+            {
+              "in": "configured",
+              "kind": "raise",
+              "line": 47
             }
           ],
-          "hash": "915a26bb7bf49b633e8958c475d1d2fe69ccc102cc9fd4e971e7645c414f36b2",
+          "hash": "278fe7bc87f96f67a8713979d17ad3ae2191fff796a096c433ae7c9934e43508",
           "path": "src/interlock/paths.py"
         },
         {
@@ -13928,6 +13933,7 @@
             "test_live_seams_are_not_stubs",
             "test_live_seams_post_only_to_11441",
             "test_no_covering_companion_call_refuses_companion_not_covering",
+            "test_no_watchdog_is_in_the_block_receipt_header_finished_or_aborted",
             "test_no_watchdog_runs_the_pilot_and_both_pilot_documents_record_it",
             "test_one_inconclusive_pair_does_not_decide_another",
             "test_one_missing_pilot_clock_is_recorded_and_seventeen_good_calls_refuse",
@@ -13958,7 +13964,7 @@
             "test_unsteady_warmup_refuses_clock_not_steady",
             "test_warm_until_steady_and_a_short_warm_is_not_steady"
           ],
-          "hash": "b68fbb0a3ca6e8b2ba44f95c86a0a9f7868e12532e3e46467f7e9125d474efac",
+          "hash": "44f5de1903e49027e1ea726a9915eddeadfce1d3b2d7ef15d001c591c23c6579",
           "importOrder": [
             "src/interlock/adapters/base.py",
             "src/interlock/adapters/ollama.py",
@@ -13971,7 +13977,8 @@
             "src/interlock/harness/timing.py",
             "src/interlock/cli.py",
             "src/interlock/harness/runner.py",
-            "src/interlock/harness/__init__.py"
+            "src/interlock/harness/__init__.py",
+            "src/interlock/receipt.py"
           ],
           "importsFiles": [
             "src/interlock/adapters/base.py",
@@ -13985,7 +13992,8 @@
             "src/interlock/harness/ollama_serve.py",
             "src/interlock/harness/runner.py",
             "src/interlock/harness/spec.py",
-            "src/interlock/harness/timing.py"
+            "src/interlock/harness/timing.py",
+            "src/interlock/receipt.py"
           ],
           "path": "tests/test_e4b.py",
           "testFramework": "pytest"
@@ -14138,6 +14146,7 @@
             "test_guards_run_per_model_and_rest_is_not_taken",
             "test_keep_alive_zero_unloads_the_count_and_the_measured_confirm_waits_for_idle",
             "test_missing_cuda_host_lines_refuse_after_the_first_load",
+            "test_no_watchdog_survives_an_aborted_preflight_row",
             "test_num_predict_1_does_not_publish_a_decode_rate",
             "test_num_predict_above_1_keeps_the_measured_rate",
             "test_one_measured_window_skips_a_bisect_with_less_than_one_cache_of_room",
@@ -14157,7 +14166,7 @@
             "test_the_search_does_not_load_above_the_trained_length",
             "test_the_server_log_fills_the_four_fields"
           ],
-          "hash": "39cf4ef9b4bfc48572370168df67f1241f78eb6cfc0ddf230e3bab398ae12502",
+          "hash": "0481a12f168fd8b6510e2385ffc6666f1350120e11c5e4c8d79033dc4650afc5",
           "importOrder": [
             "src/interlock/adapters/base.py",
             "src/interlock/adapters/ollama.py",
@@ -14187,6 +14196,7 @@
         },
         {
           "exports": [
+            "test_an_unset_heartbeat_reads_as_infinitely_stale_instead_of_crashing",
             "test_assess_step_refuses_the_wrong_flag_and_unknown_devices",
             "test_card_must_be_empty",
             "test_cpu_window_is_required_only_when_the_leg_is_heavy",
@@ -14194,7 +14204,7 @@
             "test_heartbeat_uses_mtime_and_refuses_a_stale_or_missing_file",
             "test_npu_session_covers_npu_and_igpu_only"
           ],
-          "hash": "cae1dd682e924eb62e1ae8c6840ddb915cf0983af2f2dfad4695947452cf74d6",
+          "hash": "9599a58597bd16fc87c8291ad191be692f60664a64babd24c129e489d566464f",
           "importsFiles": [
             "src/interlock/guards.py"
           ],
@@ -14892,6 +14902,8 @@
           "exports": [
             "test_a_configured_heartbeat_is_still_checked",
             "test_a_malformed_config_file_is_a_structured_error",
+            "test_a_paths_table_that_is_not_a_table_or_a_value_that_is_not_a_path_is_a_structured_error",
+            "test_an_unknown_key_in_paths_is_refused_listing_the_valid_ones",
             "test_an_unset_heartbeat_is_none_not_a_default_path",
             "test_an_unset_heartbeat_refuses_and_names_the_variable",
             "test_no_shipped_file_names_a_drive_letter_home_or_users_path",
@@ -14904,17 +14916,19 @@
             "test_the_hot_cache_comes_from_env_then_the_config_file",
             "test_the_hot_cache_default_is_under_the_user_hugging_face_cache_and_the_dead_constants_are_gone",
             "test_the_run_command_passes_no_watchdog_only_when_the_flag_is_given",
+            "test_the_run_command_reports_a_malformed_paths_file_on_stderr_and_exits_1",
             "test_the_scratch_default_is_under_the_system_temp_directory",
             "test_the_scratch_root_comes_from_env_then_the_config_file"
           ],
-          "hash": "f690ba29e817b5f12fed97e0ef01e75b24e73ff3451e92e70fa97ae2ea2cfbba",
+          "hash": "98e236d3012a887fe14ffddc4962dbdb5bdb1395c5bb99878c53f4f8f86889a6",
           "importOrder": [
             "src/interlock/adapters/offrig_calibrate.py",
             "src/interlock/harness/runner.py",
             "src/interlock/guards.py",
             "src/interlock/cli.py",
             "src/interlock/harness/__init__.py",
-            "src/interlock/harness/storage.py"
+            "src/interlock/harness/storage.py",
+            "src/interlock/paths.py"
           ],
           "importsFiles": [
             "src/interlock/adapters/offrig_calibrate.py",
@@ -14922,7 +14936,8 @@
             "src/interlock/guards.py",
             "src/interlock/harness/__init__.py",
             "src/interlock/harness/runner.py",
-            "src/interlock/harness/storage.py"
+            "src/interlock/harness/storage.py",
+            "src/interlock/paths.py"
           ],
           "path": "tests/test_portable_defaults.py",
           "testFramework": "pytest"
@@ -15026,11 +15041,12 @@
             "test_the_idle_wait_also_waits_for_no_process_on_the_gpu",
             "test_the_import_check_runs_fifteen_triples_in_order",
             "test_the_live_gpu_reader_names_only_compute_workloads",
+            "test_the_real_heartbeat_seam_reads_an_unset_heartbeat_as_stale_not_a_crash",
             "test_the_stop_step_waits_for_spans_then_stops_and_expects_77",
             "test_the_vram_watch_writes_the_stop_file_once_over_the_ceiling",
             "test_unload_all_and_wait_idle"
           ],
-          "hash": "deeaa79c97baa0bd13452d121fb05289620497fb196b908693cf89ea15ffe3ee",
+          "hash": "415d762861464b942ea5bdc6c1fc283372a9d83f932d457adc44e587c2ee14fc",
           "importsFiles": [
             "scripts/relay_s1.py"
           ],
@@ -16094,7 +16110,7 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "266b83103bc8b8aa0302366bbbe5c6d9bd5a95f9",
+    "commit": "699ab09342a15023299de9e468059d518d31c694",
     "tracked": 292
   },
   "landings": [
@@ -16787,7 +16803,7 @@
       "path": "site/src/content/docs/handbook/architecture.md"
     },
     {
-      "hash": "0072f6166ed3822c2707b668d02080fd9e29b5be581b8c7b4a517d55b3569a32",
+      "hash": "12d98fec0a782f837d9fed9b4b7c63986c4d8e0b2bc12591ea7fa5399f9ad725",
       "path": "site/src/content/docs/handbook/configuration.md"
     },
     {

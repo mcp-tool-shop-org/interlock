@@ -1,6 +1,6 @@
 # interlock: how it works
 
-Mapped at 2026-10-25 from commit 266b831 by Atlas 1.24.0.
+Mapped at 2026-10-25 from commit 699ab09 by Atlas 1.24.0.
 
 ## What this is
 
@@ -8,14 +8,9 @@ interlock routes each job to a model, engine and device from a receipt-backed ta
 
 10 parts, mostly Python (106 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.
 
-## What changed since 2026-10-14 (0deac11)
+## What changed since 2026-10-25 (266b831)
 
-- CI now also runs src/interlock/cli.py.
-- SECURITY.md is now read by tests/test_route_cli.py.
-- experiments/c2-fill-card/spec.yaml is now read by tests/test_import_remote_jsonl.py, tests/test_linux_cuda.py, tests/test_linux_cuda_harness_fixes.py and tests/test_linux_cuda_sampler_error.py.
-- experiments/c2-generate/spec.yaml is now read by tests/test_import_remote_jsonl.py, tests/test_importers.py, tests/test_linux_cuda.py, tests/test_linux_cuda_harness_fixes.py, tests/test_linux_cuda_sampler_error.py, tests/test_receipt.py and tests/test_router_policy.py.
-- And 7 more new writers and readers of places.
-- 27 files added and 54 changed content, across 6 parts.
+Nothing structural changed since 2026-10-25; 11 files changed content.
 
 ## What comes in
 

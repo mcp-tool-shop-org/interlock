@@ -215,3 +215,16 @@ def test_the_run_command_reports_a_malformed_paths_file_on_stderr_and_exits_1(tm
     spec = ROOT / "experiments" / "e5" / "spec.yaml"
     assert main(["run", str(spec), "--root", str(ROOT), "--grant", "g"]) == 1
     assert "interlock.toml" in capsys.readouterr().err
+
+
+def test_an_unknown_key_in_paths_is_refused_listing_the_valid_ones(tmp_path):
+    from interlock.paths import PATH_KEYS, PathsConfigError, configured
+
+    assert PATH_KEYS == frozenset({"scratch_root", "weights_hot", "heartbeat"})
+    _toml(tmp_path, 'heartbaet = "typo"')
+    with pytest.raises(PathsConfigError, match="unknown") as caught:
+        configured("NOT_SET_ANYWHERE", "heartbeat")
+    for name in sorted(PATH_KEYS):
+        assert name in str(caught.value)
+    assert "heartbaet" in str(caught.value)
+

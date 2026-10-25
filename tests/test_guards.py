@@ -39,6 +39,12 @@ def test_cpu_window_is_required_only_when_the_leg_is_heavy():
         require_cpu_window(None, required=True)
 
 
+def test_an_unset_heartbeat_reads_as_infinitely_stale_instead_of_crashing():
+    from interlock.guards import heartbeat_age_s
+
+    assert heartbeat_age_s(None, 1_000.0) == float("inf")
+
+
 def test_heartbeat_uses_mtime_and_refuses_a_stale_or_missing_file(tmp_path: Path):
     path = tmp_path / "_watchdog_HEARTBEAT"
     path.write_text("do not read this", encoding="utf-8")

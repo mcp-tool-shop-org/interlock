@@ -1526,7 +1526,7 @@ def run_fill_card(
                                     spec_rel=spec_rel,
                                     run_id=run_id,
                                     date=date,
-                                    notes=str(exc),
+                                    notes=_join(str(exc), notes),
                                     record=kept,
                                 )
                             )
