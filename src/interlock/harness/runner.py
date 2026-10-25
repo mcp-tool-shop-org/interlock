@@ -2304,12 +2304,19 @@ def run_spec(
     marker.write()
     try:
         if spec.get("platform") == "linux-cuda":
-            from interlock.harness.linux_cuda import LinuxOllamaServer, probe_linux_gpu, run_linux_spec
+            from interlock.harness.linux_cuda import (
+                LinuxOllamaServer,
+                probe_linux_gpu,
+                run_linux_spec,
+                validate_loopback_ollama_host,
+            )
 
             linux_spec = dict(spec)
             if chosen_models is not None:
                 linux_spec["models"] = chosen_models
             seam_map = seams if isinstance(seams, dict) else {}
+            seam_host = seam_map.get("host", "127.0.0.1:11441")
+            validate_loopback_ollama_host(seam_host)
             remote_dev = seam_map.get("remote_device")
             vram_sampler = seam_map.get("sample_vram_mib")
             if remote_dev is None or vram_sampler is None:
@@ -2326,7 +2333,7 @@ def run_spec(
                 k in seam_map for k in ("popen", "http_get", "http_post", "host", "log_path")
             ):
                 server = LinuxOllamaServer(
-                    host=seam_map.get("host", "127.0.0.1:11441"),
+                    host=seam_host,
                     log_path=seam_map.get("log_path", root / "logs" / f"{name}.ollama.log"),
                     popen=seam_map.get("popen"),
                     http_get=seam_map.get("http_get"),

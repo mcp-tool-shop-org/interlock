@@ -45,7 +45,7 @@ _ZONE_POOL = re.compile(
     r"|colab-(?:pool|zone|free|pro|payg)(?:-[a-z0-9]+)*)$"
 )
 _ACCOUNT_PREFIX = re.compile(
-    r"^(?:account|acct|user|uid|owner|email|github|hf|huggingface)[:_-]",
+    r"^(?:account|acct|user|uid|owner|login|handle|email|github|hf|huggingface)[:_=-]",
     re.IGNORECASE,
 )
 _NUMERIC_VERSION = re.compile(r"^[0-9]+(?:\.[0-9]+)+$")
