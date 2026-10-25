@@ -69,6 +69,8 @@ def test_the_ci_tests_current_python_with_the_required_check_name_kept():
     test_job = ci.split(nl + "  test:" + nl, 1)[1].split(nl + "  test-py313:", 1)[0]
     assert 'python-version: "3.15"' in test_job
     assert "atlas" in test_job
+    assert "- name: Fuzz" not in test_job  # atheris has no cp315 wheel: the fuzz step runs on 3.14
+    assert "atheris==3.1.0; python_version" in (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     for leg, version in (("test-py313", "3.13"), ("test-py314", "3.14")):
         body = ci.split(nl + "  " + leg + ":" + nl, 1)[1].split(nl + "  test-py3", 1)[0]
         assert f'python-version: "{version}"' in body

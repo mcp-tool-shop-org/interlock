@@ -409,7 +409,7 @@ dev = [
     { name = "tokenizers" },
 ]
 fuzz = [
-    { name = "atheris" },
+    { name = "atheris", marker = "python_full_version < '3.15'" },
 ]
 
 [package.metadata]
@@ -434,7 +434,7 @@ dev = [
     { name = "ruff", specifier = "==0.17.0" },
     { name = "tokenizers", specifier = "==0.22.2" },
 ]
-fuzz = [{ name = "atheris", specifier = "==3.1.0" }]
+fuzz = [{ name = "atheris", marker = "python_full_version < '3.15'", specifier = "==3.1.0" }]
 
 [[package]]
 name = "mdurl"

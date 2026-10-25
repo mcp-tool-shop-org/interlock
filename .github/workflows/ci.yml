@@ -72,12 +72,6 @@ jobs:
       - name: Test
         run: uv run pytest --cov-report=xml
 
-      - name: Fuzz receipt and spec parsers
-        timeout-minutes: 10
-        run: |
-          uv sync --group fuzz
-          uv run --group fuzz python tests/fuzz_receipts.py -max_total_time=30
-
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
@@ -105,8 +99,8 @@ jobs:
         run: uv run interlock check
 
   # Python 3.13. A job of its own so the required status check "test" keeps its name (it runs on 3.15).
-  # Lint, tests with the coverage floor, and the wheel install run here; the audit, fuzz, Atlas check
-  # and Codecov upload run once, on the 3.15 job above.
+  # Lint, tests with the coverage floor, and the wheel install run here; the audit, Atlas check and
+  # Codecov upload run once, on the 3.15 job above, and the fuzz step runs on the 3.14 job.
   test-py313:
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -140,8 +134,8 @@ jobs:
           "$RUNNER_TEMP/wheel-venv/bin/python" -I -c "from interlock.harness.linux_cuda import load_throughput_inputs_fixture as f; f()"
 
   # Python 3.14. A job of its own so the required status check "test" keeps its name (it runs on 3.15).
-  # Lint, tests with the coverage floor, and the wheel install run here; the audit, fuzz, Atlas check
-  # and Codecov upload run once, on the 3.15 job above.
+  # Lint, tests with the coverage floor, the fuzz step (atheris has no cp315 wheel yet) and the wheel
+  # install run here; the audit, Atlas check and Codecov upload run once, on the 3.15 job above.
   test-py314:
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -163,6 +157,12 @@ jobs:
 
       - name: Test
         run: uv run pytest
+
+      - name: Fuzz (atheris has no cp315 wheel yet) receipt and spec parsers
+        timeout-minutes: 10
+        run: |
+          uv sync --group fuzz
+          uv run --group fuzz python tests/fuzz_receipts.py -max_total_time=30
 
       - name: Wheel install loads the C2 specs and inputs
         run: |

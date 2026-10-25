@@ -57,7 +57,7 @@ dev = [
 # Atheris publishes manylinux wheels only. It stays out of default-groups so
 # `uv sync` never tries to install it.
 fuzz = [
-    "atheris==3.1.0",
+    "atheris==3.1.0; python_version < \"3.15\"",
 ]
 
 [build-system]
