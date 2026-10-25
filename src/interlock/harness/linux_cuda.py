@@ -30,6 +30,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from interlock import __version__
 from interlock.devices import COLAB_CARDS, RemoteDeviceIdentity
 from interlock.families import stamp_family
 from interlock.receipt import validate_row
@@ -1815,10 +1816,16 @@ _CANONICAL_CARD_VRAM_MIB: dict[str, int] = {
 }
 
 
+def c2_sources_user_agent() -> str:
+    """The User-Agent the live registry and Hugging Face reads send. It follows the package version."""
+
+    return f"interlock-c2-sources/{__version__}"
+
+
 def _default_live_fetch(url: str) -> tuple[int, bytes]:
     if not url.startswith("https://"):
         raise LinuxCudaError(f"verify_c2_sources_live only permits https:// URLs, got {url!r}")
-    headers = {"User-Agent": "interlock-c2-sources/0.3.0"}
+    headers = {"User-Agent": c2_sources_user_agent()}
     if "registry.ollama.ai" in url and "/manifests/" in url:
         headers["Accept"] = "application/vnd.docker.distribution.manifest.v2+json"
     req = urllib.request.Request(url, headers=headers)  # noqa: S310
