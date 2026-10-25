@@ -18,7 +18,7 @@
 
 # interlock: local AI device router
 
-> **Prototype, 0.3.x: a research instrument.** The CLI, the receipt format and the experiment specs can change without notice between 0.x releases. interlock is advisory only: it suggests a model, engine and device, and it never serves traffic. Every local number in it was measured on one rig (Intel Core Ultra 9 285K with its NPU and iGPU, plus an RTX 5090), and remote `colab:<card>` rows live in their own separate evidence pool with full card identity (`provider`, `card`, `vram_mib`, `driver_version`, `cuda_version`, `pool`). Treat its routes as measured evidence for that specific hardware pool, not a general benchmark.
+> **Version 1.0.0: a research instrument.** From 1.0, versions follow semantic versioning: a change that breaks the CLI, the receipt format or the experiment spec format comes with a new major version. interlock is advisory only: it suggests a model, engine and device, and it never serves traffic. Every local number in it was measured on one rig (Intel Core Ultra 9 285K with its NPU and iGPU, plus an RTX 5090), and remote `colab:<card>` rows live in their own separate evidence pool with full card identity (`provider`, `card`, `vram_mib`, `driver_version`, `cuda_version`, `pool`). Treat its routes as measured evidence for that specific hardware pool, not a general benchmark.
 
 Railway interlocking stops a train being routed into a conflicting path. This tool does that for devices: it sends each job to a model, an engine and a device.
 
@@ -33,7 +33,7 @@ uv sync
 uv run interlock --help
 ```
 
-From PyPI, from v0.1.0:
+From PyPI:
 
 ```
 pip install mcptoolshop-interlock
@@ -43,15 +43,28 @@ pip install mcptoolshop-interlock
 uv tool install mcptoolshop-interlock
 ```
 
-The distribution name is `mcptoolshop-interlock`. The import and the command are `interlock`. Python 3.12 only (`requires-python` is `>=3.12,<3.13`). CI runs the tests on Ubuntu. A live measurement run is written for the Windows rig this table was measured on.
+The distribution name is `mcptoolshop-interlock`. The import and the command are `interlock`. Python 3.12 only (`requires-python` is `>=3.12,<3.13`). CI runs the tests on Ubuntu. A live measurement run on the rig is written for the Windows rig this table was measured on. The Linux CUDA path (new in 1.0.0) runs on a remote Colab VM.
 
 What this program is allowed to touch is in the [threat model](#threat-model).
 
 The receipt schema, the routing table, and the harness came first. `interlock route` reads that table. It does not spend device time.
 
+## What's new in 1.0.0
+
+1.0.0 follows 0.2.0. There was no separate 0.3.0 release; its changes ship in 1.0.0.
+
+- **Remote Colab cards as devices.** `colab:A100-40`, `colab:A100-80`, `colab:L4`, `colab:T4` and `colab:G4` rows carry the card's identity (`provider`, `card`, `vram_mib`, driver and CUDA versions, and a zone `pool`) and sit in their own pool, apart from the rig's rows. See [Devices](#devices).
+- **A Linux CUDA measuring path** for those cards (`interlock run` with a `platform: linux-cuda` spec), with three pre-registered specs: `experiments/c2-fill-card/`, `experiments/c2-generate/` and `experiments/c2-throughput/`. Failed shapes (`oom`, `load_refused`, `timeout`, `ctx_exceeded`) are kept as capability rows.
+- **Every C2 model names a checked source:** an Ollama tag with its registry manifest digest, or a GGUF file with its Hugging Face repo, commit and sha256. Gemma 4 31B uses the Ollama library's Q4_K_M, Q8_0 and BF16 builds; it has no published Q6_K build, so that cell is pre-registered as `load_refused`. `interlock c2-sources <spec>` prints each entry's source and pull command, and `--verify-live` checks every source, digest and quant label against `registry.ollama.ai` and `huggingface.co`.
+- **Throughput inputs are exact token lengths.** Each throughput model gets fixed 128-token and 510-token inputs built with its own tokenizer at a pinned revision (510 leaves room for the special tokens inside a 512-token limit), committed in `experiments/c2-throughput/inputs.json`. Rerank and NLI are out of scope on C2: stock Ollama serves neither, so those cells are pre-registered as `load_refused` with that reason.
+- **Opt-in remote routing.** `interlock route` ignores remote rows unless the request passes `--allow-remote` or `--device colab:<card>`. A remote winner is marked `remote: true` with its `remote_device`. See [Route](#route).
+- **Importing a remote window:** `interlock import --remote-window <path>` keeps every repeat slot, and `interlock table --device colab:<card>` (or `colab:*`) lists remote rows.
+
+The table holds no remote rows yet: no remote window has been imported. See [CHANGELOG.md](CHANGELOG.md) for the full list.
+
 ## What the table says today
 
-The routing table holds 509 rows from committed receipts. A few of the answers it already gives:
+The routing table holds 509 rows from committed receipts, all measured on the rig. A few of the answers it already gives:
 
 - **A small model runs well on the Intel side.** Phi-3.5-mini decodes at about 20–22 tokens/s on the CPU and the iGPU, and about 15 tokens/s on the NPU, at a 1024-token prompt with thinking off. That leaves the 5090 free for bigger work.
 - **An 8B model doesn't belong on the Intel side.** At the same 1024-token prompt with thinking off, Qwen3-8B decodes at about 10–12 tokens/s on the CPU, iGPU and NPU. On the 5090 it decodes at about 208 tokens/s with thinking off and 211 with it on. Ask for 15 tokens/s with the 5090 busy, and the router refuses and names the experiment behind the gap: `interlock route --task generate --model qwen3-8b --min-tok-s 15 --busy 5090`.
@@ -110,7 +123,7 @@ With no `--run-id`, E4b uses `e4b-block` or `e4b-pilot`, then `<base>-2`, `<base
 
 ## Threat model
 
-interlock touches local devices and local HTTP, and the network only to download a model that an experiment spec already named, from that model's publisher.
+interlock touches local devices and local HTTP, and the network only to download a model that an experiment spec already named, from that model's publisher, or to check C2 sources when asked.
 
 - Receipts and the routing table are local files.
 - Ollama calls, when a run is actually started, go to `127.0.0.1:11434` (the 5090) or `127.0.0.1:11490` (CPU). Cloud model tags are refused.
@@ -119,11 +132,14 @@ interlock touches local devices and local HTTP, and the network only to download
 - The 5090 path checks that the VRAM watchdog heartbeat is at most 60 seconds old and that no model is loaded. The heartbeat file is not opened. Only its modified time is read.
 - Nothing here listens on a port.
 - interlock does not send telemetry.
+- The Linux CUDA path (`platform: linux-cuda`, for remote `colab:<card>` windows) runs on the remote VM, not on the rig. It starts its own Ollama on a dedicated loopback port (`127.0.0.1:11441` by default), refuses the shared ports `11434` and `11490`, and refuses any Ollama URL that isn't loopback: the host must be `127.0.0.1:<port>`, `[::1]:<port>`, or `localhost:<port>` when `localhost` resolves only to loopback, with the port in ASCII digits from 1 to 65535. It reads the card through NVML or `nvidia-smi`. It does not download models, and it does not touch Windows counters.
+- `interlock c2-sources --verify-live` is the one command that reaches the internet for C2. It sends read-only HTTPS requests to `registry.ollama.ai` (manifests and config blobs) and `huggingface.co` (file trees and `tokenizer.json`), and nothing else. It downloads no model weights and sends no credentials. Without `--verify-live`, `c2-sources` reads only local files.
+- A remote window's results reach the table only as a receipt file that `interlock import --remote-window` reads. interlock does not connect to Colab. A field named for an account (`account`, `user`, `owner`, their `_id` forms, `ggufRepo`, `gguf_repo` or `gguf_source`) must hold `sha256:<64-hex>`. Remote rows also refuse a tagged account token, such as `account:<id>` or `user=<id>`, in any string value or key, and `remote_device` refuses account ids, emails, paths and repo handles in its own fields. Ordinary words such as "user-facing" pass in a value or a key.
 - interlock does not rent a GPU, set a spending cap, or open offrig's database. A remote price enters only as a dated snapshot file.
 
 ## Layout
 
-`devices` is the allow-list. `guards` is the grant, the session, the heartbeat and the empty card. `receipt` is the schema and `interlock check`. `importers` rebuilds `table/routing.jsonl` from pinned receipts. `interlock table` prints that table, filtered by task or device. `table/gaps.md` is the experiment backlog. The harness runs a committed spec. `interlock route` reads that table and does not touch a device.
+`devices` is the allow-list. `guards` is the grant, the session, the heartbeat and the empty card. `receipt` is the schema and `interlock check`. `importers` rebuilds `table/routing.jsonl` from pinned receipts, and `importers/remote.py` reads a remote window's receipt. `interlock table` prints that table, filtered by task or device. `table/gaps.md` is the experiment backlog. The harness runs a committed spec; `harness/linux_cuda.py` is the Linux CUDA path for remote cards. `interlock route` reads that table and does not touch a device.
 
 The build brief and the four feedback notes it names are snapshotted in `docs/handoff/`. The copy in the studio memory store stays authoritative.
 
@@ -151,6 +167,8 @@ Every experiment is pre-registered: its spec under `experiments/<id>/spec.yaml` 
 interlock run experiments/e4/spec.yaml --dry-run
 interlock run experiments/e4/spec.yaml --grant "<grant text>" --npu-session "<session>"
 ```
+
+A `platform: linux-cuda` spec (the C2 specs under `experiments/c2-*/`) runs on a remote Colab VM inside a booked window, against its own Ollama on a dedicated loopback port.
 
 `--dry-run` prints the plan and the guards a real run would need, and starts nothing. A real run needs the flags its devices call for: `--grant` for the 5090, `--npu-session` for the NPU or iGPU, and `--cpu-window` for a CPU-heavy leg. It writes one receipt under `receipts/`. `interlock import` (with optional `--remote-window <path>` for remote Colab window JSON receipts) then rebuilds `table/` from the committed receipts, and `interlock check` validates them.
 

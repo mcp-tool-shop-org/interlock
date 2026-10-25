@@ -7,7 +7,7 @@ sidebar:
 
 Python 3.12 only: `requires-python` is `>=3.12,<3.13`.
 
-From PyPI, from v0.1.0:
+From PyPI:
 
 ```bash
 pip install mcptoolshop-interlock
@@ -28,7 +28,7 @@ uv sync
 uv run interlock --help
 ```
 
-The distribution name is `mcptoolshop-interlock`. The import and the command are `interlock`. CI runs the tests on Ubuntu. A live measurement run is written for the Windows rig this table was measured on.
+The distribution name is `mcptoolshop-interlock`. The import and the command are `interlock`. CI runs the tests on Ubuntu. A live measurement run is written for the Windows rig this table was measured on. Since 1.0.0, a `platform: linux-cuda` spec runs on a remote Colab VM instead.
 
 `uv sync` does not install the `intel` extra. Tests do not need OpenVINO. A live NPU or iGPU run does, and that extra is pinned in `pyproject.toml`.
 

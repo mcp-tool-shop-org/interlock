@@ -89,3 +89,17 @@ rnd drew the charts from these receipts. They are up:
 - [Triplet effects](https://mcp-tool-shop-org.github.io/rnd/charts/e4b-triplet-effects.svg)
 - [Pilot clock](https://mcp-tool-shop-org.github.io/rnd/charts/e4b-pilot-clock.svg)
 - [iGPU latency](https://mcp-tool-shop-org.github.io/rnd/charts/e4b-igpu-latency.svg)
+
+## C2: remote Colab cards
+
+C2 measures the same questions on rented Colab cards (`colab:A100-40`, `colab:A100-80`, `colab:L4`, `colab:T4`, `colab:G4`) through the Linux CUDA path, `platform: linux-cuda`. The specs are pre-registered like the rig's:
+
+- `experiments/c2-fill-card/`: the largest resident context per model, with 2048-token grid bisection.
+- `experiments/c2-generate/`: time to first token and decode rate at prompt lengths 512 to 32768 and concurrencies 1, 4 and 8.
+- `experiments/c2-throughput/`: `embed` at batches 1, 8 and 32, with fixed 128-token and 510-token inputs built per model with its own tokenizer at a pinned revision (`experiments/c2-throughput/inputs.json`). `rerank` and `nli` are out of scope: stock Ollama serves neither, so those cells are pre-registered as `load_refused` with that reason.
+
+Every entry names a checked source: an Ollama tag with its registry manifest digest, or a GGUF file with its Hugging Face repo, 40-hex commit and sha256. A cell with no published build, such as Gemma 4 31B at Q6_K, is pre-registered as `load_refused` with the reason `no published Q6_K build`. `interlock c2-sources <spec>` prints each entry's source, pull command and expected digest. `--verify-live` checks them against `registry.ollama.ai` and `huggingface.co`, including each quant label and each throughput tokenizer's digest.
+
+A shape that runs out of memory, is refused at load, times out or exceeds the context is kept as a capability row with its measured reason (`oom`, `load_refused`, `timeout`, `ctx_exceeded`). The harness reads residency from `/api/ps`, the card from NVML or `nvidia-smi`, and the engine version from `/api/version` (or records `unrecorded` when the server failed before answering).
+
+A window's receipt reaches the table through `interlock import --remote-window`. Remote rows stay in their own pool and are routed only on request. No remote window has been imported yet.

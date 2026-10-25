@@ -1,11 +1,18 @@
 [project]
 name = "mcptoolshop-interlock"
-version = "0.3.0"
-description = "Local AI device router: a prototype that sends each job to a model, an engine and a device named by a measured receipt."
+version = "1.0.0"
+description = "Local AI device router: it sends each job to a model, an engine and a device named by a measured receipt."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 license = "MIT"
 authors = [{name = "mcp-tool-shop"}]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: POSIX :: Linux",
+]
 keywords = [
     "local-ai",
     "gpu",
