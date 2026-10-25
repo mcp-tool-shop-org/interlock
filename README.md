@@ -18,7 +18,7 @@
 
 # interlock: local AI device router
 
-> **Version 1.0.1: a research instrument.** From 1.0, versions follow semantic versioning: a change that breaks the CLI, the receipt format or the experiment spec format comes with a new major version. interlock is advisory only: it suggests a model, engine and device, and it never serves traffic. Every local number in it was measured on one rig (Intel Core Ultra 9 285K with its NPU and iGPU, plus an RTX 5090), and remote `colab:<card>` rows live in their own separate evidence pool with full card identity (`provider`, `card`, `vram_mib`, `driver_version`, `cuda_version`, `pool`). Treat its routes as measured evidence for that specific hardware pool, not a general benchmark.
+> **Version 1.0.2: a research instrument.** From 1.0, versions follow semantic versioning: a change that breaks the CLI, the receipt format or the experiment spec format comes with a new major version. interlock is advisory only: it suggests a model, engine and device, and it never serves traffic. Every local number in it was measured on one rig (Intel Core Ultra 9 285K with its NPU and iGPU, plus an RTX 5090), and remote `colab:<card>` rows live in their own separate evidence pool with full card identity (`provider`, `card`, `vram_mib`, `driver_version`, `cuda_version`, `pool`). Treat its routes as measured evidence for that specific hardware pool, not a general benchmark.
 
 Railway interlocking stops a train being routed into a conflicting path. This tool does that for devices: it sends each job to a model, an engine and a device.
 
@@ -177,8 +177,8 @@ A `platform: linux-cuda` spec (the C2 specs under `experiments/c2-*/`) runs on a
 No path of anyone's rig is written in the code. Each location below is an environment variable first, then `[paths]` in `interlock.toml` in the working directory, and a value is used as you gave it:
 
 - `INTERLOCK_SCRATCH_ROOT` / `scratch_root`: the scratch directory offrig opens as its project for `offrig verify calibrate`. Default: `interlock-scratch` under the system temp directory.
-- `INTERLOCK_WEIGHTS_HOT` / `weights_hot`: the hot weights cache an arm with `hf_cache: hot` reads; a missing copy is a refusal. Default: `hot/` under `HF_HOME`, or under the user's Hugging Face cache.
-- `WATCHDOG_HEARTBEAT` / `heartbeat`: the heartbeat file of the VRAM watchdog, which the heartbeat guard reads before a 5090 step. There is no default: unset, the run refuses and names `WATCHDOG_HEARTBEAT`. If you run no watchdog, pass `--no-watchdog`; the receipt's `notes` records that.
+- `INTERLOCK_WEIGHTS_HOT` / `weights_hot`: the hot weights cache that a spec arm with `hf_cache: hot` reads its weights from; a missing copy is a refusal. Default: `hot/` under `HF_HOME`, or under the user's Hugging Face cache.
+- `WATCHDOG_HEARTBEAT` / `heartbeat`: the heartbeat file of the VRAM watchdog, which the heartbeat guard reads before each step on the 5090. There is no default: unset, the run refuses and names `WATCHDOG_HEARTBEAT`. If you run no watchdog, pass `--no-watchdog`; the receipt's `notes` records that.
 
 ```toml
 [paths]
@@ -200,7 +200,7 @@ npu = "../rnd"
 aspire = "../aspire-si"
 ```
 
-The flag beats the file, and there is no default path. The commit is not configurable: a clone that does not hold it is refused. The import writes each source's name, pin and path (as you gave it) at the end of `table/gaps.md`, never into a row. A rebuild replaces only the rows it produces; every other row in the table stays, and a rebuild that would drop a row it owns is refused unless you pass `--allow-shrink`.
+The flag takes precedence over the file, and there is no default path. The commit is not configurable: a clone that does not hold it is refused. The import writes each source's name, pin and path (as you gave it) at the end of `table/gaps.md`, never into a row. A rebuild replaces only the rows it produces; all the other rows in the table stay, and a rebuild that would drop a row it owns is refused unless you pass `--allow-shrink`.
 
 ## When Ollama hangs
 
