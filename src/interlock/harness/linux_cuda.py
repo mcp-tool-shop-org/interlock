@@ -27,6 +27,8 @@ import urllib.request
 from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from importlib import resources
+from importlib.resources.abc import Traversable
 from pathlib import Path
 from typing import Any
 
@@ -45,7 +47,18 @@ THROUGHPUT_TOKEN_LENGTHS = (128, 510)
 THROUGHPUT_SEED = "The switchyard parity check measures every batch on the same text. "
 THROUGHPUT_INPUTS_REL = "experiments/c2-throughput/inputs.json"
 THROUGHPUT_INPUTS_SHA256 = "48f5905ddcb24f66d9a6cd59ff2376e8766db3f8ebd4aa1e141f2fb290332966"
-THROUGHPUT_INPUTS_PATH = Path(__file__).resolve().parents[3] / "experiments" / "c2-throughput" / "inputs.json"
+# The wheel carries the file as package data (pyproject force-include); a source checkout or an
+# editable install has only the committed copy under experiments/.
+THROUGHPUT_INPUTS_RESOURCE = "data/c2-throughput-inputs.json"
+THROUGHPUT_INPUTS_SOURCE_PATH = Path(__file__).resolve().parents[3] / "experiments" / "c2-throughput" / "inputs.json"
+
+
+def _throughput_inputs_path() -> Path | Traversable:
+    packaged = resources.files("interlock.harness").joinpath(THROUGHPUT_INPUTS_RESOURCE)
+    return packaged if packaged.is_file() else THROUGHPUT_INPUTS_SOURCE_PATH
+
+
+THROUGHPUT_INPUTS_PATH = _throughput_inputs_path()
 _THROUGHPUT_MODEL_ALIASES: dict[str, str] = {
     "nomic-ai/nomic-embed-text-v1.5": "nomic-ai/nomic-embed-text-v1.5",
     "nomic-embed-text:137m-v1.5-fp16": "nomic-ai/nomic-embed-text-v1.5",

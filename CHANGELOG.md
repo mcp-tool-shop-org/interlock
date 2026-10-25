@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Fixed
+
+- The C2 throughput inputs now ship inside the wheel as package data and load through `importlib.resources`. In 1.0.0 a wheel install looked for `experiments/` next to site-packages, so `interlock run` and `c2-sources --verify-live` on `experiments/c2-throughput/spec.yaml` failed with a missing `inputs.json`. A source checkout or editable install falls back to the committed copy.
+- CI builds the wheel, installs it in a clean virtual environment, runs `c2-sources` on all three C2 specs and loads the throughput inputs from the installed wheel, so a packaging gap like this fails the pull request.
+
 ## [1.0.0] - 2026-10-25
 
 The first release since 0.2.0. There was no separate 0.3.0 release; its changes ship in 1.0.0. From 1.0, versions follow semantic versioning.
