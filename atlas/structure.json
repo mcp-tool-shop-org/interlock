@@ -13,7 +13,7 @@
           "path": ".github/dependabot.yml"
         },
         {
-          "hash": "d149c4769d26f20e7c3970f00147c7ecab7732a40b91691ef4537e6eaf19f17b",
+          "hash": "86c9dd0c6070086e930eafd7faecdf7870a5983d9eb4cf70b6797264f290588f",
           "path": ".github/workflows/ci.yml"
         },
         {
@@ -21,7 +21,7 @@
           "path": ".github/workflows/pages.yml"
         },
         {
-          "hash": "f217b4beb61429b621ed0acd7b84c54febb24fea00ad40cb0c4118c9c0b9e19e",
+          "hash": "9dd1c8925383399566965affb1183e002f611f8a2b7f7b87f3fe684bbb3b44dd",
           "path": ".github/workflows/release.yml"
         },
         {
@@ -580,11 +580,11 @@
           "path": ".gitignore"
         },
         {
-          "hash": "7b55f8e67b5623c4bef3fa691288da9437d79d3aba156de48d481db32ac7d16d",
+          "hash": "1253c91eccb2aac1c6ff2ac03fd69c1aaa0b221abd3d1bf5b563c12602452b4e",
           "path": ".python-version"
         },
         {
-          "hash": "2c55c6cc310a83afc68ca9befb66e50b0688affdc9c594455d1c84e94dbeb08f",
+          "hash": "37136f236e36296b126ea993d9f4068a2e7a9f36dbb9901a16b42886368d56bb",
           "path": "CHANGELOG.md"
         },
         {
@@ -600,35 +600,35 @@
           "path": "LICENSE"
         },
         {
-          "hash": "bed0022815fbac8947c0ffd367c51f6811da6b301f21a1f9d1c41cc914693f8c",
+          "hash": "c4b71084a4681dc43b599047df3918d9820536f35d4b136e0c0ff7480f760b17",
           "path": "README.es.md"
         },
         {
-          "hash": "2099fc31149df079b0865439472254357d91cb1383bc0a730aefe221a531937f",
+          "hash": "d6ec57c00c568243595f8071809592695540d52e613565f126ad08a6a52c3d18",
           "path": "README.fr.md"
         },
         {
-          "hash": "b67fe1ac71b18005c1b9812a1e02102fa27eee0fa9e94fce07debfb31290e902",
+          "hash": "6cd08e02809e8ea2f4fcaf9d3ca1980421c0fa32d7f33cace41e0bc29ce9bd71",
           "path": "README.hi.md"
         },
         {
-          "hash": "2cb4eac27d35ea7a1dfdd609934517a9b5d616d796f43420d60be8aee7fef1d8",
+          "hash": "f6edc9e49ea8cc9844b08675e36e393d2dafea8aa595552c20732263a05bc3a0",
           "path": "README.it.md"
         },
         {
-          "hash": "62949117f83bec708f0e1b70d9b75239aaa3ab3d7ce5901f7f5ebc15694495f1",
+          "hash": "f4feab264dd6f0f5176b0e48513952a968609a34c4e5da841f27316548f8f551",
           "path": "README.ja.md"
         },
         {
-          "hash": "62a3de95706dbd8f45790dcf87ba2ac53f14dc8efe504807e879a6232d191432",
+          "hash": "3cedc92d91b55c224127351e85a378b4869d28456833e7fe375b503d2768980b",
           "path": "README.md"
         },
         {
-          "hash": "8635a803736b2dbb043795827b9ce16a3b3e28115ebf1951d227b9058a1ea8ca",
+          "hash": "47e869ef511013bfe2351b3dd55f80cb40800f5847f0c3fbb64ac9daef9543fd",
           "path": "README.pt-BR.md"
         },
         {
-          "hash": "9bd2b6e10a29855a899e28f85fb0db63175c7c01250ae7da06d994a6b768bdde",
+          "hash": "1772dd749c0583305339fc2b2935f5eddfae9e0c700bfec9829d83925ba9726b",
           "path": "README.zh.md"
         },
         {
@@ -640,7 +640,7 @@
           "path": "SECURITY.md"
         },
         {
-          "hash": "6748bf1f29f234d75ee6104d1bd8d7507cbffac754b875dee410a742c3fd80b1",
+          "hash": "0825f564af6b5013736eb55e321f2419413e42772c5a8ce1bf693c0299de3cb2",
           "path": "SHIP_GATE.md"
         },
         {
@@ -648,11 +648,11 @@
           "path": "codecov.yml"
         },
         {
-          "hash": "b4bd452074a4dfe4d3cc778f783a5600ea410edb0927bb46ac0be5b89476f7eb",
+          "hash": "a4254927d3e3f813283a5ee65f373530ec831d930523da1af76133a6cc43ad41",
           "path": "pyproject.toml"
         },
         {
-          "hash": "b276fd2668848fe12ec777df426c72f1428d63b2b64c885e72783d8589cf9d38",
+          "hash": "07cf454c641345e5dcb6609136844f852ba6b4f247f052090929869fd4a2f878",
           "path": "uv.lock"
         },
         {
@@ -882,7 +882,7 @@
       "files": [
         {
           "constantOnly": true,
-          "hash": "f19aa2da32dc9ca5b530f046f9e724a046e0df5382380b435169ed12e375311b",
+          "hash": "9329ac74c013e7b6f2256fe3afe5a7439c169b57d3703e35a77d122437895849",
           "path": "src/interlock/__init__.py"
         },
         {
@@ -1243,52 +1243,42 @@
           "failurePaths": [
             {
               "kind": "except",
-              "line": 101
+              "line": 102
             },
             {
               "in": "_need_openvino",
               "kind": "raise",
-              "line": 140
+              "line": 153
             },
             {
               "in": "parse_static_shape",
               "kind": "raise",
-              "line": 161
+              "line": 172
             },
             {
               "in": "parse_static_shape",
               "kind": "except",
-              "line": 164
+              "line": 175
             },
             {
               "in": "parse_static_shape",
               "kind": "raise",
-              "line": 165
+              "line": 176
             },
             {
               "in": "parse_static_shape",
               "kind": "raise",
-              "line": 167
+              "line": 178
             },
             {
               "in": "pad_truncate",
               "kind": "raise",
-              "line": 185
+              "line": 196
             },
             {
               "in": "pool",
               "kind": "raise",
-              "line": 219
-            },
-            {
-              "in": "pool",
-              "kind": "raise",
-              "line": 222
-            },
-            {
-              "in": "pool",
-              "kind": "raise",
-              "line": 229
+              "line": 230
             },
             {
               "in": "pool",
@@ -1296,372 +1286,382 @@
               "line": 233
             },
             {
+              "in": "pool",
+              "kind": "raise",
+              "line": 240
+            },
+            {
+              "in": "pool",
+              "kind": "raise",
+              "line": 244
+            },
+            {
               "in": "first_batch",
               "kind": "raise",
-              "line": 255
+              "line": 266
             },
             {
               "in": "enumerate_devices",
               "kind": "except",
-              "line": 349
+              "line": 360
             },
             {
               "in": "_resolve_ov_id",
               "kind": "except",
-              "line": 365
+              "line": 376
             },
             {
               "in": "_resolve_ov_id",
               "kind": "raise",
-              "line": 366
+              "line": 377
             },
             {
               "in": "_model_path",
               "kind": "raise",
-              "line": 395
+              "line": 406
             },
             {
               "in": "_model_path",
               "kind": "except",
-              "line": 398
+              "line": 409
             },
             {
               "in": "_model_path",
               "kind": "raise",
-              "line": 399
+              "line": 410
             },
             {
               "in": "_model_path",
               "kind": "except",
-              "line": 404
-            },
-            {
-              "in": "_model_path",
-              "kind": "except",
-              "line": 412
-            },
-            {
-              "in": "_model_path",
-              "kind": "raise",
-              "line": 413
-            },
-            {
-              "in": "_model_path",
-              "kind": "raise",
               "line": 415
             },
             {
+              "in": "_model_path",
+              "kind": "except",
+              "line": 423
+            },
+            {
+              "in": "_model_path",
+              "kind": "raise",
+              "line": 424
+            },
+            {
+              "in": "_model_path",
+              "kind": "raise",
+              "line": 426
+            },
+            {
               "in": "_load_compiled",
               "kind": "except",
-              "line": 427
+              "line": 438
             },
             {
               "in": "_load_compiled",
               "kind": "raise",
-              "line": 428
+              "line": 439
             },
             {
               "in": "_default_tokenizer_loader",
-              "kind": "except",
-              "line": 509
-            },
-            {
-              "in": "_default_tokenizer_loader",
-              "kind": "raise",
-              "line": 510
-            },
-            {
-              "in": "_directory_tokenizer_loader",
               "kind": "except",
               "line": 520
             },
             {
-              "in": "_directory_tokenizer_loader",
+              "in": "_default_tokenizer_loader",
               "kind": "raise",
               "line": 521
             },
             {
               "in": "_directory_tokenizer_loader",
               "kind": "except",
-              "line": 524
+              "line": 531
             },
             {
               "in": "_directory_tokenizer_loader",
               "kind": "raise",
-              "line": 525
+              "line": 532
+            },
+            {
+              "in": "_directory_tokenizer_loader",
+              "kind": "except",
+              "line": 535
+            },
+            {
+              "in": "_directory_tokenizer_loader",
+              "kind": "raise",
+              "line": 536
             },
             {
               "in": "work",
               "kind": "except",
-              "line": 629
+              "line": 640
             },
             {
               "in": "_bounded_call",
               "kind": "raise",
-              "line": 638
+              "line": 649
             },
             {
               "in": "_pooling_for",
               "kind": "raise",
-              "line": 682
+              "line": 693
             },
             {
               "in": "_require_static_shape",
               "kind": "raise",
-              "line": 703
+              "line": 714
             },
             {
               "in": "_require_static_shape",
               "kind": "raise",
-              "line": 707
+              "line": 718
             },
             {
               "in": "_run_embed",
               "kind": "raise",
-              "line": 716
-            },
-            {
-              "in": "_run_embed",
-              "kind": "except",
-              "line": 741
-            },
-            {
-              "in": "_run_embed",
-              "kind": "raise",
-              "line": 742
+              "line": 727
             },
             {
               "in": "_run_embed",
               "kind": "except",
-              "line": 743
+              "line": 752
             },
             {
               "in": "_run_embed",
               "kind": "raise",
-              "line": 749
-            },
-            {
-              "in": "_run_embed",
-              "kind": "raise",
-              "line": 750
+              "line": 753
             },
             {
               "in": "_run_embed",
               "kind": "except",
-              "line": 764
+              "line": 754
             },
             {
               "in": "_run_embed",
               "kind": "raise",
-              "line": 771
+              "line": 760
             },
             {
               "in": "_run_embed",
               "kind": "raise",
-              "line": 774
+              "line": 761
+            },
+            {
+              "in": "_run_embed",
+              "kind": "except",
+              "line": 775
+            },
+            {
+              "in": "_run_embed",
+              "kind": "raise",
+              "line": 782
+            },
+            {
+              "in": "_run_embed",
+              "kind": "raise",
+              "line": 785
             },
             {
               "in": "_run_generate",
               "kind": "raise",
-              "line": 833
+              "line": 844
             },
             {
               "in": "_run_generate",
               "kind": "except",
-              "line": 860
+              "line": 871
             },
             {
               "in": "_run_generate",
               "kind": "raise",
-              "line": 861
+              "line": 872
             },
             {
               "in": "_run_generate",
               "kind": "except",
-              "line": 862
+              "line": 873
             },
             {
               "in": "_run_generate",
               "kind": "raise",
-              "line": 868
+              "line": 879
             },
             {
               "in": "_run_generate",
               "kind": "raise",
-              "line": 874
+              "line": 885
             },
             {
               "in": "_run_generate",
               "kind": "except",
-              "line": 889
+              "line": 900
             },
             {
               "in": "_run_generate",
               "kind": "raise",
-              "line": 896
+              "line": 907
             },
             {
               "in": "_run_generate",
               "kind": "raise",
-              "line": 897
+              "line": 908
             },
             {
               "in": "_run_generate",
               "kind": "except",
-              "line": 920
+              "line": 931
             },
             {
               "in": "_run_generate",
               "kind": "except",
-              "line": 929
+              "line": 940
             },
             {
               "in": "_real_genai_module",
               "kind": "except",
-              "line": 954
+              "line": 965
             },
             {
               "in": "_real_genai_module",
               "kind": "raise",
-              "line": 955
+              "line": 966
             },
             {
               "in": "_prepare_dir",
               "kind": "raise",
-              "line": 990
+              "line": 999
             },
             {
               "in": "_prepare_dir",
               "kind": "except",
-              "line": 994
+              "line": 1003
             },
             {
               "in": "_prepare_dir",
               "kind": "raise",
-              "line": 995
-            },
-            {
-              "in": "_prepare_dir",
-              "kind": "except",
               "line": 1004
             },
             {
               "in": "_prepare_dir",
-              "kind": "raise",
-              "line": 1005
-            },
-            {
-              "in": "_prepare_dir",
               "kind": "except",
-              "line": 1006
+              "line": 1013
             },
             {
               "in": "_prepare_dir",
               "kind": "raise",
-              "line": 1007
+              "line": 1014
+            },
+            {
+              "in": "_prepare_dir",
+              "kind": "except",
+              "line": 1015
+            },
+            {
+              "in": "_prepare_dir",
+              "kind": "raise",
+              "line": 1016
             },
             {
               "in": "_cold_copy",
               "kind": "except",
-              "line": 1023
+              "line": 1032
             },
             {
               "in": "_cold_copy",
               "kind": "raise",
-              "line": 1025
+              "line": 1034
             },
             {
               "in": "_model_dir",
               "kind": "except",
-              "line": 1055
+              "line": 1064
             },
             {
               "in": "_model_dir",
               "kind": "raise",
-              "line": 1056
+              "line": 1065
             },
             {
               "in": "_model_dir",
               "kind": "except",
-              "line": 1059
+              "line": 1068
             },
             {
               "in": "_model_dir",
               "kind": "raise",
-              "line": 1060
+              "line": 1069
             },
             {
               "in": "_pipeline",
               "kind": "raise",
-              "line": 1138
+              "line": 1147
             },
             {
               "in": "_run",
               "kind": "raise",
-              "line": 1165
+              "line": 1174
             },
             {
               "in": "_run",
               "kind": "raise",
-              "line": 1173
+              "line": 1182
             },
             {
               "in": "_run",
               "kind": "except",
-              "line": 1176
+              "line": 1185
             },
             {
               "in": "_run",
               "kind": "raise",
-              "line": 1177
+              "line": 1186
             },
             {
               "in": "_run",
               "kind": "except",
-              "line": 1178
+              "line": 1187
             },
             {
               "in": "_start_session",
               "kind": "raise",
-              "line": 1214
+              "line": 1223
             },
             {
               "in": "loop",
               "kind": "except",
-              "line": 1281
+              "line": 1290
             },
             {
               "in": "_start_session",
               "kind": "raise",
-              "line": 1296
+              "line": 1305
             },
             {
               "in": "_start_session",
-              "kind": "raise",
-              "line": 1297
-            },
-            {
-              "in": "_stop_session",
               "kind": "raise",
               "line": 1306
             },
             {
               "in": "_stop_session",
               "kind": "raise",
-              "line": 1320
+              "line": 1315
             },
             {
               "in": "_stop_session",
               "kind": "raise",
-              "line": 1322
+              "line": 1329
+            },
+            {
+              "in": "_stop_session",
+              "kind": "raise",
+              "line": 1331
             },
             {
               "in": "_guarded_unload",
               "kind": "raise",
-              "line": 1327
+              "line": 1336
             }
           ],
-          "hash": "24c3b16a488e522cfed6dea78269c27f583e1c418cc7ca2ed9f8c3a1b3653d36",
+          "hash": "ebd0fd406672341feae323acc2dec9baeec49c2dd5eccba983ffbb498e8161bf",
           "importsFiles": [
             "src/interlock/adapters/base.py",
             "src/interlock/devices.py",
@@ -13888,11 +13888,14 @@
         },
         {
           "exports": [
+            "test_current_python_is_the_target_and_the_lockfile_agrees",
+            "test_the_ci_tests_current_python_with_the_required_check_name_kept",
             "test_the_classifiers_match_what_ci_tests_and_the_license_is_an_spdx_expression",
             "test_the_distribution_name_is_mcptoolshop_interlock",
-            "test_the_help_header_names_the_router"
+            "test_the_help_header_names_the_router",
+            "test_the_intel_extra_resolves_only_where_openvino_publishes_wheels"
           ],
-          "hash": "aa690bd65d16cf54787b70fec27616d547116dda39dd0e06389fd155951e8791",
+          "hash": "956100ad7238dcc2a69869ff54c668d54a4cf6479363d223e51c1057b0ca58fe",
           "importsFiles": [
             "src/interlock/cli.py"
           ],
@@ -14740,6 +14743,8 @@
             "local_model",
             "make_adapter",
             "req",
+            "test_a_missing_openvino_genai_names_the_python_range_where_the_extra_is_skipped",
+            "test_a_missing_openvino_names_the_python_range_where_the_extra_is_skipped",
             "test_an_igpu_step_without_a_shape_refuses_before_compile",
             "test_compile_cache_and_precision_config",
             "test_count_tokens_is_the_encode_and_a_short_prompt_records_zero_dropped",
@@ -14813,7 +14818,7 @@
             "test_unreadable_perf_metrics_are_recorded_not_dropped",
             "test_warm_reload_compile_recorded_on_fresh_cache"
           ],
-          "hash": "7f7eee3129de695dfb4de7015add9d242b03d56dd10a05d369359a5dea1572cd",
+          "hash": "92bfc90f14a1be62d2ac9064d7157a62d977ee93df3202b39f750c5807ae3d18",
           "importOrder": [
             "src/interlock/adapters/__init__.py",
             "src/interlock/adapters/openvino.py",
@@ -15488,14 +15493,6 @@
           "programs": [
             "uv"
           ],
-          "step": "Fuzz receipt and spec parsers"
-        },
-        {
-          "dir": "",
-          "job": "test",
-          "programs": [
-            "uv"
-          ],
           "step": "Wheel install loads the C2 specs and inputs"
         },
         {
@@ -15513,6 +15510,78 @@
             "uv"
           ],
           "step": "Empty table"
+        },
+        {
+          "dir": "",
+          "job": "test-py313",
+          "programs": [
+            "uv"
+          ],
+          "step": "Install"
+        },
+        {
+          "dir": "",
+          "job": "test-py313",
+          "programs": [
+            "uv"
+          ],
+          "step": "Lint"
+        },
+        {
+          "dir": "",
+          "job": "test-py313",
+          "programs": [
+            "uv"
+          ],
+          "step": "Test"
+        },
+        {
+          "dir": "",
+          "job": "test-py313",
+          "programs": [
+            "uv"
+          ],
+          "step": "Wheel install loads the C2 specs and inputs"
+        },
+        {
+          "dir": "",
+          "job": "test-py314",
+          "programs": [
+            "uv"
+          ],
+          "step": "Install"
+        },
+        {
+          "dir": "",
+          "job": "test-py314",
+          "programs": [
+            "uv"
+          ],
+          "step": "Lint"
+        },
+        {
+          "dir": "",
+          "job": "test-py314",
+          "programs": [
+            "uv"
+          ],
+          "step": "Test"
+        },
+        {
+          "dir": "",
+          "job": "test-py314",
+          "programs": [
+            "uv"
+          ],
+          "step": "Fuzz (atheris has no cp315 wheel yet) receipt and spec parsers"
+        },
+        {
+          "dir": "",
+          "job": "test-py314",
+          "programs": [
+            "uv"
+          ],
+          "step": "Wheel install loads the C2 specs and inputs"
         }
       ],
       "elsewhere": [],
@@ -15521,6 +15590,38 @@
         {
           "basis": "declared",
           "name": "test",
+          "runsOn": [
+            {
+              "labels": [
+                "ubuntu-latest"
+              ],
+              "platform": {
+                "cpu": "x64",
+                "libc": "glibc",
+                "os": "linux"
+              }
+            }
+          ]
+        },
+        {
+          "basis": "declared",
+          "name": "test-py313",
+          "runsOn": [
+            {
+              "labels": [
+                "ubuntu-latest"
+              ],
+              "platform": {
+                "cpu": "x64",
+                "libc": "glibc",
+                "os": "linux"
+              }
+            }
+          ]
+        },
+        {
+          "basis": "declared",
+          "name": "test-py314",
           "runsOn": [
             {
               "labels": [
@@ -15572,6 +15673,16 @@
           "runKind": "executes"
         },
         {
+          "job": "test-py313",
+          "path": "src/interlock/cli.py",
+          "runKind": "executes"
+        },
+        {
+          "job": "test-py314",
+          "path": "src/interlock/cli.py",
+          "runKind": "executes"
+        },
+        {
           "directory": true,
           "job": "test",
           "matched": true,
@@ -15580,7 +15691,23 @@
           "via": "pytest pyproject.toml"
         },
         {
-          "job": "test",
+          "directory": true,
+          "job": "test-py313",
+          "matched": true,
+          "path": "tests/",
+          "runKind": "executes",
+          "via": "pytest pyproject.toml"
+        },
+        {
+          "directory": true,
+          "job": "test-py314",
+          "matched": true,
+          "path": "tests/",
+          "runKind": "executes",
+          "via": "pytest pyproject.toml"
+        },
+        {
+          "job": "test-py314",
           "path": "tests/fuzz_receipts.py",
           "runKind": "executes"
         }
@@ -15608,10 +15735,26 @@
           "step": "Test"
         },
         {
+          "config": "pyproject.toml",
+          "coverage": true,
+          "files": 48,
+          "job": "test-py313",
+          "runner": "pytest",
+          "step": "Test"
+        },
+        {
+          "config": "pyproject.toml",
+          "coverage": true,
+          "files": 48,
+          "job": "test-py314",
+          "runner": "pytest",
+          "step": "Test"
+        },
+        {
           "files": 1,
-          "job": "test",
+          "job": "test-py314",
           "runner": "python",
-          "step": "Fuzz receipt and spec parsers"
+          "step": "Fuzz (atheris has no cp315 wheel yet) receipt and spec parsers"
         }
       ],
       "triggers": [
@@ -15648,16 +15791,34 @@
         {
           "job": "test",
           "manifest": "pyproject.toml",
-          "requires": ">=3.12,<3.13",
+          "requires": ">=3.13",
           "rule": "D1-python",
-          "step": "Fuzz receipt and spec parsers",
+          "step": "Install",
           "tool": "uv sync",
           "why": "no setup-python step before it"
         },
         {
-          "job": "test",
+          "job": "test-py313",
           "manifest": "pyproject.toml",
-          "requires": ">=3.12,<3.13",
+          "requires": ">=3.13",
+          "rule": "D1-python",
+          "step": "Install",
+          "tool": "uv sync",
+          "why": "no setup-python step before it"
+        },
+        {
+          "job": "test-py314",
+          "manifest": "pyproject.toml",
+          "requires": ">=3.13",
+          "rule": "D1-python",
+          "step": "Fuzz (atheris has no cp315 wheel yet) receipt and spec parsers",
+          "tool": "uv sync",
+          "why": "no setup-python step before it"
+        },
+        {
+          "job": "test-py314",
+          "manifest": "pyproject.toml",
+          "requires": ">=3.13",
           "rule": "D1-python",
           "step": "Install",
           "tool": "uv sync",
@@ -16112,7 +16273,7 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "fc864e402f5ce1ae717f39128a3dbb24229ddd86",
+    "commit": "bbe78ceb144ff5755ce8934b6c2ad311bca0e63d",
     "tracked": 292
   },
   "landings": [
@@ -16813,11 +16974,11 @@
       "path": "site/src/content/docs/handbook/experiments.md"
     },
     {
-      "hash": "4c7930a525a3af3b24d17d03b0a1eaf27465c32008c7535a210f88e87d227f22",
+      "hash": "864e4523a6d8b70588868ccbc1a32162c1ace84d7f60240137cbeb27912284be",
       "path": "site/src/content/docs/handbook/getting-started.md"
     },
     {
-      "hash": "bc2ed845a4f0b8c5032523f38a292c5b9d4a3fb03daaf545aa0a490b46d6827a",
+      "hash": "507c178bf223a2011c3eb5c6c5ffe809845d4905113c8ac675e041cc7adba40b",
       "path": "site/src/content/docs/handbook/index.md"
     },
     {
@@ -16842,7 +17003,7 @@
     },
     {
       "constantOnly": true,
-      "hash": "a716c818d27d2455127ddd084880f1be2d68a2b616a9255353df42fac88ed28d",
+      "hash": "377958b9f91f4582b54139145b629d1a0cfc165f123c79f385718c621a7156ce",
       "path": "site/src/site-config.ts"
     },
     {

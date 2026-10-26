@@ -5,7 +5,7 @@ sidebar:
   order: 1
 ---
 
-Python 3.12 only: `requires-python` is `>=3.12,<3.13`.
+Python 3.13, 3.14 and 3.15: `requires-python` is `>=3.13`. On 3.15 PyYAML installs from source until it publishes cp315 wheels. The `intel` extra needs 3.13 or 3.14 (no cp315 OpenVINO wheels yet).
 
 From PyPI:
 

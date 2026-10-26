@@ -43,7 +43,7 @@ pip install mcptoolshop-interlock
 uv tool install mcptoolshop-interlock
 ```
 
-The distribution name is `mcptoolshop-interlock`. The import and the command are `interlock`. Python 3.12 only (`requires-python` is `>=3.12,<3.13`). CI runs the tests on Ubuntu. A live measurement run on the rig is written for the Windows rig this table was measured on. The Linux CUDA path (new in 1.0.0) runs on a remote Colab VM.
+The distribution name is `mcptoolshop-interlock`. The import and the command are `interlock`. Python 3.13, 3.14 and 3.15 (`requires-python` is `>=3.13`; 3.13 is what Colab's default image runs). CI runs the tests on Ubuntu on all three, with 3.15 as the main leg. On 3.15 PyYAML installs from source until it publishes cp315 wheels (it builds a pure-Python wheel when libyaml is absent). The `intel` extra needs Python 3.13 or 3.14: OpenVINO 2026.4.1 has no cp315 wheels yet, so on 3.15 the extra installs `transformers` but no `openvino*` (an environment marker); the core works on 3.15. A live measurement run on the rig is written for the Windows rig this table was measured on. The Linux CUDA path (new in 1.0.0) runs on a remote Colab VM.
 
 What this program is allowed to touch is in the [threat model](#threat-model).
 
@@ -228,7 +228,7 @@ Each restart is written on the run marker and on `settings.ollama_restarts`: whe
 
 ## Develop
 
-Python 3.12. `uv sync --frozen` creates the project environment from the lockfile. It does not share the NPU environment. OpenVINO 2026.4.1 is the `intel` extra. Tests do not need it.
+Python 3.15 (`.python-version`); 3.13 and 3.14 also work. `uv sync --frozen` creates the project environment from the lockfile. It does not share the NPU environment. OpenVINO 2026.4.1 is the `intel` extra. Tests do not need it.
 
 ```
 uv sync --frozen

@@ -1314,3 +1314,33 @@ def test_fake_hides_platform(case, tmp_path, monkeypatch):
     r = a.run(req(task=case, model=m, device="CPU", static_shape="1x16", batch=1))
     assert r.ok and r.resolved["pooling"] == "none"
     assert len(r.output) == 3
+
+
+def test_a_missing_openvino_names_the_python_range_where_the_extra_is_skipped(monkeypatch):
+    # The intel extra's openvino packages carry python_version < "3.15" (OpenVINO has no cp315 wheels).
+    old = ovm._intel_missing("openvino", "is not installed", " to run Intel experiments", version=(3, 14, 0))
+    assert old == "the 'openvino' package is not installed; install the intel extra to run Intel experiments"
+    new = ovm._intel_missing("openvino", "is not installed", " to run Intel experiments", version=(3, 15, 0))
+    assert new == "the Intel extra needs Python 3.13 or 3.14 (OpenVINO has no 3.15 wheels yet)"
+    assert "not installed" not in new
+    monkeypatch.setattr(ovm, "ov", None)
+    monkeypatch.setattr(ovm.sys, "version_info", (3, 15, 1, "final", 0))
+    with pytest.raises(AdapterError, match=r"Intel extra needs Python 3\.13 or 3\.14"):
+        ovm._need_openvino()
+    monkeypatch.setattr(ovm.sys, "version_info", (3, 13, 16, "final", 0))
+    with pytest.raises(AdapterError, match="package is not installed"):
+        ovm._need_openvino()
+
+
+def test_a_missing_openvino_genai_names_the_python_range_where_the_extra_is_skipped(monkeypatch):
+    monkeypatch.setattr(ovm, "_GENAI_REAL", None)
+    monkeypatch.setitem(sys.modules, "openvino_genai", None)  # makes `import openvino_genai` raise ImportError
+    monkeypatch.setattr(ovm.sys, "version_info", (3, 15, 1, "final", 0))
+    with pytest.raises(AdapterError, match=r"Intel extra needs Python 3\.13 or 3\.14") as skipped:
+        ovm._real_genai_module()
+    assert "is needed for generate steps" not in str(skipped.value)
+    monkeypatch.setattr(ovm.sys, "version_info", (3, 14, 9, "final", 0))
+    old = "'openvino-genai' package is needed for generate steps; install the intel extra"
+    with pytest.raises(AdapterError, match=old):
+        ovm._real_genai_module()
+

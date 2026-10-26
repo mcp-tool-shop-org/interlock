@@ -69,6 +69,7 @@ import gc
 import os
 import shutil
 import subprocess
+import sys
 import threading
 import time
 import warnings
@@ -135,11 +136,21 @@ def _is_device_lost(exc: BaseException) -> bool:
     return any(marker in text for marker in _LOST_MARKERS)
 
 
+_NO_OPENVINO_WHEELS = (3, 15)  # OpenVINO 2026.4.1 publishes cp313 and cp314 wheels, none for 3.15 (PyPI, 2026-10-25)
+_INTEL_RANGE_MESSAGE = "the Intel extra needs Python 3.13 or 3.14 (OpenVINO has no 3.15 wheels yet)"
+
+
+def _intel_missing(package: str, why: str, suffix: str = "", version: tuple | None = None) -> str:
+    """The message for a missing OpenVINO package. On a Python the extra skips (an environment marker), say so."""
+
+    if tuple((sys.version_info if version is None else version)[:2]) >= _NO_OPENVINO_WHEELS:
+        return _INTEL_RANGE_MESSAGE
+    return f"the '{package}' package {why}; install the intel extra{suffix}"
+
+
 def _need_openvino() -> None:
     if ov is None:
-        raise AdapterError(
-            "the 'openvino' package is not installed; install the intel extra to run Intel experiments"
-        )
+        raise AdapterError(_intel_missing("openvino", "is not installed", " to run Intel experiments"))
 
 
 def parse_model_ref(model: str) -> tuple[str, str | None]:
@@ -952,9 +963,7 @@ def _real_genai_module():
         try:
             import openvino_genai as module
         except ImportError as exc:
-            raise AdapterError(
-                "the 'openvino-genai' package is needed for generate steps; install the intel extra"
-            ) from exc
+            raise AdapterError(_intel_missing("openvino-genai", "is needed for generate steps")) from exc
         _GENAI_REAL = module
     return _GENAI_REAL
 

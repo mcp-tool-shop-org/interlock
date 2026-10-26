@@ -3,14 +3,16 @@ name = "mcptoolshop-interlock"
 version = "1.0.2"
 description = "Local AI device router: it sends each job to a model, an engine and a device named by a measured receipt."
 readme = "README.md"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.13"
 license = "MIT"
 authors = [{name = "mcp-tool-shop"}]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "Operating System :: POSIX :: Linux",
 ]
 keywords = [
@@ -31,9 +33,9 @@ dependencies = [
 
 [project.optional-dependencies]
 intel = [
-    "openvino==2026.4.1",
-    "openvino-tokenizers==2026.4.1.0",
-    "openvino-genai==2026.4.1.0",
+    "openvino==2026.4.1; python_version < \"3.15\"",
+    "openvino-tokenizers==2026.4.1.0; python_version < \"3.15\"",
+    "openvino-genai==2026.4.1.0; python_version < \"3.15\"",
     "transformers==5.10.1",
 ]
 # NVIDIA NeMo Relay for `--trace relay` (the interlock-relay experiment, stage 0). Nothing imports it otherwise.
@@ -55,7 +57,7 @@ dev = [
 # Atheris publishes manylinux wheels only. It stays out of default-groups so
 # `uv sync` never tries to install it.
 fuzz = [
-    "atheris==3.1.0",
+    "atheris==3.1.0; python_version < \"3.15\"",
 ]
 
 [build-system]
@@ -83,7 +85,7 @@ source = ["interlock"]
 omit = ["*/schema/*"]
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py313"
 # Sources were already written past the 88 default. 120 keeps E501 on.
 line-length = 120
 
