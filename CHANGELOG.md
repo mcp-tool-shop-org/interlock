@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.0.8] - 2026-10-26
+
 ### Fixed
 
 - **A per-cell wall cap.** `request_timeout_s` is clamped to 120 to 900 s per request, so a slow, fully resident c4 or c8 cell could take four passes of 900 s (an hour) plus up to six calibration calls, and a few such cells in a 3-quant window on an 80 or 96 GB card could pass Colab's roughly 4 h VM-loss line. A cell now has `CELL_WALL_S = 1800` (`settings.cell_wall_s` on every generate-ladder row). After calibration, a cell whose projected wall, `(1 warmup + repeats) x (ceil(3 x concurrency x t_verify_s) + 60)` from the real unclamped estimate, is over the cap is refused before any timed pass and recorded as `timeout` (`projected N s > cell wall 1800 s; not run`). `CELL_DEADLINE_S` (2 x the cap) is the outer bound over the whole cell: whatever call is blocked, the cell ends as an `unmeasured` row and the ladder carries on. The harness cannot see the window's wall; the launcher's wall stays the outer bound of the window.
@@ -24,6 +26,10 @@
 - Another shape of the winner's own candidate is no longer listed under `runners_up` for generate (it is not an alternative to it), and a refusal gives each measured failure reason once with a count (`(x20)`) instead of repeating it for every row.
 - The pre-v3 guard is unchanged: a pre-v3 row's concurrency-above-1 throughput and ttft are still never used.
 
+
+### Docs
+
+- The handbook describes `route --concurrency`, the `fill_card` and `rig_check` exclusions, the per-cell wall cap, the `nvidia-smi` sampler fallback, the phase markers and the rig-check identity.
 
 ## [1.0.7] - 2026-10-26
 
