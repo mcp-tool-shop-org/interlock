@@ -34,32 +34,24 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 3,
-      "changed": 7,
+      "added": 0,
+      "changed": 4,
       "moved": 0,
       "parts": 3,
-      "removed": 2
+      "removed": 0
     },
     "items": [
       {
-        "kind": "landing",
-        "sentence": "tests/fixtures/route/r3_table.jsonl is now read by tests/test_route_concurrency.py.",
-        "subjects": [
-          "tests/fixtures/route/r3_table.jsonl",
-          "tests/test_route_concurrency.py"
-        ]
-      },
-      {
         "kind": "counts",
-        "sentence": "3 files added, 2 removed and 7 changed content, across 3 parts.",
+        "sentence": "Nothing structural changed since 2026-10-26; 4 files changed content.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "1296f138af8df38c10213e4398240e35c0a1a6ea",
-      "generatedAt": "2026-10-26T20:23:00.840Z"
+      "commit": "50238e13fd021c4c37d0c154336d1330c073c945",
+      "generatedAt": "2026-10-26T22:39:15.435Z"
     },
-    "unchanged": false
+    "unchanged": true
   },
   "changesTogether": [
     {
@@ -80,7 +72,7 @@
     {
       "a": "site/src/site-config.ts",
       "b": "src/interlock/__init__.py",
-      "either": 13,
+      "either": 14,
       "partLabels": [
         null,
         "src"
@@ -90,26 +82,11 @@
         "src"
       ],
       "relation": "unassigned",
-      "shared": 9
+      "shared": 10
     },
     {
       "a": "src/interlock/importers/remote.py",
       "b": "src/interlock/receipt.py",
-      "either": 7,
-      "partLabels": [
-        "src",
-        "src"
-      ],
-      "parts": [
-        "src",
-        "src"
-      ],
-      "relation": "inside",
-      "shared": 4
-    },
-    {
-      "a": "src/interlock/importers/remote.py",
-      "b": "src/interlock/router/policy.py",
       "either": 7,
       "partLabels": [
         "src",
@@ -136,6 +113,21 @@
       ],
       "relation": "b-imports-a",
       "shared": 5
+    },
+    {
+      "a": "src/switchyard/harness/receipts.py",
+      "b": "src/switchyard/receipt.py",
+      "either": 13,
+      "partLabels": [
+        null,
+        null
+      ],
+      "parts": [
+        null,
+        null
+      ],
+      "relation": "unassigned",
+      "shared": 7
     }
   ],
   "changesTogetherNote": [
@@ -144,9 +136,9 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 16 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 2,
-  "commit": "5bca251f2202be4416a605dba5ec93830a5c3583",
+  "commit": "2d1f6c041a91d8fccca56883af901a008da804e8",
   "defaultBranch": "main",
-  "derived": "10 parts, mostly Python (115 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
+  "derived": "10 parts, mostly Python (116 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
   "doors": [
     {
       "checks": [],
@@ -166,7 +158,7 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 57
+          "files": 58
         },
         {
           "boundary": "scripts",
@@ -309,7 +301,7 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-26T20:27:57.879Z",
+  "generatedAt": "2026-10-26T22:56:06.131Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "5 writes and 6 reads use paths built at run time and are not named here.",
@@ -344,10 +336,10 @@
   ],
   "summary": "interlock routes each job to a model, engine and device from a receipt-backed table.",
   "summaryFrom": "person",
-  "testFiles": 84,
+  "testFiles": 85,
   "testedBy": {
     "scripts": 2,
-    "src": 54
+    "src": 55
   },
   "unnamedWrites": 5,
   "unread": [],

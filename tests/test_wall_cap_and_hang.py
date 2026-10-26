@@ -68,25 +68,45 @@ def test_the_cap_and_the_calibration_timeout_are_named_with_their_defaults():
 
 
 def test_a_cell_whose_projection_is_over_the_cap_is_refused_before_any_timed_pass():
-    server = FakeOllama(overhead_s=250.0)  # a 250 s verify (inside the 300 s calibration timeout): 3 x 811 s > 1800 s
+    # c4, 250 s verify (inside the calibration timeout): 3 x (ceil(4 x 250.148) + 60) = 3183 s > 1800 s
+    server = FakeOllama(overhead_s=250.0)
     with pytest.raises(LinuxShapeFailure) as caught:
-        _measure(server, 512, repeats=2)
+        _measure(server, 512, concurrency=4, repeats=2)
     assert caught.value.failure_class == "timeout"
-    assert caught.value.reason.startswith("projected 2433 s > cell wall 1800 s; not run")
+    assert caught.value.reason.startswith("projected 3183 s > cell wall 1800 s; not run")
     assert all(call["num_predict"] == 1 for call in server.all_calls)  # calibration calls only: no timed pass was sent
 
 
-def test_the_projection_uses_the_unclamped_budget_not_the_clamped_one():
-    # A 295 s verify: the per-request budget is clamped to 900 s, but the cell takes 3 x (3 x 295.148 + 60) = 2838 s.
+def test_the_projection_is_an_expected_wall_time_without_a_safety_factor():
+    # A 295 s verify at c4: 3 passes x (ceil(4 x 295.148) + 60) = 3723 s. The request timeout keeps its 3x (clamped to
+    # 900 s); the projection is what the cell is expected to take, and CELL_DEADLINE_S is the real bound.
     server = FakeOllama(overhead_s=295.0)
     with pytest.raises(LinuxShapeFailure) as caught:
-        _measure(server, 512, repeats=2)
-    assert linux_cuda.request_timeout_s(1, 295.148) == 900  # the clamped per-request budget
-    assert caught.value.reason.startswith("projected 2838 s")  # 3 x 946, not 3 x 900
+        _measure(server, 512, concurrency=4, repeats=2)
+    assert linux_cuda.request_timeout_s(4, 295.148) == 900
+    assert caught.value.reason.startswith("projected 3723 s")
+
+
+def test_an_a100_80_shaped_c8_cell_with_a_30_second_verify_measures():
+    # A resident 30B-class c8 x 32k cell on an A100-80 or G4: a 30 s verify, passes of about 5 minutes. v4's 3x factor
+    # projected 3 x (ceil(3 x 8 x 30) + 60) = 2340 s and refused it; the expected time is 3 x (240 + 60) = 900 s.
+    server = FakeOllama(overhead_s=29.85)
+    result = _measure(server, 512, concurrency=8, repeats=2)
+    assert result["cell_wall_s"] == CELL_WALL_S
+    assert result["request_timeout_s"] == linux_cuda.request_timeout_s(8, 30.0)  # the per-request 3x is unchanged
+    assert result["request_timeout_s"] > 700
+
+
+def test_a_t4_shaped_slow_cell_is_still_refused():
+    # r3's T4 evidence: a c8 cell whose single verify call takes 100 s (Go-side overhead on 2 vCPUs) cannot finish four
+    # passes in 30 minutes: 4 x (ceil(8 x 100.148) + 60) = 3448 s.
+    with pytest.raises(LinuxShapeFailure) as caught:
+        _measure(FakeOllama(overhead_s=100.0), 512, concurrency=8, repeats=3)
+    assert caught.value.failure_class == "timeout" and caught.value.reason.startswith("projected 3448 s")
 
 
 def test_a_cell_under_the_cap_measures_and_the_record_carries_the_cap():
-    server = FakeOllama(overhead_s=100.0)  # 3 x (3 x 100 + 60) = 1083 s <= 1800 s
+    server = FakeOllama(overhead_s=100.0)  # 3 x (100 + 60) = 480 s <= 1800 s
     result = _measure(server, 512, repeats=2)
     assert result["cell_wall_s"] == CELL_WALL_S
     (row,) = _ladder(FakeOllama(overhead_s=100.0), (512,))
@@ -95,9 +115,9 @@ def test_a_cell_under_the_cap_measures_and_the_record_carries_the_cap():
 
 
 def test_a_refused_cell_is_a_timeout_row_that_also_records_the_cap_and_its_budget():
-    (row,) = _ladder(FakeOllama(overhead_s=250.0), (512,))
+    (row,) = _ladder(FakeOllama(overhead_s=250.0), (512,), (4,))
     assert row["outcome"] == "timeout" and row["notes"].startswith("timeout: projected")
-    assert row["settings"]["cell_wall_s"] == 1800 and row["settings"]["request_timeout_s"] == 811
+    assert row["settings"]["cell_wall_s"] == 1800 and row["settings"]["request_timeout_s"] == 900
 
 
 def test_calibration_calls_carry_the_lower_timeout():

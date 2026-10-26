@@ -14,6 +14,7 @@ says nothing about what the card can load.
 
 from __future__ import annotations
 
+import contextvars
 import hashlib
 import inspect
 import ipaddress
@@ -152,6 +153,22 @@ _CUDA_HEADER = re.compile(r"CUDA\s+(?:UMD\s+)?Version\s*:\s*([0-9]+\.[0-9]+)")
 
 class LinuxCudaError(Exception):
     """Refusal or probe error in the Linux CUDA measuring path."""
+
+
+# The cell a call belongs to. A cell's thread and its pass workers set it to the server's epoch when the cell begins; a
+# call that carries an old epoch is refused. When a cell's outer deadline fires its thread is abandoned, not stopped, so
+# without this its next request would land in the following cell.
+_CELL_EPOCH: contextvars.ContextVar[int | None] = contextvars.ContextVar("interlock_cell_epoch", default=None)
+
+
+class StaleCell(Exception):
+    """A call from a cell that has ended reached the server. It is refused and never recorded as a row."""
+
+
+def _check_epoch(current: int) -> None:
+    bound = _CELL_EPOCH.get()
+    if bound is not None and bound != current:
+        raise StaleCell(f"a call from cell epoch {bound} reached the server in epoch {current}")
 
 
 class LinuxShapeFailure(Exception):
@@ -529,6 +546,7 @@ class LinuxOllamaServer:
         self._log_handle: Any = None
         self.version: str = UNRECORDED
         self.num_parallel = 1
+        self.epoch = 0
         self._log_offset = 0
 
     @property
@@ -536,9 +554,11 @@ class LinuxOllamaServer:
         return None if self._proc is None else int(self._proc.pid)
 
     def get(self, path: str) -> dict[str, Any]:
+        _check_epoch(self.epoch)
         return self._http_get(f"{self.base_url}{path}")
 
     def post(self, path: str, payload: dict[str, Any], timeout: float | None = None) -> dict[str, Any]:
+        _check_epoch(self.epoch)
         if timeout is not None and not self._custom_post:
             return _default_http_post(f"{self.base_url}{path}", payload, timeout=timeout)
         return self._http_post(f"{self.base_url}{path}", payload)
@@ -604,9 +624,17 @@ class LinuxOllamaServer:
         if running:
             self.start()
 
-    def begin_cell(self) -> None:
-        """Start reading the log from here, so a cell never reads an earlier cell's load."""
+    def restart_after_deadline(self) -> None:
+        """Restart the harness's own server so no runner request from an abandoned cell survives."""
 
+        self.epoch += 1  # a call from the abandoned cell is stale from here, not only from the next begin_cell()
+        self.stop()
+        self.start()
+
+    def begin_cell(self) -> None:
+        """Start a cell: a new epoch (calls from earlier cells are refused), and read the log from here."""
+
+        self.epoch += 1
         try:
             self._log_offset = self.log_path.stat().st_size
         except OSError:
@@ -1059,14 +1087,29 @@ def run_linux_generate_ladder(
     quant: str = UNRECORDED,
     licence: str = UNRECORDED,
     on_progress: Callable[[list[dict[str, Any]]], None] | None = None,
+    recover: Callable[[], None] | None = None,
 ) -> list[dict[str, Any]]:
-    """Sweep generate TTFT and decode tok/s across prompt lengths 512..32k at concurrencies 1, 4, 8."""
+    """Sweep generate TTFT and decode tok/s across prompt lengths 512..32k at concurrencies 1, 4, 8.
+
+    ``recover`` restarts the harness's server after a cell's outer deadline fired, before the next cell.
+    """
 
     abort_mib = compute_abort_mib(remote_device.vram_mib, abort_fraction)
     rows: list[dict[str, Any]] = _ProgressRows(on_progress)
+    restarted = {"pending": False}
+
+    def append_row(row: dict[str, Any]) -> None:
+        if restarted["pending"]:  # the first row after a restart says so
+            row["settings"]["server_restarted_after_deadline"] = True
+            restarted["pending"] = False
+        rows.append(row)
+
     # Concurrency is the outer loop: the server restarts to change its slot count, so each count is set once.
     for concurrency in concurrencies:
-        baseline: tuple[int, float] | None = None  # (target tokens, ttft ms) of the first measured cell at this count
+        # (target tokens, prefill ms) of the last cell measured at this concurrency: each cell is compared with the step
+        # before it, not with the first cell, whose fixed per-request cost (T4 r5, c8: 847 ms at 512) overstates the
+        # growth the next cells need. A failed or unmeasured cell does not move it.
+        baseline: tuple[int, float] | None = None
         for prompt_len in sorted(prompt_lengths):
             try:
                 deadline_s = CELL_DEADLINE_S
@@ -1077,12 +1120,26 @@ def run_linux_generate_ladder(
                         "unmeasured",
                         f"cell p{plen} c{conc} did not finish within its {limit:g} s outer deadline (a call did not "
                         "return)",
-                        evidence={"num_ctx_sent": None, "request_timeout_s": None},
+                        evidence={"num_ctx_sent": None, "request_timeout_s": None, "cell_deadline": True},
                     ),
                 )
             except LinuxShapeFailure as exc:
                 _phase(f"cell p{prompt_len} c{concurrency}: end, {exc.failure_class}")
-                rows.append(
+                deadline_fired = bool((exc.evidence or {}).get("cell_deadline"))
+                restarted_now = False
+                if deadline_fired:
+                    # The abandoned cell's thread may still be inside a request. The epoch refuses what it sends next;
+                    # restarting the server kills the request it is in, so nothing of it reaches the next cell.
+                    if recover is not None:
+                        _phase(f"cell p{prompt_len} c{concurrency}: outer deadline fired; restarting the server")
+                        recover()
+                        restarted_now = True
+                    else:
+                        _phase(
+                            f"cell p{prompt_len} c{concurrency}: outer deadline fired; no recover hook, server not "
+                            "restarted"
+                        )
+                append_row(
                     build_linux_failure_row(
                         spec_id=spec_id,
                         spec_rel=spec_rel,
@@ -1110,6 +1167,7 @@ def run_linux_generate_ladder(
                         licence=licence,
                     )
                 )
+                restarted["pending"] = restarted_now  # the next row is the first after a restart that happened
                 continue
 
             ttft_ms = float(measured["ttft_ms"])
@@ -1124,7 +1182,7 @@ def run_linux_generate_ladder(
                     if size_vram < size
                     else f"peak {peak_mib} MiB >= abort_mib {abort_mib} MiB"
                 )
-                rows.append(
+                append_row(
                     build_linux_failure_row(
                         spec_id=spec_id,
                         spec_rel=spec_rel,
@@ -1168,10 +1226,10 @@ def run_linux_generate_ladder(
             evaluated_tokens, token_method = _evaluated_or_requested(measured, prompt_len)
             prefill_ms = float(measured.get("prefill_ms", ttft_ms))
             reason = _ttft_does_not_scale(baseline, prompt_len, prefill_ms)
-            if reason is None and baseline is None:
+            if reason is None:
                 baseline = (prompt_len, prefill_ms)
             if reason is not None:
-                rows.append(
+                append_row(
                     build_linux_failure_row(
                         spec_id=spec_id,
                         spec_rel=spec_rel,
@@ -1265,7 +1323,7 @@ def run_linux_generate_ladder(
             stamp_family(row)
             _mark_rig_check(row, remote_device)
             validate_row(row)
-            rows.append(row)
+            append_row(row)
     return rows
 
 
@@ -1567,7 +1625,7 @@ def measure_linux_ollama_window(
 ) -> dict[str, Any]:
     """Measure one ``num_ctx`` window against a running ``LinuxOllamaServer`` and VRAM sampler."""
 
-    used_before, _ = sample_vram_mib()
+    used_before, _ = _sample_with_deadline(sample_vram_mib)
     peak_mib = used_before
     try:
         resp = server.post(
@@ -1618,8 +1676,8 @@ LADDER_TOKEN_TOLERANCE = 0.02  # the evaluated prompt must be within 2% of the t
 # A prefill faster than this cannot be real on any card this harness targets; it means llama-server answered from its
 # prompt cache (it reuses the longest common prefix). A cell above it is unmeasured.
 PREFILL_TOK_S_CEILING = 250_000.0
-# Prefill time grows with the prompt: from the first measured cell at a concurrency, a longer cell's ttft must be at
-# least this fraction of the proportional growth. A cached cell stays flat, far under it.
+# Prefill time grows with the prompt: from the previous measured cell at a concurrency, a longer cell's prefill must be
+# at least this fraction of the proportional growth. A cached cell stays flat, far under it.
 TTFT_SCALING_FLOOR = 0.6
 # One request's budget. Calibration calls are single requests (a partial offload is caught before they matter). A timed
 # call gets three times what `concurrency` verify-sized requests need, plus decode, clamped; the budget is recorded in
@@ -1633,11 +1691,15 @@ REQUEST_TIMEOUT_FACTOR = 3
 REQUEST_TIMEOUT_DECODE_ALLOWANCE_S = 60
 REQUEST_TIMEOUT_FLOOR_S = 120
 REQUEST_TIMEOUT_CEILING_S = 900
-# The whole cell, calibration and timed passes, gets this much wall time. A slow, fully resident c8 cell could take four
-# passes at the 900 s ceiling (an hour), and a 3-quant window on an 80 or 96 GB card is bounded by Colab's roughly 4 h
-# VM-loss line, so a cell whose calibrated projection ((1 warmup + repeats) x the unclamped budget) is over it is
-# refused before its timed passes. `CELL_DEADLINE_S` is the outer bound: whatever call is blocked, the cell ends as a
-# row. The harness cannot see the window's wall, so the launcher's wall stays the outer bound of the window.
+# The whole cell, calibration and timed passes, gets this much wall time. A 3-quant window on an 80 or 96 GB card is
+# bounded by Colab's roughly 4 h VM-loss line, so a cell whose projection is over this is refused before its timed
+# passes. The projection is an EXPECTED wall time, (1 warmup + repeats) x (ceil(concurrency x t_verify) + 60): the
+# Go side of Ollama (tokenising, templating) runs on 2 vCPUs and does not scale with the slots, so `concurrency`
+# requests take about `concurrency` verify calls, and the 60 s covers decode. It carries no safety factor (v4 had a 3x,
+# which refused any c8 cell whose verify took over 16 s, though a resident 30B c8 x 32k cell on an A100-80 finishes in
+# 10 to 22 minutes). The safety is elsewhere: each request keeps its 3x timeout, and `CELL_DEADLINE_S` is the real
+# bound on the cell's wall: whatever call is blocked, the cell ends as a row. The harness cannot see the window's
+# wall, so the launcher's wall stays the outer bound of the window.
 CELL_WALL_S = 1800
 CELL_DEADLINE_S = 2 * CELL_WALL_S
 # One VRAM sample (NVML has no timeout of its own; T4 r4 hung for 56 minutes right after the kernel's OOM killer took a
@@ -1778,13 +1840,23 @@ class GuardedSampler:
             raise LinuxShapeFailure("unmeasured", f"nvidia-smi did not answer within {seconds:g} s") from None
         except (OSError, subprocess.CalledProcessError) as exc:
             raise LinuxShapeFailure("unmeasured", f"nvidia-smi failed: {exc}") from exc
-        parts = [part.strip() for part in text.strip().splitlines()[0].split(",")] if text.strip() else []
+        lines = [line for line in text.strip().splitlines() if line.strip()]
+        answer = text.strip()[:80]
+        if len(lines) != 1:  # one GPU, one line: several lines would be a reading of some other card
+            raise LinuxShapeFailure("unmeasured", f"nvidia-smi answered {answer!r}, not one line 'used, total'")
+        parts = [part.strip() for part in lines[0].split(",")]
+        if len(parts) != 2:
+            raise LinuxShapeFailure("unmeasured", f"nvidia-smi answered {answer!r}, not 'used, total'")
         try:
-            used, total = int(float(parts[0])), int(float(parts[1]))
-        except (IndexError, ValueError):
-            answer = text.strip()[:80]
+            used_f, total_f = float(parts[0]), float(parts[1])
+        except ValueError:
             raise LinuxShapeFailure("unmeasured", f"nvidia-smi answered {answer!r}, not 'used, total'") from None
-        return used, total
+        if not (used_f >= 0 and total_f > 0 and used_f <= total_f and math.isfinite(total_f)):
+            raise LinuxShapeFailure(
+                "unmeasured",
+                f"nvidia-smi answered {answer!r}: need 0 <= used <= total and total > 0 (and finite)",
+            )
+        return int(used_f), int(total_f)
 
 
 def _sampler_evidence(sample_vram_mib: Any) -> dict[str, Any]:
@@ -2040,6 +2112,7 @@ def measure_linux_ollama_generate(
 ) -> dict[str, Any]:
     """Measure one cell, and say which sampler the cell used (and why the run switched) in the result or the failure."""
 
+    outer_epoch = _CELL_EPOCH.get()  # the cell sets its own; a caller on this thread gets its context back
     try:
         result = _measure_generate_cell(
             server, sample_vram_mib, model=model, prompt_tokens=prompt_tokens, concurrency=concurrency,
@@ -2048,6 +2121,8 @@ def measure_linux_ollama_generate(
     except LinuxShapeFailure as exc:
         exc.evidence = {**(exc.evidence or {}), **_sampler_evidence(sample_vram_mib)}
         raise
+    finally:
+        _CELL_EPOCH.set(outer_epoch)
     return {**result, **_sampler_evidence(sample_vram_mib)}
 
 
@@ -2073,7 +2148,9 @@ def _measure_generate_cell(
         ensure_parallel(max(1, concurrency))
     begin_cell = getattr(server, "begin_cell", None)
     if callable(begin_cell):
-        begin_cell()  # the log is read from here: this cell's load, not an earlier cell's
+        begin_cell()  # a new epoch, and the log is read from here: this cell's load, not an earlier cell's
+    epoch = getattr(server, "epoch", None)
+    _CELL_EPOCH.set(epoch)  # this cell's thread; the pass workers below carry the same epoch
     cell_started = clock()
     cell = f"cell p{prompt_tokens} c{concurrency}"
     _phase(f"{cell}: start, sampling VRAM")
@@ -2090,10 +2167,8 @@ def _measure_generate_cell(
         raise _failure_for(server, exc, peak_mib, calibration_budget) from exc
     budget_s = request_timeout_s(concurrency, verify_s)
     budget = {**sent, "request_timeout_s": budget_s}
-    unclamped_s = (
-        math.ceil(REQUEST_TIMEOUT_FACTOR * max(1, concurrency) * verify_s) + REQUEST_TIMEOUT_DECODE_ALLOWANCE_S
-    )
-    projected_s = (1 + max(1, repeats)) * unclamped_s
+    pass_s = math.ceil(max(1, concurrency) * verify_s) + REQUEST_TIMEOUT_DECODE_ALLOWANCE_S
+    projected_s = (1 + max(1, repeats)) * pass_s
     _phase(
         f"{cell}: calibrated in {clock() - cell_started:.1f} s (verify {verify_s:.1f} s); projected {projected_s} s "
         f"for {1 + max(1, repeats)} passes"
@@ -2102,7 +2177,7 @@ def _measure_generate_cell(
         raise LinuxShapeFailure(
             "timeout",
             f"projected {projected_s} s > cell wall {CELL_WALL_S} s; not run "
-            f"({1 + max(1, repeats)} passes of up to {unclamped_s} s, from a {verify_s:.1f} s verify call at "
+            f"({1 + max(1, repeats)} passes of about {pass_s} s, from a {verify_s:.1f} s verify call at "
             f"concurrency {concurrency})",
             peak_mib=peak_mib,
             evidence=budget,
@@ -2125,6 +2200,7 @@ def _measure_generate_cell(
     per_request: list[float] = []
 
     def _call_once(index: int) -> dict[str, Any]:
+        _CELL_EPOCH.set(epoch)
         payload = {
             "model": model,
             "prompt": ladder_prompt(words, ladder_prefix(nonce, index)),
@@ -2297,7 +2373,7 @@ def measure_linux_ollama_batch(
     """Measure one ``(task, token_length, batch)`` cell on a running ``LinuxOllamaServer``."""
 
     endpoint, payload = _batch_endpoint_and_payload(model, task, batch, token_length=token_length)
-    used_before, _ = sample_vram_mib()
+    used_before, _ = _sample_with_deadline(sample_vram_mib)
     peak_mib = used_before
     passes = ("warmup", *("repeat" for _ in range(max(1, repeats))))
     slots: list[dict[str, Any]] = []
@@ -2532,6 +2608,7 @@ def run_linux_spec(
                             abort_fraction=abort_fraction,
                             num_predict=num_predict,
                             on_progress=progress,
+                            recover=getattr(active_server, "restart_after_deadline", None),
                             engine_version=engine_version,
                             quant=quant,
                             licence=licence,
