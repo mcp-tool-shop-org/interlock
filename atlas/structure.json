@@ -584,6 +584,10 @@
           "path": ".python-version"
         },
         {
+          "hash": "9e5d0db1e97aa8ef0482f8ae431cde2adc0896f06eaf6f639d908723a01e2d76",
+          "path": "CHANGELOG.md"
+        },
+        {
           "hash": "39f3dcc6915c9a974b20aa424493b56ff830ee5b47630a85a2359eceb326c24b",
           "path": "CONTRIBUTING.md"
         },
@@ -596,35 +600,35 @@
           "path": "LICENSE"
         },
         {
-          "hash": "a0966baf9e0232fb437bbbfc0fc2074c2b772d4b97c4fcfc11f57b79ee890863",
+          "hash": "519f0007126699483b12011579237777848a555cd4fdf6eb8b504516809370d5",
           "path": "README.es.md"
         },
         {
-          "hash": "a42cf7bb4ef81f11a1d44dfc33fa3124a2645e98068e6fcbfc2fb9c06e0d75b6",
+          "hash": "5eee4d93bfa0916dc854ecabfa378eebcf73b7b41f6efd8e60a486f3dea46986",
           "path": "README.fr.md"
         },
         {
-          "hash": "499327462b0876cb962768657b5cf405aa50e34acc02db0833d7c6470df9f936",
+          "hash": "19a2ffb2fd8b34b3134f9d4b9d2b64f30f41e5c0c01f56de4e88eaf16c0a0957",
           "path": "README.hi.md"
         },
         {
-          "hash": "ac211131dc9f305858e0fb9c58245f872bdca2e751cabad75502c2ccff0ed76c",
+          "hash": "8bd48bb29e59af034752f97aeaefd36b332c63e13c43e76c97879888250322ac",
           "path": "README.it.md"
         },
         {
-          "hash": "62698c4d861516b3a5ba444a11090c0fa4c6294aa489b31802bb0de4eeba6460",
+          "hash": "71d0f87c481564a9cccd986eb7c8611feae0bcf38a3afdbed3c5938ef803860b",
           "path": "README.ja.md"
         },
         {
-          "hash": "9429a05cea5bf5f60d6366ae0b3e71a0a88025b3aad4015f63c4dc88f6c90b6c",
+          "hash": "53a541385acd64573c638e1ab3175c33c4a659312738eb94202d49d4eb8a7acf",
           "path": "README.md"
         },
         {
-          "hash": "aa5aecf9d82838ec7f6c93e405bbc66e4ef8d4a1fe5ca54ff41087c1d66764d7",
+          "hash": "fd0dbd7d14e3f86de46eba8447cddb512a6d2a4897a1534466e7baf36bd6c428",
           "path": "README.pt-BR.md"
         },
         {
-          "hash": "7beeed96e91afbcde267d316fd242f745d91789a0d3a6b251e0135bd4a3db629",
+          "hash": "fc8f34d3ff5857042262d80b2ebce8ff374321bc957813c04ec2e1b409bb8928",
           "path": "README.zh.md"
         },
         {
@@ -644,11 +648,11 @@
           "path": "codecov.yml"
         },
         {
-          "hash": "e9bb83030bde616570f4255659ae13a4a89a337364e8f1d0f4687b005e74f364",
+          "hash": "82830396c5c871607734d01a9bb66bdfe6c7f83375c93ff96cbf65f269b39bb9",
           "path": "pyproject.toml"
         },
         {
-          "hash": "efad768107a42c8edc87fb230d8c1debd4be9870eb3c73e9c4eb2667604450b1",
+          "hash": "3dc25f75d7f6c028e675a8789b0087c0e85ed510c74f8e96551d38669aeacf46",
           "path": "uv.lock"
         },
         {
@@ -878,7 +882,7 @@
       "files": [
         {
           "constantOnly": true,
-          "hash": "81924adee4df130e82e6bd7fbc6d32279c027b43fa95ca1b75c10a94f0612ab3",
+          "hash": "62c4a23169719fd75036bdd4ec70599c508117abc6bbe00ebbe5220114dd7de1",
           "path": "src/interlock/__init__.py"
         },
         {
@@ -5908,107 +5912,92 @@
             {
               "in": "load_throughput_inputs_fixture",
               "kind": "raise",
-              "line": 114
+              "line": 115
+            },
+            {
+              "in": "_check_epoch",
+              "kind": "raise",
+              "line": 171
             },
             {
               "in": "__init__",
               "kind": "raise",
-              "line": 169
+              "line": 186
             },
             {
               "in": "__init__",
               "kind": "raise",
-              "line": 173
+              "line": 190
             },
             {
               "in": "map_card_name",
               "kind": "raise",
-              "line": 222
+              "line": 239
             },
             {
               "in": "map_card_name",
               "kind": "raise",
-              "line": 225
+              "line": 242
             },
             {
               "in": "compute_abort_mib",
               "kind": "raise",
-              "line": 235
+              "line": 252
             },
             {
               "in": "compute_abort_mib",
               "kind": "raise",
-              "line": 241
+              "line": 258
             },
             {
               "in": "runner",
               "kind": "except",
-              "line": 257
+              "line": 274
             },
             {
               "in": "runner",
               "kind": "raise",
-              "line": 259
+              "line": 276
             },
             {
               "in": "probe_nvidia_smi",
               "kind": "raise",
-              "line": 270
+              "line": 287
             },
             {
               "in": "probe_nvidia_smi",
               "kind": "raise",
-              "line": 273
+              "line": 290
             },
             {
               "in": "probe_nvidia_smi",
               "kind": "except",
-              "line": 278
+              "line": 295
             },
             {
               "in": "probe_nvidia_smi",
               "kind": "raise",
-              "line": 279
+              "line": 296
             },
             {
               "in": "probe_nvidia_smi",
               "kind": "raise",
-              "line": 284
+              "line": 301
             },
             {
               "in": "_localhost_resolves_only_to_loopback",
               "kind": "except",
-              "line": 332
+              "line": 349
             },
             {
               "in": "_localhost_resolves_only_to_loopback",
               "kind": "except",
-              "line": 341
+              "line": 358
             },
             {
               "in": "validate_loopback_ollama_host",
               "kind": "raise",
-              "line": 357
-            },
-            {
-              "in": "validate_loopback_ollama_host",
-              "kind": "raise",
-              "line": 360
-            },
-            {
-              "in": "validate_loopback_ollama_host",
-              "kind": "raise",
-              "line": 363
-            },
-            {
-              "in": "validate_loopback_ollama_host",
-              "kind": "raise",
-              "line": 368
-            },
-            {
-              "in": "validate_loopback_ollama_host",
-              "kind": "raise",
-              "line": 370
+              "line": 374
             },
             {
               "in": "validate_loopback_ollama_host",
@@ -6023,12 +6012,17 @@
             {
               "in": "validate_loopback_ollama_host",
               "kind": "raise",
-              "line": 382
+              "line": 385
             },
             {
               "in": "validate_loopback_ollama_host",
               "kind": "raise",
-              "line": 388
+              "line": 387
+            },
+            {
+              "in": "validate_loopback_ollama_host",
+              "kind": "raise",
+              "line": 394
             },
             {
               "in": "validate_loopback_ollama_host",
@@ -6038,367 +6032,362 @@
             {
               "in": "validate_loopback_ollama_host",
               "kind": "raise",
-              "line": 402
+              "line": 399
             },
             {
-              "in": "_validate_loopback_ollama_url",
+              "in": "validate_loopback_ollama_host",
               "kind": "raise",
-              "line": 410
+              "line": 405
             },
             {
-              "in": "_validate_loopback_ollama_url",
-              "kind": "except",
-              "line": 413
-            },
-            {
-              "in": "_validate_loopback_ollama_url",
+              "in": "validate_loopback_ollama_host",
               "kind": "raise",
               "line": 414
             },
             {
+              "in": "validate_loopback_ollama_host",
+              "kind": "raise",
+              "line": 419
+            },
+            {
+              "in": "_validate_loopback_ollama_url",
+              "kind": "raise",
+              "line": 427
+            },
+            {
+              "in": "_validate_loopback_ollama_url",
+              "kind": "except",
+              "line": 430
+            },
+            {
+              "in": "_validate_loopback_ollama_url",
+              "kind": "raise",
+              "line": 431
+            },
+            {
               "in": "_default_http_post",
               "kind": "except",
-              "line": 439
+              "line": 456
             },
             {
               "in": "_default_http_post",
               "kind": "except",
-              "line": 445
+              "line": 462
             },
             {
               "in": "__enter__",
               "kind": "raise",
-              "line": 567
+              "line": 587
             },
             {
               "in": "__enter__",
               "kind": "except",
-              "line": 574
+              "line": 594
             },
             {
               "in": "__enter__",
-              "kind": "raise",
-              "line": 577
-            },
-            {
-              "in": "__enter__",
-              "kind": "raise",
-              "line": 581
-            },
-            {
-              "in": "ensure_parallel",
               "kind": "raise",
               "line": 597
             },
             {
+              "in": "__enter__",
+              "kind": "raise",
+              "line": 601
+            },
+            {
+              "in": "ensure_parallel",
+              "kind": "raise",
+              "line": 617
+            },
+            {
               "in": "begin_cell",
               "kind": "except",
-              "line": 612
+              "line": 639
             },
             {
               "in": "load_report",
               "kind": "except",
-              "line": 622
+              "line": 649
             },
             {
               "in": "effective_slots",
               "kind": "except",
-              "line": 633
+              "line": 660
             },
             {
               "in": "__exit__",
               "kind": "except",
-              "line": 653
+              "line": 680
             },
             {
               "in": "build_linux_failure_row",
               "kind": "raise",
-              "line": 696
+              "line": 723
             },
             {
               "in": "build_linux_failure_row",
               "kind": "raise",
-              "line": 698
+              "line": 725
             },
             {
               "in": "_eval_window",
               "kind": "except",
-              "line": 874
+              "line": 901
             },
             {
               "in": "run_linux_generate_ladder",
               "kind": "except",
-              "line": 1083
+              "line": 1122
             },
             {
               "in": "run_linux_throughput_ladder",
               "kind": "except",
-              "line": 1303
+              "line": 1350
             },
             {
               "in": "run_linux_throughput_ladder",
               "kind": "except",
-              "line": 1305
+              "line": 1352
             },
             {
               "in": "probe_linux_gpu",
               "kind": "except",
-              "line": 1513
+              "line": 1560
             },
             {
               "in": "_sample_during_cell",
               "kind": "except",
-              "line": 1530
+              "line": 1577
             },
             {
               "in": "_sample_during_cell",
               "kind": "raise",
-              "line": 1531
+              "line": 1578
             },
             {
               "in": "_sample_during_cell",
               "kind": "except",
-              "line": 1532
+              "line": 1579
             },
             {
               "in": "_sample_during_cell",
               "kind": "raise",
-              "line": 1533
+              "line": 1580
             },
             {
               "in": "_query_ps_entry",
               "kind": "raise",
-              "line": 1558
+              "line": 1605
             },
             {
               "in": "measure_linux_ollama_window",
               "kind": "raise",
-              "line": 1583
+              "line": 1630
             },
             {
               "in": "measure_linux_ollama_window",
               "kind": "except",
-              "line": 1587
+              "line": 1634
             },
             {
               "in": "measure_linux_ollama_window",
               "kind": "raise",
-              "line": 1588
+              "line": 1635
             },
             {
               "in": "run",
               "kind": "except",
-              "line": 1721
+              "line": 1772
             },
             {
               "in": "_with_deadline",
               "kind": "raise",
-              "line": 1728
-            },
-            {
-              "in": "_with_deadline",
-              "kind": "raise",
-              "line": 1730
-            },
-            {
-              "in": "_fallback",
-              "kind": "except",
-              "line": 1777
-            },
-            {
-              "in": "_fallback",
-              "kind": "raise",
-              "line": 1778
-            },
-            {
-              "in": "_fallback",
-              "kind": "except",
               "line": 1779
             },
             {
-              "in": "_fallback",
+              "in": "_with_deadline",
               "kind": "raise",
-              "line": 1780
+              "line": 1781
             },
             {
               "in": "_fallback",
               "kind": "except",
-              "line": 1784
+              "line": 1828
             },
             {
               "in": "_fallback",
               "kind": "raise",
-              "line": 1786
+              "line": 1829
             },
             {
-              "in": "_evaluated_tokens",
+              "in": "_fallback",
+              "kind": "except",
+              "line": 1830
+            },
+            {
+              "in": "_fallback",
+              "kind": "raise",
+              "line": 1831
+            },
+            {
+              "in": "_fallback",
+              "kind": "raise",
+              "line": 1836
+            },
+            {
+              "in": "_fallback",
+              "kind": "except",
+              "line": 1839
+            },
+            {
+              "in": "_fallback",
+              "kind": "raise",
+              "line": 1840
+            },
+            {
+              "in": "_fallback",
               "kind": "raise",
               "line": 1842
             },
             {
               "in": "_evaluated_tokens",
               "kind": "raise",
-              "line": 1845
+              "line": 1900
+            },
+            {
+              "in": "_evaluated_tokens",
+              "kind": "raise",
+              "line": 1903
             },
             {
               "in": "_check_fully_resident",
               "kind": "except",
-              "line": 1880
+              "line": 1938
             },
             {
               "in": "_check_fully_resident",
               "kind": "raise",
-              "line": 1907
+              "line": 1965
             },
             {
               "in": "_calibrate_ladder_prompt",
               "kind": "raise",
-              "line": 1979
+              "line": 2037
             },
             {
               "in": "_calibrate_ladder_prompt",
               "kind": "raise",
-              "line": 1997
+              "line": 2055
             },
             {
               "in": "_calibrate_ladder_prompt",
               "kind": "raise",
-              "line": 2004
+              "line": 2062
             },
             {
               "in": "_calibrate_ladder_prompt",
               "kind": "raise",
-              "line": 2007
+              "line": 2065
             },
             {
               "in": "measure_linux_ollama_generate",
               "kind": "except",
-              "line": 2048
+              "line": 2107
             },
             {
               "in": "measure_linux_ollama_generate",
               "kind": "raise",
-              "line": 2050
+              "line": 2109
             },
             {
               "in": "_measure_generate_cell",
               "kind": "except",
-              "line": 2089
+              "line": 2152
             },
             {
               "in": "_measure_generate_cell",
               "kind": "raise",
-              "line": 2090
+              "line": 2153
             },
             {
               "in": "_measure_generate_cell",
               "kind": "raise",
-              "line": 2102
+              "line": 2163
             },
             {
               "in": "_measure_generate_cell",
               "kind": "raise",
-              "line": 2114
+              "line": 2175
             },
             {
               "in": "_call_once",
               "kind": "raise",
-              "line": 2136
+              "line": 2198
             },
             {
               "in": "_measure_generate_cell",
               "kind": "raise",
-              "line": 2155
+              "line": 2217
             },
             {
               "in": "_measure_generate_cell",
               "kind": "raise",
-              "line": 2158
+              "line": 2220
             },
             {
               "in": "_measure_generate_cell",
               "kind": "raise",
-              "line": 2170
+              "line": 2232
             },
             {
               "in": "_measure_generate_cell",
               "kind": "except",
-              "line": 2211
+              "line": 2273
             },
             {
               "in": "_measure_generate_cell",
               "kind": "raise",
-              "line": 2219
+              "line": 2281
             },
             {
               "in": "_build_fixed_token_item",
               "kind": "raise",
-              "line": 2259
+              "line": 2321
             },
             {
               "in": "_batch_endpoint_and_payload",
               "kind": "raise",
-              "line": 2280
+              "line": 2342
             },
             {
               "in": "_batch_endpoint_and_payload",
               "kind": "raise",
-              "line": 2284
+              "line": 2346
             },
             {
               "in": "measure_linux_ollama_batch",
               "kind": "raise",
-              "line": 2308
+              "line": 2370
             },
             {
               "in": "measure_linux_ollama_batch",
               "kind": "except",
-              "line": 2316
+              "line": 2378
             },
             {
               "in": "measure_linux_ollama_batch",
               "kind": "raise",
-              "line": 2317
+              "line": 2379
             },
             {
               "in": "_unloaded_after",
               "kind": "except",
-              "line": 2366
+              "line": 2428
             },
             {
               "in": "run_linux_spec",
               "kind": "raise",
-              "line": 2629
-            },
-            {
-              "in": "resolve_c2_sources",
-              "kind": "raise",
-              "line": 2639
-            },
-            {
-              "in": "resolve_c2_sources",
-              "kind": "raise",
-              "line": 2642
-            },
-            {
-              "in": "resolve_c2_sources",
-              "kind": "raise",
-              "line": 2662
-            },
-            {
-              "in": "resolve_c2_sources",
-              "kind": "raise",
-              "line": 2667
-            },
-            {
-              "in": "resolve_c2_sources",
-              "kind": "raise",
-              "line": 2671
-            },
-            {
-              "in": "resolve_c2_sources",
-              "kind": "raise",
-              "line": 2698
+              "line": 2692
             },
             {
               "in": "resolve_c2_sources",
@@ -6408,100 +6397,130 @@
             {
               "in": "resolve_c2_sources",
               "kind": "raise",
-              "line": 2739
+              "line": 2705
+            },
+            {
+              "in": "resolve_c2_sources",
+              "kind": "raise",
+              "line": 2725
+            },
+            {
+              "in": "resolve_c2_sources",
+              "kind": "raise",
+              "line": 2730
+            },
+            {
+              "in": "resolve_c2_sources",
+              "kind": "raise",
+              "line": 2734
+            },
+            {
+              "in": "resolve_c2_sources",
+              "kind": "raise",
+              "line": 2761
+            },
+            {
+              "in": "resolve_c2_sources",
+              "kind": "raise",
+              "line": 2765
+            },
+            {
+              "in": "resolve_c2_sources",
+              "kind": "raise",
+              "line": 2802
             },
             {
               "in": "_default_live_fetch",
               "kind": "raise",
-              "line": 2773
+              "line": 2836
             },
             {
               "in": "_default_live_fetch",
               "kind": "except",
-              "line": 2781
-            },
-            {
-              "in": "_default_live_fetch",
-              "kind": "except",
-              "line": 2783
-            },
-            {
-              "in": "_default_live_fetch",
-              "kind": "raise",
-              "line": 2784
-            },
-            {
-              "in": "verify_c2_sources_live",
-              "kind": "raise",
-              "line": 2828
-            },
-            {
-              "in": "verify_c2_sources_live",
-              "kind": "raise",
-              "line": 2831
-            },
-            {
-              "in": "verify_c2_sources_live",
-              "kind": "raise",
-              "line": 2839
-            },
-            {
-              "in": "verify_c2_sources_live",
-              "kind": "raise",
               "line": 2844
             },
             {
-              "in": "verify_c2_sources_live",
+              "in": "_default_live_fetch",
+              "kind": "except",
+              "line": 2846
+            },
+            {
+              "in": "_default_live_fetch",
               "kind": "raise",
-              "line": 2858
+              "line": 2847
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2881
+              "line": 2891
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2888
+              "line": 2894
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2892
+              "line": 2902
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2919
+              "line": 2907
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2922
+              "line": 2921
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2930
+              "line": 2944
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2950
+              "line": 2951
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2979
+              "line": 2955
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
               "line": 2982
+            },
+            {
+              "in": "verify_c2_sources_live",
+              "kind": "raise",
+              "line": 2985
+            },
+            {
+              "in": "verify_c2_sources_live",
+              "kind": "raise",
+              "line": 2993
+            },
+            {
+              "in": "verify_c2_sources_live",
+              "kind": "raise",
+              "line": 3013
+            },
+            {
+              "in": "verify_c2_sources_live",
+              "kind": "raise",
+              "line": 3042
+            },
+            {
+              "in": "verify_c2_sources_live",
+              "kind": "raise",
+              "line": 3045
             }
           ],
-          "hash": "472a7ae0ad7bf1f384ff506a7d757eebf9b890ecb11cff2d82a951695f95b785",
+          "hash": "ae7e58dd2950633ef80177e9acc8438d983b29c723ad28010e89051b18fa8aba",
           "importsFiles": [
             "src/interlock/__init__.py",
             "src/interlock/devices.py",
@@ -6513,37 +6532,37 @@
             {
               "calls": [
                 {
-                  "line": 300,
+                  "line": 317,
                   "name": "nvmlInit",
                   "target": null
                 },
                 {
-                  "line": 302,
+                  "line": 319,
                   "name": "nvmlDeviceGetHandleByIndex",
                   "target": null
                 },
                 {
-                  "line": 303,
+                  "line": 320,
                   "name": "nvmlDeviceGetName",
                   "target": null
                 },
                 {
-                  "line": 306,
+                  "line": 323,
                   "name": "nvmlDeviceGetMemoryInfo",
                   "target": null
                 },
                 {
-                  "line": 309,
+                  "line": 326,
                   "name": "nvmlSystemGetDriverVersion",
                   "target": null
                 },
                 {
-                  "line": 312,
+                  "line": 329,
                   "name": "nvmlSystemGetCudaDriverVersion_v2",
                   "target": null
                 },
                 {
-                  "line": 317,
+                  "line": 334,
                   "name": "nvmlShutdown",
                   "target": null
                 }
@@ -6556,17 +6575,17 @@
             {
               "calls": [
                 {
-                  "line": 361,
+                  "line": 378,
                   "name": "rsplit",
                   "target": null
                 },
                 {
-                  "line": 369,
+                  "line": 386,
                   "name": "count",
                   "target": null
                 },
                 {
-                  "line": 373,
+                  "line": 390,
                   "name": "rsplit",
                   "target": null
                 }
@@ -6579,19 +6598,19 @@
             {
               "calls": [
                 {
-                  "line": 361,
+                  "line": 378,
                   "name": "rsplit",
                   "target": null,
                   "via": "validate_loopback_ollama_host"
                 },
                 {
-                  "line": 369,
+                  "line": 386,
                   "name": "count",
                   "target": null,
                   "via": "validate_loopback_ollama_host"
                 },
                 {
-                  "line": 373,
+                  "line": 390,
                   "name": "rsplit",
                   "target": null,
                   "via": "validate_loopback_ollama_host"
@@ -6605,19 +6624,19 @@
             {
               "calls": [
                 {
-                  "line": 361,
+                  "line": 378,
                   "name": "rsplit",
                   "target": null,
                   "via": "validate_loopback_ollama_host"
                 },
                 {
-                  "line": 369,
+                  "line": 386,
                   "name": "count",
                   "target": null,
                   "via": "validate_loopback_ollama_host"
                 },
                 {
-                  "line": 373,
+                  "line": 390,
                   "name": "rsplit",
                   "target": null,
                   "via": "validate_loopback_ollama_host"
@@ -6631,19 +6650,19 @@
             {
               "calls": [
                 {
-                  "line": 361,
+                  "line": 378,
                   "name": "rsplit",
                   "target": null,
                   "via": "validate_loopback_ollama_host"
                 },
                 {
-                  "line": 369,
+                  "line": 386,
                   "name": "count",
                   "target": null,
                   "via": "validate_loopback_ollama_host"
                 },
                 {
-                  "line": 373,
+                  "line": 390,
                   "name": "rsplit",
                   "target": null,
                   "via": "validate_loopback_ollama_host"
@@ -6657,19 +6676,19 @@
             {
               "calls": [
                 {
-                  "line": 767,
+                  "line": 794,
                   "name": "to_dict",
                   "target": null
                 },
                 {
-                  "line": 785,
+                  "line": 812,
                   "name": "stamp_family",
                   "target": {
                     "file": "src/interlock/families.py"
                   }
                 },
                 {
-                  "line": 787,
+                  "line": 814,
                   "name": "validate_row",
                   "target": {
                     "file": "src/interlock/receipt.py"
@@ -6685,14 +6704,14 @@
               "calls": [
                 {
                   "branch": "grain <= 0 or trained_ctx < grain",
-                  "line": 767,
+                  "line": 794,
                   "name": "to_dict",
                   "target": null,
                   "via": "build_linux_failure_row"
                 },
                 {
                   "branch": "grain <= 0 or trained_ctx < grain",
-                  "line": 785,
+                  "line": 812,
                   "name": "stamp_family",
                   "target": {
                     "file": "src/interlock/families.py"
@@ -6701,7 +6720,7 @@
                 },
                 {
                   "branch": "grain <= 0 or trained_ctx < grain",
-                  "line": 787,
+                  "line": 814,
                   "name": "validate_row",
                   "target": {
                     "file": "src/interlock/receipt.py"
@@ -6709,19 +6728,19 @@
                   "via": "build_linux_failure_row"
                 },
                 {
-                  "line": 987,
+                  "line": 1014,
                   "name": "to_dict",
                   "target": null
                 },
                 {
-                  "line": 1020,
+                  "line": 1047,
                   "name": "stamp_family",
                   "target": {
                     "file": "src/interlock/families.py"
                   }
                 },
                 {
-                  "line": 1022,
+                  "line": 1049,
                   "name": "validate_row",
                   "target": {
                     "file": "src/interlock/receipt.py"
@@ -6736,13 +6755,13 @@
             {
               "calls": [
                 {
-                  "line": 767,
+                  "line": 794,
                   "name": "to_dict",
                   "target": null,
                   "via": "build_linux_failure_row"
                 },
                 {
-                  "line": 785,
+                  "line": 812,
                   "name": "stamp_family",
                   "target": {
                     "file": "src/interlock/families.py"
@@ -6750,7 +6769,7 @@
                   "via": "build_linux_failure_row"
                 },
                 {
-                  "line": 787,
+                  "line": 814,
                   "name": "validate_row",
                   "target": {
                     "file": "src/interlock/receipt.py"
@@ -6758,19 +6777,19 @@
                   "via": "build_linux_failure_row"
                 },
                 {
-                  "line": 1217,
+                  "line": 1264,
                   "name": "to_dict",
                   "target": null
                 },
                 {
-                  "line": 1265,
+                  "line": 1312,
                   "name": "stamp_family",
                   "target": {
                     "file": "src/interlock/families.py"
                   }
                 },
                 {
-                  "line": 1267,
+                  "line": 1314,
                   "name": "validate_row",
                   "target": {
                     "file": "src/interlock/receipt.py"
@@ -6785,13 +6804,13 @@
             {
               "calls": [
                 {
-                  "line": 767,
+                  "line": 794,
                   "name": "to_dict",
                   "target": null,
                   "via": "build_linux_failure_row"
                 },
                 {
-                  "line": 785,
+                  "line": 812,
                   "name": "stamp_family",
                   "target": {
                     "file": "src/interlock/families.py"
@@ -6799,7 +6818,7 @@
                   "via": "build_linux_failure_row"
                 },
                 {
-                  "line": 787,
+                  "line": 814,
                   "name": "validate_row",
                   "target": {
                     "file": "src/interlock/receipt.py"
@@ -6807,19 +6826,19 @@
                   "via": "build_linux_failure_row"
                 },
                 {
-                  "line": 1407,
+                  "line": 1454,
                   "name": "to_dict",
                   "target": null
                 },
                 {
-                  "line": 1425,
+                  "line": 1472,
                   "name": "stamp_family",
                   "target": {
                     "file": "src/interlock/families.py"
                   }
                 },
                 {
-                  "line": 1427,
+                  "line": 1474,
                   "name": "validate_row",
                   "target": {
                     "file": "src/interlock/receipt.py"
@@ -6835,49 +6854,49 @@
               "calls": [
                 {
                   "branch": "nvml_module is not None",
-                  "line": 300,
+                  "line": 317,
                   "name": "nvmlInit",
                   "target": null,
                   "via": "probe_nvml"
                 },
                 {
                   "branch": "nvml_module is not None",
-                  "line": 302,
+                  "line": 319,
                   "name": "nvmlDeviceGetHandleByIndex",
                   "target": null,
                   "via": "probe_nvml"
                 },
                 {
                   "branch": "nvml_module is not None",
-                  "line": 303,
+                  "line": 320,
                   "name": "nvmlDeviceGetName",
                   "target": null,
                   "via": "probe_nvml"
                 },
                 {
                   "branch": "nvml_module is not None",
-                  "line": 306,
+                  "line": 323,
                   "name": "nvmlDeviceGetMemoryInfo",
                   "target": null,
                   "via": "probe_nvml"
                 },
                 {
                   "branch": "nvml_module is not None",
-                  "line": 309,
+                  "line": 326,
                   "name": "nvmlSystemGetDriverVersion",
                   "target": null,
                   "via": "probe_nvml"
                 },
                 {
                   "branch": "nvml_module is not None",
-                  "line": 312,
+                  "line": 329,
                   "name": "nvmlSystemGetCudaDriverVersion_v2",
                   "target": null,
                   "via": "probe_nvml"
                 },
                 {
                   "branch": "nvml_module is not None",
-                  "line": 317,
+                  "line": 334,
                   "name": "nvmlShutdown",
                   "target": null,
                   "via": "probe_nvml"
@@ -6891,7 +6910,7 @@
             {
               "calls": [
                 {
-                  "line": 1573,
+                  "line": 1620,
                   "name": "post",
                   "target": null
                 }
@@ -6905,12 +6924,12 @@
               "calls": [
                 {
                   "branch": "\"timeout\" in inspect.signature(server.post).parameters",
-                  "line": 1815,
+                  "line": 1873,
                   "name": "post",
                   "target": null
                 },
                 {
-                  "line": 1816,
+                  "line": 1874,
                   "name": "post",
                   "target": null
                 }
@@ -6924,13 +6943,13 @@
               "calls": [
                 {
                   "branch": "\"timeout\" in inspect.signature(server.post).parameters",
-                  "line": 1815,
+                  "line": 1873,
                   "name": "post",
                   "target": null,
                   "via": "_post"
                 },
                 {
-                  "line": 1816,
+                  "line": 1874,
                   "name": "post",
                   "target": null,
                   "via": "_post"
@@ -6945,13 +6964,13 @@
               "calls": [
                 {
                   "branch": "\"timeout\" in inspect.signature(server.post).parameters",
-                  "line": 1815,
+                  "line": 1873,
                   "name": "post",
                   "target": null,
                   "via": "_post"
                 },
                 {
-                  "line": 1816,
+                  "line": 1874,
                   "name": "post",
                   "target": null,
                   "via": "_post"
@@ -6966,13 +6985,13 @@
               "calls": [
                 {
                   "branch": "\"timeout\" in inspect.signature(server.post).parameters",
-                  "line": 1815,
+                  "line": 1873,
                   "name": "post",
                   "target": null,
                   "via": "_post"
                 },
                 {
-                  "line": 1816,
+                  "line": 1874,
                   "name": "post",
                   "target": null,
                   "via": "_post"
@@ -6987,13 +7006,13 @@
               "calls": [
                 {
                   "branch": "\"timeout\" in inspect.signature(server.post).parameters",
-                  "line": 1815,
+                  "line": 1873,
                   "name": "post",
                   "target": null,
                   "via": "_post"
                 },
                 {
-                  "line": 1816,
+                  "line": 1874,
                   "name": "post",
                   "target": null,
                   "via": "_post"
@@ -7007,7 +7026,7 @@
             {
               "calls": [
                 {
-                  "line": 2306,
+                  "line": 2368,
                   "name": "post",
                   "target": null
                 }
@@ -7020,12 +7039,12 @@
             {
               "calls": [
                 {
-                  "line": 2354,
+                  "line": 2416,
                   "name": "is_absolute",
                   "target": null
                 },
                 {
-                  "line": 2354,
+                  "line": 2416,
                   "name": "as_posix",
                   "target": null
                 }
@@ -7038,7 +7057,7 @@
             {
               "calls": [
                 {
-                  "line": 2365,
+                  "line": 2427,
                   "name": "unload",
                   "target": null
                 }
@@ -7052,75 +7071,75 @@
               "calls": [
                 {
                   "branch": "nvml_module is not None",
-                  "line": 300,
+                  "line": 317,
                   "name": "nvmlInit",
                   "target": null,
                   "via": "probe_nvml"
                 },
                 {
                   "branch": "nvml_module is not None",
-                  "line": 302,
+                  "line": 319,
                   "name": "nvmlDeviceGetHandleByIndex",
                   "target": null,
                   "via": "probe_nvml"
                 },
                 {
                   "branch": "nvml_module is not None",
-                  "line": 303,
+                  "line": 320,
                   "name": "nvmlDeviceGetName",
                   "target": null,
                   "via": "probe_nvml"
                 },
                 {
                   "branch": "nvml_module is not None",
-                  "line": 306,
+                  "line": 323,
                   "name": "nvmlDeviceGetMemoryInfo",
                   "target": null,
                   "via": "probe_nvml"
                 },
                 {
                   "branch": "nvml_module is not None",
-                  "line": 309,
+                  "line": 326,
                   "name": "nvmlSystemGetDriverVersion",
                   "target": null,
                   "via": "probe_nvml"
                 },
                 {
                   "branch": "nvml_module is not None",
-                  "line": 312,
+                  "line": 329,
                   "name": "nvmlSystemGetCudaDriverVersion_v2",
                   "target": null,
                   "via": "probe_nvml"
                 },
                 {
                   "branch": "nvml_module is not None",
-                  "line": 317,
+                  "line": 334,
                   "name": "nvmlShutdown",
                   "target": null,
                   "via": "probe_nvml"
                 },
                 {
-                  "line": 2354,
+                  "line": 2416,
                   "name": "is_absolute",
                   "target": null,
                   "via": "_relative_spec_posix"
                 },
                 {
-                  "line": 2354,
+                  "line": 2416,
                   "name": "as_posix",
                   "target": null,
                   "via": "_relative_spec_posix"
                 },
                 {
                   "branch": "mode == \"fill-card\"",
-                  "line": 767,
+                  "line": 794,
                   "name": "to_dict",
                   "target": null,
                   "via": "build_linux_failure_row"
                 },
                 {
                   "branch": "mode == \"fill-card\"",
-                  "line": 785,
+                  "line": 812,
                   "name": "stamp_family",
                   "target": {
                     "file": "src/interlock/families.py"
@@ -7129,7 +7148,7 @@
                 },
                 {
                   "branch": "mode == \"fill-card\"",
-                  "line": 787,
+                  "line": 814,
                   "name": "validate_row",
                   "target": {
                     "file": "src/interlock/receipt.py"
@@ -7138,21 +7157,21 @@
                 },
                 {
                   "branch": "mode == \"fill-card\"",
-                  "line": 2365,
+                  "line": 2427,
                   "name": "unload",
                   "target": null,
                   "via": "_unloaded_after"
                 },
                 {
                   "branch": "mode == \"fill-card\"",
-                  "line": 987,
+                  "line": 1014,
                   "name": "to_dict",
                   "target": null,
                   "via": "run_linux_fill_card"
                 },
                 {
                   "branch": "mode == \"fill-card\"",
-                  "line": 1020,
+                  "line": 1047,
                   "name": "stamp_family",
                   "target": {
                     "file": "src/interlock/families.py"
@@ -7161,7 +7180,7 @@
                 },
                 {
                   "branch": "mode == \"fill-card\"",
-                  "line": 1022,
+                  "line": 1049,
                   "name": "validate_row",
                   "target": {
                     "file": "src/interlock/receipt.py"
@@ -7170,21 +7189,21 @@
                 },
                 {
                   "branch": "mode == \"fill-card\"",
-                  "line": 1573,
+                  "line": 1620,
                   "name": "post",
                   "target": null,
                   "via": "measure_linux_ollama_window"
                 },
                 {
                   "branch": "mode == \"generate-ladder\"",
-                  "line": 1217,
+                  "line": 1264,
                   "name": "to_dict",
                   "target": null,
                   "via": "run_linux_generate_ladder"
                 },
                 {
                   "branch": "mode == \"generate-ladder\"",
-                  "line": 1265,
+                  "line": 1312,
                   "name": "stamp_family",
                   "target": {
                     "file": "src/interlock/families.py"
@@ -7193,7 +7212,7 @@
                 },
                 {
                   "branch": "mode == \"generate-ladder\"",
-                  "line": 1267,
+                  "line": 1314,
                   "name": "validate_row",
                   "target": {
                     "file": "src/interlock/receipt.py"
@@ -7202,21 +7221,21 @@
                 },
                 {
                   "branch": "mode == \"generate-ladder\"",
-                  "line": 1815,
+                  "line": 1873,
                   "name": "post",
                   "target": null,
                   "via": "_post"
                 },
                 {
                   "branch": "mode == \"batch-ladder\"",
-                  "line": 1407,
+                  "line": 1454,
                   "name": "to_dict",
                   "target": null,
                   "via": "run_linux_throughput_ladder"
                 },
                 {
                   "branch": "mode == \"batch-ladder\"",
-                  "line": 1425,
+                  "line": 1472,
                   "name": "stamp_family",
                   "target": {
                     "file": "src/interlock/families.py"
@@ -7225,7 +7244,7 @@
                 },
                 {
                   "branch": "mode == \"batch-ladder\"",
-                  "line": 1427,
+                  "line": 1474,
                   "name": "validate_row",
                   "target": {
                     "file": "src/interlock/receipt.py"
@@ -13852,6 +13871,10 @@
           ]
         },
         {
+          "hash": "55a8602284be7561eb3d98952900817178fe61a3a793d7daa4351103a0eb5420",
+          "path": "src/interlock/schema/route-decision.v1.json"
+        },
+        {
           "hash": "ada1ee89ea1921e6cd946725ecd3e10797df56a38a2b4520ba85b32ee623aee5",
           "path": "src/interlock/schema/routing-row.schema.json"
         },
@@ -13982,7 +14005,7 @@
           "testFramework": "pytest"
         },
         {
-          "hash": "9a0e2510fcc90bf8ffbc4f7eac8443eea39f80ea4fdfe923b47c796caf435b49",
+          "hash": "8d4971a8cfc2df690c9346eb3e139d096f8cf37396fd1485a6366b3c96e8af97",
           "importsFiles": [
             "src/interlock/harness/linux_cuda.py"
           ],
@@ -15473,7 +15496,7 @@
             "test_the_sweep_fails_on_each_planted_climb",
             "test_the_wheel_carries_the_family_table_byte_for_byte"
           ],
-          "hash": "b114c45e3b95328d8100a797d600b19f046b3a4424f95fbf2dc4edb3c5d86597",
+          "hash": "d85db7d78444c5ecc546da1849707d0e6543ff209638a7ac2dba0ca8025f65af",
           "importsFiles": [
             "src/interlock/__init__.py",
             "src/interlock/families.py"
@@ -16147,18 +16170,20 @@
             "test_a_sampler_that_answers_late_but_inside_the_deadline_still_measures",
             "test_a_sampler_that_hangs_mid_cell_is_also_unmeasured",
             "test_a_sampler_that_never_answers_makes_the_cell_unmeasured_within_the_deadline",
+            "test_a_t4_shaped_slow_cell_is_still_refused",
             "test_a_total_given_in_mib_has_no_rounding_margin_clause",
+            "test_an_a100_80_shaped_c8_cell_with_a_30_second_verify_measures",
             "test_calibration_calls_carry_the_lower_timeout",
             "test_colab_rows_are_unchanged_and_carry_no_mark",
             "test_every_row_built_with_a_rig_identity_is_marked_not_for_import_and_validates",
             "test_interlock_import_refuses_a_rig_row_naming_the_field",
             "test_the_cap_and_the_calibration_timeout_are_named_with_their_defaults",
             "test_the_harness_names_each_phase_on_stderr",
-            "test_the_projection_uses_the_unclamped_budget_not_the_clamped_one",
+            "test_the_projection_is_an_expected_wall_time_without_a_safety_factor",
             "test_the_router_excludes_a_rig_row_with_its_own_code_and_never_ranks_it",
             "test_the_t4_r4_hang_after_a_host_ram_kill_ends_as_a_row_the_next_cell_starts_and_the_run_closes"
           ],
-          "hash": "8fdb2a016025b4298cc2fe3b289c8a98241d6267cc28a66bae8b1842251cbe6a",
+          "hash": "16e59d4a5156129268a827bba06463313cdb92f64e146e47ded5e4d2008fa525",
           "importOrder": [
             "src/interlock/devices.py",
             "src/interlock/harness/__init__.py",
@@ -17022,10 +17047,22 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "5bca251f2202be4416a605dba5ec93830a5c3583",
-    "tracked": 303
+    "commit": "4eb14887b8f744eaace46dc93389b53b2350599b",
+    "tracked": 305
   },
   "landings": [
+    {
+      "readers": [
+        {
+          "by": "tests/test_old_name.py",
+          "call": "literal",
+          "confidence": "ast",
+          "fromTests": true
+        }
+      ],
+      "target": "CHANGELOG.md",
+      "writers": []
+    },
     {
       "readers": [
         {
@@ -17820,7 +17857,7 @@
       "path": "site/src/content/docs/handbook/configuration.md"
     },
     {
-      "hash": "9a715c1210c164fc78ba556e862dd84a47a5833217db3eafcd0b5cbed6c77b82",
+      "hash": "77b715e4dd98021a3215e99758e47a9c649f131fab12cb55edeb69faae15fce0",
       "path": "site/src/content/docs/handbook/experiments.md"
     },
     {
@@ -17828,7 +17865,7 @@
       "path": "site/src/content/docs/handbook/getting-started.md"
     },
     {
-      "hash": "f6078def6caaef2657c40294d53a90bdbf8a6813c80b035bf8b52535005c6d37",
+      "hash": "9cd4da13257857b85485a69407775620c8bfe67df42cfc9533f9e298534dde40",
       "path": "site/src/content/docs/handbook/index.md"
     },
     {
@@ -17836,7 +17873,7 @@
       "path": "site/src/content/docs/handbook/security.md"
     },
     {
-      "hash": "f5d02ac56dfa21c4bc7d95b5ee27db4864aa0ecf2fb14da6ccd3d34c29782738",
+      "hash": "ecf900830ee8f4b5d83be3dd87aa5808d764a4efa94e715da8adc5ba9965ce95",
       "path": "site/src/content/docs/handbook/usage.md"
     },
     {
@@ -17853,7 +17890,7 @@
     },
     {
       "constantOnly": true,
-      "hash": "ecfb70853e0ef24c69ba6b473b6acc40333f9bf48d5dd1b5aeb319c28ca64f85",
+      "hash": "811d18e5ce4576afa658c2b92206348485fbf58c95c51fa9476a9766aa6d180e",
       "path": "site/src/site-config.ts"
     },
     {

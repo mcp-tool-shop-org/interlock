@@ -34,30 +34,30 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 3,
-      "changed": 7,
+      "added": 2,
+      "changed": 19,
       "moved": 0,
       "parts": 3,
-      "removed": 2
+      "removed": 0
     },
     "items": [
       {
         "kind": "landing",
-        "sentence": "tests/fixtures/route/r3_table.jsonl is now read by tests/test_route_concurrency.py.",
+        "sentence": "CHANGELOG.md is now read by tests/test_old_name.py.",
         "subjects": [
-          "tests/fixtures/route/r3_table.jsonl",
-          "tests/test_route_concurrency.py"
+          "CHANGELOG.md",
+          "tests/test_old_name.py"
         ]
       },
       {
         "kind": "counts",
-        "sentence": "3 files added, 2 removed and 7 changed content, across 3 parts.",
+        "sentence": "2 files added and 19 changed content, across 3 parts.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "1296f138af8df38c10213e4398240e35c0a1a6ea",
-      "generatedAt": "2026-10-26T20:23:00.840Z"
+      "commit": "5bca251f2202be4416a605dba5ec93830a5c3583",
+      "generatedAt": "2026-10-26T20:27:57.879Z"
     },
     "unchanged": false
   },
@@ -80,7 +80,7 @@
     {
       "a": "site/src/site-config.ts",
       "b": "src/interlock/__init__.py",
-      "either": 13,
+      "either": 14,
       "partLabels": [
         null,
         "src"
@@ -90,26 +90,11 @@
         "src"
       ],
       "relation": "unassigned",
-      "shared": 9
+      "shared": 10
     },
     {
       "a": "src/interlock/importers/remote.py",
       "b": "src/interlock/receipt.py",
-      "either": 7,
-      "partLabels": [
-        "src",
-        "src"
-      ],
-      "parts": [
-        "src",
-        "src"
-      ],
-      "relation": "inside",
-      "shared": 4
-    },
-    {
-      "a": "src/interlock/importers/remote.py",
-      "b": "src/interlock/router/policy.py",
       "either": 7,
       "partLabels": [
         "src",
@@ -136,6 +121,21 @@
       ],
       "relation": "b-imports-a",
       "shared": 5
+    },
+    {
+      "a": "src/switchyard/harness/receipts.py",
+      "b": "src/switchyard/receipt.py",
+      "either": 13,
+      "partLabels": [
+        null,
+        null
+      ],
+      "parts": [
+        null,
+        null
+      ],
+      "relation": "unassigned",
+      "shared": 7
     }
   ],
   "changesTogetherNote": [
@@ -144,7 +144,7 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 16 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 2,
-  "commit": "5bca251f2202be4416a605dba5ec93830a5c3583",
+  "commit": "4eb14887b8f744eaace46dc93389b53b2350599b",
   "defaultBranch": "main",
   "derived": "10 parts, mostly Python (115 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
   "doors": [
@@ -309,7 +309,7 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-26T20:27:57.879Z",
+  "generatedAt": "2026-10-26T22:12:25.511Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "5 writes and 6 reads use paths built at run time and are not named here.",

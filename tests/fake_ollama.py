@@ -23,7 +23,7 @@ import math
 import threading
 from typing import Any
 
-from interlock.harness.linux_cuda import parse_load_report
+from interlock.harness.linux_cuda import _CELL_EPOCH, StaleCell, _check_epoch, parse_load_report
 
 NUM_KEEP = 4
 
@@ -73,6 +73,9 @@ class FakeOllama:
         self.timeouts: list[float | None] = []
         self._load = {"on_gpu": layers_total, "cpu_kv": 0.0, "kv": 0.0, "killed": False}
         self.version = "0.40.11"
+        self.epoch = 0
+        self.stale_calls = 0  # requests from an earlier cell that the epoch refused
+        self.restarts_after_deadline = 0
         self.kills = 0  # loads that ended in a SIGKILL
         self.num_parallel = 1
         self.restarts = 0
@@ -87,12 +90,27 @@ class FakeOllama:
         self._loaded_ctx: int | None = None
 
     # -- the server surface the harness uses -------------------------------------------------------------------------
+    def _refuse_stale(self) -> None:
+        try:
+            _check_epoch(self.epoch)
+        except StaleCell:
+            self.stale_calls += 1
+            raise
+
     def get(self, _path: str) -> dict[str, Any]:
+        self._refuse_stale()
         size = self.weights_mib + self._load["kv"]
         return {"models": [{"name": "m", "size": size, "size_vram": size - self._load["cpu_kv"]}]}
 
     def begin_cell(self) -> None:
+        self.epoch += 1
         self._log_start = len(self.log_text)
+
+    def restart_after_deadline(self) -> None:
+        self.restarts_after_deadline += 1
+        self._slot_free = [self._now] * self.num_parallel
+        self._last_words = []
+        self._loaded_ctx = None
 
     def load_report(self) -> dict[str, Any]:
         return parse_load_report(self.log_text[self._log_start :])
@@ -175,6 +193,7 @@ class FakeOllama:
         return None
 
     def post(self, path: str, payload: dict[str, Any], timeout: float | None = None) -> dict[str, Any]:
+        self._refuse_stale()
         if path != "/api/generate":
             return {}
         if "options" not in payload:  # an unload or a pull is not a generation
@@ -185,7 +204,10 @@ class FakeOllama:
         with self._lock:
             if num_predict == 1:
                 self._arrival = self._now  # the calibration's calls are sequential: each starts when the last ended
-            self.all_calls.append({"prompt": payload["prompt"], "num_predict": num_predict, "timeout": timeout})
+            epoch = _CELL_EPOCH.get()
+            self.all_calls.append(
+                {"prompt": payload["prompt"], "num_predict": num_predict, "timeout": timeout, "epoch": epoch}
+            )
             self.timeouts.append(timeout)
             if self._loaded_ctx != options["num_ctx"]:
                 self._loaded_ctx = options["num_ctx"]
