@@ -399,10 +399,13 @@ def _validate_loopback_ollama_url(url: str) -> None:
         raise LinuxCudaError(f"refusing non-loopback Ollama URL {url!r}: {exc}") from exc
 
 
-def _default_http_get(url: str) -> dict[str, Any]:
+READY_POLL_TIMEOUT_S = 2.0  # one readiness poll; the whole wait is ``ready_timeout_s``
+
+
+def _default_http_get(url: str, timeout: float = 30.0) -> dict[str, Any]:
     _validate_loopback_ollama_url(url)
     req = urllib.request.Request(url, method="GET")  # noqa: S310
-    with urllib.request.urlopen(req, timeout=30.0) as resp:  # noqa: S310
+    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
         return json.loads(resp.read().decode("utf-8"))
 
 
@@ -455,6 +458,8 @@ class LinuxOllamaServer:
         self._custom_popen = popen is not None
         self._popen = popen or subprocess.Popen
         self._http_get = http_get or _default_http_get
+        # A hung poll must not use up the readiness budget: each poll is short, the loop retries inside the budget.
+        self._poll_get = http_get or (lambda url: _default_http_get(url, timeout=READY_POLL_TIMEOUT_S))
         self._http_post = http_post or _default_http_post
         self._sleep = sleep
         self._proc: Any = None
@@ -498,7 +503,7 @@ class LinuxOllamaServer:
                     f"Ollama server exited before becoming ready (exit code {self._proc.poll()})"
                 )
             try:
-                reply = self._http_get(f"{self.base_url}/api/version")
+                reply = self._poll_get(f"{self.base_url}/api/version")
                 self.version = str(reply.get("version") or UNRECORDED)
                 return self
             except (OSError, RuntimeError, ValueError) as exc:
@@ -1097,7 +1102,8 @@ def run_linux_generate_ladder(
                     "prefix_caching": "off",  # every timed call has its own prefix, so no prefix is cached
                     "parallel_slots": measured.get("parallel_slots", concurrency),
                     "parallel_slots_source": measured.get("parallel_slots_source", "requested"),
-                    "throughput_method": measured.get("throughput_method", "wall_clock_aggregate"),
+                    "throughput_method": measured.get("throughput_method", "decode_phase_wall_clock_aggregate"),
+                    "end_to_end_tok_s": measured.get("end_to_end_tok_s"),
                     "per_request_decode_tok_s": measured.get("per_request_decode_tok_s"),
                     "ttft_ms": ttft_ms,
                     "decode_tok_s": decode_tok_s,
@@ -1693,7 +1699,11 @@ def measure_linux_ollama_generate(
             slots.append(
                 {
                     "phase": phase,
-                    "throughput": round(sum(eval_counts) / wall_s, 3),  # generated tokens over the pass's wall clock
+                    # The aggregate decode rate: the pass's generated tokens over its decode phase, which runs from the
+                    # earliest first token (the shortest prefill, all requests having been sent together) to the end of
+                    # the pass. Prefill is not decode.
+                    "throughput": round(sum(eval_counts) / max(wall_s - min(ttfts_ns) / 1e9, 1e-9), 3),
+                    "end_to_end_tok_s": round(sum(eval_counts) / wall_s, 3),  # the same tokens over the whole pass
                     "latency_ms": round(wall_s * 1000.0, 3),
                     "ttft_ms": round((sum(ttfts_ns) / len(ttfts_ns)) / 1_000_000.0, 3),
                     "tokens": sum(eval_counts),
@@ -1722,7 +1732,8 @@ def measure_linux_ollama_generate(
         "num_ctx_sent": num_ctx,
         "parallel_slots": slot_count,
         "parallel_slots_source": slot_source,
-        "throughput_method": "wall_clock_aggregate",
+        "throughput_method": "decode_phase_wall_clock_aggregate",
+        "end_to_end_tok_s": round(float(sorted(float(s["end_to_end_tok_s"]) for s in repeat_slots)[mid]), 3),
         "per_request_decode_tok_s": round(sum(per_request) / len(per_request), 3) if per_request else None,
     }
 

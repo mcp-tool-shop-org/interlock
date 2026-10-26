@@ -1,16 +1,17 @@
 # interlock: how it works
 
-Mapped at 2026-10-26 from commit 4a85b14 by Atlas 1.24.0.
+Mapped at 2026-10-26 from commit 560f997 by Atlas 1.24.0.
 
 ## What this is
 
 interlock routes each job to a model, engine and device from a receipt-backed table. (written by a person)
 
-10 parts, mostly Python (109 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.
+10 parts, mostly Python (111 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.
 
-## What changed since 2026-10-26 (1a8953f)
+## What changed since 2026-10-26 (4a85b14)
 
-Nothing structural changed since 2026-10-26; 25 files changed content.
+- experiments/c2-generate/spec.yaml is now also read by tests/test_ladder_v3.py.
+- 2 files added and 2 changed content, across 3 parts.
 
 ## What comes in
 
@@ -90,7 +91,6 @@ Read those in order to follow one pull request end to end.
 ## What this map cannot see
 
 - 1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.
-- 1 import could not be resolved: `tests/test_generation_failure_kinds.py` imports `tests.fake_ollama`, which is no module on its import path and no declared dependency.
 - 5 writes and 6 reads use paths built at run time and are not named here.
 - 17 writes and 46 reads go to a path their caller passes, not to this repository.
 - 5 reads go to the directory the command is run in (experiments/, interlock.toml and receipts/), not to this repository.

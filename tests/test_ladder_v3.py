@@ -162,8 +162,37 @@ def test_with_a_slot_per_request_the_aggregate_is_about_the_concurrency_times_on
     assert result["decode_tok_s"] == pytest.approx(4 * single, rel=0.1)
     assert result["parallel_slots"] == 4
     assert result["parallel_slots_source"] == "llama-server log"
-    assert result["throughput_method"] == "wall_clock_aggregate"
+    assert result["throughput_method"] == "decode_phase_wall_clock_aggregate"
     assert result["per_request_decode_tok_s"] == pytest.approx(50.0, rel=0.01)  # a separate field, per stream
+
+
+@pytest.mark.parametrize("target", [512, 2048, 8192, 32768])
+def test_at_concurrency_1_the_decode_aggregate_is_the_per_request_decode_rate_at_every_length(target):
+    server = FakeOllama()
+    result = _measure(server, target, concurrency=1)
+    assert result["decode_tok_s"] == pytest.approx(server.decode_tok_s, rel=0.01)  # prefill is not in it
+    assert result["per_request_decode_tok_s"] == pytest.approx(server.decode_tok_s, rel=0.01)
+
+
+def test_the_end_to_end_rate_is_its_own_field_and_falls_with_the_prompt_length():
+    short = _measure(FakeOllama(), 512)
+    long = _measure(FakeOllama(), 32768)
+    assert long["end_to_end_tok_s"] < short["end_to_end_tok_s"] / 3  # prefill dominates a long prompt's wall clock
+    assert short["end_to_end_tok_s"] < short["decode_tok_s"]
+    assert long["decode_tok_s"] == pytest.approx(short["decode_tok_s"], rel=0.01)  # the router ranks on this one
+
+
+def test_the_router_ranks_on_the_decode_aggregate_not_the_end_to_end_rate():
+    server = FakeOllama()
+    (long_row,) = run_linux_generate_ladder(
+        spec_id="C2-GENERATE", spec_rel="experiments/c2-generate/spec.yaml", run_id="t4-r3", date="2026-10-26",
+        remote_device=IDENT, model="phi3.5:3.8b", revision_or_digest="d" * 64,
+        measure_shape=lambda length, conc: _measure(server, length, conc),
+        prompt_lengths=(8192,), concurrencies=(1,), quant="Q4_K_M", licence="mit",
+    )
+    assert long_row["settings"]["end_to_end_tok_s"] < long_row["settings"]["decode_tok_s"]
+    result = decide([long_row], request())
+    assert result.document["margin"]["bound"] == pytest.approx(long_row["settings"]["decode_tok_s"], rel=0.001)
 
 
 def test_a_server_that_logged_fewer_slots_than_the_concurrency_is_unmeasured():
@@ -198,6 +227,29 @@ def test_the_ladder_sets_each_slot_count_once_by_looping_concurrency_outermost()
     )
     assert server.restarts == 2  # 1 -> 4 -> 8; the first count needs no restart
     assert [row["settings"]["concurrency"] for row in rows] == [1, 1, 4, 4, 8, 8]
+
+
+def test_each_readiness_poll_is_short_so_one_hung_request_cannot_use_the_budget(monkeypatch):
+    seen: list[float] = []
+
+    class _Reply:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_exc):
+            return False
+
+        def read(self):
+            return b'{"version": "0.40.11"}'
+
+    def urlopen(_request, timeout):
+        seen.append(timeout)
+        return _Reply()
+
+    monkeypatch.setattr(linux_cuda.urllib.request, "urlopen", urlopen)
+    server = LinuxOllamaServer()  # the real http_get
+    assert server._poll_get("http://127.0.0.1:11441/api/version") == {"version": "0.40.11"}
+    assert seen == [linux_cuda.READY_POLL_TIMEOUT_S] and seen[0] <= 2.0
 
 
 class _Proc:
