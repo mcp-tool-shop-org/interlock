@@ -14301,7 +14301,7 @@
             "test_the_search_does_not_load_above_the_trained_length",
             "test_the_server_log_fills_the_four_fields"
           ],
-          "hash": "0481a12f168fd8b6510e2385ffc6666f1350120e11c5e4c8d79033dc4650afc5",
+          "hash": "7bdf31a225a96a6050087c68e48af4a20ca69ca01e55bf4d86660a1fed6c58e2",
           "importOrder": [
             "src/interlock/adapters/base.py",
             "src/interlock/adapters/ollama.py",
@@ -16498,7 +16498,7 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "0ee89bedb4a773f4b0f1463a421a0b2f0176934b",
+    "commit": "1a8953f68bf4043a36d989cb089425c4606096bf",
     "tracked": 295
   },
   "landings": [

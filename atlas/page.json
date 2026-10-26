@@ -35,21 +35,21 @@
   "changes": {
     "fileCounts": {
       "added": 0,
-      "changed": 3,
+      "changed": 1,
       "moved": 0,
-      "parts": 3,
+      "parts": 1,
       "removed": 0
     },
     "items": [
       {
         "kind": "counts",
-        "sentence": "Nothing structural changed since 2026-10-26; 3 files changed content.",
+        "sentence": "Nothing structural changed since 2026-10-26; 1 file changed content.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "e982592d226c667fca75f98e90ca6f1bd377d8b4",
-      "generatedAt": "2026-10-26T06:51:38.955Z"
+      "commit": "0ee89bedb4a773f4b0f1463a421a0b2f0176934b",
+      "generatedAt": "2026-10-26T07:25:11.147Z"
     },
     "unchanged": true
   },
@@ -72,7 +72,7 @@
     {
       "a": "src/interlock/receipt.py",
       "b": "src/interlock/router/policy.py",
-      "either": 7,
+      "either": 8,
       "partLabels": [
         "src",
         "src"
@@ -136,7 +136,7 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 14 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 1,
-  "commit": "0ee89bedb4a773f4b0f1463a421a0b2f0176934b",
+  "commit": "1a8953f68bf4043a36d989cb089425c4606096bf",
   "defaultBranch": "main",
   "derived": "10 parts, mostly Python (109 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
   "doors": [
@@ -301,7 +301,7 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-26T07:25:11.147Z",
+  "generatedAt": "2026-10-26T07:47:42.768Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "5 writes and 6 reads use paths built at run time and are not named here.",

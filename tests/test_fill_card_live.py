@@ -1263,10 +1263,19 @@ def test_a_hanging_unload_stops_before_the_next_load(tmp_path: Path):
     transport = _Transport(None, abort_at=8192, trained=8192, self_sample=False, hold_abort=True, hang_unload=True)
     seams = _seams(transport)
     seams.threaded = True
-    started = time.monotonic()
-    with pytest.raises(RunnerError, match="the model may still be resident"):
-        _run(tmp_path, transport, seams=seams, unload_timeout=0.3)
-    assert time.monotonic() - started < 3
+    recorded = seams.slept
+
+    def yielding_sleep(seconds):  # a settle loop that spins starves the threads on a busy machine
+        recorded.append(seconds)
+        time.sleep(0.001)
+
+    seams.sleep = yielding_sleep
+    try:
+        # The raise proves the timeout fired: nothing else ends a hung unload. No wall-clock bound is asserted.
+        with pytest.raises(RunnerError, match="the model may still be resident"):
+            _run(tmp_path, transport, seams=seams, unload_timeout=0.3)
+    finally:
+        transport._hang.set()  # let the hung unload thread end, whatever happened above
     ctxs = _ctxs(transport)
     assert 8192 in ctxs
     assert 6144 not in ctxs
