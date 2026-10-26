@@ -584,7 +584,7 @@
           "path": ".python-version"
         },
         {
-          "hash": "a2cdf723aa58d9a5a8921f1f798c890ea1ad8076b2886b441496e8300fb7bbd0",
+          "hash": "d5585cd5b9899d1f4db97c7c139cb63bbe4ca158a011e76885b923aeaa401f49",
           "path": "CHANGELOG.md"
         },
         {
@@ -2762,19 +2762,19 @@
           ],
           "failurePaths": [
             {
+              "in": "families_path",
+              "kind": "raise",
+              "line": 32
+            },
+            {
               "in": "load_families",
               "kind": "except",
-              "line": 35
+              "line": 39
             },
             {
               "in": "load_families",
               "kind": "raise",
-              "line": 36
-            },
-            {
-              "in": "load_families",
-              "kind": "raise",
-              "line": 38
+              "line": 40
             },
             {
               "in": "load_families",
@@ -2782,12 +2782,17 @@
               "line": 42
             },
             {
+              "in": "load_families",
+              "kind": "raise",
+              "line": 46
+            },
+            {
               "in": "family_of",
               "kind": "raise",
-              "line": 51
+              "line": 55
             }
           ],
-          "hash": "659bd5dca4858e3756502d2af9b45c743860c97c042aded56ffe734288feb667",
+          "hash": "342218f4e71a120d7fb7eb62c6c1856283008d310183eb95f144bd679c86876c",
           "path": "src/interlock/families.py"
         },
         {
@@ -13500,7 +13505,7 @@
         "pytest",
         "python"
       ],
-      "testedBy": 45,
+      "testedBy": 46,
       "unresolvedSites": 0
     },
     {
@@ -14844,6 +14849,27 @@
         },
         {
           "exports": [
+            "package_escapes",
+            "test_every_action_in_the_workflows_is_pinned_by_commit_sha_with_a_version_comment",
+            "test_family_of_and_stamp_family_work_from_a_clean_venv_outside_the_repository",
+            "test_family_table_lookup_names_both_places_it_tried",
+            "test_no_file_relative_read_leaves_the_package_except_the_named_lines",
+            "test_the_sweep_fails_on_each_planted_climb",
+            "test_the_wheel_carries_the_family_table_byte_for_byte"
+          ],
+          "hash": "290e64777da16564ae8d906b3a761c60ed30a07fc7f3ce477b99bdadbf9e54fc",
+          "importsFiles": [
+            "src/interlock/__init__.py",
+            "src/interlock/families.py"
+          ],
+          "names": [
+            "src/interlock/harness/linux_cuda.py"
+          ],
+          "path": "tests/test_packaging.py",
+          "testFramework": "pytest"
+        },
+        {
+          "exports": [
             "test_a_contended_slot_records_top_after_call",
             "test_a_directory_tokenizer_refuses_a_hub_fetch",
             "test_a_drift_block_has_no_cold_slot",
@@ -15653,7 +15679,7 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 48
+          "files": 49
         },
         {
           "boundary": "scripts",
@@ -15729,7 +15755,7 @@
         {
           "config": "pyproject.toml",
           "coverage": true,
-          "files": 48,
+          "files": 49,
           "job": "test",
           "runner": "pytest",
           "step": "Test"
@@ -15737,7 +15763,7 @@
         {
           "config": "pyproject.toml",
           "coverage": true,
-          "files": 48,
+          "files": 49,
           "job": "test-py313",
           "runner": "pytest",
           "step": "Test"
@@ -15745,7 +15771,7 @@
         {
           "config": "pyproject.toml",
           "coverage": true,
-          "files": 48,
+          "files": 49,
           "job": "test-py314",
           "runner": "pytest",
           "step": "Test"
@@ -16273,8 +16299,8 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "132aa3c8147d985c38a5491cec50284fb1852915",
-    "tracked": 292
+    "commit": "b99c46b9c63e385d07e67d950b6b7684bbc60575",
+    "tracked": 293
   },
   "landings": [
     {
@@ -16695,6 +16721,18 @@
     {
       "readers": [
         {
+          "by": "tests/test_packaging.py",
+          "call": "literal",
+          "confidence": "ast",
+          "fromTests": true
+        }
+      ],
+      "target": "src/interlock/families.py",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
           "by": "pyproject.toml",
           "call": "configuration",
           "confidence": "config"
@@ -16723,6 +16761,18 @@
         }
       ],
       "target": "src/interlock/harness/fill.py",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "tests/test_packaging.py",
+          "call": "literal",
+          "confidence": "ast",
+          "fromTests": true
+        }
+      ],
+      "target": "src/interlock/harness/linux_cuda.py",
       "writers": []
     },
     {
@@ -16939,7 +16989,7 @@
   "overlaps": [],
   "submodules": [],
   "symlinks": [],
-  "testFiles": 71,
+  "testFiles": 72,
   "unassigned": [
     {
       "hash": "75850ad95072b8a51fa832b381c4cf6bfea4a3ba8456a242aec0ab79ff0db466",

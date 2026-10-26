@@ -19,8 +19,12 @@ PACKAGE = ROOT / "src" / "interlock"
 FAMILIES_TABLE = ROOT / "table" / "model-families.json"
 FAMILIES_RESOURCE = "interlock/data/model-families.json"
 
-# Climbing out of the package from `__file__` is only allowed in a module that first asks importlib.resources.
-PACKAGED_FIRST = "resources.files("
+# A `__file__`-relative read may leave the package only where the module first asks importlib.resources for the
+# packaged copy. Each such line is named exactly; a new one, or a moved one, fails until it is reviewed and listed.
+ESCAPES_ALLOWED = {
+    ("src/interlock/families.py", 23),
+    ("src/interlock/harness/linux_cuda.py", 58),
+}
 
 
 def _build_wheel(out_dir: Path) -> Path:
@@ -45,7 +49,7 @@ def test_family_of_and_stamp_family_work_from_a_clean_venv_outside_the_repositor
     uv = shutil.which("uv")
     subprocess.run([uv, "venv", "--python", sys.executable, str(venv)], check=True, capture_output=True)
     python = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-    install = [uv, "pip", "install", "--python", str(python), "--no-deps", str(wheel)]
+    install = [uv, "pip", "install", "--python", str(python), str(wheel)]
     subprocess.run(install, check=True, capture_output=True)
     table = json.loads(FAMILIES_TABLE.read_text(encoding="utf-8"))
     tag, family = next(iter(table.items()))
@@ -58,6 +62,19 @@ def test_family_of_and_stamp_family_work_from_a_clean_venv_outside_the_repositor
         "stamp_family(row)\n"
         f"assert row['model_family'] == {family!r}\n"
         "assert family_of('no-such-tag:1b') is None\n"
+        "from interlock.devices import RemoteDeviceIdentity\n"
+        "from interlock.harness.linux_cuda import THROUGHPUT_INPUTS_SHA256, run_linux_throughput_ladder\n"
+        "card = RemoteDeviceIdentity(provider='colab', card='L4', vram_mib=23034, driver_version='550.54.15',\n"
+        "                            cuda_version='12.4', pool='us-central1-a')\n"
+        "models = {'embed': ('BAAI/bge-base-en-v1.5', 'd1'), 'rerank': ('BAAI/bge-reranker-v2-m3', 'd2'),\n"
+        "          'nli': ('cross-encoder/nli-deberta-v3-base', 'd3')}\n"
+        "stub = lambda task, batch, token_length=510: {'throughput': 10.0 * batch, 'warm_p50_ms': 5.0 * batch,\n"
+        "                                              'peak_mib': 2000, 'size': 1800, 'size_vram': 1800}\n"
+        "rows = run_linux_throughput_ladder(spec_id='C2-THROUGHPUT', spec_rel='experiments/c2-throughput/spec.yaml',\n"
+        "                                   run_id='wheel-stub', date='2026-10-26', remote_device=card,\n"
+        "                                   models_by_task=models, measure_batch=stub)\n"
+        "assert len(rows) == 9, len(rows)\n"
+        "assert {r['settings']['input_fixture_sha256'] for r in rows} == {THROUGHPUT_INPUTS_SHA256}\n"
         "print('ok')\n"
     )
     env = {k: v for k, v in os.environ.items() if k not in {"PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV"}}
@@ -66,52 +83,123 @@ def test_family_of_and_stamp_family_work_from_a_clean_venv_outside_the_repositor
     assert done.stdout.strip() == "ok"
 
 
-def _levels_up(tree: ast.AST) -> list[tuple[int, int]]:
-    """(line, directories above the file's own directory) for every expression built from `__file__`."""
+def _climb(parent, node, up):
+    """Follow the expression built from `node` upward. Returns (directories climbed, problems, last node)."""
 
-    parent = {child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
-    found = []
-    for name in ast.walk(tree):
-        if not (isinstance(name, ast.Name) and name.id == "__file__"):
-            continue
-        node, up = name, 0
-        while node in parent:
-            above = parent[node]
-            if isinstance(above, ast.Attribute) and above.value is node:
-                if above.attr == "parent":
-                    up += 1
-                elif above.attr == "parents":
-                    sub = parent.get(above)
-                    if isinstance(sub, ast.Subscript) and isinstance(sub.slice, ast.Constant):
-                        up += sub.slice.value + 1
-                        node = sub
-                        continue
-            elif not isinstance(above, (ast.Call, ast.Subscript)):
-                break
+    problems = []
+    while node in parent:
+        above = parent[node]
+        if isinstance(above, ast.Attribute) and above.value is node:
+            if above.attr == "parent":
+                up += 1
+            elif above.attr == "parents":
+                sub = parent.get(above)
+                if isinstance(sub, ast.Subscript) and isinstance(sub.slice, ast.Constant):
+                    up += sub.slice.value + 1
+                else:
+                    problems.append("parents[<variable>]")
+                node = sub if isinstance(sub, ast.Subscript) else above
+                continue
             node = above
-        found.append((name.lineno, up))
+        elif isinstance(above, ast.BinOp) and isinstance(above.op, ast.Div) and above.left is node:
+            if isinstance(above.right, ast.Constant) and above.right.value == "..":
+                up += 1
+            node = above
+        elif isinstance(above, ast.Call):
+            func = above.func
+            name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+            if node is not func and name == "dirname":
+                problems.append("os.path.dirname(__file__)")
+            up += sum(1 for arg in above.args if isinstance(arg, ast.Constant) and arg.value == "..")
+            node = above
+        elif isinstance(above, ast.Subscript) and above.value is node:
+            node = above
+        else:
+            break
+    return up, problems, node
+
+
+def _file_reads(source: str) -> list[tuple[int, int, list[str]]]:
+    """(line, directories above the file's own directory, problems) for every expression built from `__file__`.
+
+    A name bound to such an expression is followed, so `here = Path(__file__).parent; here.parent` is counted.
+    """
+
+    tree = ast.parse(source)
+    parent = {child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
+    tracked: dict[str, int] = {}
+    found: list[tuple[int, int, list[str]]] = []
+    for _ in range(4):
+        found = []
+        for name in ast.walk(tree):
+            if not isinstance(name, ast.Name):
+                continue
+            if name.id == "__file__":
+                base = 0
+            elif name.id in tracked and isinstance(name.ctx, ast.Load):
+                base = tracked[name.id] + 1  # the bound path is `base` directories up; +1 makes 0 mean the file itself
+            else:
+                continue
+            start = base - 1 if name.id != "__file__" else 0
+            up, problems, last = _climb(parent, name, start)
+            if name.id == "__file__" or up != start or problems:  # a bound path merely passed along is not a climb
+                found.append((name.lineno, up, problems))
+            bound = parent.get(last)
+            if isinstance(bound, (ast.Assign, ast.AnnAssign)) and bound.value is last:
+                targets = bound.targets if isinstance(bound, ast.Assign) else [bound.target]
+                for target in targets:
+                    if isinstance(target, ast.Name):
+                        tracked[target.id] = max(tracked.get(target.id, 0), up)
     return found
 
 
-def test_no_file_relative_read_leaves_the_package_without_a_packaged_copy():
-    checked = 0
-    for path in sorted(PACKAGE.rglob("*.py")):
-        source = path.read_text(encoding="utf-8")
-        inside = len(path.relative_to(PACKAGE).parts)  # parents[inside - 1] is the package root
-        for line, up in _levels_up(ast.parse(source)):
-            checked += 1
-            if up > inside:
-                assert PACKAGED_FIRST in source, (
-                    f"{path.relative_to(ROOT)}:{line} reads {up} directories up from __file__, outside the package, "
-                    "and the module has no importlib.resources packaged copy"
-                )
-    assert checked
+def package_escapes(package: Path, root: Path) -> tuple[list[str], set[tuple[str, int]]]:
+    """Violations of the `__file__` rule in a package directory, and the allow-listed (file, line) pairs it met."""
+
+    violations, met = [], set()
+    for path in sorted(package.rglob("*.py")):
+        rel = path.relative_to(root).as_posix()
+        inside = len(path.relative_to(package).parts)  # parents[inside - 1] is the package root
+        for line, up, problems in _file_reads(path.read_text(encoding="utf-8")):
+            escapes = up > inside
+            if not (escapes or problems):
+                continue
+            if (rel, line) in ESCAPES_ALLOWED:
+                met.add((rel, line))
+            else:
+                what = problems or [f"{up} directories up from __file__, outside the package"]
+                violations.append(f"{rel}:{line} {', '.join(what)}")
+    return violations, met
 
 
-def test_the_sweep_catches_the_1_0_3_families_read():
-    (line, up), = _levels_up(ast.parse('p = Path(__file__).resolve().parents[2] / "table" / "x.json"\n'))
-    assert up == 3 and line == 1
-    assert _levels_up(ast.parse('p = Path(__file__).resolve().parent.joinpath("schema", "a.json")\n')) == [(1, 1)]
+def test_no_file_relative_read_leaves_the_package_except_the_named_lines():
+    violations, met = package_escapes(PACKAGE, ROOT)
+    assert not violations, chr(10).join(violations)
+    assert met == ESCAPES_ALLOWED, f"allow-listed lines that no longer escape (remove them): {ESCAPES_ALLOWED - met}"
+
+
+PATH = "from pathlib import Path"
+PLANTED = {
+    "parents index": [PATH, 'X = Path(__file__).resolve().parents[2] / "t.json"'],
+    "parent chain": [PATH, 'X = Path(__file__).parent.parent.parent / "t.json"'],
+    "dirname": ["import os", "X = os.path.dirname(__file__)"],
+    "variable index": [PATH, "N = 1", "X = Path(__file__).parents[N]"],
+    "dotdot division": [PATH, 'X = Path(__file__).parent / ".." / ".." / "t.json"'],
+    "dotdot join": ["import os", 'X = os.path.join(os.fspath(__file__), "..", "..", "..")'],
+    "bound name": [PATH, "here = Path(__file__).parent", 'X = here.parent.parent / "t.json"'],
+}
+
+
+def test_the_sweep_fails_on_each_planted_climb(tmp_path):
+    package = tmp_path / "src" / "pkg"
+    package.mkdir(parents=True)
+    for label, source in PLANTED.items():
+        (package / "planted.py").write_text(chr(10).join(source) + chr(10), encoding="utf-8")
+        violations, _ = package_escapes(package, tmp_path)
+        assert violations, f"the sweep missed: {label}"
+    clean = chr(10).join([PATH, 'X = Path(__file__).parent / "schema"'])
+    (package / "planted.py").write_text(clean, encoding="utf-8")
+    assert package_escapes(package, tmp_path)[0] == []
 
 
 # The SLSA generator is a reusable workflow that must be called by tag (it refuses a sha ref).
@@ -128,3 +216,33 @@ def test_every_action_in_the_workflows_is_pinned_by_commit_sha_with_a_version_co
             assert re.fullmatch(r"[\w./-]+@[0-9a-f]{40}", ref), f"{workflow.name}: {ref} is not pinned by commit sha"
             assert re.search(r"# v\d", rest), f"{workflow.name}: {ref} has no version comment"
     assert found
+
+
+def test_family_table_lookup_names_both_places_it_tried(tmp_path, monkeypatch):
+    import pytest
+
+    from interlock import families
+
+    monkeypatch.setattr(families, "_FAMILIES_SOURCE_PATH", tmp_path / "table" / "model-families.json")
+    monkeypatch.setattr(families.resources, "files", lambda _package: tmp_path / "installed")
+    with pytest.raises(families.FamilyError) as error:
+        families.family_of("anything")
+    message = str(error.value)
+    assert str(tmp_path / "installed" / "data" / "model-families.json") in message
+    assert str(tmp_path / "table" / "model-families.json") in message
+
+
+def test_family_table_lookup_prefers_the_packaged_copy_then_the_source_table(tmp_path, monkeypatch):
+    from interlock import families
+
+    source = tmp_path / "table" / "model-families.json"
+    packaged = tmp_path / "installed" / "data" / "model-families.json"
+    source.parent.mkdir(parents=True)
+    source.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(families, "_FAMILIES_SOURCE_PATH", source)
+    monkeypatch.setattr(families.resources, "files", lambda _package: tmp_path / "installed")
+    assert families.families_path() == source
+
+    packaged.parent.mkdir(parents=True)
+    packaged.write_text("{}", encoding="utf-8")
+    assert families.families_path() == packaged

@@ -5,10 +5,13 @@
 ### Fixed
 
 - **The wheel now carries the model family table.** `interlock.families` read `table/model-families.json` relative to the source tree (`parents[2]`), which is not in the wheel, so `family_of` and `stamp_family` raised `FamilyError` on every installed copy (1.0.3 and earlier). The file ships as package data (`interlock/data/model-families.json`, a hatch force-include) and is read through `importlib.resources`; a source checkout still reads `table/`.
+- `families_path()` raises `FamilyError` naming both places it tried (the packaged copy and `table/`) when neither exists.
 
 ### Added
 
 - `tests/test_packaging.py`: the wheel's copy is byte-equal to `table/model-families.json`; a wheel installed into a clean venv, run from outside the repository with `-I`, answers `family_of` and `stamp_family` (it runs on every CI Python leg and fails on 1.0.3 with `FamilyError`); a sweep fails on any `__file__`-relative read that climbs out of the package in a module with no `importlib.resources` packaged copy; every workflow action is pinned by commit SHA with a version comment (the SLSA generator is a reusable workflow that must be called by tag).
+- The `__file__` sweep names its exceptions exactly, as (file, line) pairs, and fails if a listed line stops escaping. It also flags `os.path.dirname(__file__)`, `parents[<variable>]`, `/ ".."` climbs and a bound path climbed later; each form has a planted example.
+- The clean-venv wheel test also runs `run_linux_throughput_ladder` with a stub backend, so the packaged throughput inputs are exercised from the wheel; it installs the wheel with its dependencies.
 
 ### Changed
 

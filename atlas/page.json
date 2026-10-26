@@ -34,30 +34,38 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 0,
-      "changed": 19,
+      "added": 1,
+      "changed": 2,
       "moved": 0,
-      "parts": 4,
+      "parts": 3,
       "removed": 0
     },
     "items": [
       {
         "kind": "landing",
-        "sentence": "table/model-families.json is now also read by pyproject.toml.",
+        "sentence": "src/interlock/families.py is now read by tests/test_packaging.py.",
         "subjects": [
-          "table/model-families.json",
-          "pyproject.toml"
+          "src/interlock/families.py",
+          "tests/test_packaging.py"
+        ]
+      },
+      {
+        "kind": "landing",
+        "sentence": "src/interlock/harness/linux_cuda.py is now read by tests/test_packaging.py.",
+        "subjects": [
+          "src/interlock/harness/linux_cuda.py",
+          "tests/test_packaging.py"
         ]
       },
       {
         "kind": "counts",
-        "sentence": "19 files changed content, across 4 parts.",
+        "sentence": "1 file added and 2 changed content, across 3 parts.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "bbe78ceb144ff5755ce8934b6c2ad311bca0e63d",
-      "generatedAt": "2026-10-25T21:53:30.801Z"
+      "commit": "132aa3c8147d985c38a5491cec50284fb1852915",
+      "generatedAt": "2026-10-26T02:44:18.776Z"
     },
     "unchanged": false
   },
@@ -144,9 +152,9 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 13 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 1,
-  "commit": "132aa3c8147d985c38a5491cec50284fb1852915",
+  "commit": "b99c46b9c63e385d07e67d950b6b7684bbc60575",
   "defaultBranch": "main",
-  "derived": "10 parts, mostly Python (106 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
+  "derived": "10 parts, mostly Python (107 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
   "doors": [
     {
       "checks": [],
@@ -166,7 +174,7 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 48
+          "files": 49
         },
         {
           "boundary": "scripts",
@@ -309,7 +317,7 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-26T02:44:18.776Z",
+  "generatedAt": "2026-10-26T03:15:18.115Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "5 writes and 6 reads use paths built at run time and are not named here.",
@@ -344,10 +352,10 @@
   ],
   "summary": "interlock routes each job to a model, engine and device from a receipt-backed table.",
   "summaryFrom": "person",
-  "testFiles": 71,
+  "testFiles": 72,
   "testedBy": {
     "scripts": 2,
-    "src": 45
+    "src": 46
   },
   "unnamedWrites": 5,
   "unread": [],

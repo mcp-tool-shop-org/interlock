@@ -25,7 +25,11 @@ _FAMILIES_SOURCE_PATH = Path(__file__).resolve().parents[2] / "table" / "model-f
 
 def families_path() -> Path | Traversable:
     packaged = resources.files("interlock").joinpath(FAMILIES_RESOURCE)
-    return packaged if packaged.is_file() else _FAMILIES_SOURCE_PATH
+    if packaged.is_file():
+        return packaged
+    if _FAMILIES_SOURCE_PATH.is_file():
+        return _FAMILIES_SOURCE_PATH
+    raise FamilyError(f"model family table not found: tried the packaged copy {packaged} and {_FAMILIES_SOURCE_PATH}")
 
 
 def load_families() -> dict[str, str]:
