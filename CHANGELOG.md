@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-10-26
+
 ### Fixed
 
 - **The wheel now carries the model family table.** `interlock.families` read `table/model-families.json` relative to the source tree (`parents[2]`), which is not in the wheel, so `family_of` and `stamp_family` raised `FamilyError` on every installed copy (1.0.3 and earlier). The file ships as package data (`interlock/data/model-families.json`, a hatch force-include) and is read through `importlib.resources`; a source checkout still reads `table/`.
