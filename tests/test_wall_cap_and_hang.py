@@ -197,8 +197,9 @@ def _spec_repo(tmp_path: Path) -> Path:
 
 
 def test_the_t4_r4_hang_after_a_host_ram_kill_ends_as_a_row_the_next_cell_starts_and_the_run_closes(
-    tmp_path, quick_sampler
+    tmp_path, quick_sampler, monkeypatch
 ):
+    monkeypatch.setattr(linux_cuda, "_nvidia_smi_query", lambda timeout_s: "1000, 15360" + chr(10))  # fallback
     from interlock.harness.runner import run_spec
 
     spec = _spec_repo(tmp_path)

@@ -687,6 +687,8 @@ def build_linux_failure_row(
     offload: dict[str, Any] | None = None,
     request_timeout_s: int | None = None,
     num_ctx_sent: int | None = None,
+    vram_sampler: str | None = None,
+    vram_sampler_reason: str | None = None,
 ) -> dict[str, Any]:
     """Build a schema-valid capability/failure row for a failed remote shape."""
 
@@ -734,6 +736,9 @@ def build_linux_failure_row(
         settings["concurrency"] = concurrency
         settings["request_timeout_s"] = request_timeout_s  # the budget in force (None before one existed)
         settings["cell_wall_s"] = CELL_WALL_S
+        if vram_sampler is not None:  # which sampler took this cell's readings, and why the run switched
+            settings["vram_sampler"] = vram_sampler
+            settings["vram_sampler_reason"] = vram_sampler_reason
         # `num_ctx` is the window the request sent, as on a measured row, and `cell_tokens` the nominal cell. A failure
         # before any request was sent (a pre-registered refusal, a stub) never had a window: it keeps the nominal size
         # in `num_ctx` and says so in `num_ctx_source`.
@@ -1096,6 +1101,8 @@ def run_linux_generate_ladder(
                         offload=(exc.evidence or {}).get("offload"),
                         request_timeout_s=(exc.evidence or {}).get("request_timeout_s"),
                         num_ctx_sent=(exc.evidence or {}).get("num_ctx_sent"),
+                        vram_sampler=(exc.evidence or {}).get("vram_sampler"),
+                        vram_sampler_reason=(exc.evidence or {}).get("vram_sampler_reason"),
                         peak_mib=exc.peak_mib,
                         abort_mib=abort_mib,
                         engine_version=engine_version,
@@ -1137,6 +1144,8 @@ def run_linux_generate_ladder(
                         concurrency=concurrency,
                         request_timeout_s=measured.get("request_timeout_s"),
                         num_ctx_sent=measured.get("num_ctx_sent"),
+                        vram_sampler=measured.get("vram_sampler"),
+                        vram_sampler_reason=measured.get("vram_sampler_reason"),
                         peak_mib=peak_mib,
                         abort_mib=abort_mib,
                         engine_version=engine_version,
@@ -1182,6 +1191,8 @@ def run_linux_generate_ladder(
                         concurrency=concurrency,
                         request_timeout_s=measured.get("request_timeout_s"),
                         num_ctx_sent=measured.get("num_ctx_sent"),
+                        vram_sampler=measured.get("vram_sampler"),
+                        vram_sampler_reason=measured.get("vram_sampler_reason"),
                         peak_mib=peak_mib,
                         abort_mib=abort_mib,
                         engine_version=engine_version,
@@ -1222,6 +1233,8 @@ def run_linux_generate_ladder(
                     "prefix_caching": "off",  # every timed call has its own prefix, so no prefix is cached
                     "request_timeout_s": measured.get("request_timeout_s"),
                     "cell_wall_s": CELL_WALL_S,
+                    "vram_sampler": measured.get("vram_sampler"),
+                    "vram_sampler_reason": measured.get("vram_sampler_reason"),
                     "parallel_slots": measured.get("parallel_slots", concurrency),
                     "parallel_slots_source": measured.get("parallel_slots_source", "requested"),
                     "throughput_method": measured.get("throughput_method", "ollama_durations_decode_window"),
@@ -1472,32 +1485,40 @@ def probe_linux_gpu(
     """Probe the active Linux CUDA GPU via NVML or ``nvidia-smi`` and return ``(identity, sample_fn)``."""
 
     resolved_pool = pool or "us-central1-a"
+
+    def tagged(sampler: Callable[[], tuple[int, int]], kind: str) -> Callable[[], tuple[int, int]]:
+        sampler.sampler_kind = kind  # type: ignore[attr-defined]
+        return sampler
+
     if nvml_module is not None:
         reading = probe_nvml(nvml=nvml_module, pool=resolved_pool)
-        return reading.to_remote_identity(), (
+        return reading.to_remote_identity(), tagged(
             lambda: (
                 probe_nvml(nvml=nvml_module, pool=resolved_pool).used_mib,
                 reading.total_mib,
-            )
+            ),
+            "nvml",
         )
     try:
         import pynvml  # type: ignore[import-not-found]
 
         reading = probe_nvml(nvml=pynvml, pool=resolved_pool)
-        return reading.to_remote_identity(), (
+        return reading.to_remote_identity(), tagged(
             lambda: (
                 probe_nvml(nvml=pynvml, pool=resolved_pool).used_mib,
                 reading.total_mib,
-            )
+            ),
+            "nvml",
         )
     except Exception:
         active_runner = runner or _default_nvidia_smi_runner
         reading = probe_nvidia_smi(runner=active_runner, pool=resolved_pool)
-        return reading.to_remote_identity(), (
+        return reading.to_remote_identity(), tagged(
             lambda: (
                 probe_nvidia_smi(runner=active_runner, pool=resolved_pool).used_mib,
                 reading.total_mib,
-            )
+            ),
+            "nvidia-smi",
         )
 
 
@@ -1622,6 +1643,11 @@ CELL_DEADLINE_S = 2 * CELL_WALL_S
 # One VRAM sample (NVML has no timeout of its own; T4 r4 hung for 56 minutes right after the kernel's OOM killer took a
 # CUDA process). A wedged NVML costs this many seconds per cell, not the window.
 SAMPLER_TIMEOUT_S = 30.0
+# After the first NVML timeout the run's sampler switches to this subprocess: a hung `nvidia-smi` can be killed, while
+# an NVML call abandoned on a daemon thread can leave pynvml wedged inside the process, so every later cell would wait
+# out SAMPLER_TIMEOUT_S again. A wedged driver now costs at most NVIDIA_SMI_TIMEOUT_S per sample and cannot pin it.
+NVIDIA_SMI_TIMEOUT_S = 10.0
+NVIDIA_SMI_ARGV = ("nvidia-smi", "--query-gpu=memory.used,memory.total", "--format=csv,noheader,nounits")
 _LADDER_INSTRUCTION = "In two or three sentences, describe a quiet town by a river."
 _CELL_COUNTER = itertools.count(1)
 
@@ -1705,9 +1731,75 @@ def _with_deadline(call: Callable[[], Any], seconds: float, on_expiry: Callable[
     return outcome["value"]
 
 
+def _nvidia_smi_query(timeout_s: float) -> str:
+    """``nvidia-smi``'s memory reading as CSV text. A subprocess, so a hang is killed at the timeout."""
+
+    done = subprocess.run(  # noqa: S603
+        list(NVIDIA_SMI_ARGV), check=True, capture_output=True, text=True, timeout=timeout_s
+    )
+    return done.stdout
+
+
+class GuardedSampler:
+    """One run's VRAM sampler: NVML with a deadline, then ``nvidia-smi`` in a subprocess after the first timeout.
+
+    NVML has no timeout, and a call abandoned on a daemon thread can leave it wedged inside this process. So the first
+    time the primary sampler does not answer in ``SAMPLER_TIMEOUT_S`` the cell is ``unmeasured`` and the run switches,
+    for the rest of the run, to ``nvidia-smi`` with a killable timeout. If that also fails or times out, the cell is
+    ``unmeasured`` with the real reason and the ladder continues. ``mode`` and ``switch_reason`` are put in each row.
+    """
+
+    def __init__(self, primary: Callable[[], tuple[int, int]]) -> None:
+        self.primary = primary
+        self.primary_kind = str(getattr(primary, "sampler_kind", "nvml"))
+        self.mode = self.primary_kind
+        self.switch_reason: str | None = None
+
+    def __call__(self) -> tuple[int, int]:
+        if self.mode == "nvidia-smi-fallback":
+            return self._fallback()
+        seconds = SAMPLER_TIMEOUT_S
+
+        def expired() -> BaseException:
+            self.mode = "nvidia-smi-fallback"
+            self.switch_reason = f"the {self.primary_kind} sampler did not answer within {seconds:g} s"
+            _phase(f"VRAM sampler: {self.switch_reason}; switching to nvidia-smi for the rest of the run")
+            return LinuxShapeFailure(
+                "unmeasured", f"VRAM sampler did not answer within {seconds:g} s (switching to nvidia-smi)"
+            )
+
+        return _with_deadline(self.primary, seconds, expired)
+
+    def _fallback(self) -> tuple[int, int]:
+        seconds = NVIDIA_SMI_TIMEOUT_S
+        try:
+            text = _nvidia_smi_query(seconds)
+        except subprocess.TimeoutExpired:
+            raise LinuxShapeFailure("unmeasured", f"nvidia-smi did not answer within {seconds:g} s") from None
+        except (OSError, subprocess.CalledProcessError) as exc:
+            raise LinuxShapeFailure("unmeasured", f"nvidia-smi failed: {exc}") from exc
+        parts = [part.strip() for part in text.strip().splitlines()[0].split(",")] if text.strip() else []
+        try:
+            used, total = int(float(parts[0])), int(float(parts[1]))
+        except (IndexError, ValueError):
+            answer = text.strip()[:80]
+            raise LinuxShapeFailure("unmeasured", f"nvidia-smi answered {answer!r}, not 'used, total'") from None
+        return used, total
+
+
+def _sampler_evidence(sample_vram_mib: Any) -> dict[str, Any]:
+    """Which sampler a cell used and why the run switched, for the row."""
+
+    if isinstance(sample_vram_mib, GuardedSampler):
+        return {"vram_sampler": sample_vram_mib.mode, "vram_sampler_reason": sample_vram_mib.switch_reason}
+    return {}
+
+
 def _sample_with_deadline(sample_vram_mib: Callable[[], tuple[int, int]]) -> tuple[int, int]:
     """A VRAM reading that cannot hang the run: no answer in ``SAMPLER_TIMEOUT_S`` makes the cell unmeasured."""
 
+    if isinstance(sample_vram_mib, GuardedSampler):
+        return sample_vram_mib()  # it applies the deadline, and the switch to nvidia-smi, itself
     seconds = SAMPLER_TIMEOUT_S
     return _with_deadline(
         sample_vram_mib,
@@ -1936,6 +2028,30 @@ def _ttft_does_not_scale(baseline: tuple[int, float] | None, prompt_len: int, pr
 
 
 def measure_linux_ollama_generate(
+    server: LinuxOllamaServer,
+    sample_vram_mib: Callable[[], tuple[int, int]],
+    *,
+    model: str,
+    prompt_tokens: int,
+    concurrency: int,
+    num_predict: int = 128,
+    repeats: int = 3,
+    clock: Callable[[], float] = time.perf_counter,
+) -> dict[str, Any]:
+    """Measure one cell, and say which sampler the cell used (and why the run switched) in the result or the failure."""
+
+    try:
+        result = _measure_generate_cell(
+            server, sample_vram_mib, model=model, prompt_tokens=prompt_tokens, concurrency=concurrency,
+            num_predict=num_predict, repeats=repeats, clock=clock,
+        )
+    except LinuxShapeFailure as exc:
+        exc.evidence = {**(exc.evidence or {}), **_sampler_evidence(sample_vram_mib)}
+        raise
+    return {**result, **_sampler_evidence(sample_vram_mib)}
+
+
+def _measure_generate_cell(
     server: LinuxOllamaServer,
     sample_vram_mib: Callable[[], tuple[int, int]],
     *,
@@ -2269,6 +2385,8 @@ def run_linux_spec(
         probed_device, probed_sampler = probe_linux_gpu()
         remote_device = remote_device or probed_device
         sample_vram_mib = sample_vram_mib or probed_sampler
+    if not isinstance(sample_vram_mib, GuardedSampler):
+        sample_vram_mib = GuardedSampler(sample_vram_mib)  # one guard per run: its switch lasts the run
 
     owns_server = server is None
     active_server = server or LinuxOllamaServer()
