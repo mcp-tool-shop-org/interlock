@@ -18,7 +18,7 @@
 
 # interlock：本地 AI 设备路由器
 
-> **版本 1.0.2：一种研究工具。** 从 1.0 开始，版本遵循语义版本控制：如果某个更改破坏了 CLI、收据格式或实验规范格式，则会发布一个全新的主要版本。互锁仅提供建议：它会建议一个模型、引擎和设备，并且它绝不会处理实际流量。其中的每个本地编号都曾在同一测试平台上进行测量（Intel Core Ultra 9 285K 及其 NPU 和 iGPU，以及一张 RTX 5090），而远程 `colab:<card>` 行则位于各自独立的证据池中，并具有完整的设备标识（`provider`、`card`、`vram_mib`、`driver_version`、`cuda_version`、`pool`）。将它的路由视为针对特定硬件池的测量证据，而不是通用的基准测试。
+> **版本 1.0.3：一种研究工具。** 从 1.0 开始，版本遵循语义版本控制：如果某个更改破坏了 CLI、收据格式或实验规范格式，则会发布一个全新的主要版本。互锁仅提供建议：它会建议一个模型、引擎和设备，并且它绝不会处理实际流量。其中的每个本地编号都曾在同一测试平台上进行测量（Intel Core Ultra 9 285K 及其 NPU 和 iGPU，以及一张 RTX 5090），而远程 `colab:<card>` 行则位于各自独立的证据池中，并具有完整的设备标识（`provider`、`card`、`vram_mib`、`driver_version`、`cuda_version`、`pool`）。将它的路由视为针对特定硬件池的测量证据，而不是通用的基准测试。
 
 铁路互锁系统可以防止列车被引导到冲突的轨道上。此工具对设备执行相同的操作：它将每个任务发送到模型、引擎和设备。
 
@@ -43,7 +43,7 @@ pip install mcptoolshop-interlock
 uv tool install mcptoolshop-interlock
 ```
 
-分发名称为 `mcptoolshop-interlock`。导入命令为 `interlock`。仅支持 Python 3.12（`requires-python` 是 `>=3.12,<3.13`）。CI 在 Ubuntu 上运行测试。针对本表格中使用的 Windows 测试平台编写了一个实时测量脚本。Linux CUDA 路径（1.0.0 版本中的新功能）在远程 Colab VM 上运行。
+发行包的名称是`mcptoolshop-interlock`。导入和命令是`interlock`。Python 3.13、3.14 和 3.15（`requires-python`是`>=3.13`；3.13 是 Colab 默认镜像运行的版本）。CI 在所有三个版本上，在 Ubuntu 上运行测试，其中 3.15 是主要版本。在 3.15 上，PyYAML 会从源代码安装，直到它发布 cp315 轮子（当 libyaml 不存在时，它会构建一个纯 Python 轮子）。`intel` 附加组件需要 Python 3.13 或 3.14：OpenVINO 2026.4.1 尚未提供 cp315 轮子，因此在 3.15 上，附加组件会安装`transformers`，但不会安装`openvino*`（一个环境标记）；核心组件在 3.15 上运行。针对测试平台的实时测量运行，是为用于测量此表格的 Windows 测试平台编写的。Linux CUDA 路径（1.0.0 版本中的新功能）在远程 Colab 虚拟机上运行。
 
 此程序允许访问的内容在 [威胁模型](#威胁模型) 中。
 
@@ -228,7 +228,7 @@ aspire = "../aspire-si"
 
 ## 开发
 
-Python 3.12。`uv sync --frozen` 从锁文件中创建项目环境。它不共享 NPU 环境。OpenVINO 2026.4.1 是 `intel` 附加内容。测试不需要它。
+Python 3.15（`.python-version`）；3.13 和 3.14 也可以使用。`uv sync --frozen` 从 lockfile 文件创建项目环境。它不会共享 NPU 环境。OpenVINO 2026.4.1 是额外的组件（`intel`）。测试不需要它。
 
 ```
 uv sync --frozen
