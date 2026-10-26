@@ -95,6 +95,7 @@
         "prompt_tokens": {"type": ["integer", "null"], "minimum": 0},
         "prompt_token_method": {"type": ["string", "null"]},
         "ladder_version": {"type": ["integer", "null"], "minimum": 1},
+        "prompt_tokens_target": {"type": ["integer", "null"], "minimum": 0},
         "prompt_token_search": {"type": ["integer", "null"], "minimum": 0},
         "prompt_token_cold": {"type": ["integer", "null"], "minimum": 0},
         "truncated_tokens": {"type": ["integer", "null"], "minimum": 0}

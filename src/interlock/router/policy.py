@@ -141,7 +141,7 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
         else:
             pool.append(row)
     excluded.sort(key=lambda item: item["id"])
-    pool, version_notes = _newest_ladder_per_device_model(pool)
+    version_notes: list[str] = []
 
     steps: list[tuple[str, object]] = [("task", None), ("model", None)]
     if request.device is not None:
@@ -167,11 +167,18 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
         later.append(("max_ttft_ms", request.max_ttft_ms))
 
     current = pool
+    identity = [name for name, _ in steps if name in {"task", "model", "device"}][-1]
     for constraint, limit in steps:
         kept, dropped = _split(current, request, constraint, limit)
         if not kept:
             return _empty(constraint, limit, dropped, excluded, request, failure_reasons=failure_reasons)
         current = kept
+        if constraint == identity:
+            # Before any floor: a v1 row must not win, or be listed, because the v2 row failed a floor.
+            before = current
+            current, version_notes = _newest_ladder_per_device_model(before)
+            dropped_ids = {id(row) for row in before} - {id(row) for row in current}
+            pool = [row for row in pool if id(row) not in dropped_ids]
 
     if request.max_ttft_ms is not None and current:
         refusal = _ttft_refusal(current, request, excluded)
@@ -204,15 +211,17 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
 
 
 def ladder_version(row: Mapping) -> int | None:
-    """The generate ladder that measured a row. A Colab generate row with no field is version 1.
+    """The generate ladder that measured a row. A Colab ladder cell with no field is version 1.
 
-    Other rows (the rig's own harnesses) did not come from the ladder and have no version.
+    Other rows (a fill-card row, the rig's own harnesses) did not come from the ladder and have no version.
     """
 
     value = (row.get("settings") or {}).get("ladder_version")
     if isinstance(value, int) and not isinstance(value, bool):
         return value
-    if row.get("task") == "generate" and is_colab_device(row.get("device")):
+    settings = row.get("settings") or {}
+    # Ladder cells carry a concurrency; a fill-card row (max_resident_ctx) is not a ladder row.
+    if row.get("task") == "generate" and is_colab_device(row.get("device")) and "concurrency" in settings:
         return 1
     return None
 

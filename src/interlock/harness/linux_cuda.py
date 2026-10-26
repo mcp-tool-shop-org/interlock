@@ -547,6 +547,8 @@ def build_linux_failure_row(
     num_predict: int | None = None,
     batch: int | None = None,
     prompt_tokens: int | None = None,
+    prompt_tokens_target: int | None = None,
+    prompt_token_method: str | None = None,
     token_length: int | None = None,
     concurrency: int | None = None,
     peak_mib: int | None = None,
@@ -577,10 +579,13 @@ def build_linux_failure_row(
         "failure_class": failure_class,
         "failure_reason": clean_reason,
     }
-    if task == "generate":
+    if task == "generate" and concurrency is not None:  # a ladder cell; a fill-card row is not one
         settings["ladder_version"] = GENERATE_LADDER_VERSION
     if prompt_tokens is not None:
         settings["prompt_tokens"] = prompt_tokens
+        # A failure row that carries a requested length did not verify it; one that carries a count says how it was got.
+        settings["prompt_token_method"] = prompt_token_method or "requested_not_verified"
+        settings["prompt_tokens_target"] = prompt_tokens_target if prompt_tokens_target is not None else prompt_tokens
     elif token_length is not None:
         input_spec = get_throughput_input_spec(model, token_length)
         if input_spec is not None:
@@ -963,7 +968,9 @@ def run_linux_generate_ladder(
                         reason=reason,
                         num_ctx=prompt_len,
                         num_predict=num_predict,
-                        prompt_tokens=prompt_len,
+                        prompt_tokens=_evaluated_or_requested(measured, prompt_len)[0],
+                        prompt_tokens_target=prompt_len,
+                        prompt_token_method=_evaluated_or_requested(measured, prompt_len)[1],
                         concurrency=concurrency,
                         peak_mib=peak_mib,
                         abort_mib=abort_mib,
@@ -984,9 +991,7 @@ def run_linux_generate_ladder(
                 ]
             )
             repeats = sum(1 for s in slots if isinstance(s, Mapping) and s.get("phase") == "repeat") or 1
-            reported = measured.get("prompt_tokens_evaluated")
-            evaluated_tokens = int(reported) if isinstance(reported, int) else prompt_len
-            token_method = "ollama_prompt_eval_count" if isinstance(reported, int) else "requested_not_verified"  # noqa: S105
+            evaluated_tokens, token_method = _evaluated_or_requested(measured, prompt_len)
             row: dict[str, Any] = {
                 "id": f"{spec_id}/{model}/{quant}/{remote_device.card}/p{prompt_len}-c{concurrency}/{run_id}",
                 "task": "generate",
@@ -1010,6 +1015,7 @@ def run_linux_generate_ladder(
                     "static_shape": None,
                     "precision": None,
                     "prompt_tokens": evaluated_tokens,
+                    "prompt_tokens_target": prompt_len,
                     "prompt_token_method": token_method,
                     "ladder_version": GENERATE_LADDER_VERSION,
                     "concurrency": concurrency,
@@ -1204,9 +1210,9 @@ _LOAD_REFUSAL_PHRASES = (
     "unable to load",
     "error loading model",
     "failed to load model",  # not "failed to load manifest": that is a pull or registry error
-    "insufficient",
+    "insufficient memory",
     "not resident",
-    "too large for",
+    "too large for system memory",
 )
 
 
@@ -1407,6 +1413,15 @@ def _evaluated_tokens(server: LinuxOllamaServer, model: str, words: int, num_ctx
     if evaluated <= 0:
         raise LinuxShapeFailure("unmeasured", "Ollama reported no prompt_eval_count; the prompt length is unknown")
     return evaluated
+
+
+def _evaluated_or_requested(measured: Mapping[str, Any], requested: int) -> tuple[int, str]:
+    """The prompt length a ladder cell can vouch for, and how it knows."""
+
+    reported = measured.get("prompt_tokens_evaluated")
+    if isinstance(reported, int) and not isinstance(reported, bool):
+        return reported, "ollama_prompt_eval_count"
+    return requested, "requested_not_verified"
 
 
 def _calibrate_ladder_prompt(server: LinuxOllamaServer, model: str, target: int, num_ctx: int) -> tuple[int, int]:

@@ -1,6 +1,6 @@
 # interlock: how it works
 
-Mapped at 2026-10-26 from commit 578bb41 by Atlas 1.24.0.
+Mapped at 2026-10-26 from commit e982592 by Atlas 1.24.0.
 
 ## What this is
 
@@ -8,10 +8,10 @@ interlock routes each job to a model, engine and device from a receipt-backed ta
 
 10 parts, mostly Python (109 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.
 
-## What changed since 2026-10-26 (a0b66c8)
+## What changed since 2026-10-26 (578bb41)
 
-- experiments/c2-generate/spec.yaml is now also read by tests/test_ladder_versions.py.
-- 1 file added and 3 changed content, across 3 parts.
+- experiments/c2-fill-card/spec.yaml is now also read by tests/test_generation_failure_kinds.py.
+- 9 files changed content, across 3 parts.
 
 ## What comes in
 
@@ -58,7 +58,7 @@ CI writes nothing this map can see.
 
 Confidence is low: fewer than 25 source files reach 10 revisions in the window.
 
-Window: 180 days; a pair counts from 3 shared commits, since 13 source files reach 10 revisions; the floor rises to 10 when 25 do.
+Window: 180 days; a pair counts from 3 shared commits, since 14 source files reach 10 revisions; the floor rises to 10 when 25 do.
 
 ## What no test touches
 

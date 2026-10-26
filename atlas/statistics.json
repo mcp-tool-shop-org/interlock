@@ -130,12 +130,12 @@
           "scripts"
         ]
       },
-      "cohesion": 0.179692,
+      "cohesion": 0,
       "cohesionDropped": false,
       "confidence": "full",
       "highWater": null,
       "name": "src",
-      "qualifyingSourceCommits": 34,
+      "qualifyingSourceCommits": 35,
       "rebaseline": null
     },
     {
@@ -169,7 +169,7 @@
       "confidence": "full",
       "highWater": null,
       "name": "tests",
-      "qualifyingSourceCommits": 91,
+      "qualifyingSourceCommits": 92,
       "rebaseline": null
     }
   ],
@@ -217,8 +217,8 @@
         "path": ".python-version"
       },
       {
-        "commits": 58,
-        "lines": 260,
+        "commits": 59,
+        "lines": 264,
         "path": "CHANGELOG.md"
       },
       {
@@ -377,8 +377,8 @@
         "path": "assets/logo/switchyard_64.png"
       },
       {
-        "commits": 45,
-        "lines": 912,
+        "commits": 46,
+        "lines": 924,
         "path": "atlas/README.md"
       },
       {
@@ -387,18 +387,18 @@
         "path": "atlas/boundaries.yaml"
       },
       {
-        "commits": 45,
-        "lines": 3000,
+        "commits": 46,
+        "lines": 3028,
         "path": "atlas/page.json"
       },
       {
-        "commits": 45,
-        "lines": 8934,
+        "commits": 46,
+        "lines": 9058,
         "path": "atlas/statistics.json"
       },
       {
-        "commits": 45,
-        "lines": 48499,
+        "commits": 46,
+        "lines": 48682,
         "path": "atlas/structure.json"
       },
       {
@@ -1437,8 +1437,8 @@
         "path": "src/interlock/harness/lifecycle.py"
       },
       {
-        "commits": 9,
-        "lines": 2766,
+        "commits": 10,
+        "lines": 2844,
         "path": "src/interlock/harness/linux_cuda.py"
       },
       {
@@ -2062,8 +2062,8 @@
         "path": "tests/test_fill_card_live.py"
       },
       {
-        "commits": 2,
-        "lines": 248,
+        "commits": 3,
+        "lines": 323,
         "path": "tests/test_generation_failure_kinds.py"
       },
       {
@@ -2232,9 +2232,9 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-10-26T06:20:59.782Z",
+  "generatedAt": "2026-10-26T06:51:38.955Z",
   "generatedFrom": {
-    "commit": "578bb417d98f817eded8f12a3ca9344dbf1d750c"
+    "commit": "e982592d226c667fca75f98e90ca6f1bd377d8b4"
   },
   "pairs": [
     {
@@ -2492,43 +2492,43 @@
     {
       "a": "atlas/README.md",
       "b": "atlas/page.json",
-      "either": 41,
-      "shared": 41,
+      "either": 42,
+      "shared": 42,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/statistics.json",
-      "either": 41,
-      "shared": 41,
+      "either": 42,
+      "shared": 42,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/structure.json",
-      "either": 41,
-      "shared": 41,
+      "either": 42,
+      "shared": 42,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/statistics.json",
-      "either": 41,
-      "shared": 41,
+      "either": 42,
+      "shared": 42,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/structure.json",
-      "either": 41,
-      "shared": 41,
+      "either": 42,
+      "shared": 42,
       "strength": 1
     },
     {
       "a": "atlas/statistics.json",
       "b": "atlas/structure.json",
-      "either": 41,
-      "shared": 41,
+      "either": 42,
+      "shared": 42,
       "strength": 1
     },
     {
@@ -2617,17 +2617,10 @@
     },
     {
       "a": "src/interlock/harness/linux_cuda.py",
-      "b": "src/interlock/receipt.py",
+      "b": "tests/test_linux_cuda.py",
       "either": 10,
       "shared": 5,
       "strength": 0.5
-    },
-    {
-      "a": "src/interlock/harness/linux_cuda.py",
-      "b": "tests/test_linux_cuda.py",
-      "either": 9,
-      "shared": 5,
-      "strength": 0.555556
     },
     {
       "a": "src/interlock/receipt.py",
@@ -2703,16 +2696,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-10-26T02:07:38-04:00",
+    "headDate": "2026-10-26T02:29:48-04:00",
     "inScopeFiles": 300,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 142,
+    "qualifyingCommits": 143,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-04-29T06:07:38.000Z",
+    "since": "2026-04-29T06:29:48.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",
@@ -2728,7 +2721,7 @@
     ],
     "sourceFileReach": 20,
     "sourceFileRise": 25,
-    "sourceFilesReachingStrongFloor": 13,
+    "sourceFilesReachingStrongFloor": 14,
     "strength": 0.5,
     "windowDays": 180
   },

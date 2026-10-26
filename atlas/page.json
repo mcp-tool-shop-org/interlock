@@ -34,8 +34,8 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 1,
-      "changed": 3,
+      "added": 0,
+      "changed": 9,
       "moved": 0,
       "parts": 3,
       "removed": 0
@@ -43,21 +43,21 @@
     "items": [
       {
         "kind": "landing",
-        "sentence": "experiments/c2-generate/spec.yaml is now also read by tests/test_ladder_versions.py.",
+        "sentence": "experiments/c2-fill-card/spec.yaml is now also read by tests/test_generation_failure_kinds.py.",
         "subjects": [
-          "experiments/c2-generate/spec.yaml",
-          "tests/test_ladder_versions.py"
+          "experiments/c2-fill-card/spec.yaml",
+          "tests/test_generation_failure_kinds.py"
         ]
       },
       {
         "kind": "counts",
-        "sentence": "1 file added and 3 changed content, across 3 parts.",
+        "sentence": "9 files changed content, across 3 parts.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "a0b66c8b3c385a2759fa755fd61d2d223f22a120",
-      "generatedAt": "2026-10-26T05:57:46.184Z"
+      "commit": "578bb417d98f817eded8f12a3ca9344dbf1d750c",
+      "generatedAt": "2026-10-26T06:20:59.782Z"
     },
     "unchanged": false
   },
@@ -141,10 +141,10 @@
   "changesTogetherNote": [
     "2 files changed together with their own tests, as expected.",
     "Confidence is low: fewer than 25 source files reach 10 revisions in the window.",
-    "Window: 180 days; a pair counts from 3 shared commits, since 13 source files reach 10 revisions; the floor rises to 10 when 25 do."
+    "Window: 180 days; a pair counts from 3 shared commits, since 14 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 2,
-  "commit": "578bb417d98f817eded8f12a3ca9344dbf1d750c",
+  "commit": "e982592d226c667fca75f98e90ca6f1bd377d8b4",
   "defaultBranch": "main",
   "derived": "10 parts, mostly Python (109 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
   "doors": [
@@ -309,7 +309,7 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-26T06:20:59.782Z",
+  "generatedAt": "2026-10-26T06:51:38.955Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "5 writes and 6 reads use paths built at run time and are not named here.",

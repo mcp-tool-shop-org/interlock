@@ -279,3 +279,44 @@ def test_a_ladder_row_records_the_evaluated_length_and_how_it_was_counted():
     assert row["settings"]["prompt_tokens"] == 2051
     assert row["settings"]["prompt_token_method"] == "ollama_prompt_eval_count"  # noqa: S105
     validate_row(row)
+
+
+def test_a_failure_row_with_a_requested_length_says_it_did_not_verify_it():
+    row = _row("timeout")
+    assert row["settings"]["prompt_tokens"] == 2048
+    assert row["settings"]["prompt_tokens_target"] == 2048
+    assert row["settings"]["prompt_token_method"] == "requested_not_verified"  # noqa: S105
+    validate_row(row)
+
+
+def test_a_fill_card_failure_row_is_not_stamped_as_a_ladder_row():
+    row = build_linux_failure_row(
+        spec_id="C2-FILL-CARD", spec_rel="experiments/c2-fill-card/spec.yaml", run_id="r", date="2026-10-26",
+        task="generate", model="phi3.5:3.8b", revision_or_digest="d" * 64, remote_device=IDENT,
+        failure_class="oom", reason="peak over the abort line", quant="Q4_K_M", licence="mit",
+    )
+    assert "ladder_version" not in row["settings"]
+
+
+def test_the_post_measurement_oom_row_records_the_evaluated_count_and_its_method():
+    measured = {"ttft_ms": 10.0, "decode_tok_s": 30.0, "peak_mib": 15000, "size": 5, "size_vram": 5,
+                "prompt_tokens_evaluated": 2051, "prompt_tokens_target": 2048}
+    (row,) = run_linux_generate_ladder(
+        spec_id="C2-GENERATE", spec_rel="experiments/c2-generate/spec.yaml", run_id="t4-r2", date="2026-10-26",
+        remote_device=IDENT, model="phi3.5:3.8b", revision_or_digest="d" * 64, measure_shape=lambda _p, _c: measured,
+        prompt_lengths=(2048,), concurrencies=(1,), quant="Q4_K_M", licence="mit",
+    )
+    assert row["outcome"] == "oom"
+    assert row["settings"]["prompt_tokens"] == 2051
+    assert row["settings"]["prompt_tokens_target"] == 2048
+    assert row["settings"]["prompt_token_method"] == "ollama_prompt_eval_count"  # noqa: S105
+
+
+def test_load_refused_needs_the_whole_ollama_message():
+    for text, kind in (
+        ("insufficient memory", "load_refused"),
+        ("model is too large for system memory", "load_refused"),
+        ("insufficient privileges to open the socket", "unmeasured"),
+        ("the file is too large for the upload", "unmeasured"),
+    ):
+        assert classify_linux_error(RuntimeError(text)).failure_class == kind, text
