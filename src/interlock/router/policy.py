@@ -30,7 +30,7 @@ They stay eligible.
 Capability rows (``native_binary_rejected``, ``compile_rejected``,
 ``compile_timeout``, ``hang``, ``device_lost``, ``oom``, ``load_refused``,
 ``timeout``, ``ctx_exceeded``) and unmeasured cells (``sampler_error``,
-``generation_aborted``) are excluded, with those codes, and never ranked. A row
+``generation_aborted``, ``unmeasured``) are excluded, with those codes, and never ranked. A row
 with ``parity_valid`` false is excluded the same way, code ``parity_invalid``.
 When a row is both, the capability code is the one shown.
 Missing ``parity_valid`` stays eligible.
@@ -74,6 +74,7 @@ EXCLUDED_OUTCOMES = (
     "ctx_exceeded",
     "sampler_error",
     "generation_aborted",
+    "unmeasured",
 )
 
 _KNOWN_PREFIX = frozenset({"on", "off", "default"})
@@ -127,7 +128,8 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
         outcome = row.get("outcome")
         if outcome in EXCLUDED_OUTCOMES and _task_model(row, request):
             excluded.append({"id": str(row["id"]), "code": str(outcome)})
-            measured = None if outcome in {"sampler_error", "generation_aborted"} else _measured_failure_reason(row)
+            unmeasured = outcome in {"sampler_error", "generation_aborted", "unmeasured"}
+            measured = None if unmeasured else _measured_failure_reason(row)
             if measured is not None:
                 failure_reasons.append(f"{row.get('device')}: {measured}")
         elif outcome in EXCLUDED_OUTCOMES:
@@ -139,6 +141,7 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
         else:
             pool.append(row)
     excluded.sort(key=lambda item: item["id"])
+    pool, version_notes = _newest_ladder_per_device_model(pool)
 
     steps: list[tuple[str, object]] = [("task", None), ("model", None)]
     if request.device is not None:
@@ -184,6 +187,11 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
     direction = "higher" if request.task == "generate" else "lower"
     metric = "decode_tok_s" if request.task == "generate" else "warm_latency_ms"
     ranked = [row for row in current if _rank_bound(row, request) is not None]
+    ranked, across = _newest_ladder_version(ranked)
+    version_notes = [*version_notes, *across]
+    if across:
+        newest = max(ladder_version(row) or 0 for row in ranked)
+        pool = [row for row in pool if ladder_version(row) in (None, newest)]
     if not ranked:
         return _empty(metric, None, current, excluded, request, failure_reasons=failure_reasons)
 
@@ -191,8 +199,53 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
     winner = ranked[0]
     runners = _runners(pool, winner, ranked, request)
     return Decision(
-        _document(winner, ranked, runners, excluded, request, direction, metric, pool)
+        _document(winner, ranked, runners, excluded, request, direction, metric, pool, version_notes)
     )
+
+
+def ladder_version(row: Mapping) -> int | None:
+    """The generate ladder that measured a row. A Colab generate row with no field is version 1.
+
+    Other rows (the rig's own harnesses) did not come from the ladder and have no version.
+    """
+
+    value = (row.get("settings") or {}).get("ladder_version")
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    if row.get("task") == "generate" and is_colab_device(row.get("device")):
+        return 1
+    return None
+
+
+def _newest_ladder_per_device_model(pool: list[Mapping]) -> tuple[list[Mapping], list[str]]:
+    """Within one device and model, only the newest ladder version is a candidate."""
+
+    newest: dict[tuple[str, str], int] = {}
+    for row in pool:
+        version = ladder_version(row)
+        if version is not None:
+            key = (str(row.get("device")), _model_label(row))
+            newest[key] = max(newest.get(key, version), version)
+    kept = [
+        row
+        for row in pool
+        if (version := ladder_version(row)) is None or version == newest[(str(row.get("device")), _model_label(row))]
+    ]
+    dropped = len(pool) - len(kept)
+    notes = [f"{dropped} older-ladder row(s) not compared"] if dropped else []
+    return kept, notes
+
+
+def _newest_ladder_version(ranked: list[Mapping]) -> tuple[list[Mapping], list[str]]:
+    """Speeds from different ladder versions are never ranked against each other."""
+
+    versions = {v for row in ranked if (v := ladder_version(row)) is not None}
+    if len(versions) < 2:
+        return ranked, []
+    newest = max(versions)
+    kept = [row for row in ranked if ladder_version(row) in (None, newest)]
+    older = sorted(versions - {newest})
+    return kept, [f"ranked on ladder version {newest} only; version(s) {', '.join(map(str, older))} not compared"]
 
 
 def _document(
@@ -204,6 +257,7 @@ def _document(
     direction: str,
     metric: str,
     pool: Sequence[Mapping],
+    version_notes: Sequence[str] = (),
 ) -> dict:
     bound = _rank_bound(winner, request)
     assert bound is not None  # noqa: S101  # rank only sees a row that has a bound
@@ -217,7 +271,7 @@ def _document(
         next_bound = None
         delta = None
         next_id = None
-    notes: list[str] = []
+    notes: list[str] = list(version_notes)
     if "5090" not in request.busy and not _any_5090(pool, request):
         notes.append("no 5090 row")
     remote = _is_remote(winner)

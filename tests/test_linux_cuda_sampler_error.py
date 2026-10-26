@@ -57,9 +57,11 @@ class Server:
         ctx = int((payload.get("options") or {}).get("num_ctx") or 2048)
         if ctx > 8192:
             return {"error": f"request ({ctx} tokens) exceeds the available context size (8192 tokens)"}
+        prompt = str(payload.get("prompt") or "")
+        evaluated = min(len(prompt.split()), ctx) if "quiet town" in prompt else int(ctx * 0.9)  # the ladder prompt
         return {
             "load_duration": 20_000_000,
-            "prompt_eval_count": int(ctx * 0.9),
+            "prompt_eval_count": evaluated,
             "prompt_eval_duration": 100_000_000,
             "eval_count": 16,
             "eval_duration": 250_000_000,

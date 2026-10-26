@@ -41,7 +41,7 @@ constraints:
 A row with no repeat spread is not ranked on that metric. The margin is the
 gap between conservative bounds, never a median. Capability rows
 (native_binary_rejected, compile_rejected, compile_timeout, hang,
-device_lost, oom, load_refused, timeout, ctx_exceeded, sampler_error, generation_aborted) and a row with
+device_lost, oom, load_refused, timeout, ctx_exceeded, sampler_error, generation_aborted, unmeasured) and a row with
 parity_valid false (parity_invalid) are listed under excluded and are not
 candidates. No row meets the constraints: exit 1 and a structured error. It
 does not fall back.
@@ -276,9 +276,20 @@ def _cmd_table(args: argparse.Namespace) -> int:
         rows = [row for row in rows if row["task"] == args.task]
     if args.device:
         rows = [row for row in rows if matches_device_filter(row.get("device"), args.device)]
-    for row in rows:
+    from interlock.router.policy import ladder_version
+
+    # Generate-ladder rows are grouped by device, model and ladder version, and show the version: speeds from
+    # different versions are different measurements.
+    plain = [row for row in rows if ladder_version(row) is None]
+    ladder = sorted(
+        (row for row in rows if ladder_version(row) is not None),
+        key=lambda row: (str(row["device"]), str(row["model"]["repo_or_tag"]), ladder_version(row)),
+    )
+    for row in [*plain, *ladder]:
         model = row["model"]["repo_or_tag"]
-        print(f"{row['id']}\t{row['task']}\t{row['device']}\t{model}")
+        version = ladder_version(row)
+        suffix = f"\tladder v{version}" if version is not None else ""
+        print(f"{row['id']}\t{row['task']}\t{row['device']}\t{model}{suffix}")
     print(f"{len(rows)} row(s)")
     return 0
 

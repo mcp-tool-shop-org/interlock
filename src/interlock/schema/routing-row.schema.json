@@ -140,7 +140,8 @@
         "timeout",
         "ctx_exceeded",
         "sampler_error",
-        "generation_aborted"
+        "generation_aborted",
+        "unmeasured"
       ]
     },
     "parity_valid": {"type": "boolean"},

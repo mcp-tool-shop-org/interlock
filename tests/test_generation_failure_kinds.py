@@ -9,6 +9,7 @@ import pytest
 
 from interlock.devices import RemoteDeviceIdentity
 from interlock.harness.linux_cuda import (
+    _LADDER_WORDS,
     GENERATE_LADDER_VERSION,
     LinuxShapeFailure,
     build_linux_failure_row,
@@ -35,7 +36,11 @@ LOOP = "prediction aborted, token repeat limit reached"
         ("Post http://127.0.0.1:11434/api/generate: context deadline exceeded", "timeout"),
         ("the read timed out", "timeout"),
         ("model failed to load: resource limitations", "load_refused"),
-        ("something else broke", "load_refused"),
+        ("unable to load model", "load_refused"),
+        ("model requires more system memory (12.0 GiB) than is available", "load_refused"),
+        ("something else broke", "unmeasured"),
+        ("the room was a bloom", "unmeasured"),
+        ("oom-killer fired", "oom"),
         ("CUDA error: out of memory", "oom"),
     ],
 )
@@ -46,16 +51,23 @@ def test_each_generation_error_gets_its_own_kind(message, kind):
 class _Server:
     """A stub Ollama that returns whatever the test says."""
 
-    def __init__(self, reply: dict[str, Any]) -> None:
+    def __init__(self, reply: dict[str, Any], tokens_per_word: int = 1) -> None:
         self.reply = reply
+        self.tokens_per_word = tokens_per_word
         self.prompts: list[str] = []
 
     def get(self, _path: str) -> dict[str, Any]:
         return {"models": [{"name": "m", "size": 5, "size_vram": 5}]}
 
     def post(self, _path: str, payload: dict[str, Any]) -> dict[str, Any]:
-        self.prompts.append(payload["prompt"])
-        return self.reply
+        options = payload["options"]
+        if options["num_predict"] != 1:
+            self.prompts.append(payload["prompt"])
+        if "error" in self.reply:
+            return self.reply
+        # Ollama reads at most num_ctx tokens of the prompt, and reports what it read.
+        evaluated = min(len(payload["prompt"].split()) * self.tokens_per_word, options["num_ctx"])
+        return {"prompt_eval_count": evaluated, **self.reply}
 
 
 def _measure(reply: dict[str, Any]) -> dict[str, Any]:
@@ -153,6 +165,7 @@ def test_the_ladder_prompt_is_varied_deterministic_and_does_not_repeat_the_old_t
     assert len(body) == 2048
     assert "token" not in set(body)
     assert len(set(body)) > 40
+    assert len(_LADDER_WORDS) == len(set(_LADDER_WORDS))  # no word listed twice
     # no short period: no window of 8 words repeats back to back anywhere
     assert all(body[i : i + 8] != body[i + 8 : i + 16] for i in range(0, len(body) - 16))
     assert len(ladder_prompt(1)) > 0 and ladder_prompt(0).split("\n\n")[0].count(" ") == 0
@@ -160,5 +173,64 @@ def test_the_ladder_prompt_is_varied_deterministic_and_does_not_repeat_the_old_t
 
 def test_the_generate_cell_sends_the_ladder_prompt():
     server = _Server({"prompt_eval_duration": 1, "eval_count": 8, "eval_duration": 1})
-    measure_linux_ollama_generate(server, lambda: (1000, 15360), model="m", prompt_tokens=256, concurrency=1, repeats=1)
-    assert set(server.prompts) == {ladder_prompt(256)}
+    result = measure_linux_ollama_generate(
+        server, lambda: (1000, 15360), model="m", prompt_tokens=256, concurrency=1, repeats=1
+    )
+    (prompt,) = set(server.prompts)
+    assert prompt == ladder_prompt(len(prompt.split()) - 12)  # the calibrated word count plus the instruction's words
+    assert abs(result["prompt_tokens_evaluated"] - 256) <= 5
+
+
+@pytest.mark.parametrize("target", [512, 2048, 8192])
+def test_the_recorded_prompt_length_is_what_ollama_evaluated_and_num_ctx_has_room_for_it(target):
+    server = _Server({"prompt_eval_duration": 1, "eval_count": 8, "eval_duration": 1}, tokens_per_word=1)
+    result = measure_linux_ollama_generate(
+        server, lambda: (1000, 15360), model="m", prompt_tokens=target, concurrency=1, repeats=1, num_predict=128
+    )
+    assert abs(result["prompt_tokens_evaluated"] - target) <= target * 0.02
+    assert result["prompt_tokens_target"] == target
+
+
+def test_a_calibrated_prompt_with_two_tokens_per_word_still_lands_on_the_target():
+    server = _Server({"prompt_eval_duration": 1, "eval_count": 8, "eval_duration": 1}, tokens_per_word=2)
+    result = measure_linux_ollama_generate(
+        server, lambda: (1000, 15360), model="m", prompt_tokens=1024, concurrency=1, repeats=1
+    )
+    assert abs(result["prompt_tokens_evaluated"] - 1024) <= 21
+
+
+def test_a_prompt_that_ollama_truncates_below_the_target_is_unmeasured_not_a_short_row():
+    class Truncating(_Server):
+        def post(self, _path, payload):  # reads only half the window, whatever it is sent
+            return {"prompt_eval_count": payload["options"]["num_ctx"] // 2, "prompt_eval_duration": 1,
+                    "eval_count": 8, "eval_duration": 1}
+
+    with pytest.raises(LinuxShapeFailure) as caught:
+        measure_linux_ollama_generate(
+            Truncating({}), lambda: (1000, 15360), model="m", prompt_tokens=2048, concurrency=1, repeats=1
+        )
+    assert caught.value.failure_class == "unmeasured"
+    assert "not the target 2048" in caught.value.reason
+
+
+def test_a_reply_with_no_prompt_eval_count_is_unmeasured():
+    class Silent(_Server):
+        def post(self, _path, payload):
+            return {"eval_count": 8}
+
+    with pytest.raises(LinuxShapeFailure) as caught:
+        measure_linux_ollama_generate(Silent({}), lambda: (1000, 15360), model="m", prompt_tokens=512, concurrency=1)
+    assert caught.value.failure_class == "unmeasured"
+
+
+def test_a_ladder_row_records_the_evaluated_length_and_how_it_was_counted():
+    measured = {"ttft_ms": 10.0, "decode_tok_s": 30.0, "peak_mib": 6000, "size": 5, "size_vram": 5,
+                "prompt_tokens_evaluated": 2051, "prompt_tokens_target": 2048}
+    (row,) = run_linux_generate_ladder(
+        spec_id="C2-GENERATE", spec_rel="experiments/c2-generate/spec.yaml", run_id="t4-r2", date="2026-10-26",
+        remote_device=IDENT, model="phi3.5:3.8b", revision_or_digest="d" * 64, measure_shape=lambda _p, _c: measured,
+        prompt_lengths=(2048,), concurrencies=(1,), quant="Q4_K_M", licence="mit",
+    )
+    assert row["settings"]["prompt_tokens"] == 2051
+    assert row["settings"]["prompt_token_method"] == "ollama_prompt_eval_count"  # noqa: S105
+    validate_row(row)
