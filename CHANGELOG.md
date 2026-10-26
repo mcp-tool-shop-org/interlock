@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.0.7] - 2026-10-26
+
 ### Fixed
 
 T4 rung r3 (the log of its Ollama and the VM's `free -m`) showed that version 3 labelled some cells wrongly. `GENERATE_LADDER_VERSION` is now 4. **The `timeout` and `unmeasured` labels that v3 gave to a partially offloaded cell or to a cell killed for host RAM are superseded by v4's `oom`** (the T4 r3 rows stay as data under their v3 labels). The router guard stays keyed on version 3 (`LADDER_MEASURED_FROM`): a v3 row's measured ttft and throughput are still valid.
@@ -19,6 +21,10 @@ T4 rung r3 (the log of its Ollama and the VM's `free -m`) showed that version 3 
 - **A failure row records the window that was sent, as a measured row does.** `settings.num_ctx` is the `num_ctx` the request sent and `settings.cell_tokens` the nominal cell, on every failure path of the generate ladder (`oom` from a partial offload or host RAM, `timeout`, `unmeasured`, `load_refused`, `ctx_exceeded`); an `oom` row's `num_ctx` now equals the window its own reason names (it used to say the nominal 16384 beside a reason that said 16903 was sent). A failure before any request was sent (a pre-registered refusal, a failure outside the measurement) never had a window: it keeps the nominal size in `num_ctx`, and `settings.num_ctx_source` says `nominal: no request was sent` (it is `sent` otherwise).
 - `_ttft_does_not_scale` names the prefill, not the ttft, in its parameter and message (it has read `prefill_ms` since v3).
 - `tests/fake_ollama.py` now reports a partial offload (`/api/ps`, and the `offloaded N/M layers` and `CPU KV buffer size` log lines), simulates the SIGKILL when host buffers exceed the VM's RAM, raises `TimeoutError` past the timeout a call was sent with, and gives a slow fully resident cell. The parser tests read lines from T4 r3's own log (`tests/fixtures/ollama_logs/0.40.11/`).
+
+### Docs
+
+- The handbook's experiments page describes ladder version 4: partial offload and host-RAM `oom` found before any timed call, the scaled request timeout (`settings.request_timeout_s`), and the window every failure row records.
 
 ## [1.0.6] - 2026-10-26
 
