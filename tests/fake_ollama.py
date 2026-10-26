@@ -48,6 +48,7 @@ class FakeOllama:
         mapped_mib: float = 70.0,
         system_total_mib: float = 12975.0,
         log_lines: bool = True,
+        kill_early: bool = False,
     ) -> None:
         self.tokens_per_word = tokens_per_word
         self.prefill_tok_s = prefill_tok_s
@@ -66,6 +67,8 @@ class FakeOllama:
         self.system_total_mib = system_total_mib
         self.log_lines = log_lines
         self.log_text = ""
+        self._log_start = 0
+        self.kill_early = kill_early  # killed after its system-memory line, before any load_tensors block
         self.all_calls: list[dict[str, Any]] = []  # every request, probes included
         self.timeouts: list[float | None] = []
         self._load = {"on_gpu": layers_total, "cpu_kv": 0.0, "kv": 0.0, "killed": False}
@@ -86,8 +89,11 @@ class FakeOllama:
         size = self.weights_mib + self._load["kv"]
         return {"models": [{"name": "m", "size": size, "size_vram": size - self._load["cpu_kv"]}]}
 
+    def begin_cell(self) -> None:
+        self._log_start = len(self.log_text)
+
     def load_report(self) -> dict[str, Any]:
-        return parse_load_report(self.log_text)
+        return parse_load_report(self.log_text[self._log_start :])
 
     def _log_load(self, num_ctx: int) -> None:
         """What llama-server logs when the model loads at this window and slot count (formats read from T4 r3)."""
@@ -97,11 +103,18 @@ class FakeOllama:
         fraction = 1.0 if free >= kv else max(0.0, free) / kv
         on_gpu = self.layers_total if fraction >= 1.0 else int(self.layers_total * fraction)
         cpu_kv = 0.0 if fraction >= 1.0 else kv * (1.0 - fraction)
-        killed = cpu_kv + self.mapped_mib > self.system_total_mib
+        killed = self.kill_early or cpu_kv + self.mapped_mib > self.system_total_mib
         self._load = {"on_gpu": on_gpu, "cpu_kv": cpu_kv, "kv": kv, "killed": killed}
-        lines = [
+        system_line = (
             f'time=2026-10-26T14:00:00.000Z level=INFO source=sched.go:658 msg="system memory" '
-            f'total="{self.system_total_mib / 1024:.1f} GiB" free="10.8 GiB" free_swap="0 B"',
+            f'total="{self.system_total_mib / 1024:.1f} GiB" free="10.8 GiB" free_swap="0 B"'
+        )
+        if self.kill_early:
+            if self.log_lines:
+                self.log_text += system_line + "\n"
+            return
+        lines = [
+            system_line,
             "load_tensors: loading model tensors, this can take a while... (load_mode = mmap)",
             f"load_tensors: offloaded {on_gpu}/{self.layers_total} layers to GPU",
             f"load_tensors:   CPU_Mapped model buffer size =   {self.mapped_mib:.2f} MiB",

@@ -455,29 +455,40 @@ def parse_load_report(text: str) -> dict[str, Any]:
     """The latest model load in an Ollama server log: layers on the GPU, host KV and mapped weights, system memory.
 
     The load starts at the last ``load_tensors: loading model tensors`` line (else the last ``offloaded`` line). The
-    system memory is the last ``msg="system memory"`` line before it. Every value is None when it is not in the log;
-    nothing is inferred.
+    system memory is the last ``msg="system memory"`` line. A system-memory line with no ``load_tensors`` block after
+    it is a load that has not got as far as its block (it was killed first), so that load has no layers or buffers:
+    the block before it belongs to an earlier load and is not read. Every value is None when it is not in the log;
+    nothing is inferred. Ollama prints the total in GiB to one decimal, so ``system_total_margin_mib`` is 51.2 (half of
+    0.1 GiB) when it was given in GiB, and 0 when in MiB.
     """
 
     starts = [m.start() for m in re.finditer(r"load_tensors: loading model tensors", text)] or [
         m.start() for m in _OFFLOADED.finditer(text)
     ]
+    system_all = list(_SYSTEM_MEMORY.finditer(text))
     start = starts[-1] if starts else len(text)
+    if system_all and system_all[-1].start() > start:
+        start = len(text)  # the latest load logged its system memory and no block: an empty block
+        system = [system_all[-1].groups()]
+    else:
+        before = [m for m in system_all if m.start() < start] if starts else system_all
+        system = [before[-1].groups()] if before else []
     block = text[start:]
     layers = _OFFLOADED.findall(block)
     cpu_kv = [float(v) for v in _CPU_KV.findall(block)]
     mapped = [float(v) for v in _CPU_MAPPED.findall(block)]
-    system = _SYSTEM_MEMORY.findall(text[:start] if starts else text)
-    system_mib = None
+    system_mib, margin = None, 0.0
     if system:
         amount, unit = system[-1]
         system_mib = float(amount) * (1024.0 if unit == "GiB" else 1.0)
+        margin = 51.2 if unit == "GiB" else 0.0
     return {
         "layers_on_gpu": int(layers[-1][0]) if layers else None,
         "layers_total": int(layers[-1][1]) if layers else None,
         "cpu_kv_mib": sum(cpu_kv) if cpu_kv else None,
         "cpu_mapped_mib": sum(mapped) if mapped else None,
         "system_total_mib": system_mib,
+        "system_total_margin_mib": margin,
     }
 
 
@@ -590,6 +601,14 @@ class LinuxOllamaServer:
         self.num_parallel = slots
         if running:
             self.start()
+
+    def begin_cell(self) -> None:
+        """Start reading the log from here, so a cell never reads an earlier cell's load."""
+
+        try:
+            self._log_offset = self.log_path.stat().st_size
+        except OSError:
+            self._log_offset = 0
 
     def load_report(self) -> dict[str, Any]:
         """The latest load's layers, host buffers and system memory, from this process's part of the server log."""
@@ -1725,20 +1744,30 @@ def _failure_for(
         failure = exc
     elif "signal: killed" in str(exc).lower():
         report = _load_report(server)
-        cpu_kv, mapped = report.get("cpu_kv_mib"), report.get("cpu_mapped_mib") or 0
+        cpu_kv, mapped = report.get("cpu_kv_mib"), report.get("cpu_mapped_mib")
         system = report.get("system_total_mib")
-        if cpu_kv is not None and system is not None and cpu_kv + mapped > system:
+        margin = float(report.get("system_total_margin_mib") or 0.0)
+        missing = [
+            name
+            for name, value in (("CPU KV", cpu_kv), ("mapped weights", mapped), ("system memory", system))
+            if value is None
+        ]
+        if not missing and cpu_kv + mapped > system + margin:
             failure = LinuxShapeFailure(
                 "oom",
                 f"host RAM: the load needed {cpu_kv + mapped:.0f} MiB in host RAM (CPU KV {cpu_kv:.0f} + mapped "
-                f"weights {mapped:.0f}); the VM has {system:.0f} MiB (Ollama system memory)",
+                f"weights {mapped:.0f}); the VM has {system:.0f} MiB (Ollama system memory, to 0.1 GiB: a margin of "
+                f"{margin:.1f} MiB was required)",
                 peak_mib=peak_mib,
                 evidence={"offload": {**report, "source": "llama-server log"}},
             )
         else:
-            failure = LinuxShapeFailure(
-                "unmeasured", f"{exc} (the server log has no host-RAM numbers that explain it)", peak_mib=peak_mib
+            why = (
+                f"the server log lacks {', '.join(missing)}"
+                if missing
+                else "the host buffers fit the VM's RAM within the rounding of its total"
             )
+            failure = LinuxShapeFailure("unmeasured", f"{exc} ({why})", peak_mib=peak_mib)
     else:
         failure = classify_linux_error(exc, peak_mib=peak_mib)
     if evidence:
@@ -1837,6 +1866,9 @@ def measure_linux_ollama_generate(
     ensure_parallel = getattr(server, "ensure_parallel", None)
     if callable(ensure_parallel):
         ensure_parallel(max(1, concurrency))
+    begin_cell = getattr(server, "begin_cell", None)
+    if callable(begin_cell):
+        begin_cell()  # the log is read from here: this cell's load, not an earlier cell's
     used_before, _ = sample_vram_mib()
     peak_mib = used_before
     num_ctx = ladder_window(prompt_tokens, num_predict)

@@ -69,6 +69,7 @@ def test_the_parser_reads_the_killed_p8192_c8_load_from_the_real_log():
     assert report["cpu_kv_mib"] == 14688.0
     assert report["cpu_mapped_mib"] == pytest.approx(731.45 + 70.34 + 461.41)  # the CPU_Mapped lines are summed
     assert report["system_total_mib"] == pytest.approx(12.7 * 1024)
+    assert report["system_total_margin_mib"] == 51.2  # given in GiB to one decimal
 
 
 def test_the_parser_reads_a_partial_offload_and_a_fully_resident_load():
@@ -82,7 +83,7 @@ def test_the_parser_reads_a_partial_offload_and_a_fully_resident_load():
 def test_the_parser_returns_none_for_everything_it_does_not_find_and_uses_the_latest_load():
     assert parse_load_report("") == {
         "layers_on_gpu": None, "layers_total": None, "cpu_kv_mib": None, "cpu_mapped_mib": None,
-        "system_total_mib": None,
+        "system_total_mib": None, "system_total_margin_mib": 0.0,
     }
     two = (FIXTURES / "r3_killed_p8192_c8.log").read_text(encoding="utf-8") + (
         FIXTURES / "r3_resident.log"
@@ -148,7 +149,8 @@ def test_a_kill_with_host_buffers_over_the_vm_ram_is_oom_host_ram():
     reason = caught.value.reason
     assert caught.value.failure_class == "oom"
     assert reason.startswith("host RAM: the load needed ") and "MiB in host RAM (CPU KV " in reason
-    assert "mapped weights 70" in reason and "the VM has 13005 MiB (Ollama system memory)" in reason
+    assert "mapped weights 70" in reason
+    assert "the VM has 13005 MiB (Ollama system memory, to 0.1 GiB: a margin of 51.2 MiB" in reason
     assert len(server.all_calls) == 1  # the kill came on the first probe
 
 
@@ -157,7 +159,7 @@ def test_a_kill_with_no_log_numbers_stays_unmeasured():
     with pytest.raises(LinuxShapeFailure) as caught:
         _measure(server, 32768, concurrency=8)
     assert caught.value.failure_class == "unmeasured"
-    assert "signal: killed" in caught.value.reason and "no host-RAM numbers" in caught.value.reason
+    assert "signal: killed" in caught.value.reason and "the server log lacks" in caught.value.reason
 
 
 def test_a_kill_with_host_buffers_under_the_vm_ram_stays_unmeasured():
@@ -366,3 +368,104 @@ def test_a_failure_before_any_request_was_sent_keeps_the_nominal_size_and_says_s
     )
     assert row["settings"]["num_ctx"] == 2048 == row["settings"]["cell_tokens"]
     assert row["settings"]["num_ctx_source"] == "nominal: no request was sent"
+
+
+# -- B needs every number, a cell reads only its own load, and the GiB rounding is a margin ------------------------
+
+
+def _kill_with_log(log: str):
+    class Killed(FakeOllama):
+        def post(self, path, payload, timeout=None):
+            self.log_text = log
+            raise RuntimeError("llama-server process has terminated: signal: killed")
+
+    return Killed()
+
+
+def _log(*, cpu_kv: float | None, mapped: float | None, system: str = "12.7 GiB") -> str:
+    lines = [f'time=2026-10-26T14:00:00.000Z level=INFO source=sched.go:658 msg="system memory" total="{system}"']
+    lines += ["load_tensors: loading model tensors, this can take a while... (load_mode = mmap)",
+              "load_tensors: offloaded 15/33 layers to GPU"]
+    if mapped is not None:
+        lines.append(f"load_tensors:   CPU_Mapped model buffer size =   {mapped:.2f} MiB")
+    if cpu_kv is not None:
+        lines.append(f"llama_kv_cache:        CPU KV buffer size = {cpu_kv:.2f} MiB")
+    return "\n".join(lines) + "\n"
+
+
+def test_host_ram_needs_all_three_numbers_and_never_prints_one_that_was_not_read():
+    for missing_one in (
+        _log(cpu_kv=99999.0, mapped=None),  # no CPU_Mapped line
+        _log(cpu_kv=None, mapped=70.0),  # no CPU KV line
+        "load_tensors: loading model tensors\nllama_kv_cache: CPU KV buffer size = 99999.00 MiB\n"
+        "load_tensors:   CPU_Mapped model buffer size = 70.00 MiB\n",  # no system-memory line
+    ):
+        with pytest.raises(LinuxShapeFailure) as caught:
+            _measure(_kill_with_log(missing_one), 2048)
+        assert caught.value.failure_class == "unmeasured"
+        assert "the server log lacks" in caught.value.reason
+        assert "mapped weights 0" not in caught.value.reason
+
+
+def test_host_buffers_within_the_gib_rounding_of_the_vm_ram_are_not_called_host_ram():
+    total = 12.7 * 1024  # 13004.8 MiB; the real total is anywhere within 51.2 MiB of it
+    within = _log(cpu_kv=total + 30.0 - 70.0, mapped=70.0)  # over the printed total, under total + 51.2
+    with pytest.raises(LinuxShapeFailure) as caught:
+        _measure(_kill_with_log(within), 2048)
+    assert caught.value.failure_class == "unmeasured"
+    assert "within the rounding of its total" in caught.value.reason
+    over = _log(cpu_kv=total + 100.0 - 70.0, mapped=70.0)
+    with pytest.raises(LinuxShapeFailure) as caught:
+        _measure(_kill_with_log(over), 2048)
+    assert caught.value.failure_class == "oom" and "a margin of 51.2 MiB was required" in caught.value.reason
+
+
+def test_a_system_memory_line_with_no_block_after_it_is_an_empty_load_not_the_block_before():
+    earlier = _log(cpu_kv=14688.0, mapped=1263.0)
+    later = 'time=2026-10-26T14:05:00.000Z level=INFO source=sched.go:658 msg="system memory" total="12.7 GiB"\n'
+    report = parse_load_report(earlier + later)
+    assert report["layers_on_gpu"] is None and report["cpu_kv_mib"] is None and report["cpu_mapped_mib"] is None
+    assert report["system_total_mib"] == pytest.approx(12.7 * 1024)  # from the latest line
+
+
+def test_a_cell_killed_before_its_own_block_is_unmeasured_never_oom_with_the_last_cells_numbers():
+    server = _small_card()
+    with pytest.raises(LinuxShapeFailure) as first:
+        _measure(server, 32768, concurrency=8)  # cell N: a full block, host buffers over the RAM
+    assert first.value.failure_class == "oom" and first.value.reason.startswith("host RAM")
+    server.kill_early = True
+    server._loaded_ctx = None  # cell N+1 loads again: it logs its system memory and is killed before load_tensors
+    with pytest.raises(LinuxShapeFailure) as second:
+        _measure(server, 16384, concurrency=8)
+    assert second.value.failure_class == "unmeasured"
+    assert "the server log lacks" in second.value.reason
+
+
+class _Proc:
+    pid = 4242
+
+    def poll(self):
+        return None
+
+    def terminate(self) -> None:
+        return None
+
+    def wait(self, timeout=None):
+        return 0
+
+
+def test_the_real_server_reads_the_log_from_the_start_of_each_cell(tmp_path):
+    log = tmp_path / "ollama.log"
+    log.write_text((FIXTURES / "r3_killed_p8192_c8.log").read_text(encoding="utf-8"), encoding="utf-8")
+    server = linux_cuda.LinuxOllamaServer(
+        log_path=log, popen=lambda *a, **k: _Proc(), http_get=lambda _u: {"version": "x"}
+    )
+    server.start()
+    server._log_offset = 0  # as a restart earlier in the run would leave it
+    assert server.load_report()["cpu_kv_mib"] == 14688.0  # the earlier cell's load
+    server.begin_cell()
+    with log.open("a", encoding="utf-8") as handle:
+        handle.write('time=x msg="system memory" total="12.7 GiB" free="1 GiB"\n')
+    report = server.load_report()
+    assert report["cpu_kv_mib"] is None and report["layers_on_gpu"] is None
+    server.stop()
