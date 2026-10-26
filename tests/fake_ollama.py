@@ -8,6 +8,10 @@ Read from Ollama v0.40.9 and v0.40.11 (llm/llama_server.go, envconfig/config.go)
 - A prompt of ``num_ctx - 1`` tokens or more is cut to ``num_ctx - max((num_ctx - num_keep) // 2, 1)`` tokens
   (``num_keep`` is 4), and that is the count reported.
 - ``OLLAMA_NUM_PARALLEL`` defaults to 1: with fewer slots than requests, the requests queue.
+- A load whose weights and KV (``num_ctx`` times the slots) do not fit ``vram_mib`` is a partial offload: ``/api/ps``
+  shows ``size_vram < size`` and the log says ``offloaded N/M layers`` and ``CPU KV buffer size`` (T4 r3). When the host
+  buffers exceed ``system_total_mib`` the process is killed on its first call: ``signal: killed``.
+- A request that takes longer than the timeout it was sent with raises ``TimeoutError``.
 
 Time is virtual. Each request takes its prefill plus its decode, on the earliest free slot; ``clock()`` returns the
 finish time of the latest request, so a pass's wall clock is exact whatever the threads do.
@@ -18,6 +22,8 @@ from __future__ import annotations
 import math
 import threading
 from typing import Any
+
+from interlock.harness.linux_cuda import parse_load_report
 
 NUM_KEEP = 4
 
@@ -35,6 +41,13 @@ class FakeOllama:
         long_prompt_bias: float = 0.0,
         overhead_s: float = 0.0,
         overhead_s_per_ktok: float = 0.0,
+        vram_mib: float | None = None,
+        weights_mib: float = 2400.0,
+        kv_mib_per_token: float = 0.375,
+        layers_total: int = 33,
+        mapped_mib: float = 70.0,
+        system_total_mib: float = 12975.0,
+        log_lines: bool = True,
     ) -> None:
         self.tokens_per_word = tokens_per_word
         self.prefill_tok_s = prefill_tok_s
@@ -45,6 +58,17 @@ class FakeOllama:
         self.overhead_s = overhead_s  # time that is neither prefill nor decode (Ollama's Go side)
         self.overhead_s_per_ktok = overhead_s_per_ktok
         self.long_prompt_bias = long_prompt_bias  # T4 r2: long prompts ran ~1.2% over the probes
+        self.vram_mib = vram_mib  # None: everything fits
+        self.weights_mib = weights_mib
+        self.kv_mib_per_token = kv_mib_per_token
+        self.layers_total = layers_total
+        self.mapped_mib = mapped_mib
+        self.system_total_mib = system_total_mib
+        self.log_lines = log_lines
+        self.log_text = ""
+        self.all_calls: list[dict[str, Any]] = []  # every request, probes included
+        self.timeouts: list[float | None] = []
+        self._load = {"on_gpu": layers_total, "cpu_kv": 0.0, "kv": 0.0, "killed": False}
         self.num_parallel = 1
         self.restarts = 0
         self.prompts: list[str] = []  # the timed prompts: every call that asked for more than one token
@@ -59,7 +83,40 @@ class FakeOllama:
 
     # -- the server surface the harness uses -------------------------------------------------------------------------
     def get(self, _path: str) -> dict[str, Any]:
-        return {"models": [{"name": "m", "size": 5, "size_vram": 5}]}
+        size = self.weights_mib + self._load["kv"]
+        return {"models": [{"name": "m", "size": size, "size_vram": size - self._load["cpu_kv"]}]}
+
+    def load_report(self) -> dict[str, Any]:
+        return parse_load_report(self.log_text)
+
+    def _log_load(self, num_ctx: int) -> None:
+        """What llama-server logs when the model loads at this window and slot count (formats read from T4 r3)."""
+
+        kv = num_ctx * self.num_parallel * self.kv_mib_per_token
+        free = (self.vram_mib - self.weights_mib) if self.vram_mib is not None else kv
+        fraction = 1.0 if free >= kv else max(0.0, free) / kv
+        on_gpu = self.layers_total if fraction >= 1.0 else int(self.layers_total * fraction)
+        cpu_kv = 0.0 if fraction >= 1.0 else kv * (1.0 - fraction)
+        killed = cpu_kv + self.mapped_mib > self.system_total_mib
+        self._load = {"on_gpu": on_gpu, "cpu_kv": cpu_kv, "kv": kv, "killed": killed}
+        lines = [
+            f'time=2026-10-26T14:00:00.000Z level=INFO source=sched.go:658 msg="system memory" '
+            f'total="{self.system_total_mib / 1024:.1f} GiB" free="10.8 GiB" free_swap="0 B"',
+            "load_tensors: loading model tensors, this can take a while... (load_mode = mmap)",
+            f"load_tensors: offloaded {on_gpu}/{self.layers_total} layers to GPU",
+            f"load_tensors:   CPU_Mapped model buffer size =   {self.mapped_mib:.2f} MiB",
+        ]
+        if cpu_kv > 0:
+            lines.append(f"llama_kv_cache:        CPU KV buffer size = {cpu_kv:.2f} MiB")
+        if fraction > 0:
+            lines.append(f"llama_kv_cache:      CUDA0 KV buffer size = {kv * fraction:.2f} MiB")
+        if killed:
+            lines.append(
+                'time=2026-10-26T14:00:11.000Z level=INFO source=sched.go:686 msg="Load failed" '
+                'error="llama-server process has terminated: signal: killed"'
+            )
+        if self.log_lines:
+            self.log_text += "\n".join(lines) + "\n"
 
     def ensure_parallel(self, slots: int) -> None:
         if slots == self.num_parallel:
@@ -93,14 +150,23 @@ class FakeOllama:
             return tokens
         return window - max((window - NUM_KEEP) // 2, 1)
 
-    def post(self, _path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def post(self, _path: str, payload: dict[str, Any], timeout: float | None = None) -> dict[str, Any]:
         options = payload["options"]
         num_predict = int(options.get("num_predict") or 1)
         words = payload["prompt"].split()
         with self._lock:
+            if num_predict == 1:
+                self._arrival = self._now  # the calibration's calls are sequential: each starts when the last ended
+            self.all_calls.append({"prompt": payload["prompt"], "num_predict": num_predict, "timeout": timeout})
+            self.timeouts.append(timeout)
             if self._loaded_ctx != options["num_ctx"]:
                 self._loaded_ctx = options["num_ctx"]
                 self._last_words = []  # a reload drops the cache
+                self._log_load(options["num_ctx"])
+            if self._load["killed"]:
+                raise RuntimeError(
+                    "HTTP 500: llama-server process has terminated: signal: killed (the load needed more host memory)"
+                )
             evaluated = self.evaluated(payload)
             common = 0
             if self.cache:
@@ -120,6 +186,9 @@ class FakeOllama:
             self._slot_free[index] = finish
             self._now = max(self._now, finish)
             total_s = finish - self._arrival  # Ollama's total_duration counts the wait for a free slot
+            limit = 120.0 if timeout is None else timeout  # the fixed urlopen timeout a caller gets without one
+            if total_s > limit:
+                raise TimeoutError(f"timed out after {limit:.0f} s")
             if num_predict > 1:
                 self.prompts.append(payload["prompt"])
                 self.contexts.append(options["num_ctx"])

@@ -15,6 +15,7 @@ says nothing about what the card can load.
 from __future__ import annotations
 
 import hashlib
+import inspect
 import ipaddress
 import itertools
 import json
@@ -56,8 +57,12 @@ GENERATE_CONCURRENCIES = (1, 4, 8)
 # hit), and the concurrency cells ran through one slot while the aggregate multiplied by the concurrency. Version 3
 # sizes the window from the accepted prompt, gives every timed call a unique prefix, runs `concurrency` slots, and
 # takes the aggregate from the pass's wall clock. Speeds from different versions are never compared; a version-1 or
-# version-2 ttft or concurrency throughput is never used (see the router).
-GENERATE_LADDER_VERSION = 3
+# version-2 ttft or concurrency throughput is never used (see the router; the guard stays at version 3, whose measured
+# ttft and throughput are still valid). Version 4 (T4 r3) checks that the model loads fully on the GPU before any
+# timed call (a partial offload is `oom`, where v3 recorded `timeout`), reads a SIGKILL during a load as host RAM only
+# when the log's numbers say so (`oom`; v3 recorded `unmeasured`), and scales each cell's request timeout from its own
+# verify call and records it.
+GENERATE_LADDER_VERSION = 4
 THROUGHPUT_TASKS = ("embed", "rerank", "nli")
 THROUGHPUT_BATCH_SIZES = (1, 8, 32)
 THROUGHPUT_TOKEN_LENGTHS = (128, 510)
@@ -150,7 +155,14 @@ class LinuxCudaError(Exception):
 class LinuxShapeFailure(Exception):
     """A measured shape failed on the remote card and must be recorded as a failure row."""
 
-    def __init__(self, failure_class: str, reason: str, *, peak_mib: int | None = None) -> None:
+    def __init__(
+        self,
+        failure_class: str,
+        reason: str,
+        *,
+        peak_mib: int | None = None,
+        evidence: dict[str, Any] | None = None,
+    ) -> None:
         if failure_class not in ROW_FAILURE_CLASSES:
             raise LinuxCudaError(
                 f"unknown Linux CUDA failure class {failure_class!r}; expected one of {ROW_FAILURE_CLASSES}"
@@ -161,6 +173,7 @@ class LinuxShapeFailure(Exception):
         self.failure_class = failure_class
         self.reason = reason.strip()
         self.peak_mib = peak_mib
+        self.evidence = evidence  # what the failure was read from, put in the row (offload, request_timeout_s)
 
 
 @dataclass(frozen=True)
@@ -409,7 +422,7 @@ def _default_http_get(url: str, timeout: float = 30.0) -> dict[str, Any]:
         return json.loads(resp.read().decode("utf-8"))
 
 
-def _default_http_post(url: str, payload: dict[str, Any]) -> dict[str, Any]:
+def _default_http_post(url: str, payload: dict[str, Any], timeout: float = 120.0) -> dict[str, Any]:
     _validate_loopback_ollama_url(url)
     body = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(  # noqa: S310
@@ -419,7 +432,7 @@ def _default_http_post(url: str, payload: dict[str, Any]) -> dict[str, Any]:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=120.0) as resp:  # noqa: S310
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         raw = exc.read().decode("utf-8", errors="replace")
@@ -430,6 +443,42 @@ def _default_http_post(url: str, payload: dict[str, Any]) -> dict[str, Any]:
         except json.JSONDecodeError:
             pass
         return {"error": f"HTTP {exc.code}: {raw.strip() or exc.reason}"}
+
+
+_OFFLOADED = re.compile(r"offloaded\s+(\d+)\s*/\s*(\d+)\s+layers")
+_CPU_KV = re.compile(r"CPU KV buffer size\s*=\s*([\d.]+)\s*MiB")
+_CPU_MAPPED = re.compile(r"CPU_Mapped model buffer size\s*=\s*([\d.]+)\s*MiB")
+_SYSTEM_MEMORY = re.compile(r'msg="system memory"[^\n]*?total="([\d.]+)\s*(GiB|MiB)"')
+
+
+def parse_load_report(text: str) -> dict[str, Any]:
+    """The latest model load in an Ollama server log: layers on the GPU, host KV and mapped weights, system memory.
+
+    The load starts at the last ``load_tensors: loading model tensors`` line (else the last ``offloaded`` line). The
+    system memory is the last ``msg="system memory"`` line before it. Every value is None when it is not in the log;
+    nothing is inferred.
+    """
+
+    starts = [m.start() for m in re.finditer(r"load_tensors: loading model tensors", text)] or [
+        m.start() for m in _OFFLOADED.finditer(text)
+    ]
+    start = starts[-1] if starts else len(text)
+    block = text[start:]
+    layers = _OFFLOADED.findall(block)
+    cpu_kv = [float(v) for v in _CPU_KV.findall(block)]
+    mapped = [float(v) for v in _CPU_MAPPED.findall(block)]
+    system = _SYSTEM_MEMORY.findall(text[:start] if starts else text)
+    system_mib = None
+    if system:
+        amount, unit = system[-1]
+        system_mib = float(amount) * (1024.0 if unit == "GiB" else 1.0)
+    return {
+        "layers_on_gpu": int(layers[-1][0]) if layers else None,
+        "layers_total": int(layers[-1][1]) if layers else None,
+        "cpu_kv_mib": sum(cpu_kv) if cpu_kv else None,
+        "cpu_mapped_mib": sum(mapped) if mapped else None,
+        "system_total_mib": system_mib,
+    }
 
 
 class LinuxOllamaServer:
@@ -461,6 +510,7 @@ class LinuxOllamaServer:
         # A hung poll must not use up the readiness budget: each poll is short, the loop retries inside the budget.
         self._poll_get = http_get or (lambda url: _default_http_get(url, timeout=READY_POLL_TIMEOUT_S))
         self._http_post = http_post or _default_http_post
+        self._custom_post = http_post is not None
         self._sleep = sleep
         self._proc: Any = None
         self._log_handle: Any = None
@@ -475,7 +525,9 @@ class LinuxOllamaServer:
     def get(self, path: str) -> dict[str, Any]:
         return self._http_get(f"{self.base_url}{path}")
 
-    def post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def post(self, path: str, payload: dict[str, Any], timeout: float | None = None) -> dict[str, Any]:
+        if timeout is not None and not self._custom_post:
+            return _default_http_post(f"{self.base_url}{path}", payload, timeout=timeout)
         return self._http_post(f"{self.base_url}{path}", payload)
 
     def __enter__(self) -> LinuxOllamaServer:
@@ -539,6 +591,17 @@ class LinuxOllamaServer:
         if running:
             self.start()
 
+    def load_report(self) -> dict[str, Any]:
+        """The latest load's layers, host buffers and system memory, from this process's part of the server log."""
+
+        try:
+            with self.log_path.open("rb") as handle:
+                handle.seek(self._log_offset)
+                text = handle.read().decode("utf-8", errors="replace")
+        except OSError:
+            return parse_load_report("")
+        return parse_load_report(text)
+
     def effective_slots(self) -> int | None:
         """The slot count llama-server logged for this process (``n_slots`` or ``--parallel``), or None."""
 
@@ -600,6 +663,8 @@ def build_linux_failure_row(
     concurrency: int | None = None,
     peak_mib: int | None = None,
     abort_mib: int | None = None,
+    offload: dict[str, Any] | None = None,
+    request_timeout_s: int | None = None,
 ) -> dict[str, Any]:
     """Build a schema-valid capability/failure row for a failed remote shape."""
 
@@ -645,6 +710,9 @@ def build_linux_failure_row(
             settings["prompt_token_method"] = "word_approx_1to1"  # noqa: S105
     if concurrency is not None:
         settings["concurrency"] = concurrency
+        settings["request_timeout_s"] = request_timeout_s  # the budget in force (None before one existed)
+    if offload is not None:
+        settings["offload"] = offload
     if peak_mib is not None:
         settings["peak_mib"] = peak_mib
     if abort_mib is not None:
@@ -982,6 +1050,8 @@ def run_linux_generate_ladder(
                         num_predict=num_predict,
                         prompt_tokens=prompt_len,
                         concurrency=concurrency,
+                        offload=(exc.evidence or {}).get("offload"),
+                        request_timeout_s=(exc.evidence or {}).get("request_timeout_s"),
                         peak_mib=exc.peak_mib,
                         abort_mib=abort_mib,
                         engine_version=engine_version,
@@ -1021,6 +1091,7 @@ def run_linux_generate_ladder(
                         prompt_tokens_target=prompt_len,
                         prompt_token_method=_evaluated_or_requested(measured, prompt_len)[1],
                         concurrency=concurrency,
+                        request_timeout_s=measured.get("request_timeout_s"),
                         peak_mib=peak_mib,
                         abort_mib=abort_mib,
                         engine_version=engine_version,
@@ -1064,6 +1135,7 @@ def run_linux_generate_ladder(
                         prompt_tokens_target=prompt_len,
                         prompt_token_method=token_method,
                         concurrency=concurrency,
+                        request_timeout_s=measured.get("request_timeout_s"),
                         peak_mib=peak_mib,
                         abort_mib=abort_mib,
                         engine_version=engine_version,
@@ -1101,6 +1173,7 @@ def run_linux_generate_ladder(
                     "ladder_version": GENERATE_LADDER_VERSION,
                     "concurrency": concurrency,
                     "prefix_caching": "off",  # every timed call has its own prefix, so no prefix is cached
+                    "request_timeout_s": measured.get("request_timeout_s"),
                     "parallel_slots": measured.get("parallel_slots", concurrency),
                     "parallel_slots_source": measured.get("parallel_slots_source", "requested"),
                     "throughput_method": measured.get("throughput_method", "ollama_durations_decode_window"),
@@ -1475,6 +1548,14 @@ PREFILL_TOK_S_CEILING = 250_000.0
 # Prefill time grows with the prompt: from the first measured cell at a concurrency, a longer cell's ttft must be at
 # least this fraction of the proportional growth. A cached cell stays flat, far under it.
 TTFT_SCALING_FLOOR = 0.6
+# One request's budget. Calibration calls are single requests (a partial offload is caught before they matter). A timed
+# call gets three times what `concurrency` verify-sized requests need, plus decode, clamped; the budget is recorded in
+# every generate row. After the residency check a timeout can only be a fully resident cell that is slow.
+CALIBRATION_TIMEOUT_S = 900
+REQUEST_TIMEOUT_FACTOR = 3
+REQUEST_TIMEOUT_DECODE_ALLOWANCE_S = 60
+REQUEST_TIMEOUT_FLOOR_S = 120
+REQUEST_TIMEOUT_CEILING_S = 900
 _LADDER_INSTRUCTION = "In two or three sentences, describe a quiet town by a river."
 _CELL_COUNTER = itertools.count(1)
 
@@ -1519,8 +1600,28 @@ def ladder_prompt(prompt_tokens: int, prefix: str = "") -> str:
     return prefix + " ".join(words) + "\n\n" + _LADDER_INSTRUCTION
 
 
-def _evaluated_tokens(server: LinuxOllamaServer, model: str, prompt: str, num_ctx: int) -> int:
-    """Ollama's ``prompt_eval_count`` for ``prompt`` (a one-token reply keeps this cheap)."""
+def _post(server: Any, path: str, payload: dict[str, Any], timeout: float) -> Any:
+    """``server.post`` with a request timeout, for servers that take one (a fake or an older server may not)."""
+
+    if "timeout" in inspect.signature(server.post).parameters:
+        return server.post(path, payload, timeout=timeout)
+    return server.post(path, payload)
+
+
+def request_timeout_s(concurrency: int, verify_s: float) -> int:
+    """The budget for one timed call: three times what ``concurrency`` verify-sized requests need, plus decode."""
+
+    scaled = math.ceil(REQUEST_TIMEOUT_FACTOR * max(1, concurrency) * verify_s) + REQUEST_TIMEOUT_DECODE_ALLOWANCE_S
+    return int(min(max(scaled, REQUEST_TIMEOUT_FLOOR_S), REQUEST_TIMEOUT_CEILING_S))
+
+
+def _evaluated_tokens(
+    server: LinuxOllamaServer, model: str, prompt: str, num_ctx: int
+) -> tuple[int, float | None]:
+    """Ollama's ``prompt_eval_count`` for ``prompt`` and the request's own seconds (``total - load``), if reported.
+
+    A one-token reply keeps this cheap. These are single requests, so they get the long calibration timeout.
+    """
 
     payload = {
         "model": model,
@@ -1528,13 +1629,15 @@ def _evaluated_tokens(server: LinuxOllamaServer, model: str, prompt: str, num_ct
         "stream": False,
         "options": {"num_ctx": num_ctx, "num_predict": 1, "temperature": 0.0},
     }
-    resp = server.post("/api/generate", payload)
+    resp = _post(server, "/api/generate", payload, CALIBRATION_TIMEOUT_S)
     if isinstance(resp, Mapping) and resp.get("error"):
         raise RuntimeError(str(resp["error"]))
     evaluated = int(resp.get("prompt_eval_count") or 0) if isinstance(resp, Mapping) else 0
     if evaluated <= 0:
         raise LinuxShapeFailure("unmeasured", "Ollama reported no prompt_eval_count; the prompt length is unknown")
-    return evaluated
+    total = int(resp.get("total_duration") or 0)
+    seconds = (total - int(resp.get("load_duration") or 0)) / 1e9 if total > 0 else None
+    return evaluated, seconds
 
 
 def _evaluated_or_requested(measured: Mapping[str, Any], requested: int) -> tuple[int, str]:
@@ -1546,13 +1649,100 @@ def _evaluated_or_requested(measured: Mapping[str, Any], requested: int) -> tupl
     return requested, "requested_not_verified"
 
 
-def _calibrate_ladder_prompt(
-    server: LinuxOllamaServer, model: str, target: int, num_ctx: int, nonce: str
-) -> tuple[int, int]:
-    """The word count whose prompt (prefix included) Ollama evaluates to ``target`` tokens, and the count it evaluated.
+def _load_report(server: Any) -> dict[str, Any]:
+    """The latest load's layers, host buffers and system memory from the server log; an old server has none."""
 
-    Ollama truncates a prompt that overflows ``num_ctx`` to about half of it, and reports the count it kept, so a
-    reading from an overflowing prompt says nothing about its length. Two small prompts that cannot overflow give the
+    reader = getattr(server, "load_report", None)
+    report = reader() if callable(reader) else {}
+    return report if isinstance(report, dict) else {}
+
+
+def _check_fully_resident(
+    server: LinuxOllamaServer, model: str, num_ctx: int, concurrency: int, peak_mib: int | None
+) -> None:
+    """Right after the first probe has loaded the model at the cell's window and slots, it must be fully on the GPU.
+
+    A model that is partly in host RAM runs on the CPU for the rest of the cell and times out (T4 r3: 3 cells), and
+    its verify call would be the thing that failed. Residency is read from ``/api/ps`` and from the load's log lines,
+    and either one is enough. Only what was read is put in the reason.
+    """
+
+    try:
+        size, size_vram = _query_ps_entry(server, model)
+    except LinuxShapeFailure:
+        size = size_vram = None
+    report = _load_report(server)
+    layers, total = report.get("layers_on_gpu"), report.get("layers_total")
+    cpu_kv = report.get("cpu_kv_mib")
+    by_layers = layers is not None and total is not None and layers < total
+    by_kv = cpu_kv is not None and cpu_kv > 0
+    by_ps = size is not None and size_vram is not None and size_vram < size
+    if not (by_layers or by_kv or by_ps):
+        return
+    parts = []
+    if by_layers:
+        parts.append(f"{layers}/{total} layers on the GPU")
+    if by_kv:
+        parts.append(f"{cpu_kv:.0f} MiB of KV in host RAM")
+    if by_ps:
+        parts.append(f"size_vram {size_vram} < size {size}")
+    offload = {
+        "layers_on_gpu": layers,
+        "layers_total": total,
+        "cpu_kv_mib": cpu_kv,
+        "size": size,
+        "size_vram": size_vram,
+        "source": " and ".join(
+            name for name, hit in (("llama-server log", by_layers or by_kv), ("/api/ps", by_ps)) if hit
+        ),
+    }
+    raise LinuxShapeFailure(
+        "oom",
+        f"partial offload at num_ctx {num_ctx} x {concurrency} slots: " + ", ".join(parts),
+        peak_mib=peak_mib,
+        evidence={"offload": offload, "request_timeout_s": CALIBRATION_TIMEOUT_S},
+    )
+
+
+def _failure_for(
+    server: Any, exc: BaseException, peak_mib: int | None, evidence: dict[str, Any] | None = None
+) -> LinuxShapeFailure:
+    """A failure for ``exc``. A SIGKILL during a load is host RAM only when the log's numbers say so."""
+
+    if isinstance(exc, LinuxShapeFailure):
+        failure = exc
+    elif "signal: killed" in str(exc).lower():
+        report = _load_report(server)
+        cpu_kv, mapped = report.get("cpu_kv_mib"), report.get("cpu_mapped_mib") or 0
+        system = report.get("system_total_mib")
+        if cpu_kv is not None and system is not None and cpu_kv + mapped > system:
+            failure = LinuxShapeFailure(
+                "oom",
+                f"host RAM: the load needed {cpu_kv + mapped:.0f} MiB in host RAM (CPU KV {cpu_kv:.0f} + mapped "
+                f"weights {mapped:.0f}); the VM has {system:.0f} MiB (Ollama system memory)",
+                peak_mib=peak_mib,
+                evidence={"offload": {**report, "source": "llama-server log"}},
+            )
+        else:
+            failure = LinuxShapeFailure(
+                "unmeasured", f"{exc} (the server log has no host-RAM numbers that explain it)", peak_mib=peak_mib
+            )
+    else:
+        failure = classify_linux_error(exc, peak_mib=peak_mib)
+    if evidence:
+        failure.evidence = {**evidence, **(failure.evidence or {})}
+    return failure
+
+
+def _calibrate_ladder_prompt(
+    server: LinuxOllamaServer, model: str, target: int, num_ctx: int, nonce: str, concurrency: int = 1
+) -> tuple[int, int, float]:
+    """The word count whose prompt (prefix included) Ollama evaluates to ``target`` tokens, the count it evaluated,
+    and the seconds the accepted verify request took (``total - load``, a single full-length request).
+
+    The first probe loads the model at the cell's window and slots, and must find it fully on the GPU. Ollama
+    truncates a prompt that overflows ``num_ctx`` to about half of it, and reports the count it kept, so a reading
+    from an overflowing prompt says nothing about its length. Two small prompts that cannot overflow give the
     tokens-per-word ratio and the fixed tokens (prefix and instruction); the word count follows, and is then verified
     with the real ``num_ctx``. A reading well under what the ratio predicts means truncation: the prompt is cut back to
     the target estimate and tried again. A prompt that cannot be brought within tolerance of the target is a cell that
@@ -1560,8 +1750,9 @@ def _calibrate_ladder_prompt(
     """
 
     small, large = LADDER_PROBE_WORDS
-    low = _evaluated_tokens(server, model, ladder_prompt(small, ladder_prefix(nonce, 9001)), num_ctx)
-    high = _evaluated_tokens(server, model, ladder_prompt(large, ladder_prefix(nonce, 9002)), num_ctx)
+    low, _ = _evaluated_tokens(server, model, ladder_prompt(small, ladder_prefix(nonce, 9001)), num_ctx)
+    _check_fully_resident(server, model, num_ctx, concurrency, None)
+    high, _ = _evaluated_tokens(server, model, ladder_prompt(large, ladder_prefix(nonce, 9002)), num_ctx)
     ratio = (high - low) / (large - small)
     if ratio <= 0 or high >= num_ctx * 0.9:
         raise LinuxShapeFailure(
@@ -1575,7 +1766,7 @@ def _calibrate_ladder_prompt(
     evaluated = 0
     for attempt in range(4):
         prompt = ladder_prompt(words, ladder_prefix(nonce, 9100 + attempt))
-        evaluated = _evaluated_tokens(server, model, prompt, num_ctx)
+        evaluated, verify_s = _evaluated_tokens(server, model, prompt, num_ctx)
         expected = fixed + ratio * words
         if evaluated < expected * 0.9:
             if words > estimate:
@@ -1587,7 +1778,9 @@ def _calibrate_ladder_prompt(
                 f"and evaluated to {evaluated} (num_ctx {num_ctx})",
             )
         if abs(evaluated - target) <= tolerance:
-            return words, evaluated
+            if verify_s is None or verify_s <= 0:
+                raise LinuxShapeFailure("unmeasured", "Ollama reported no total_duration for the verify call")
+            return words, evaluated, verify_s
         words = max(1, round(words + (target - evaluated) / ratio))
     raise LinuxShapeFailure(
         "unmeasured",
@@ -1596,18 +1789,18 @@ def _calibrate_ladder_prompt(
     )
 
 
-def _ttft_does_not_scale(baseline: tuple[int, float] | None, prompt_len: int, ttft_ms: float) -> str | None:
-    """A reason when a longer cell's ttft did not grow with its prompt, which means the prefill was cached."""
+def _ttft_does_not_scale(baseline: tuple[int, float] | None, prompt_len: int, prefill_ms: float) -> str | None:
+    """A reason when a longer cell's prefill did not grow with its prompt, which means the prefill was cached."""
 
     if baseline is None or prompt_len <= baseline[0]:
         return None
-    base_len, base_ttft = baseline
-    required = TTFT_SCALING_FLOOR * base_ttft * (prompt_len / base_len)
-    if ttft_ms >= required:
+    base_len, base_prefill = baseline
+    required = TTFT_SCALING_FLOOR * base_prefill * (prompt_len / base_len)
+    if prefill_ms >= required:
         return None
     return (
-        f"ttft {ttft_ms:.1f} ms at {prompt_len} tokens is under {required:.1f} ms, {TTFT_SCALING_FLOOR:.0%} of the "
-        f"growth from {base_ttft:.1f} ms at {base_len} tokens: the prefill did not scale with the prompt "
+        f"prefill {prefill_ms:.1f} ms at {prompt_len} tokens is under {required:.1f} ms, {TTFT_SCALING_FLOOR:.0%} of "
+        f"the growth from {base_prefill:.1f} ms at {base_len} tokens: the prefill did not scale with the prompt "
         "(a prompt-cache hit)"
     )
 
@@ -1625,8 +1818,8 @@ def measure_linux_ollama_generate(
 ) -> dict[str, Any]:
     """Measure one ``(prompt_tokens, concurrency)`` cell on a running ``LinuxOllamaServer``.
 
-    The server runs ``concurrency`` slots; every timed call has its own prompt prefix; the pass's throughput is the
-    generated tokens over its wall clock; a prefill rate no card reaches is an unmeasured cell.
+    The server runs ``concurrency`` slots; the model must load fully on the GPU; every timed call has its own prompt
+    prefix and a budget scaled from the cell's own verify call; a prefill rate no card reaches is an unmeasured cell.
     """
 
     ensure_parallel = getattr(server, "ensure_parallel", None)
@@ -1636,10 +1829,13 @@ def measure_linux_ollama_generate(
     peak_mib = used_before
     num_ctx = ladder_window(prompt_tokens, num_predict)
     nonce = _cell_nonce(model, prompt_tokens, concurrency)
+    calibration_budget = {"request_timeout_s": CALIBRATION_TIMEOUT_S}
     try:
-        words, evaluated = _calibrate_ladder_prompt(server, model, prompt_tokens, num_ctx, nonce)
+        words, evaluated, verify_s = _calibrate_ladder_prompt(server, model, prompt_tokens, num_ctx, nonce, concurrency)
     except BaseException as exc:
-        raise classify_linux_error(exc, peak_mib=peak_mib) from exc
+        raise _failure_for(server, exc, peak_mib, calibration_budget) from exc
+    budget_s = request_timeout_s(concurrency, verify_s)
+    budget = {"request_timeout_s": budget_s}
     reported_slots = getattr(server, "effective_slots", lambda: None)()
     if isinstance(reported_slots, int) and not isinstance(reported_slots, bool):
         slot_count, slot_source = reported_slots, "llama-server log"
@@ -1648,6 +1844,7 @@ def measure_linux_ollama_generate(
                 "unmeasured",
                 f"the server ran {slot_count} slot(s) for concurrency {concurrency}; the requests would queue",
                 peak_mib=peak_mib,
+                evidence=budget,
             )
     else:
         slot_count, slot_source = max(1, concurrency), "requested OLLAMA_NUM_PARALLEL (not read from the server log)"
@@ -1663,7 +1860,7 @@ def measure_linux_ollama_generate(
             "stream": False,
             "options": {"num_ctx": num_ctx, "num_predict": num_predict, "temperature": 0.0},
         }
-        resp = server.post("/api/generate", payload)
+        resp = _post(server, "/api/generate", payload, budget_s)
         if isinstance(resp, Mapping) and resp.get("error"):
             raise RuntimeError(str(resp["error"]))
         return dict(resp) if isinstance(resp, Mapping) else {}
@@ -1692,15 +1889,24 @@ def measure_linux_ollama_generate(
                     peak_mib=peak_mib,
                 )
             eval_counts = [max(1, int(r.get("eval_count") or num_predict)) for r in pass_resps]
-            eval_durations_ns = [max(1, int(r.get("eval_duration") or 50_000_000)) for r in pass_resps]
+            eval_durations_ns = [int(r.get("eval_duration") or 0) for r in pass_resps]
+            total_ns = [int(r.get("total_duration") or 0) for r in pass_resps]
+            # Without Ollama's own clock for each request the decode window cannot be told from the queue wait and
+            # the overhead, and the concurrency inflation (T4 r2) would come back. So no figure is guessed.
+            if min(total_ns) <= 0 or min(eval_durations_ns) <= 0:
+                raise LinuxShapeFailure(
+                    "unmeasured", "Ollama reported no total_duration or eval_duration; the decode window is unknown"
+                )
             load_ns = [int(r.get("load_duration") or 0) for r in pass_resps]
-            # Ollama's own clock for each request. Between the request and the first token there is time that is
-            # neither prefill nor decode (T4 r2, the rig: up to 2.3 s at 16k), so the client's wall clock cannot give a
-            # clean decode rate; the replies' durations can.
-            total_ns = [
-                int(r.get("total_duration") or 0) or (load + prefill + decode)
-                for r, load, prefill, decode in zip(pass_resps, load_ns, prefill_ns, eval_durations_ns, strict=True)
+            rates = [
+                count / (duration / 1_000_000_000.0)
+                for count, duration in zip(eval_counts, eval_durations_ns, strict=True)
             ]
+            if phase == "repeat":
+                per_request.extend(rates)
+            # Between the request and the first token there is time that is neither prefill nor decode (T4 r2, the
+            # rig: up to 2.3 s at 16k), so the client's wall clock cannot give a clean decode rate; the replies' own
+            # durations can.
             decode_window_s = max(
                 (max(total_ns) - min(t - e for t, e in zip(total_ns, eval_durations_ns, strict=True))) / 1e9, 1e-9
             )
@@ -1708,12 +1914,6 @@ def measure_linux_ollama_generate(
             overhead_ns = [
                 t - ld - p - e for t, ld, p, e in zip(total_ns, load_ns, prefill_ns, eval_durations_ns, strict=True)
             ]
-            rates = [
-                count / (duration / 1_000_000_000.0)
-                for count, duration in zip(eval_counts, eval_durations_ns, strict=True)
-            ]
-            if phase == "repeat":
-                per_request.extend(rates)
             slots.append(
                 {
                     "phase": phase,
@@ -1735,7 +1935,14 @@ def measure_linux_ollama_generate(
             )
         size, size_vram = _query_ps_entry(server, model)
     except BaseException as exc:
-        raise classify_linux_error(exc, peak_mib=peak_mib) from exc
+        failure = _failure_for(server, exc, peak_mib, budget)
+        if failure.failure_class == "timeout":
+            failure.reason = (
+                f"did not finish within {budget_s} s (scaled from a {verify_s:.1f} s verify call at concurrency "
+                f"{concurrency})"
+            )
+            failure.args = (f"timeout: {failure.reason}",)
+        raise failure from exc
 
     repeat_slots = [s for s in slots if s["phase"] == "repeat"]
     mid = len(repeat_slots) // 2
@@ -1761,6 +1968,7 @@ def measure_linux_ollama_generate(
         "parallel_slots_source": slot_source,
         "throughput_method": "ollama_durations_decode_window",
         "end_to_end_tok_s": round(float(sorted(float(s["end_to_end_tok_s"]) for s in repeat_slots)[mid]), 3),
+        "request_timeout_s": budget_s,
         "per_request_decode_tok_s": round(sum(per_request) / len(per_request), 3) if per_request else None,
     }
 

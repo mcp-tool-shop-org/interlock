@@ -35,7 +35,7 @@
   "changes": {
     "fileCounts": {
       "added": 0,
-      "changed": 4,
+      "changed": 23,
       "moved": 0,
       "parts": 3,
       "removed": 0
@@ -43,13 +43,13 @@
     "items": [
       {
         "kind": "counts",
-        "sentence": "Nothing structural changed since 2026-10-26; 4 files changed content.",
+        "sentence": "Nothing structural changed since 2026-10-26; 23 files changed content.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "560f9974d666098584a7ce22f0796d809b406956",
-      "generatedAt": "2026-10-26T09:40:28.455Z"
+      "commit": "1ecf1dbdb2f12b0ef8264b77ddb00dea429e5263",
+      "generatedAt": "2026-10-26T10:08:48.046Z"
     },
     "unchanged": true
   },
@@ -72,7 +72,7 @@
     {
       "a": "site/src/site-config.ts",
       "b": "src/interlock/__init__.py",
-      "either": 11,
+      "either": 12,
       "partLabels": [
         null,
         "src"
@@ -82,7 +82,7 @@
         "src"
       ],
       "relation": "unassigned",
-      "shared": 7
+      "shared": 8
     },
     {
       "a": "src/interlock/harness/fill.py",
@@ -133,10 +133,10 @@
   "changesTogetherNote": [
     "2 files changed together with their own tests, as expected.",
     "Confidence is low: fewer than 25 source files reach 10 revisions in the window.",
-    "Window: 180 days; a pair counts from 3 shared commits, since 15 source files reach 10 revisions; the floor rises to 10 when 25 do."
+    "Window: 180 days; a pair counts from 3 shared commits, since 14 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 2,
-  "commit": "1ecf1dbdb2f12b0ef8264b77ddb00dea429e5263",
+  "commit": "37eafadb86067b3aefc28eab44968f847970d5aa",
   "defaultBranch": "main",
   "derived": "10 parts, mostly Python (111 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
   "doors": [
@@ -301,7 +301,7 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-26T10:08:48.046Z",
+  "generatedAt": "2026-10-26T15:19:45.519Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "5 writes and 6 reads use paths built at run time and are not named here.",
@@ -339,7 +339,7 @@
   "testFiles": 76,
   "testedBy": {
     "scripts": 2,
-    "src": 49
+    "src": 50
   },
   "unnamedWrites": 5,
   "unread": [],
