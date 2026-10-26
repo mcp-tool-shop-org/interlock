@@ -230,3 +230,19 @@ def test_family_table_lookup_names_both_places_it_tried(tmp_path, monkeypatch):
     message = str(error.value)
     assert str(tmp_path / "installed" / "data" / "model-families.json") in message
     assert str(tmp_path / "table" / "model-families.json") in message
+
+
+def test_family_table_lookup_prefers_the_packaged_copy_then_the_source_table(tmp_path, monkeypatch):
+    from interlock import families
+
+    source = tmp_path / "table" / "model-families.json"
+    packaged = tmp_path / "installed" / "data" / "model-families.json"
+    source.parent.mkdir(parents=True)
+    source.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(families, "_FAMILIES_SOURCE_PATH", source)
+    monkeypatch.setattr(families.resources, "files", lambda _package: tmp_path / "installed")
+    assert families.families_path() == source
+
+    packaged.parent.mkdir(parents=True)
+    packaged.write_text("{}", encoding="utf-8")
+    assert families.families_path() == packaged
