@@ -1105,7 +1105,10 @@ def run_linux_generate_ladder(
 
     # Concurrency is the outer loop: the server restarts to change its slot count, so each count is set once.
     for concurrency in concurrencies:
-        baseline: tuple[int, float] | None = None  # (target tokens, ttft ms) of the first measured cell at this count
+        # (target tokens, prefill ms) of the last cell measured at this concurrency: each cell is compared with the step
+        # before it, not with the first cell, whose fixed per-request cost (T4 r5, c8: 847 ms at 512) overstates the
+        # growth the next cells need. A failed or unmeasured cell does not move it.
+        baseline: tuple[int, float] | None = None
         for prompt_len in sorted(prompt_lengths):
             try:
                 deadline_s = CELL_DEADLINE_S
@@ -1215,7 +1218,7 @@ def run_linux_generate_ladder(
             evaluated_tokens, token_method = _evaluated_or_requested(measured, prompt_len)
             prefill_ms = float(measured.get("prefill_ms", ttft_ms))
             reason = _ttft_does_not_scale(baseline, prompt_len, prefill_ms)
-            if reason is None and baseline is None:
+            if reason is None:
                 baseline = (prompt_len, prefill_ms)
             if reason is not None:
                 append_row(
@@ -1665,8 +1668,8 @@ LADDER_TOKEN_TOLERANCE = 0.02  # the evaluated prompt must be within 2% of the t
 # A prefill faster than this cannot be real on any card this harness targets; it means llama-server answered from its
 # prompt cache (it reuses the longest common prefix). A cell above it is unmeasured.
 PREFILL_TOK_S_CEILING = 250_000.0
-# Prefill time grows with the prompt: from the first measured cell at a concurrency, a longer cell's ttft must be at
-# least this fraction of the proportional growth. A cached cell stays flat, far under it.
+# Prefill time grows with the prompt: from the previous measured cell at a concurrency, a longer cell's prefill must be
+# at least this fraction of the proportional growth. A cached cell stays flat, far under it.
 TTFT_SCALING_FLOOR = 0.6
 # One request's budget. Calibration calls are single requests (a partial offload is caught before they matter). A timed
 # call gets three times what `concurrency` verify-sized requests need, plus decode, clamped; the budget is recorded in

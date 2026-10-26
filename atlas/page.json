@@ -34,8 +34,8 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 2,
-      "changed": 19,
+      "added": 1,
+      "changed": 3,
       "moved": 0,
       "parts": 3,
       "removed": 0
@@ -43,21 +43,21 @@
     "items": [
       {
         "kind": "landing",
-        "sentence": "CHANGELOG.md is now read by tests/test_old_name.py.",
+        "sentence": "experiments/c2-generate/spec.yaml is now also read by tests/test_cell_epoch.py.",
         "subjects": [
-          "CHANGELOG.md",
-          "tests/test_old_name.py"
+          "experiments/c2-generate/spec.yaml",
+          "tests/test_cell_epoch.py"
         ]
       },
       {
         "kind": "counts",
-        "sentence": "2 files added and 19 changed content, across 3 parts.",
+        "sentence": "1 file added and 3 changed content, across 3 parts.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "5bca251f2202be4416a605dba5ec93830a5c3583",
-      "generatedAt": "2026-10-26T20:27:57.879Z"
+      "commit": "4eb14887b8f744eaace46dc93389b53b2350599b",
+      "generatedAt": "2026-10-26T22:12:25.511Z"
     },
     "unchanged": false
   },
@@ -144,9 +144,9 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 16 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 2,
-  "commit": "4eb14887b8f744eaace46dc93389b53b2350599b",
+  "commit": "50238e13fd021c4c37d0c154336d1330c073c945",
   "defaultBranch": "main",
-  "derived": "10 parts, mostly Python (115 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
+  "derived": "10 parts, mostly Python (116 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
   "doors": [
     {
       "checks": [],
@@ -166,7 +166,7 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 57
+          "files": 58
         },
         {
           "boundary": "scripts",
@@ -309,7 +309,7 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-26T22:12:25.511Z",
+  "generatedAt": "2026-10-26T22:39:15.435Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "5 writes and 6 reads use paths built at run time and are not named here.",
@@ -344,10 +344,10 @@
   ],
   "summary": "interlock routes each job to a model, engine and device from a receipt-backed table.",
   "summaryFrom": "person",
-  "testFiles": 84,
+  "testFiles": 85,
   "testedBy": {
     "scripts": 2,
-    "src": 54
+    "src": 55
   },
   "unnamedWrites": 5,
   "unread": [],

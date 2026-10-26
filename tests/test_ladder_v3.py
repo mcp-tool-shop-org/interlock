@@ -450,3 +450,60 @@ def test_the_table_marks_the_columns_that_were_not_measured(tmp_path: Path, caps
     assert "ttft: not measured" in lines["a-v1-c1"]
     assert "throughput: not measured" in lines["b-v2-c4"] and "ttft: not measured" in lines["b-v2-c4"]
     assert "not measured" not in lines["c-v3-c4"] and "ladder v3" in lines["c-v3-c4"]
+
+
+# -- the scaling floor compares each cell with the previous measured step (T4 r5 tripped at c8 2048) --------------
+
+
+def _stub(prefill_by_length: dict[int, float | str]):
+    """A measure_shape returning r5's prefills; a string value raises that failure class."""
+
+    from interlock.harness.linux_cuda import LinuxShapeFailure
+
+    def measure(length: int, concurrency: int) -> dict:
+        value = prefill_by_length[length]
+        if isinstance(value, str):
+            raise LinuxShapeFailure(value, f"{value} at {length}")
+        return {"ttft_ms": value + 50.0, "prefill_ms": value, "decode_tok_s": 20.0, "peak_mib": 9000, "size": 5,
+                "size_vram": 5, "prompt_tokens_evaluated": length}
+
+    return measure
+
+
+def _ladder_of(prefills, lengths):
+    return run_linux_generate_ladder(
+        spec_id="C2-GENERATE", spec_rel="experiments/c2-generate/spec.yaml", run_id="t4-r5", date="2026-10-26",
+        remote_device=IDENT, model="phi3.5:3.8b", revision_or_digest="d" * 64, measure_shape=_stub(prefills),
+        prompt_lengths=lengths, concurrencies=(8,), quant="Q4_K_M", licence="mit",
+    )
+
+
+def test_t4_r5s_own_c8_prefills_all_measure():
+    # 847.5 -> 1255.5 -> 1960.4 ms. From 512 the 2048 floor was 0.6 x 847.5 x 4 = 2034.1 ms and the cell was refused;
+    # from the previous step (1024) it is 0.6 x 1255.5 x 2 = 1506.6 ms.
+    rows = _ladder_of({512: 847.5, 1024: 1255.5, 2048: 1960.4}, (512, 1024, 2048))
+    assert [row.get("outcome") for row in rows] == [None, None, None]
+
+
+def test_a_cached_cell_after_a_measured_one_is_still_unmeasured_with_the_same_reason_text():
+    rows = _ladder_of({512: 847.5, 1024: 1255.5, 2048: 30.0}, (512, 1024, 2048))
+    assert [row.get("outcome") for row in rows] == [None, None, "unmeasured"]
+    assert rows[2]["notes"].endswith(
+        "prefill 30.0 ms at 2048 tokens is under 1506.6 ms, 60% of the growth from 1255.5 ms at 1024 tokens: the "
+        "prefill did not scale with the prompt (a prompt-cache hit)"
+    )
+
+
+def test_after_a_failed_step_the_next_cell_is_compared_with_the_last_measured_one():
+    needs = 0.6 * 1255.5 * 4  # 4096 against 1024: 3013.2 ms
+    low = _ladder_of({1024: 1255.5, 2048: "oom", 4096: needs - 100}, (1024, 2048, 4096))
+    assert [row.get("outcome") for row in low] == [None, "oom", "unmeasured"]
+    assert "growth from 1255.5 ms at 1024 tokens" in low[2]["notes"]
+    ok = _ladder_of({1024: 1255.5, 2048: "oom", 4096: needs + 100}, (1024, 2048, 4096))
+    assert [row.get("outcome") for row in ok] == [None, "oom", None]
+
+
+def test_an_unmeasured_cell_does_not_move_the_baseline():
+    # 2048 is cached (unmeasured); 4096 is then compared with 1024, not with the cached 2048.
+    rows = _ladder_of({1024: 1255.5, 2048: 30.0, 4096: 3200.0}, (1024, 2048, 4096))
+    assert [row.get("outcome") for row in rows] == [None, "unmeasured", None]

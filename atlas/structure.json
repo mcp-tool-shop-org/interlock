@@ -584,7 +584,7 @@
           "path": ".python-version"
         },
         {
-          "hash": "9e5d0db1e97aa8ef0482f8ae431cde2adc0896f06eaf6f639d908723a01e2d76",
+          "hash": "8e50f722e5de54a8113f17ee841f8737eac4289223074c162ed8aa0efa6ea2ac",
           "path": "CHANGELOG.md"
         },
         {
@@ -6137,122 +6137,117 @@
             {
               "in": "run_linux_generate_ladder",
               "kind": "except",
-              "line": 1122
+              "line": 1125
             },
             {
               "in": "run_linux_throughput_ladder",
               "kind": "except",
-              "line": 1350
+              "line": 1353
             },
             {
               "in": "run_linux_throughput_ladder",
               "kind": "except",
-              "line": 1352
+              "line": 1355
             },
             {
               "in": "probe_linux_gpu",
               "kind": "except",
-              "line": 1560
+              "line": 1563
             },
             {
               "in": "_sample_during_cell",
               "kind": "except",
-              "line": 1577
-            },
-            {
-              "in": "_sample_during_cell",
-              "kind": "raise",
-              "line": 1578
-            },
-            {
-              "in": "_sample_during_cell",
-              "kind": "except",
-              "line": 1579
-            },
-            {
-              "in": "_sample_during_cell",
-              "kind": "raise",
               "line": 1580
+            },
+            {
+              "in": "_sample_during_cell",
+              "kind": "raise",
+              "line": 1581
+            },
+            {
+              "in": "_sample_during_cell",
+              "kind": "except",
+              "line": 1582
+            },
+            {
+              "in": "_sample_during_cell",
+              "kind": "raise",
+              "line": 1583
             },
             {
               "in": "_query_ps_entry",
               "kind": "raise",
-              "line": 1605
+              "line": 1608
             },
             {
               "in": "measure_linux_ollama_window",
               "kind": "raise",
-              "line": 1630
+              "line": 1633
             },
             {
               "in": "measure_linux_ollama_window",
               "kind": "except",
-              "line": 1634
+              "line": 1637
             },
             {
               "in": "measure_linux_ollama_window",
               "kind": "raise",
-              "line": 1635
+              "line": 1638
             },
             {
               "in": "run",
               "kind": "except",
-              "line": 1772
+              "line": 1775
             },
             {
               "in": "_with_deadline",
               "kind": "raise",
-              "line": 1779
+              "line": 1782
             },
             {
               "in": "_with_deadline",
               "kind": "raise",
-              "line": 1781
+              "line": 1784
             },
             {
               "in": "_fallback",
               "kind": "except",
-              "line": 1828
-            },
-            {
-              "in": "_fallback",
-              "kind": "raise",
-              "line": 1829
-            },
-            {
-              "in": "_fallback",
-              "kind": "except",
-              "line": 1830
-            },
-            {
-              "in": "_fallback",
-              "kind": "raise",
               "line": 1831
             },
             {
               "in": "_fallback",
               "kind": "raise",
-              "line": 1836
+              "line": 1832
             },
             {
               "in": "_fallback",
               "kind": "except",
+              "line": 1833
+            },
+            {
+              "in": "_fallback",
+              "kind": "raise",
+              "line": 1834
+            },
+            {
+              "in": "_fallback",
+              "kind": "raise",
               "line": 1839
             },
             {
               "in": "_fallback",
-              "kind": "raise",
-              "line": 1840
+              "kind": "except",
+              "line": 1842
             },
             {
               "in": "_fallback",
               "kind": "raise",
-              "line": 1842
+              "line": 1843
             },
             {
-              "in": "_evaluated_tokens",
+              "in": "_fallback",
               "kind": "raise",
-              "line": 1900
+              "line": 1845
             },
             {
               "in": "_evaluated_tokens",
@@ -6260,29 +6255,29 @@
               "line": 1903
             },
             {
+              "in": "_evaluated_tokens",
+              "kind": "raise",
+              "line": 1906
+            },
+            {
               "in": "_check_fully_resident",
               "kind": "except",
-              "line": 1938
+              "line": 1941
             },
             {
               "in": "_check_fully_resident",
               "kind": "raise",
-              "line": 1965
+              "line": 1968
             },
             {
               "in": "_calibrate_ladder_prompt",
               "kind": "raise",
-              "line": 2037
+              "line": 2040
             },
             {
               "in": "_calibrate_ladder_prompt",
               "kind": "raise",
-              "line": 2055
-            },
-            {
-              "in": "_calibrate_ladder_prompt",
-              "kind": "raise",
-              "line": 2062
+              "line": 2058
             },
             {
               "in": "_calibrate_ladder_prompt",
@@ -6290,44 +6285,44 @@
               "line": 2065
             },
             {
+              "in": "_calibrate_ladder_prompt",
+              "kind": "raise",
+              "line": 2068
+            },
+            {
               "in": "measure_linux_ollama_generate",
               "kind": "except",
-              "line": 2107
+              "line": 2110
             },
             {
               "in": "measure_linux_ollama_generate",
               "kind": "raise",
-              "line": 2109
+              "line": 2112
             },
             {
               "in": "_measure_generate_cell",
               "kind": "except",
-              "line": 2152
+              "line": 2155
             },
             {
               "in": "_measure_generate_cell",
               "kind": "raise",
-              "line": 2153
+              "line": 2156
             },
             {
               "in": "_measure_generate_cell",
               "kind": "raise",
-              "line": 2163
+              "line": 2166
             },
             {
               "in": "_measure_generate_cell",
               "kind": "raise",
-              "line": 2175
+              "line": 2178
             },
             {
               "in": "_call_once",
               "kind": "raise",
-              "line": 2198
-            },
-            {
-              "in": "_measure_generate_cell",
-              "kind": "raise",
-              "line": 2217
+              "line": 2201
             },
             {
               "in": "_measure_generate_cell",
@@ -6337,62 +6332,62 @@
             {
               "in": "_measure_generate_cell",
               "kind": "raise",
-              "line": 2232
-            },
-            {
-              "in": "_measure_generate_cell",
-              "kind": "except",
-              "line": 2273
+              "line": 2223
             },
             {
               "in": "_measure_generate_cell",
               "kind": "raise",
-              "line": 2281
+              "line": 2235
+            },
+            {
+              "in": "_measure_generate_cell",
+              "kind": "except",
+              "line": 2276
+            },
+            {
+              "in": "_measure_generate_cell",
+              "kind": "raise",
+              "line": 2284
             },
             {
               "in": "_build_fixed_token_item",
               "kind": "raise",
-              "line": 2321
+              "line": 2324
             },
             {
               "in": "_batch_endpoint_and_payload",
               "kind": "raise",
-              "line": 2342
+              "line": 2345
             },
             {
               "in": "_batch_endpoint_and_payload",
               "kind": "raise",
-              "line": 2346
+              "line": 2349
             },
             {
               "in": "measure_linux_ollama_batch",
               "kind": "raise",
-              "line": 2370
+              "line": 2373
             },
             {
               "in": "measure_linux_ollama_batch",
               "kind": "except",
-              "line": 2378
+              "line": 2381
             },
             {
               "in": "measure_linux_ollama_batch",
               "kind": "raise",
-              "line": 2379
+              "line": 2382
             },
             {
               "in": "_unloaded_after",
               "kind": "except",
-              "line": 2428
+              "line": 2431
             },
             {
               "in": "run_linux_spec",
               "kind": "raise",
-              "line": 2692
-            },
-            {
-              "in": "resolve_c2_sources",
-              "kind": "raise",
-              "line": 2702
+              "line": 2695
             },
             {
               "in": "resolve_c2_sources",
@@ -6402,57 +6397,57 @@
             {
               "in": "resolve_c2_sources",
               "kind": "raise",
-              "line": 2725
+              "line": 2708
             },
             {
               "in": "resolve_c2_sources",
               "kind": "raise",
-              "line": 2730
+              "line": 2728
             },
             {
               "in": "resolve_c2_sources",
               "kind": "raise",
-              "line": 2734
+              "line": 2733
             },
             {
               "in": "resolve_c2_sources",
               "kind": "raise",
-              "line": 2761
+              "line": 2737
             },
             {
               "in": "resolve_c2_sources",
               "kind": "raise",
-              "line": 2765
+              "line": 2764
             },
             {
               "in": "resolve_c2_sources",
               "kind": "raise",
-              "line": 2802
+              "line": 2768
+            },
+            {
+              "in": "resolve_c2_sources",
+              "kind": "raise",
+              "line": 2805
             },
             {
               "in": "_default_live_fetch",
               "kind": "raise",
-              "line": 2836
+              "line": 2839
             },
             {
               "in": "_default_live_fetch",
               "kind": "except",
-              "line": 2844
-            },
-            {
-              "in": "_default_live_fetch",
-              "kind": "except",
-              "line": 2846
-            },
-            {
-              "in": "_default_live_fetch",
-              "kind": "raise",
               "line": 2847
             },
             {
-              "in": "verify_c2_sources_live",
+              "in": "_default_live_fetch",
+              "kind": "except",
+              "line": 2849
+            },
+            {
+              "in": "_default_live_fetch",
               "kind": "raise",
-              "line": 2891
+              "line": 2850
             },
             {
               "in": "verify_c2_sources_live",
@@ -6462,37 +6457,37 @@
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2902
+              "line": 2897
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2907
+              "line": 2905
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2921
+              "line": 2910
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2944
+              "line": 2924
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2951
+              "line": 2947
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2955
+              "line": 2954
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2982
+              "line": 2958
             },
             {
               "in": "verify_c2_sources_live",
@@ -6502,25 +6497,30 @@
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2993
+              "line": 2988
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 3013
+              "line": 2996
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 3042
+              "line": 3016
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
               "line": 3045
+            },
+            {
+              "in": "verify_c2_sources_live",
+              "kind": "raise",
+              "line": 3048
             }
           ],
-          "hash": "ae7e58dd2950633ef80177e9acc8438d983b29c723ad28010e89051b18fa8aba",
+          "hash": "cf951fcdcfb6601996039c2e530c06fba9b5672175f163619a2f4af06a470ea1",
           "importsFiles": [
             "src/interlock/__init__.py",
             "src/interlock/devices.py",
@@ -6777,19 +6777,19 @@
                   "via": "build_linux_failure_row"
                 },
                 {
-                  "line": 1264,
+                  "line": 1267,
                   "name": "to_dict",
                   "target": null
                 },
                 {
-                  "line": 1312,
+                  "line": 1315,
                   "name": "stamp_family",
                   "target": {
                     "file": "src/interlock/families.py"
                   }
                 },
                 {
-                  "line": 1314,
+                  "line": 1317,
                   "name": "validate_row",
                   "target": {
                     "file": "src/interlock/receipt.py"
@@ -6826,19 +6826,19 @@
                   "via": "build_linux_failure_row"
                 },
                 {
-                  "line": 1454,
+                  "line": 1457,
                   "name": "to_dict",
                   "target": null
                 },
                 {
-                  "line": 1472,
+                  "line": 1475,
                   "name": "stamp_family",
                   "target": {
                     "file": "src/interlock/families.py"
                   }
                 },
                 {
-                  "line": 1474,
+                  "line": 1477,
                   "name": "validate_row",
                   "target": {
                     "file": "src/interlock/receipt.py"
@@ -6910,7 +6910,7 @@
             {
               "calls": [
                 {
-                  "line": 1620,
+                  "line": 1623,
                   "name": "post",
                   "target": null
                 }
@@ -6924,12 +6924,12 @@
               "calls": [
                 {
                   "branch": "\"timeout\" in inspect.signature(server.post).parameters",
-                  "line": 1873,
+                  "line": 1876,
                   "name": "post",
                   "target": null
                 },
                 {
-                  "line": 1874,
+                  "line": 1877,
                   "name": "post",
                   "target": null
                 }
@@ -6943,13 +6943,13 @@
               "calls": [
                 {
                   "branch": "\"timeout\" in inspect.signature(server.post).parameters",
-                  "line": 1873,
+                  "line": 1876,
                   "name": "post",
                   "target": null,
                   "via": "_post"
                 },
                 {
-                  "line": 1874,
+                  "line": 1877,
                   "name": "post",
                   "target": null,
                   "via": "_post"
@@ -6964,13 +6964,13 @@
               "calls": [
                 {
                   "branch": "\"timeout\" in inspect.signature(server.post).parameters",
-                  "line": 1873,
+                  "line": 1876,
                   "name": "post",
                   "target": null,
                   "via": "_post"
                 },
                 {
-                  "line": 1874,
+                  "line": 1877,
                   "name": "post",
                   "target": null,
                   "via": "_post"
@@ -6985,13 +6985,13 @@
               "calls": [
                 {
                   "branch": "\"timeout\" in inspect.signature(server.post).parameters",
-                  "line": 1873,
+                  "line": 1876,
                   "name": "post",
                   "target": null,
                   "via": "_post"
                 },
                 {
-                  "line": 1874,
+                  "line": 1877,
                   "name": "post",
                   "target": null,
                   "via": "_post"
@@ -7006,13 +7006,13 @@
               "calls": [
                 {
                   "branch": "\"timeout\" in inspect.signature(server.post).parameters",
-                  "line": 1873,
+                  "line": 1876,
                   "name": "post",
                   "target": null,
                   "via": "_post"
                 },
                 {
-                  "line": 1874,
+                  "line": 1877,
                   "name": "post",
                   "target": null,
                   "via": "_post"
@@ -7026,7 +7026,7 @@
             {
               "calls": [
                 {
-                  "line": 2368,
+                  "line": 2371,
                   "name": "post",
                   "target": null
                 }
@@ -7039,12 +7039,12 @@
             {
               "calls": [
                 {
-                  "line": 2416,
+                  "line": 2419,
                   "name": "is_absolute",
                   "target": null
                 },
                 {
-                  "line": 2416,
+                  "line": 2419,
                   "name": "as_posix",
                   "target": null
                 }
@@ -7057,7 +7057,7 @@
             {
               "calls": [
                 {
-                  "line": 2427,
+                  "line": 2430,
                   "name": "unload",
                   "target": null
                 }
@@ -7119,13 +7119,13 @@
                   "via": "probe_nvml"
                 },
                 {
-                  "line": 2416,
+                  "line": 2419,
                   "name": "is_absolute",
                   "target": null,
                   "via": "_relative_spec_posix"
                 },
                 {
-                  "line": 2416,
+                  "line": 2419,
                   "name": "as_posix",
                   "target": null,
                   "via": "_relative_spec_posix"
@@ -7157,7 +7157,7 @@
                 },
                 {
                   "branch": "mode == \"fill-card\"",
-                  "line": 2427,
+                  "line": 2430,
                   "name": "unload",
                   "target": null,
                   "via": "_unloaded_after"
@@ -7189,21 +7189,21 @@
                 },
                 {
                   "branch": "mode == \"fill-card\"",
-                  "line": 1620,
+                  "line": 1623,
                   "name": "post",
                   "target": null,
                   "via": "measure_linux_ollama_window"
                 },
                 {
                   "branch": "mode == \"generate-ladder\"",
-                  "line": 1264,
+                  "line": 1267,
                   "name": "to_dict",
                   "target": null,
                   "via": "run_linux_generate_ladder"
                 },
                 {
                   "branch": "mode == \"generate-ladder\"",
-                  "line": 1312,
+                  "line": 1315,
                   "name": "stamp_family",
                   "target": {
                     "file": "src/interlock/families.py"
@@ -7212,7 +7212,7 @@
                 },
                 {
                   "branch": "mode == \"generate-ladder\"",
-                  "line": 1314,
+                  "line": 1317,
                   "name": "validate_row",
                   "target": {
                     "file": "src/interlock/receipt.py"
@@ -7221,21 +7221,21 @@
                 },
                 {
                   "branch": "mode == \"generate-ladder\"",
-                  "line": 1873,
+                  "line": 1876,
                   "name": "post",
                   "target": null,
                   "via": "_post"
                 },
                 {
                   "branch": "mode == \"batch-ladder\"",
-                  "line": 1454,
+                  "line": 1457,
                   "name": "to_dict",
                   "target": null,
                   "via": "run_linux_throughput_ladder"
                 },
                 {
                   "branch": "mode == \"batch-ladder\"",
-                  "line": 1472,
+                  "line": 1475,
                   "name": "stamp_family",
                   "target": {
                     "file": "src/interlock/families.py"
@@ -7244,7 +7244,7 @@
                 },
                 {
                   "branch": "mode == \"batch-ladder\"",
-                  "line": 1474,
+                  "line": 1477,
                   "name": "validate_row",
                   "target": {
                     "file": "src/interlock/receipt.py"
@@ -13949,7 +13949,7 @@
         "pytest",
         "python"
       ],
-      "testedBy": 54,
+      "testedBy": 55,
       "unresolvedSites": 0
     },
     {
@@ -14260,6 +14260,28 @@
             "src/interlock/calltrace.py"
           ],
           "path": "tests/test_calltrace.py",
+          "testFramework": "pytest"
+        },
+        {
+          "exports": [
+            "quick",
+            "test_a_call_from_an_old_cell_is_refused_and_the_current_cell_and_unbound_callers_are_not",
+            "test_a_normal_run_does_not_restart_the_server",
+            "test_after_a_cells_deadline_the_next_cell_sees_no_request_from_the_old_one_and_the_server_restarted",
+            "test_the_first_sample_of_a_window_and_a_batch_cell_has_a_deadline",
+            "test_the_measurement_leaves_the_callers_epoch_alone",
+            "test_the_nvidia_smi_fallback_accepts_two_numbers",
+            "test_the_nvidia_smi_fallback_parse_is_strict"
+          ],
+          "hash": "e33232deddab12324b5a436a52a808a422b06279276b23afaa845d217bfb8266",
+          "importsFiles": [
+            "src/interlock/devices.py",
+            "src/interlock/harness/__init__.py",
+            "src/interlock/harness/linux_cuda.py",
+            "tests/fake_ollama.py",
+            "tests/test_linux_cuda_sampler_error.py"
+          ],
+          "path": "tests/test_cell_epoch.py",
           "testFramework": "pytest"
         },
         {
@@ -14966,6 +14988,7 @@
           "exports": [
             "request",
             "row",
+            "test_a_cached_cell_after_a_measured_one_is_still_unmeasured_with_the_same_reason_text",
             "test_a_cell_whose_prefill_came_from_the_cache_is_unmeasured",
             "test_a_ladder_cell_whose_ttft_did_not_grow_with_the_prompt_is_unmeasured",
             "test_a_pre_v3_row_with_an_inflated_floor_figure_cannot_pass_a_decode_floor",
@@ -14975,11 +14998,14 @@
             "test_a_rig_row_that_records_a_ttft_is_not_read_either",
             "test_a_server_that_logged_fewer_slots_than_the_concurrency_is_unmeasured",
             "test_a_ttft_floor_reads_the_time_to_the_first_token_and_the_cache_check_reads_the_prefill",
+            "test_after_a_failed_step_the_next_cell_is_compared_with_the_last_measured_one",
+            "test_an_unmeasured_cell_does_not_move_the_baseline",
             "test_at_concurrency_1_the_decode_aggregate_is_the_per_request_decode_rate_at_every_length",
             "test_concurrent_workers_in_one_pass_get_different_prefixes",
             "test_each_readiness_poll_is_short_so_one_hung_request_cannot_use_the_budget",
             "test_every_timed_call_starts_with_a_prefix_of_its_own_so_the_cache_cannot_answer",
             "test_pre_v3_throughput_above_one_slot_is_never_used_even_when_that_concurrency_is_asked_for",
+            "test_t4_r5s_own_c8_prefills_all_measure",
             "test_the_cache_check_still_reads_the_prefill_when_the_go_side_adds_time",
             "test_the_calibration_verify_call_differs_from_every_timed_call",
             "test_the_decode_aggregate_at_c1_is_the_per_request_rate_whatever_time_the_go_side_adds",
@@ -15001,7 +15027,7 @@
             "test_with_one_slot_the_requests_queue_and_the_wall_clock_aggregate_is_about_one_stream",
             "winner"
           ],
-          "hash": "73b96dbe572f22f11af7a6d2b4db7511868877c8d66a5d2ab1f1fdf18caf43f6",
+          "hash": "52e5d0367f2df851efa8b3a90f748b6d6e5f9c853122d4b84f6bac295c511caa",
           "importsFiles": [
             "src/interlock/cli.py",
             "src/interlock/devices.py",
@@ -16427,7 +16453,7 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 57
+          "files": 58
         },
         {
           "boundary": "scripts",
@@ -16503,7 +16529,7 @@
         {
           "config": "pyproject.toml",
           "coverage": true,
-          "files": 57,
+          "files": 58,
           "job": "test",
           "runner": "pytest",
           "step": "Test"
@@ -16511,7 +16537,7 @@
         {
           "config": "pyproject.toml",
           "coverage": true,
-          "files": 57,
+          "files": 58,
           "job": "test-py313",
           "runner": "pytest",
           "step": "Test"
@@ -16519,7 +16545,7 @@
         {
           "config": "pyproject.toml",
           "coverage": true,
-          "files": 57,
+          "files": 58,
           "job": "test-py314",
           "runner": "pytest",
           "step": "Test"
@@ -17047,8 +17073,8 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "4eb14887b8f744eaace46dc93389b53b2350599b",
-    "tracked": 305
+    "commit": "50238e13fd021c4c37d0c154336d1330c073c945",
+    "tracked": 306
   },
   "landings": [
     {
@@ -17154,6 +17180,12 @@
     },
     {
       "readers": [
+        {
+          "by": "tests/test_cell_epoch.py",
+          "call": "literal",
+          "confidence": "ast",
+          "fromTests": true
+        },
         {
           "by": "tests/test_generation_failure_kinds.py",
           "call": "literal",
@@ -17821,7 +17853,7 @@
   "overlaps": [],
   "submodules": [],
   "symlinks": [],
-  "testFiles": 84,
+  "testFiles": 85,
   "unassigned": [
     {
       "hash": "75850ad95072b8a51fa832b381c4cf6bfea4a3ba8456a242aec0ab79ff0db466",
