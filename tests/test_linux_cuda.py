@@ -340,7 +340,7 @@ def test_linux_generate_ladder_sweeps_512_to_32k_and_concurrency_1_4_8():
             raise LinuxShapeFailure("oom", "peak 38200 MiB exceeded abort_mib 36864 MiB at 32k x8", peak_mib=38200)
         if prompt_tokens == 32768 and concurrency == 4:
             return {
-                "ttft_ms": 900.0,
+                "ttft_ms": 14000.0,
                 "decode_tok_s": 40.0,
                 "latency_ms": 1200.0,
                 "peak_mib": 37000,
@@ -348,7 +348,7 @@ def test_linux_generate_ladder_sweeps_512_to_32k_and_concurrency_1_4_8():
                 "size_vram": 9000,
             }
         return {
-            "ttft_ms": 40.0 + prompt_tokens * 0.02 * concurrency,
+            "ttft_ms": prompt_tokens * 0.1 * concurrency,  # prefill grows with the prompt
             "decode_tok_s": 85.0 / (1.0 + 0.15 * (concurrency - 1)),
             "latency_ms": 250.0 + prompt_tokens * 0.05,
             "peak_mib": 14000 + (prompt_tokens // 512) * 20 * concurrency,

@@ -276,7 +276,7 @@ def _cmd_table(args: argparse.Namespace) -> int:
         rows = [row for row in rows if row["task"] == args.task]
     if args.device:
         rows = [row for row in rows if matches_device_filter(row.get("device"), args.device)]
-    from interlock.router.policy import ladder_version
+    from interlock.router.policy import ladder_version, throughput_measured, ttft_measured
 
     # Generate-ladder rows are grouped by device, model and ladder version, and show the version: speeds from
     # different versions are different measurements.
@@ -288,7 +288,14 @@ def _cmd_table(args: argparse.Namespace) -> int:
     for row in [*plain, *ladder]:
         model = row["model"]["repo_or_tag"]
         version = ladder_version(row)
-        suffix = f"\tladder v{version}" if version is not None else ""
+        marks = []
+        if version is not None:
+            marks.append(f"ladder v{version}")
+        if not ttft_measured(row):
+            marks.append("ttft: not measured")
+        if not throughput_measured(row):
+            marks.append("throughput: not measured")
+        suffix = "\t" + "\t".join(marks) if marks else ""
         print(f"{row['id']}\t{row['task']}\t{row['device']}\t{model}{suffix}")
     print(f"{len(rows)} row(s)")
     return 0

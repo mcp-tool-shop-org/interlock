@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import ipaddress
+import itertools
 import json
 import math
 import os
@@ -48,11 +49,15 @@ MEASUREMENT_FAILURE_CLASSES = ("sampler_error", "generation_aborted", "unmeasure
 ROW_FAILURE_CLASSES = FAILURE_CLASSES + MEASUREMENT_FAILURE_CLASSES
 GENERATE_PROMPT_LENGTHS = (512, 1024, 2048, 4096, 8192, 16384, 32768)
 GENERATE_CONCURRENCIES = (1, 4, 8)
-# The generate ladder's version, recorded in every generate row's settings (`ladder_version`). A row with no field is
-# version 1: the prompt was "token " repeated, which makes some models loop until Ollama aborts the prediction (T4 r1,
-# phi3.5 at ctx 2048-16384), so those cells timed a loop. Version 2 sends varied text (`ladder_prompt`). A speed read
-# from one version must not be compared with the other.
-GENERATE_LADDER_VERSION = 2
+# The generate ladder's version, recorded in every generate-ladder row's settings (`ladder_version`). A row with no
+# field is version 1. Version 1 sent "token " repeated: some models loop on it until Ollama aborts the prediction
+# (T4 r1). Version 2 sent varied text, but (T4 r2) its window could be overshot (the prompt was truncated to half),
+# every timed call resent an identical prompt so llama-server answered from its prompt cache (the ttft is a cache
+# hit), and the concurrency cells ran through one slot while the aggregate multiplied by the concurrency. Version 3
+# sizes the window from the accepted prompt, gives every timed call a unique prefix, runs `concurrency` slots, and
+# takes the aggregate from the pass's wall clock. Speeds from different versions are never compared; a version-1 or
+# version-2 ttft or concurrency throughput is never used (see the router).
+GENERATE_LADDER_VERSION = 3
 THROUGHPUT_TASKS = ("embed", "rerank", "nli")
 THROUGHPUT_BATCH_SIZES = (1, 8, 32)
 THROUGHPUT_TOKEN_LENGTHS = (128, 510)
@@ -394,10 +399,13 @@ def _validate_loopback_ollama_url(url: str) -> None:
         raise LinuxCudaError(f"refusing non-loopback Ollama URL {url!r}: {exc}") from exc
 
 
-def _default_http_get(url: str) -> dict[str, Any]:
+READY_POLL_TIMEOUT_S = 2.0  # one readiness poll; the whole wait is ``ready_timeout_s``
+
+
+def _default_http_get(url: str, timeout: float = 30.0) -> dict[str, Any]:
     _validate_loopback_ollama_url(url)
     req = urllib.request.Request(url, method="GET")  # noqa: S310
-    with urllib.request.urlopen(req, timeout=30.0) as resp:  # noqa: S310
+    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
         return json.loads(resp.read().decode("utf-8"))
 
 
@@ -450,11 +458,15 @@ class LinuxOllamaServer:
         self._custom_popen = popen is not None
         self._popen = popen or subprocess.Popen
         self._http_get = http_get or _default_http_get
+        # A hung poll must not use up the readiness budget: each poll is short, the loop retries inside the budget.
+        self._poll_get = http_get or (lambda url: _default_http_get(url, timeout=READY_POLL_TIMEOUT_S))
         self._http_post = http_post or _default_http_post
         self._sleep = sleep
         self._proc: Any = None
         self._log_handle: Any = None
         self.version: str = UNRECORDED
+        self.num_parallel = 1
+        self._log_offset = 0
 
     @property
     def pid(self) -> int | None:
@@ -470,7 +482,9 @@ class LinuxOllamaServer:
         validate_loopback_ollama_host(self.host)
         env = dict(os.environ)
         env["OLLAMA_HOST"] = self.host
+        env["OLLAMA_NUM_PARALLEL"] = str(self.num_parallel)
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
+        self._log_offset = self.log_path.stat().st_size if self.log_path.is_file() else 0
         if self._custom_popen:
             self._proc = self._popen([self.exe, "serve"], env=env)
         else:
@@ -489,7 +503,7 @@ class LinuxOllamaServer:
                     f"Ollama server exited before becoming ready (exit code {self._proc.poll()})"
                 )
             try:
-                reply = self._http_get(f"{self.base_url}/api/version")
+                reply = self._poll_get(f"{self.base_url}/api/version")
                 self.version = str(reply.get("version") or UNRECORDED)
                 return self
             except (OSError, RuntimeError, ValueError) as exc:
@@ -506,6 +520,39 @@ class LinuxOllamaServer:
 
     def unload(self, model: str) -> None:
         self._http_post(f"{self.base_url}/api/generate", {"model": model, "keep_alive": 0})
+
+    def ensure_parallel(self, slots: int) -> None:
+        """Run the server with exactly ``slots`` parallel slots (``OLLAMA_NUM_PARALLEL``), restarting it if needed.
+
+        Ollama's default is 1, so concurrent requests queue. The count is exact, not a floor: KV memory is
+        ``num_ctx`` times the slots, and a 1-slot cell measured on a 8-slot server would hold 8x the memory.
+        """
+
+        if slots < 1:
+            raise LinuxCudaError(f"parallel slots must be at least 1, got {slots}")
+        if slots == self.num_parallel and self._proc is not None and self._proc.poll() is None:
+            return
+        running = self._proc is not None
+        if running:
+            self.stop()
+        self.num_parallel = slots
+        if running:
+            self.start()
+
+    def effective_slots(self) -> int | None:
+        """The slot count llama-server logged for this process (``n_slots`` or ``--parallel``), or None."""
+
+        try:
+            with self.log_path.open("rb") as handle:
+                handle.seek(self._log_offset)
+                text = handle.read().decode("utf-8", errors="replace")
+        except OSError:
+            return None
+        found = re.findall(r"n_slots\s*[=:]\s*(\d+)|(?:--parallel|-np)\s+(\d+)", text)
+        if not found:
+            return None
+        last = found[-1]
+        return int(last[0] or last[1])
 
     def start(self) -> LinuxOllamaServer:
         return self.__enter__()
@@ -912,8 +959,10 @@ def run_linux_generate_ladder(
 
     abort_mib = compute_abort_mib(remote_device.vram_mib, abort_fraction)
     rows: list[dict[str, Any]] = _ProgressRows(on_progress)
-    for prompt_len in prompt_lengths:
-        for concurrency in concurrencies:
+    # Concurrency is the outer loop: the server restarts to change its slot count, so each count is set once.
+    for concurrency in concurrencies:
+        baseline: tuple[int, float] | None = None  # (target tokens, ttft ms) of the first measured cell at this count
+        for prompt_len in sorted(prompt_lengths):
             try:
                 measured = measure_shape(prompt_len, concurrency)
             except LinuxShapeFailure as exc:
@@ -992,6 +1041,37 @@ def run_linux_generate_ladder(
             )
             repeats = sum(1 for s in slots if isinstance(s, Mapping) and s.get("phase") == "repeat") or 1
             evaluated_tokens, token_method = _evaluated_or_requested(measured, prompt_len)
+            prefill_ms = float(measured.get("prefill_ms", ttft_ms))
+            reason = _ttft_does_not_scale(baseline, prompt_len, prefill_ms)
+            if reason is None and baseline is None:
+                baseline = (prompt_len, prefill_ms)
+            if reason is not None:
+                rows.append(
+                    build_linux_failure_row(
+                        spec_id=spec_id,
+                        spec_rel=spec_rel,
+                        run_id=run_id,
+                        date=date,
+                        task="generate",
+                        model=model,
+                        revision_or_digest=revision_or_digest,
+                        remote_device=remote_device,
+                        failure_class="unmeasured",
+                        reason=reason,
+                        num_ctx=prompt_len,
+                        num_predict=num_predict,
+                        prompt_tokens=evaluated_tokens,
+                        prompt_tokens_target=prompt_len,
+                        prompt_token_method=token_method,
+                        concurrency=concurrency,
+                        peak_mib=peak_mib,
+                        abort_mib=abort_mib,
+                        engine_version=engine_version,
+                        quant=quant,
+                        licence=licence,
+                    )
+                )
+                continue
             row: dict[str, Any] = {
                 "id": f"{spec_id}/{model}/{quant}/{remote_device.card}/p{prompt_len}-c{concurrency}/{run_id}",
                 "task": "generate",
@@ -1010,7 +1090,8 @@ def run_linux_generate_ladder(
                 "settings": {
                     "thinking_level": "off",
                     "num_predict": num_predict,
-                    "num_ctx": prompt_len,
+                    "num_ctx": int(measured.get("num_ctx_sent") or prompt_len),  # what the request sent
+                    "cell_tokens": prompt_len,  # the nominal cell size
                     "batch": None,
                     "static_shape": None,
                     "precision": None,
@@ -1019,6 +1100,14 @@ def run_linux_generate_ladder(
                     "prompt_token_method": token_method,
                     "ladder_version": GENERATE_LADDER_VERSION,
                     "concurrency": concurrency,
+                    "prefix_caching": "off",  # every timed call has its own prefix, so no prefix is cached
+                    "parallel_slots": measured.get("parallel_slots", concurrency),
+                    "parallel_slots_source": measured.get("parallel_slots_source", "requested"),
+                    "throughput_method": measured.get("throughput_method", "ollama_durations_decode_window"),
+                    "end_to_end_tok_s": measured.get("end_to_end_tok_s"),
+                    "prefill_ms": prefill_ms,
+                    "overhead_ms": measured.get("overhead_ms"),
+                    "per_request_decode_tok_s": measured.get("per_request_decode_tok_s"),
                     "ttft_ms": ttft_ms,
                     "decode_tok_s": decode_tok_s,
                     "peak_mib": peak_mib,
@@ -1379,12 +1468,45 @@ _LADDER_WORDS = (
 
 LADDER_CTX_MARGIN = 64
 LADDER_PROBE_WORDS = (64, 192)  # small enough never to overflow a window
-LADDER_TOKEN_TOLERANCE = 0.02  # the evaluated prompt must be within 2% of the target, never below it by more
+LADDER_TOKEN_TOLERANCE = 0.02  # the evaluated prompt must be within 2% of the target
+# A prefill faster than this cannot be real on any card this harness targets; it means llama-server answered from its
+# prompt cache (it reuses the longest common prefix). A cell above it is unmeasured.
+PREFILL_TOK_S_CEILING = 250_000.0
+# Prefill time grows with the prompt: from the first measured cell at a concurrency, a longer cell's ttft must be at
+# least this fraction of the proportional growth. A cached cell stays flat, far under it.
+TTFT_SCALING_FLOOR = 0.6
 _LADDER_INSTRUCTION = "In two or three sentences, describe a quiet town by a river."
+_CELL_COUNTER = itertools.count(1)
 
 
-def ladder_prompt(prompt_tokens: int) -> str:
-    """Varied, deterministic text of ``prompt_tokens`` words, ending in an instruction.
+def ladder_window(prompt_tokens: int, num_predict: int) -> int:
+    """The ``num_ctx`` a cell sends: room for the largest prompt the 2% tolerance accepts, the reply and a margin.
+
+    Ollama truncates a prompt of ``num_ctx - 1`` tokens or more to about half the window, so the window is sized from
+    the accepted prompt and never from a fixed margin the calibration can overshoot.
+    """
+
+    tolerance = max(1, int(prompt_tokens * LADDER_TOKEN_TOLERANCE))
+    return prompt_tokens + tolerance + num_predict + LADDER_CTX_MARGIN
+
+
+def ladder_prefix(nonce: str, call: int) -> str:
+    """A fixed-width prefix that is unique to one call and differs from the first character.
+
+    llama-server reuses the longest common token prefix of consecutive prompts, and Ollama cannot switch that off, so
+    every timed call (and the calibration's verify call) starts with its own call number and the cell's nonce.
+    """
+
+    return f"{call:04d}{nonce} "
+
+
+def _cell_nonce(model: str, prompt_tokens: int, concurrency: int) -> str:
+    seed = f"{model}|{prompt_tokens}|{concurrency}|{next(_CELL_COUNTER)}"
+    return hashlib.sha256(seed.encode("utf-8")).hexdigest()[:8]
+
+
+def ladder_prompt(prompt_tokens: int, prefix: str = "") -> str:
+    """``prefix``, then varied, deterministic text of ``prompt_tokens`` words, ending in an instruction.
 
     Version 1 sent ``"token " * n``. Some models answer that by repeating it until Ollama aborts the prediction, and the
     cell then timed a loop. Here the word order shifts every pass over the list, so no short period repeats, and the
@@ -1394,15 +1516,15 @@ def ladder_prompt(prompt_tokens: int) -> str:
     count = max(1, prompt_tokens)
     size = len(_LADDER_WORDS)
     words = [_LADDER_WORDS[(i * 7 + (i // size) * 13 + i // (size * size)) % size] for i in range(count)]
-    return " ".join(words) + "\n\n" + _LADDER_INSTRUCTION
+    return prefix + " ".join(words) + "\n\n" + _LADDER_INSTRUCTION
 
 
-def _evaluated_tokens(server: LinuxOllamaServer, model: str, words: int, num_ctx: int) -> int:
-    """Ollama's ``prompt_eval_count`` for a ``words``-word ladder prompt (a one-token reply keeps this cheap)."""
+def _evaluated_tokens(server: LinuxOllamaServer, model: str, prompt: str, num_ctx: int) -> int:
+    """Ollama's ``prompt_eval_count`` for ``prompt`` (a one-token reply keeps this cheap)."""
 
     payload = {
         "model": model,
-        "prompt": ladder_prompt(words),
+        "prompt": prompt,
         "stream": False,
         "options": {"num_ctx": num_ctx, "num_predict": 1, "temperature": 0.0},
     }
@@ -1424,33 +1546,41 @@ def _evaluated_or_requested(measured: Mapping[str, Any], requested: int) -> tupl
     return requested, "requested_not_verified"
 
 
-def _calibrate_ladder_prompt(server: LinuxOllamaServer, model: str, target: int, num_ctx: int) -> tuple[int, int]:
-    """The word count whose prompt Ollama evaluates to ``target`` tokens, and the count it evaluated.
+def _calibrate_ladder_prompt(
+    server: LinuxOllamaServer, model: str, target: int, num_ctx: int, nonce: str
+) -> tuple[int, int]:
+    """The word count whose prompt (prefix included) Ollama evaluates to ``target`` tokens, and the count it evaluated.
 
     Ollama truncates a prompt that overflows ``num_ctx`` to about half of it, and reports the count it kept, so a
     reading from an overflowing prompt says nothing about its length. Two small prompts that cannot overflow give the
-    tokens-per-word ratio and the instruction's tokens; the word count follows, and is then verified with the real
-    ``num_ctx``. A reading well under what the ratio predicts means truncation. A prompt that cannot be brought within
-    tolerance of the target is a cell that was not measured, never a row that records a length it did not time.
+    tokens-per-word ratio and the fixed tokens (prefix and instruction); the word count follows, and is then verified
+    with the real ``num_ctx``. A reading well under what the ratio predicts means truncation: the prompt is cut back to
+    the target estimate and tried again. A prompt that cannot be brought within tolerance of the target is a cell that
+    was not measured, never a row that records a length it did not time.
     """
 
     small, large = LADDER_PROBE_WORDS
-    low = _evaluated_tokens(server, model, small, num_ctx)
-    high = _evaluated_tokens(server, model, large, num_ctx)
+    low = _evaluated_tokens(server, model, ladder_prompt(small, ladder_prefix(nonce, 9001)), num_ctx)
+    high = _evaluated_tokens(server, model, ladder_prompt(large, ladder_prefix(nonce, 9002)), num_ctx)
     ratio = (high - low) / (large - small)
     if ratio <= 0 or high >= num_ctx * 0.9:
         raise LinuxShapeFailure(
             "unmeasured",
             f"could not size the prompt: {low} tokens for {small} words and {high} for {large} (num_ctx {num_ctx})",
         )
-    instruction = max(0.0, low - ratio * small)
+    fixed = max(0.0, low - ratio * small)
     tolerance = max(1, int(target * LADDER_TOKEN_TOLERANCE))
-    words = max(1, round((target - instruction) / ratio))
+    estimate = max(1, round((target - fixed) / ratio))
+    words = estimate
     evaluated = 0
-    for _ in range(3):
-        evaluated = _evaluated_tokens(server, model, words, num_ctx)
-        expected = instruction + ratio * words
+    for attempt in range(4):
+        prompt = ladder_prompt(words, ladder_prefix(nonce, 9100 + attempt))
+        evaluated = _evaluated_tokens(server, model, prompt, num_ctx)
+        expected = fixed + ratio * words
         if evaluated < expected * 0.9:
+            if words > estimate:
+                words = estimate  # over the target and truncated: cut back to the estimate and look again
+                continue
             raise LinuxShapeFailure(
                 "unmeasured",
                 f"the prompt was truncated: {words} words should evaluate to about {round(expected)} tokens "
@@ -1466,6 +1596,22 @@ def _calibrate_ladder_prompt(server: LinuxOllamaServer, model: str, target: int,
     )
 
 
+def _ttft_does_not_scale(baseline: tuple[int, float] | None, prompt_len: int, ttft_ms: float) -> str | None:
+    """A reason when a longer cell's ttft did not grow with its prompt, which means the prefill was cached."""
+
+    if baseline is None or prompt_len <= baseline[0]:
+        return None
+    base_len, base_ttft = baseline
+    required = TTFT_SCALING_FLOOR * base_ttft * (prompt_len / base_len)
+    if ttft_ms >= required:
+        return None
+    return (
+        f"ttft {ttft_ms:.1f} ms at {prompt_len} tokens is under {required:.1f} ms, {TTFT_SCALING_FLOOR:.0%} of the "
+        f"growth from {base_ttft:.1f} ms at {base_len} tokens: the prefill did not scale with the prompt "
+        "(a prompt-cache hit)"
+    )
+
+
 def measure_linux_ollama_generate(
     server: LinuxOllamaServer,
     sample_vram_mib: Callable[[], tuple[int, int]],
@@ -1475,57 +1621,116 @@ def measure_linux_ollama_generate(
     concurrency: int,
     num_predict: int = 128,
     repeats: int = 3,
+    clock: Callable[[], float] = time.perf_counter,
 ) -> dict[str, Any]:
-    """Measure one ``(prompt_tokens, concurrency)`` cell on a running ``LinuxOllamaServer``."""
+    """Measure one ``(prompt_tokens, concurrency)`` cell on a running ``LinuxOllamaServer``.
 
+    The server runs ``concurrency`` slots; every timed call has its own prompt prefix; the pass's throughput is the
+    generated tokens over its wall clock; a prefill rate no card reaches is an unmeasured cell.
+    """
+
+    ensure_parallel = getattr(server, "ensure_parallel", None)
+    if callable(ensure_parallel):
+        ensure_parallel(max(1, concurrency))
     used_before, _ = sample_vram_mib()
     peak_mib = used_before
-    num_ctx = prompt_tokens + num_predict + LADDER_CTX_MARGIN  # room for the whole prompt and the reply
+    num_ctx = ladder_window(prompt_tokens, num_predict)
+    nonce = _cell_nonce(model, prompt_tokens, concurrency)
     try:
-        words, evaluated = _calibrate_ladder_prompt(server, model, prompt_tokens, num_ctx)
+        words, evaluated = _calibrate_ladder_prompt(server, model, prompt_tokens, num_ctx, nonce)
     except BaseException as exc:
         raise classify_linux_error(exc, peak_mib=peak_mib) from exc
-    payload = {
-        "model": model,
-        "prompt": ladder_prompt(words),
-        "stream": False,
-        "options": {"num_ctx": num_ctx, "num_predict": num_predict, "temperature": 0.0},
-    }
+    reported_slots = getattr(server, "effective_slots", lambda: None)()
+    if isinstance(reported_slots, int) and not isinstance(reported_slots, bool):
+        slot_count, slot_source = reported_slots, "llama-server log"
+        if slot_count < concurrency:
+            raise LinuxShapeFailure(
+                "unmeasured",
+                f"the server ran {slot_count} slot(s) for concurrency {concurrency}; the requests would queue",
+                peak_mib=peak_mib,
+            )
+    else:
+        slot_count, slot_source = max(1, concurrency), "requested OLLAMA_NUM_PARALLEL (not read from the server log)"
     workers = max(1, concurrency)
     passes = ("warmup", *("repeat" for _ in range(max(1, repeats))))
     slots: list[dict[str, Any]] = []
+    per_request: list[float] = []
 
-    def _call_once(_idx: int) -> dict[str, Any]:
+    def _call_once(index: int) -> dict[str, Any]:
+        payload = {
+            "model": model,
+            "prompt": ladder_prompt(words, ladder_prefix(nonce, index)),
+            "stream": False,
+            "options": {"num_ctx": num_ctx, "num_predict": num_predict, "temperature": 0.0},
+        }
         resp = server.post("/api/generate", payload)
         if isinstance(resp, Mapping) and resp.get("error"):
             raise RuntimeError(str(resp["error"]))
         return dict(resp) if isinstance(resp, Mapping) else {}
 
     try:
-        for phase in passes:
+        for pass_no, phase in enumerate(passes):
+            first = pass_no * workers + 1  # every call in the cell has its own number, hence its own prefix
+            started = clock()
             if workers == 1:
-                pass_resps = [_call_once(0)]
+                pass_resps = [_call_once(first)]
             else:
                 with ThreadPoolExecutor(max_workers=workers) as pool:
-                    pass_resps = list(pool.map(_call_once, range(workers)))
+                    pass_resps = list(pool.map(_call_once, range(first, first + workers)))
+            wall_s = max(clock() - started, 1e-9)
             used_now, _ = _sample_during_cell(sample_vram_mib)
             peak_mib = max(peak_mib, used_now)
-            ttfts_ns = [max(1, int(r.get("prompt_eval_duration") or 10_000_000)) for r in pass_resps]
+            prefill_ns = [int(r.get("prompt_eval_duration") or 0) for r in pass_resps]
+            if min(prefill_ns) <= 0:
+                raise LinuxShapeFailure("unmeasured", "Ollama reported no prompt_eval_duration; the prefill is unknown")
+            prefill_tok_s = evaluated / (min(prefill_ns) / 1_000_000_000.0)
+            if prefill_tok_s > PREFILL_TOK_S_CEILING:
+                raise LinuxShapeFailure(
+                    "unmeasured",
+                    f"a prefill of {evaluated} tokens in {min(prefill_ns) / 1e6:.2f} ms is {prefill_tok_s:,.0f} tok/s, "
+                    f"over the {PREFILL_TOK_S_CEILING:,.0f} tok/s ceiling: the prompt came from llama-server's cache",
+                    peak_mib=peak_mib,
+                )
             eval_counts = [max(1, int(r.get("eval_count") or num_predict)) for r in pass_resps]
             eval_durations_ns = [max(1, int(r.get("eval_duration") or 50_000_000)) for r in pass_resps]
-            pass_ttft_ms = round((sum(ttfts_ns) / len(ttfts_ns)) / 1_000_000.0, 3)
-            wall_eval_ns = max(eval_durations_ns)
-            pass_decode_tok_s = round(sum(eval_counts) / (wall_eval_ns / 1_000_000_000.0), 3)
-            pass_total_ms = round(
-                max(p_ns + e_ns for p_ns, e_ns in zip(ttfts_ns, eval_durations_ns, strict=False)) / 1_000_000.0,
-                3,
+            load_ns = [int(r.get("load_duration") or 0) for r in pass_resps]
+            # Ollama's own clock for each request. Between the request and the first token there is time that is
+            # neither prefill nor decode (T4 r2, the rig: up to 2.3 s at 16k), so the client's wall clock cannot give a
+            # clean decode rate; the replies' durations can.
+            total_ns = [
+                int(r.get("total_duration") or 0) or (load + prefill + decode)
+                for r, load, prefill, decode in zip(pass_resps, load_ns, prefill_ns, eval_durations_ns, strict=True)
+            ]
+            decode_window_s = max(
+                (max(total_ns) - min(t - e for t, e in zip(total_ns, eval_durations_ns, strict=True))) / 1e9, 1e-9
             )
+            ttft_ns = [t - e - ld for t, e, ld in zip(total_ns, eval_durations_ns, load_ns, strict=True)]
+            overhead_ns = [
+                t - ld - p - e for t, ld, p, e in zip(total_ns, load_ns, prefill_ns, eval_durations_ns, strict=True)
+            ]
+            rates = [
+                count / (duration / 1_000_000_000.0)
+                for count, duration in zip(eval_counts, eval_durations_ns, strict=True)
+            ]
+            if phase == "repeat":
+                per_request.extend(rates)
             slots.append(
                 {
                     "phase": phase,
-                    "throughput": pass_decode_tok_s,
-                    "latency_ms": pass_total_ms,
-                    "ttft_ms": pass_ttft_ms,
+                    # The aggregate decode rate: the pass's generated tokens over its decode window, from the earliest
+                    # decode start to the latest end, all on Ollama's own durations. At one request it is exactly
+                    # eval_count / eval_duration.
+                    "throughput": round(sum(eval_counts) / decode_window_s, 3),
+                    "end_to_end_tok_s": round(sum(eval_counts) / wall_s, 3),  # the same tokens over the client's pass
+                    "latency_ms": round(wall_s * 1000.0, 3),
+                    # The time to the first token the user waits for: Ollama's total less the decode and the load. It
+                    # includes the time that is neither prefill nor decode. The prefill alone is `prefill_ms`, and the
+                    # cache check reads that one.
+                    "ttft_ms": round((sum(ttft_ns) / len(ttft_ns)) / 1_000_000.0, 3),
+                    "prefill_ms": round((sum(prefill_ns) / len(prefill_ns)) / 1_000_000.0, 3),
+                    "overhead_ms": round((sum(overhead_ns) / len(overhead_ns)) / 1_000_000.0, 3),
+                    "tokens": sum(eval_counts),
+                    "requests": workers,
                 }
             )
         size, size_vram = _query_ps_entry(server, model)
@@ -1535,10 +1740,14 @@ def measure_linux_ollama_generate(
     repeat_slots = [s for s in slots if s["phase"] == "repeat"]
     mid = len(repeat_slots) // 2
     ttft_ms = float(sorted(float(s["ttft_ms"]) for s in repeat_slots)[mid])
+    prefill_ms = float(sorted(float(s["prefill_ms"]) for s in repeat_slots)[mid])
+    overhead_ms = float(sorted(float(s["overhead_ms"]) for s in repeat_slots)[mid])
     decode_tok_s = float(sorted(float(s["throughput"]) for s in repeat_slots)[mid])
     total_ms = float(sorted(float(s["latency_ms"]) for s in repeat_slots)[mid])
     return {
         "ttft_ms": ttft_ms,
+        "prefill_ms": prefill_ms,
+        "overhead_ms": overhead_ms,
         "decode_tok_s": decode_tok_s,
         "latency_ms": total_ms,
         "peak_mib": peak_mib,
@@ -1547,6 +1756,12 @@ def measure_linux_ollama_generate(
         "slots": slots,
         "prompt_tokens_evaluated": evaluated,
         "prompt_tokens_target": prompt_tokens,
+        "num_ctx_sent": num_ctx,
+        "parallel_slots": slot_count,
+        "parallel_slots_source": slot_source,
+        "throughput_method": "ollama_durations_decode_window",
+        "end_to_end_tok_s": round(float(sorted(float(s["end_to_end_tok_s"]) for s in repeat_slots)[mid]), 3),
+        "per_request_decode_tok_s": round(sum(per_request) / len(per_request), 3) if per_request else None,
     }
 
 
