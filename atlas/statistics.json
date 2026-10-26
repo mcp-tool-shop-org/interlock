@@ -135,7 +135,7 @@
       "confidence": "full",
       "highWater": null,
       "name": "src",
-      "qualifyingSourceCommits": 37,
+      "qualifyingSourceCommits": 40,
       "rebaseline": null
     },
     {
@@ -169,7 +169,7 @@
       "confidence": "full",
       "highWater": null,
       "name": "tests",
-      "qualifyingSourceCommits": 94,
+      "qualifyingSourceCommits": 97,
       "rebaseline": null
     }
   ],
@@ -217,8 +217,8 @@
         "path": ".python-version"
       },
       {
-        "commits": 61,
-        "lines": 294,
+        "commits": 64,
+        "lines": 317,
         "path": "CHANGELOG.md"
       },
       {
@@ -237,43 +237,43 @@
         "path": "LICENSE"
       },
       {
-        "commits": 14,
-        "lines": 648,
+        "commits": 15,
+        "lines": 650,
         "path": "README.es.md"
       },
       {
-        "commits": 14,
-        "lines": 728,
+        "commits": 15,
+        "lines": 730,
         "path": "README.fr.md"
       },
       {
-        "commits": 13,
-        "lines": 684,
+        "commits": 14,
+        "lines": 686,
         "path": "README.hi.md"
       },
       {
-        "commits": 14,
-        "lines": 662,
+        "commits": 15,
+        "lines": 664,
         "path": "README.it.md"
       },
       {
-        "commits": 14,
-        "lines": 784,
+        "commits": 15,
+        "lines": 786,
         "path": "README.ja.md"
       },
       {
-        "commits": 34,
-        "lines": 477,
+        "commits": 35,
+        "lines": 479,
         "path": "README.md"
       },
       {
-        "commits": 14,
-        "lines": 660,
+        "commits": 15,
+        "lines": 662,
         "path": "README.pt-BR.md"
       },
       {
-        "commits": 14,
-        "lines": 728,
+        "commits": 15,
+        "lines": 730,
         "path": "README.zh.md"
       },
       {
@@ -378,7 +378,7 @@
       },
       {
         "commits": 47,
-        "lines": 943,
+        "lines": 941,
         "path": "atlas/README.md"
       },
       {
@@ -388,17 +388,17 @@
       },
       {
         "commits": 47,
-        "lines": 3114,
+        "lines": 3116,
         "path": "atlas/page.json"
       },
       {
         "commits": 47,
-        "lines": 9752,
+        "lines": 9803,
         "path": "atlas/statistics.json"
       },
       {
         "commits": 47,
-        "lines": 49511,
+        "lines": 49917,
         "path": "atlas/structure.json"
       },
       {
@@ -852,8 +852,8 @@
         "path": "interlock}/tasks.py"
       },
       {
-        "commits": 27,
-        "lines": 212,
+        "commits": 28,
+        "lines": 214,
         "path": "pyproject.toml"
       },
       {
@@ -1312,8 +1312,8 @@
         "path": "site/src/content/docs/handbook/configuration.md"
       },
       {
-        "commits": 4,
-        "lines": 115,
+        "commits": 5,
+        "lines": 119,
         "path": "site/src/content/docs/handbook/experiments.md"
       },
       {
@@ -1322,8 +1322,8 @@
         "path": "site/src/content/docs/handbook/getting-started.md"
       },
       {
-        "commits": 11,
-        "lines": 51,
+        "commits": 12,
+        "lines": 53,
         "path": "site/src/content/docs/handbook/index.md"
       },
       {
@@ -1342,8 +1342,8 @@
         "path": "site/src/pages/index.astro"
       },
       {
-        "commits": 11,
-        "lines": 155,
+        "commits": 12,
+        "lines": 157,
         "path": "site/src/site-config.ts"
       },
       {
@@ -1362,8 +1362,8 @@
         "path": "site/tsconfig.json"
       },
       {
-        "commits": 10,
-        "lines": 24,
+        "commits": 11,
+        "lines": 26,
         "path": "src/interlock/__init__.py"
       },
       {
@@ -1437,8 +1437,8 @@
         "path": "src/interlock/harness/lifecycle.py"
       },
       {
-        "commits": 9,
-        "lines": 3118,
+        "commits": 10,
+        "lines": 3463,
         "path": "src/interlock/harness/linux_cuda.py"
       },
       {
@@ -1547,8 +1547,8 @@
         "path": "src/interlock/relay_sink.py"
       },
       {
-        "commits": 6,
-        "lines": 324,
+        "commits": 8,
+        "lines": 346,
         "path": "src/interlock/router/policy.py"
       },
       {
@@ -1852,8 +1852,8 @@
         "path": "tests/conftest.py"
       },
       {
-        "commits": 1,
-        "lines": 134,
+        "commits": 2,
+        "lines": 220,
         "path": "tests/fake_ollama.py"
       },
       {
@@ -1973,6 +1973,21 @@
       },
       {
         "commits": 1,
+        "lines": 12,
+        "path": "tests/fixtures/ollama_logs/0.40.11/r3_killed_p8192_c8.log"
+      },
+      {
+        "commits": 1,
+        "lines": 12,
+        "path": "tests/fixtures/ollama_logs/0.40.11/r3_partial_29_of_33.log"
+      },
+      {
+        "commits": 1,
+        "lines": 8,
+        "path": "tests/fixtures/ollama_logs/0.40.11/r3_resident.log"
+      },
+      {
+        "commits": 1,
         "lines": 49,
         "path": "tests/fixtures/route/r3_table.jsonl"
       },
@@ -2072,8 +2087,8 @@
         "path": "tests/test_fill_card_live.py"
       },
       {
-        "commits": 2,
-        "lines": 420,
+        "commits": 3,
+        "lines": 422,
         "path": "tests/test_generation_failure_kinds.py"
       },
       {
@@ -2102,9 +2117,14 @@
         "path": "tests/test_importers.py"
       },
       {
-        "commits": 2,
-        "lines": 462,
+        "commits": 3,
+        "lines": 470,
         "path": "tests/test_ladder_v3.py"
+      },
+      {
+        "commits": 2,
+        "lines": 502,
+        "path": "tests/test_ladder_v4.py"
       },
       {
         "commits": 3,
@@ -2112,8 +2132,8 @@
         "path": "tests/test_ladder_versions.py"
       },
       {
-        "commits": 6,
-        "lines": 2712,
+        "commits": 7,
+        "lines": 2713,
         "path": "tests/test_linux_cuda.py"
       },
       {
@@ -2152,8 +2172,8 @@
         "path": "tests/test_openvino_adapter.py"
       },
       {
-        "commits": 4,
-        "lines": 338,
+        "commits": 5,
+        "lines": 340,
         "path": "tests/test_packaging.py"
       },
       {
@@ -2202,8 +2222,8 @@
         "path": "tests/test_route_cli.py"
       },
       {
-        "commits": 1,
-        "lines": 185,
+        "commits": 2,
+        "lines": 203,
         "path": "tests/test_route_concurrency.py"
       },
       {
@@ -2237,8 +2257,8 @@
         "path": "tests/test_task_scope.py"
       },
       {
-        "commits": 23,
-        "lines": 1726,
+        "commits": 24,
+        "lines": 1728,
         "path": "uv.lock"
       },
       {
@@ -2252,255 +2272,255 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-10-26T16:00:39.924Z",
+  "generatedAt": "2026-10-26T16:51:13.332Z",
   "generatedFrom": {
-    "commit": "e29cd60488cb78f406b31d5896f797a6f9173973"
+    "commit": "7d86f192ad7a73ba4a390672c05c61bec401cb5b"
   },
   "pairs": [
     {
       "a": "README.es.md",
       "b": "README.fr.md",
-      "either": 14,
-      "shared": 14,
+      "either": 15,
+      "shared": 15,
       "strength": 1
     },
     {
       "a": "README.es.md",
       "b": "README.hi.md",
-      "either": 14,
-      "shared": 13,
-      "strength": 0.928571
+      "either": 15,
+      "shared": 14,
+      "strength": 0.933333
     },
     {
       "a": "README.es.md",
       "b": "README.it.md",
-      "either": 14,
-      "shared": 14,
+      "either": 15,
+      "shared": 15,
       "strength": 1
     },
     {
       "a": "README.es.md",
       "b": "README.ja.md",
-      "either": 14,
-      "shared": 14,
+      "either": 15,
+      "shared": 15,
       "strength": 1
     },
     {
       "a": "README.es.md",
       "b": "README.pt-BR.md",
-      "either": 14,
-      "shared": 14,
+      "either": 15,
+      "shared": 15,
       "strength": 1
     },
     {
       "a": "README.es.md",
       "b": "README.zh.md",
-      "either": 14,
-      "shared": 14,
+      "either": 15,
+      "shared": 15,
       "strength": 1
     },
     {
       "a": "README.es.md",
       "b": "site/src/content/docs/handbook/index.md",
-      "either": 15,
-      "shared": 10,
-      "strength": 0.666667
+      "either": 16,
+      "shared": 11,
+      "strength": 0.6875
     },
     {
       "a": "README.es.md",
       "b": "site/src/site-config.ts",
-      "either": 15,
-      "shared": 10,
-      "strength": 0.666667
+      "either": 16,
+      "shared": 11,
+      "strength": 0.6875
     },
     {
       "a": "README.fr.md",
       "b": "README.hi.md",
-      "either": 14,
-      "shared": 13,
-      "strength": 0.928571
+      "either": 15,
+      "shared": 14,
+      "strength": 0.933333
     },
     {
       "a": "README.fr.md",
       "b": "README.it.md",
-      "either": 14,
-      "shared": 14,
+      "either": 15,
+      "shared": 15,
       "strength": 1
     },
     {
       "a": "README.fr.md",
       "b": "README.ja.md",
-      "either": 14,
-      "shared": 14,
+      "either": 15,
+      "shared": 15,
       "strength": 1
     },
     {
       "a": "README.fr.md",
       "b": "README.pt-BR.md",
-      "either": 14,
-      "shared": 14,
+      "either": 15,
+      "shared": 15,
       "strength": 1
     },
     {
       "a": "README.fr.md",
       "b": "README.zh.md",
-      "either": 14,
-      "shared": 14,
+      "either": 15,
+      "shared": 15,
       "strength": 1
     },
     {
       "a": "README.fr.md",
       "b": "site/src/content/docs/handbook/index.md",
-      "either": 15,
-      "shared": 10,
-      "strength": 0.666667
+      "either": 16,
+      "shared": 11,
+      "strength": 0.6875
     },
     {
       "a": "README.fr.md",
       "b": "site/src/site-config.ts",
-      "either": 15,
-      "shared": 10,
-      "strength": 0.666667
+      "either": 16,
+      "shared": 11,
+      "strength": 0.6875
     },
     {
       "a": "README.hi.md",
       "b": "README.it.md",
-      "either": 14,
-      "shared": 13,
-      "strength": 0.928571
+      "either": 15,
+      "shared": 14,
+      "strength": 0.933333
     },
     {
       "a": "README.hi.md",
       "b": "README.ja.md",
-      "either": 14,
-      "shared": 13,
-      "strength": 0.928571
+      "either": 15,
+      "shared": 14,
+      "strength": 0.933333
     },
     {
       "a": "README.hi.md",
       "b": "README.pt-BR.md",
-      "either": 14,
-      "shared": 13,
-      "strength": 0.928571
+      "either": 15,
+      "shared": 14,
+      "strength": 0.933333
     },
     {
       "a": "README.hi.md",
       "b": "README.zh.md",
-      "either": 14,
-      "shared": 13,
-      "strength": 0.928571
+      "either": 15,
+      "shared": 14,
+      "strength": 0.933333
     },
     {
       "a": "README.hi.md",
       "b": "site/src/content/docs/handbook/index.md",
-      "either": 15,
-      "shared": 9,
-      "strength": 0.6
+      "either": 16,
+      "shared": 10,
+      "strength": 0.625
     },
     {
       "a": "README.hi.md",
       "b": "site/src/site-config.ts",
-      "either": 15,
-      "shared": 9,
-      "strength": 0.6
+      "either": 16,
+      "shared": 10,
+      "strength": 0.625
     },
     {
       "a": "README.it.md",
       "b": "README.ja.md",
-      "either": 14,
-      "shared": 14,
+      "either": 15,
+      "shared": 15,
       "strength": 1
     },
     {
       "a": "README.it.md",
       "b": "README.pt-BR.md",
-      "either": 14,
-      "shared": 14,
+      "either": 15,
+      "shared": 15,
       "strength": 1
     },
     {
       "a": "README.it.md",
       "b": "README.zh.md",
-      "either": 14,
-      "shared": 14,
+      "either": 15,
+      "shared": 15,
       "strength": 1
     },
     {
       "a": "README.it.md",
       "b": "site/src/content/docs/handbook/index.md",
-      "either": 15,
-      "shared": 10,
-      "strength": 0.666667
+      "either": 16,
+      "shared": 11,
+      "strength": 0.6875
     },
     {
       "a": "README.it.md",
       "b": "site/src/site-config.ts",
-      "either": 15,
-      "shared": 10,
-      "strength": 0.666667
+      "either": 16,
+      "shared": 11,
+      "strength": 0.6875
     },
     {
       "a": "README.ja.md",
       "b": "README.pt-BR.md",
-      "either": 14,
-      "shared": 14,
+      "either": 15,
+      "shared": 15,
       "strength": 1
     },
     {
       "a": "README.ja.md",
       "b": "README.zh.md",
-      "either": 14,
-      "shared": 14,
+      "either": 15,
+      "shared": 15,
       "strength": 1
     },
     {
       "a": "README.ja.md",
       "b": "site/src/content/docs/handbook/index.md",
-      "either": 15,
-      "shared": 10,
-      "strength": 0.666667
+      "either": 16,
+      "shared": 11,
+      "strength": 0.6875
     },
     {
       "a": "README.ja.md",
       "b": "site/src/site-config.ts",
-      "either": 15,
-      "shared": 10,
-      "strength": 0.666667
+      "either": 16,
+      "shared": 11,
+      "strength": 0.6875
     },
     {
       "a": "README.pt-BR.md",
       "b": "README.zh.md",
-      "either": 14,
-      "shared": 14,
+      "either": 15,
+      "shared": 15,
       "strength": 1
     },
     {
       "a": "README.pt-BR.md",
       "b": "site/src/content/docs/handbook/index.md",
-      "either": 15,
-      "shared": 10,
-      "strength": 0.666667
+      "either": 16,
+      "shared": 11,
+      "strength": 0.6875
     },
     {
       "a": "README.pt-BR.md",
       "b": "site/src/site-config.ts",
-      "either": 15,
-      "shared": 10,
-      "strength": 0.666667
+      "either": 16,
+      "shared": 11,
+      "strength": 0.6875
     },
     {
       "a": "README.zh.md",
       "b": "site/src/content/docs/handbook/index.md",
-      "either": 15,
-      "shared": 10,
-      "strength": 0.666667
+      "either": 16,
+      "shared": 11,
+      "strength": 0.6875
     },
     {
       "a": "README.zh.md",
       "b": "site/src/site-config.ts",
-      "either": 15,
-      "shared": 10,
-      "strength": 0.666667
+      "either": 16,
+      "shared": 11,
+      "strength": 0.6875
     },
     {
       "a": "SECURITY.md",
@@ -2582,30 +2602,37 @@
     {
       "a": "pyproject.toml",
       "b": "uv.lock",
-      "either": 25,
-      "shared": 19,
-      "strength": 0.76
+      "either": 26,
+      "shared": 20,
+      "strength": 0.769231
+    },
+    {
+      "a": "site/src/content/docs/handbook/experiments.md",
+      "b": "site/src/content/docs/handbook/usage.md",
+      "either": 8,
+      "shared": 4,
+      "strength": 0.5
     },
     {
       "a": "site/src/content/docs/handbook/index.md",
       "b": "site/src/site-config.ts",
-      "either": 11,
-      "shared": 11,
+      "either": 12,
+      "shared": 12,
       "strength": 1
     },
     {
       "a": "site/src/content/docs/handbook/index.md",
       "b": "src/interlock/__init__.py",
-      "either": 12,
-      "shared": 8,
-      "strength": 0.666667
+      "either": 13,
+      "shared": 9,
+      "strength": 0.692308
     },
     {
       "a": "site/src/site-config.ts",
       "b": "src/interlock/__init__.py",
-      "either": 12,
-      "shared": 8,
-      "strength": 0.666667
+      "either": 13,
+      "shared": 9,
+      "strength": 0.692308
     },
     {
       "a": "src/interlock/harness/fill.py",
@@ -2624,9 +2651,9 @@
     {
       "a": "src/interlock/harness/linux_cuda.py",
       "b": "tests/test_linux_cuda.py",
-      "either": 9,
-      "shared": 6,
-      "strength": 0.666667
+      "either": 10,
+      "shared": 7,
+      "strength": 0.7
     },
     {
       "a": "src/switchyard/adapters/openvino.py",
@@ -2695,16 +2722,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-10-26T11:57:58-04:00",
-    "inScopeFiles": 304,
+    "headDate": "2026-10-26T12:50:29-04:00",
+    "inScopeFiles": 308,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 146,
+    "qualifyingCommits": 150,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-04-29T15:57:58.000Z",
+    "since": "2026-04-29T16:50:29.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",
@@ -2720,7 +2747,7 @@
     ],
     "sourceFileReach": 20,
     "sourceFileRise": 25,
-    "sourceFilesReachingStrongFloor": 14,
+    "sourceFilesReachingStrongFloor": 16,
     "strength": 0.5,
     "windowDays": 180
   },

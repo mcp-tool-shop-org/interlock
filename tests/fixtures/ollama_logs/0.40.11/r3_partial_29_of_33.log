@@ -1,0 +1,12 @@
+time=2026-10-26T14:23:32.611Z level=INFO source=sched.go:658 msg="system memory" total="12.7 GiB" free="12.1 GiB" free_swap="0 B"
+load_tensors: loading model tensors, this can take a while... (load_mode = mmap)
+load_tensors: offloading output layer to GPU
+load_tensors: offloading 28 repeating layers to GPU
+load_tensors: offloaded 29/33 layers to GPU
+load_tensors:   CPU_Mapped model buffer size =   193.51 MiB
+load_tensors:   CPU_Mapped model buffer size =    70.34 MiB
+load_tensors:   CPU_Mapped model buffer size =    64.15 MiB
+load_tensors:   CPU_Mapped model buffer size =     0.00 MiB
+load_tensors:        CUDA0 model buffer size =  1953.66 MiB
+llama_kv_cache:        CPU KV buffer size =  1584.00 MiB
+llama_kv_cache:      CUDA0 KV buffer size = 11088.00 MiB

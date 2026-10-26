@@ -43,8 +43,8 @@ def _measure(server: FakeOllama, target: int, concurrency: int = 1, repeats: int
     )
 
 
-def test_the_version_is_3():
-    assert GENERATE_LADDER_VERSION == 3
+def test_the_version_is_at_least_3():
+    assert GENERATE_LADDER_VERSION >= 3  # v4 supersedes v3 labels only for partial offload, host RAM and timeouts
 
 
 # -- A: the window is never overshot --------------------------------------------------------------------------------
@@ -125,7 +125,7 @@ def test_ttft_rises_with_prompt_length_across_the_ladder():
     ttfts = [row["settings"]["ttft_ms"] for row in rows]
     assert all(row.get("outcome") is None for row in rows)
     assert ttfts == sorted(ttfts) and ttfts[-1] > 6 * ttfts[0]  # about 8x for 8x the tokens
-    assert {row["settings"]["ladder_version"] for row in rows} == {3}
+    assert {row["settings"]["ladder_version"] for row in rows} == {GENERATE_LADDER_VERSION}
     assert {row["settings"]["prefix_caching"] for row in rows} == {"off"}
     for row in rows:
         validate_row(row)
@@ -143,7 +143,7 @@ def test_a_ladder_cell_whose_ttft_did_not_grow_with_the_prompt_is_unmeasured():
     )
     assert [row.get("outcome") for row in rows] == [None, "unmeasured", "unmeasured"]
     assert "did not scale with the prompt" in rows[1]["notes"]
-    assert all(row["settings"]["ladder_version"] == 3 for row in rows)
+    assert all(row["settings"]["ladder_version"] == GENERATE_LADDER_VERSION for row in rows)
 
 
 # -- C: real concurrency, wall-clock throughput ----------------------------------------------------------------------

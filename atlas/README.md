@@ -1,17 +1,17 @@
 # interlock: how it works
 
-Mapped at 2026-10-26 from commit e29cd60 by Atlas 1.24.0.
+Mapped at 2026-10-26 from commit 7d86f19 by Atlas 1.24.0.
 
 ## What this is
 
 interlock routes each job to a model, engine and device from a receipt-backed table. (written by a person)
 
-10 parts, mostly Python (112 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.
+10 parts, mostly Python (113 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.
 
-## What changed since 2026-10-26 (37eafad)
+## What changed since 2026-10-26 (ba16196)
 
 - tests/fixtures/route/r3_table.jsonl is now read by tests/test_route_concurrency.py.
-- 2 files added and 3 changed content, across 3 parts.
+- 2 files added and 23 changed content, across 3 parts.
 
 ## What comes in
 
@@ -49,7 +49,7 @@ CI writes nothing this map can see.
 ## What tends to change together
 
 - **src/switchyard/adapters/openvino.py** and **tests/test_openvino_adapter.py** changed together in 17 of 23 commits.
-- **site/src/site-config.ts** and **src/interlock/__init__.py** changed together in 8 of 12 commits.
+- **site/src/site-config.ts** and **src/interlock/__init__.py** changed together in 9 of 13 commits.
 - **src/interlock/harness/fill.py** and **tests/test_e5_preflight.py** changed together in 5 of 9 commits, and the tests part imports the src part.
 - **src/switchyard/harness/receipts.py** and **src/switchyard/receipt.py** changed together in 7 of 13 commits.
 - **src/interlock/harness/fill.py** and **tests/test_fill_card_live.py** changed together in 8 of 15 commits, and the tests part imports the src part.
@@ -58,7 +58,7 @@ CI writes nothing this map can see.
 
 Confidence is low: fewer than 25 source files reach 10 revisions in the window.
 
-Window: 180 days; a pair counts from 3 shared commits, since 14 source files reach 10 revisions; the floor rises to 10 when 25 do.
+Window: 180 days; a pair counts from 3 shared commits, since 16 source files reach 10 revisions; the floor rises to 10 when 25 do.
 
 ## What no test touches
 

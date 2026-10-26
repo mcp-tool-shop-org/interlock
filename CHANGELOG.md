@@ -13,6 +13,33 @@
 - Another shape of the winner's own candidate is no longer listed under `runners_up` for generate (it is not an alternative to it), and a refusal gives each measured failure reason once with a count (`(x20)`) instead of repeating it for every row.
 - The pre-v3 guard is unchanged: a pre-v3 row's concurrency-above-1 throughput and ttft are still never used.
 
+## [1.0.7] - 2026-10-26
+
+### Fixed
+
+T4 rung r3 (the log of its Ollama and the VM's `free -m`) showed that version 3 labelled some cells wrongly. `GENERATE_LADDER_VERSION` is now 4. **The `timeout` and `unmeasured` labels that v3 gave to a partially offloaded cell or to a cell killed for host RAM are superseded by v4's `oom`** (the T4 r3 rows stay as data under their v3 labels). The router guard stays keyed on version 3 (`LADDER_MEASURED_FROM`): a v3 row's measured ttft and throughput are still valid.
+
+- **A partial offload is `oom`, found before any timed call.** In r3 three cells (p32768 c1, p8192 c4, p4096 c8) loaded 27 to 29 of 33 layers on the GPU with 1.6 to 2.6 GB of KV in host RAM, then ran on the CPU until the 120 s request timeout, and were recorded as `timeout` because the calibration's verify call timed out before the residency check ran. The first calibration probe now loads the model at the cell's window and slots and the harness checks it is fully on the GPU: `/api/ps` `size_vram < size`, the load's `offloaded N/M layers` with N < M, or a `CPU KV buffer size` line. Any one of them raises `oom` with the evidence in the reason (`partial offload at num_ctx 34816 x 4 slots: 28/33 layers on the GPU, 2040 MiB of KV in host RAM, size_vram ... < size ...`; only what was read is named), before the second probe, the verify calls or any timed call, and the row records `settings.offload` (layers, host KV, sizes, and where each was read). The log is read by `LinuxOllamaServer.load_report()` / `parse_load_report` from the process's part of the server log (latest load; every value is `None` when absent), and an older server without the method still works.
+- **A SIGKILL during a load is `oom` (host RAM) only on the log's numbers.** In r3 five cells logged 14 to 95 GB of host KV on a VM with 12,975 MiB of RAM and no swap, then `llama-server process has terminated: signal: killed`, recorded as `unmeasured`. When a call fails with `signal: killed`, the harness reads the same load report; if `CPU KV + CPU_Mapped weights` is greater than Ollama's `system memory` total it records `oom` (`host RAM: the load needed X MiB in host RAM (CPU KV K + mapped weights W); the VM has Y MiB (Ollama system memory)`). With no numbers, or numbers that fit, it stays `unmeasured` with Ollama's message: host RAM is never inferred without them.
+- **The request timeout is scaled from the cell's own verify call and recorded.** Every call used a fixed 120 s timeout. Calibration calls now get `CALIBRATION_TIMEOUT_S = 900` (single requests). Timed calls get `clamp(ceil(3 x concurrency x t_verify_s) + 60, 120, 900)` (`REQUEST_TIMEOUT_FACTOR`, `REQUEST_TIMEOUT_DECODE_ALLOWANCE_S`, `REQUEST_TIMEOUT_FLOOR_S`, `REQUEST_TIMEOUT_CEILING_S`), where `t_verify_s` is the accepted verify call's `(total_duration - load_duration)`. On 2 vCPUs Ollama's Go side costs about 0.57 ms per prompt token at c8, so a fully resident c8 cell at a big card's 32k could pass 120 s and be wrongly marked unable. `settings.request_timeout_s` is on every generate-ladder row, measured or failed (`LinuxOllamaServer.post` takes a `timeout`), and a `timeout` row reads `did not finish within X s (scaled from a T s verify call at concurrency C)`.
+- **Host RAM needs all three numbers and the rounding margin.** The `oom (host RAM)` reading requires the CPU KV, the CPU_Mapped weights and the system-memory total to have all been read (a missing one makes the cell `unmeasured`, and the reason never prints a value that was not read; it used to count missing mapped weights as 0). Ollama prints the total in GiB to one decimal, so the host buffers must exceed the total by 51.2 MiB (half of 0.1 GiB), and the reason states the margin.
+- **A cell reads only its own load from the server log.** The log offset is snapshotted at the start of every cell (`LinuxOllamaServer.begin_cell`), not only when the server restarts, and a `system memory` line with no `load_tensors` block after it is a load that was killed before its block, so it has no layers or buffers (it used to inherit the previous load's block and could be called host RAM with another cell's numbers).
+- **A missing `total_duration` or `eval_duration` is `unmeasured`.** v3 fell back to load + prefill + decode, which hides the queue wait and the overhead and would bring back the concurrency inflation. The verify call's `total_duration` is required too.
+- **`route --max-ttft-ms` no longer refuses on rows that have no measured ttft.** The unversioned fill-card rows (`prefix_caching` unset) made `_ttft_refusal` answer `prefix_caching_unknown` even beside v3 generate rows (reproduced in r3). When at least one row has a measured ttft, the rows without one are dropped before the comparison, and `notes` says how many.
+
+
+
+### Changed
+
+- **A failure row records the window that was sent, as a measured row does.** `settings.num_ctx` is the `num_ctx` the request sent and `settings.cell_tokens` the nominal cell, on every failure path of the generate ladder (`oom` from a partial offload or host RAM, `timeout`, `unmeasured`, `load_refused`, `ctx_exceeded`); an `oom` row's `num_ctx` now equals the window its own reason names (it used to say the nominal 16384 beside a reason that said 16903 was sent). A failure before any request was sent (a pre-registered refusal, a failure outside the measurement) never had a window: it keeps the nominal size in `num_ctx`, and `settings.num_ctx_source` says `nominal: no request was sent` (it is `sent` otherwise).
+- `_ttft_does_not_scale` names the prefill, not the ttft, in its parameter and message (it has read `prefill_ms` since v3).
+- `tests/fake_ollama.py` now reports a partial offload (`/api/ps`, and the `offloaded N/M layers` and `CPU KV buffer size` log lines), simulates the SIGKILL when host buffers exceed the VM's RAM, raises `TimeoutError` past the timeout a call was sent with, and gives a slow fully resident cell. The parser tests read lines from T4 r3's own log (`tests/fixtures/ollama_logs/0.40.11/`).
+
+
+### Docs
+
+- The handbook's experiments page describes ladder version 4: partial offload and host-RAM `oom` found before any timed call, the scaled request timeout (`settings.request_timeout_s`), and the window every failure row records.
+
 ## [1.0.6] - 2026-10-26
 
 ### Fixed

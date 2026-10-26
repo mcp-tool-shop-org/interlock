@@ -203,6 +203,15 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
             version_notes = [*version_notes, *_unmeasured_notes(current, request)]
 
     if request.max_ttft_ms is not None and current:
+        # A row whose ttft was not measured (a fill-card row, a pre-v3 row) cannot pass the floor, and its unset
+        # prefix_caching must not make the comparison of the rows that were measured impossible.
+        measured_rows = [row for row in current if ttft_bound_ms(row) is not None]
+        if measured_rows and len(measured_rows) < len(current):
+            version_notes = [
+                *version_notes,
+                f"{len(current) - len(measured_rows)} row(s) without a measured ttft not considered for --max-ttft-ms",
+            ]
+            current = measured_rows
         refusal = _ttft_refusal(current, request, excluded)
         if refusal is not None:
             return refusal
