@@ -172,6 +172,9 @@ def _record_to_row(
             settings["prompt_tokens"] = prompt_tokens
         if concurrency is not None:
             settings["concurrency"] = concurrency
+        for opt_key in ("prompt_tokens_target", "prompt_token_method", "ladder_version"):
+            if entry.get(opt_key) is not None:
+                settings[opt_key] = entry[opt_key]
         row: dict[str, Any] = {
             "id": row_id,
             "task": task,
@@ -213,7 +216,17 @@ def _record_to_row(
         num_predict=num_predict,
         batch=batch,
     )
-    for opt_key in ("prompt_tokens", "concurrency", "ttft_ms", "decode_tok_s", "peak_mib", "max_resident_ctx"):
+    for opt_key in (
+        "prompt_tokens",
+        "prompt_tokens_target",
+        "prompt_token_method",
+        "ladder_version",
+        "concurrency",
+        "ttft_ms",
+        "decode_tok_s",
+        "peak_mib",
+        "max_resident_ctx",
+    ):
         if entry.get(opt_key) is not None:
             settings[opt_key] = entry[opt_key]
 

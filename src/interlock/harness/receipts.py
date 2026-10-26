@@ -16,7 +16,7 @@ from interlock.harness import environment as env_capture
 from interlock.harness.environment import UNRECORDED
 from interlock.harness.timing import Summary
 from interlock.importers.gaps import append_aborted_runs
-from interlock.receipt import CAPABILITY_OUTCOMES, load_jsonl, validate_row
+from interlock.receipt import CAPABILITY_OUTCOMES, MEASUREMENT_OUTCOMES, load_jsonl, validate_row
 
 # The pre-registered parity guard. The first repeat must reach this cosine
 # against the same model's CPU batch-1 arm at the same length.
@@ -206,7 +206,7 @@ def for_table(row: dict) -> dict:
     if row.get("outcome") == "native_binary_rejected":
         cleaned["latency"]["compile_ms"] = (row.get("latency") or {}).get("compile_ms")
     notes = cleaned.get("notes") or ""
-    if row.get("outcome") == "sampler_error":
+    if row.get("outcome") in MEASUREMENT_OUTCOMES:
         pass  # the cell was not measured; nothing is known about what the device can do
     elif DEVICE_LOST_NOTE not in notes:
         cleaned["notes"] = DEVICE_LOST_NOTE if not notes else f"{DEVICE_LOST_NOTE}. {notes}"

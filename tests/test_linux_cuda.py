@@ -1131,8 +1131,12 @@ def test_measure_linux_ollama_generate_runs_concurrent_requests_full_prompt_and_
         return {}
 
     def fake_post(_url: str, payload: dict[str, Any]) -> dict[str, Any]:
-        prompts_seen.append(str(payload.get("prompt") or ""))
+        options = payload.get("options") or {}
+        prompt = str(payload.get("prompt") or "")
+        if options.get("num_predict") != 1:  # one-token calls are the length calibration, not measured passes
+            prompts_seen.append(prompt)
         return {
+            "prompt_eval_count": min(len(prompt.split()), int(options.get("num_ctx") or 0)),
             "prompt_eval_duration": 20_000_000,
             "eval_count": 128,
             "eval_duration": 1_000_000_000,

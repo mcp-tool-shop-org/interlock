@@ -85,7 +85,9 @@
               "load_refused",
               "timeout",
               "ctx_exceeded",
-              "sampler_error"
+              "sampler_error",
+              "generation_aborted",
+              "unmeasured"
             ]
           }
         }

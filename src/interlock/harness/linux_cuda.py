@@ -7,7 +7,9 @@ total VRAM, driver version, and CUDA version come from NVML (``pynvml`` /
 ``nvidia-ml-py``) or ``nvidia-smi --query-gpu``.
 
 Failed shapes (``oom``, ``load_refused``, ``timeout``, ``ctx_exceeded``) are
-recorded as validated routing rows, never silently skipped.
+recorded as validated routing rows, never silently skipped. A cell that was not
+measured (``sampler_error``, ``generation_aborted``, ``unmeasured``) is recorded the same way and
+says nothing about what the card can load.
 """
 
 from __future__ import annotations
@@ -42,10 +44,15 @@ UNRECORDED = "unrecorded"
 FAILURE_CLASSES = ("oom", "load_refused", "timeout", "ctx_exceeded")
 # A cell that was not measured. It says nothing about what the card can load, so it is not a capability outcome and
 # a spec cannot pre-register it (spec.py checks FAILURE_CLASSES, which stays the capability set).
-MEASUREMENT_FAILURE_CLASSES = ("sampler_error",)
+MEASUREMENT_FAILURE_CLASSES = ("sampler_error", "generation_aborted", "unmeasured")
 ROW_FAILURE_CLASSES = FAILURE_CLASSES + MEASUREMENT_FAILURE_CLASSES
 GENERATE_PROMPT_LENGTHS = (512, 1024, 2048, 4096, 8192, 16384, 32768)
 GENERATE_CONCURRENCIES = (1, 4, 8)
+# The generate ladder's version, recorded in every generate row's settings (`ladder_version`). A row with no field is
+# version 1: the prompt was "token " repeated, which makes some models loop until Ollama aborts the prediction (T4 r1,
+# phi3.5 at ctx 2048-16384), so those cells timed a loop. Version 2 sends varied text (`ladder_prompt`). A speed read
+# from one version must not be compared with the other.
+GENERATE_LADDER_VERSION = 2
 THROUGHPUT_TASKS = ("embed", "rerank", "nli")
 THROUGHPUT_BATCH_SIZES = (1, 8, 32)
 THROUGHPUT_TOKEN_LENGTHS = (128, 510)
@@ -540,6 +547,8 @@ def build_linux_failure_row(
     num_predict: int | None = None,
     batch: int | None = None,
     prompt_tokens: int | None = None,
+    prompt_tokens_target: int | None = None,
+    prompt_token_method: str | None = None,
     token_length: int | None = None,
     concurrency: int | None = None,
     peak_mib: int | None = None,
@@ -570,8 +579,13 @@ def build_linux_failure_row(
         "failure_class": failure_class,
         "failure_reason": clean_reason,
     }
+    if task == "generate" and concurrency is not None:  # a ladder cell; a fill-card row is not one
+        settings["ladder_version"] = GENERATE_LADDER_VERSION
     if prompt_tokens is not None:
         settings["prompt_tokens"] = prompt_tokens
+        # A failure row that carries a requested length did not verify it; one that carries a count says how it was got.
+        settings["prompt_token_method"] = prompt_token_method or "requested_not_verified"
+        settings["prompt_tokens_target"] = prompt_tokens_target if prompt_tokens_target is not None else prompt_tokens
     elif token_length is not None:
         input_spec = get_throughput_input_spec(model, token_length)
         if input_spec is not None:
@@ -954,7 +968,9 @@ def run_linux_generate_ladder(
                         reason=reason,
                         num_ctx=prompt_len,
                         num_predict=num_predict,
-                        prompt_tokens=prompt_len,
+                        prompt_tokens=_evaluated_or_requested(measured, prompt_len)[0],
+                        prompt_tokens_target=prompt_len,
+                        prompt_token_method=_evaluated_or_requested(measured, prompt_len)[1],
                         concurrency=concurrency,
                         peak_mib=peak_mib,
                         abort_mib=abort_mib,
@@ -975,6 +991,7 @@ def run_linux_generate_ladder(
                 ]
             )
             repeats = sum(1 for s in slots if isinstance(s, Mapping) and s.get("phase") == "repeat") or 1
+            evaluated_tokens, token_method = _evaluated_or_requested(measured, prompt_len)
             row: dict[str, Any] = {
                 "id": f"{spec_id}/{model}/{quant}/{remote_device.card}/p{prompt_len}-c{concurrency}/{run_id}",
                 "task": "generate",
@@ -997,7 +1014,10 @@ def run_linux_generate_ladder(
                     "batch": None,
                     "static_shape": None,
                     "precision": None,
-                    "prompt_tokens": prompt_len,
+                    "prompt_tokens": evaluated_tokens,
+                    "prompt_tokens_target": prompt_len,
+                    "prompt_token_method": token_method,
+                    "ladder_version": GENERATE_LADDER_VERSION,
                     "concurrency": concurrency,
                     "ttft_ms": ttft_ms,
                     "decode_tok_s": decode_tok_s,
@@ -1184,20 +1204,46 @@ def run_linux_throughput_ladder(
     return rows
 
 
+# Ollama's own wording for a model it will not load, or cannot fit (checked against the 0.40.9 binary). "resource
+# limitations" is the runner-crash message, which can come mid-generation, so it is not here.
+_LOAD_REFUSAL_PHRASES = (
+    "unable to load",
+    "error loading model",
+    "failed to load model",  # not "failed to load manifest": that is a pull or registry error
+    "insufficient memory",
+    "not resident",
+    "too large for system memory",
+)
+
+
 def classify_linux_error(exc: BaseException, peak_mib: int | None = None) -> LinuxShapeFailure:
-    """Classify an HTTP or runtime error into one of the four Linux failure classes."""
+    """Classify an HTTP or runtime error. `load_refused` is for a recognised load or VRAM refusal only."""
 
     if isinstance(exc, LinuxShapeFailure):
         return exc
     msg = str(exc).strip() or exc.__class__.__name__
     low = msg.lower()
-    if isinstance(exc, TimeoutError) or "timed out" in low or "timeout" in low:
+    # The model loaded and generated; Ollama stopped a prediction that looped. Not a refusal, and not a speed.
+    if "repeat limit" in low or "prediction aborted" in low:
+        return LinuxShapeFailure("generation_aborted", msg, peak_mib=peak_mib)
+    if (
+        isinstance(exc, TimeoutError)
+        or "timed out" in low
+        or "timeout" in low
+        or "deadline exceeded" in low
+        or re.search(r"http \d{3}.*after \d+(?:\.\d+)?(?:ms|s|m|h)", low)  # Go's "HTTP 500 after 2m0s"
+    ):
         return LinuxShapeFailure("timeout", msg, peak_mib=peak_mib)
-    if "context" in low and ("exceed" in low or "limit" in low or "too long" in low):
+    if "longer than the context length" in low or (
+        "context" in low and ("exceed" in low or "limit" in low or "too long" in low)
+    ):
         return LinuxShapeFailure("ctx_exceeded", msg, peak_mib=peak_mib)
-    if "out of memory" in low or "cuda error" in low or "oom" in low or "alloc" in low:
+    if "out of memory" in low or "cuda error" in low or re.search(r"\boom\b", low) or "alloc" in low:
         return LinuxShapeFailure("oom", msg, peak_mib=peak_mib)
-    return LinuxShapeFailure("load_refused", msg, peak_mib=peak_mib)
+    if any(phrase in low for phrase in _LOAD_REFUSAL_PHRASES):
+        return LinuxShapeFailure("load_refused", msg, peak_mib=peak_mib)
+    # Anything else says nothing about what the card can load. It is a cell that was not measured.
+    return LinuxShapeFailure("unmeasured", msg, peak_mib=peak_mib)
 
 
 def _default_nvidia_smi_runner(argv: list[str]) -> str:
@@ -1323,6 +1369,103 @@ def measure_linux_ollama_window(
     }
 
 
+_LADDER_WORDS = (
+    "river stone market lantern copper garden window harbor bridge forest letter engine ribbon valley candle "
+    "mirror anchor meadow thread summit orchard compass velvet harvest signal marble island kettle pepper "
+    "falcon ladder quartz pasture saddle timber violet walnut yarrow zephyr amber basket cobalt dune ember "
+    "fjord glacier hollow indigo jasper kiln lagoon mosaic nectar opal prairie quiver reef sparrow tundra"
+).split()
+
+
+LADDER_CTX_MARGIN = 64
+LADDER_PROBE_WORDS = (64, 192)  # small enough never to overflow a window
+LADDER_TOKEN_TOLERANCE = 0.02  # the evaluated prompt must be within 2% of the target, never below it by more
+_LADDER_INSTRUCTION = "In two or three sentences, describe a quiet town by a river."
+
+
+def ladder_prompt(prompt_tokens: int) -> str:
+    """Varied, deterministic text of ``prompt_tokens`` words, ending in an instruction.
+
+    Version 1 sent ``"token " * n``. Some models answer that by repeating it until Ollama aborts the prediction, and the
+    cell then timed a loop. Here the word order shifts every pass over the list, so no short period repeats, and the
+    closing line asks for prose. ``GENERATE_LADDER_VERSION`` names this text.
+    """
+
+    count = max(1, prompt_tokens)
+    size = len(_LADDER_WORDS)
+    words = [_LADDER_WORDS[(i * 7 + (i // size) * 13 + i // (size * size)) % size] for i in range(count)]
+    return " ".join(words) + "\n\n" + _LADDER_INSTRUCTION
+
+
+def _evaluated_tokens(server: LinuxOllamaServer, model: str, words: int, num_ctx: int) -> int:
+    """Ollama's ``prompt_eval_count`` for a ``words``-word ladder prompt (a one-token reply keeps this cheap)."""
+
+    payload = {
+        "model": model,
+        "prompt": ladder_prompt(words),
+        "stream": False,
+        "options": {"num_ctx": num_ctx, "num_predict": 1, "temperature": 0.0},
+    }
+    resp = server.post("/api/generate", payload)
+    if isinstance(resp, Mapping) and resp.get("error"):
+        raise RuntimeError(str(resp["error"]))
+    evaluated = int(resp.get("prompt_eval_count") or 0) if isinstance(resp, Mapping) else 0
+    if evaluated <= 0:
+        raise LinuxShapeFailure("unmeasured", "Ollama reported no prompt_eval_count; the prompt length is unknown")
+    return evaluated
+
+
+def _evaluated_or_requested(measured: Mapping[str, Any], requested: int) -> tuple[int, str]:
+    """The prompt length a ladder cell can vouch for, and how it knows."""
+
+    reported = measured.get("prompt_tokens_evaluated")
+    if isinstance(reported, int) and not isinstance(reported, bool):
+        return reported, "ollama_prompt_eval_count"
+    return requested, "requested_not_verified"
+
+
+def _calibrate_ladder_prompt(server: LinuxOllamaServer, model: str, target: int, num_ctx: int) -> tuple[int, int]:
+    """The word count whose prompt Ollama evaluates to ``target`` tokens, and the count it evaluated.
+
+    Ollama truncates a prompt that overflows ``num_ctx`` to about half of it, and reports the count it kept, so a
+    reading from an overflowing prompt says nothing about its length. Two small prompts that cannot overflow give the
+    tokens-per-word ratio and the instruction's tokens; the word count follows, and is then verified with the real
+    ``num_ctx``. A reading well under what the ratio predicts means truncation. A prompt that cannot be brought within
+    tolerance of the target is a cell that was not measured, never a row that records a length it did not time.
+    """
+
+    small, large = LADDER_PROBE_WORDS
+    low = _evaluated_tokens(server, model, small, num_ctx)
+    high = _evaluated_tokens(server, model, large, num_ctx)
+    ratio = (high - low) / (large - small)
+    if ratio <= 0 or high >= num_ctx * 0.9:
+        raise LinuxShapeFailure(
+            "unmeasured",
+            f"could not size the prompt: {low} tokens for {small} words and {high} for {large} (num_ctx {num_ctx})",
+        )
+    instruction = max(0.0, low - ratio * small)
+    tolerance = max(1, int(target * LADDER_TOKEN_TOLERANCE))
+    words = max(1, round((target - instruction) / ratio))
+    evaluated = 0
+    for _ in range(3):
+        evaluated = _evaluated_tokens(server, model, words, num_ctx)
+        expected = instruction + ratio * words
+        if evaluated < expected * 0.9:
+            raise LinuxShapeFailure(
+                "unmeasured",
+                f"the prompt was truncated: {words} words should evaluate to about {round(expected)} tokens "
+                f"and evaluated to {evaluated} (num_ctx {num_ctx})",
+            )
+        if abs(evaluated - target) <= tolerance:
+            return words, evaluated
+        words = max(1, round(words + (target - evaluated) / ratio))
+    raise LinuxShapeFailure(
+        "unmeasured",
+        f"the prompt evaluated to {evaluated} tokens, not the target {target} (num_ctx {num_ctx}); "
+        "the cell would time a different length than it records",
+    )
+
+
 def measure_linux_ollama_generate(
     server: LinuxOllamaServer,
     sample_vram_mib: Callable[[], tuple[int, int]],
@@ -1337,12 +1480,16 @@ def measure_linux_ollama_generate(
 
     used_before, _ = sample_vram_mib()
     peak_mib = used_before
-    prompt_text = "token " * max(1, prompt_tokens)
+    num_ctx = prompt_tokens + num_predict + LADDER_CTX_MARGIN  # room for the whole prompt and the reply
+    try:
+        words, evaluated = _calibrate_ladder_prompt(server, model, prompt_tokens, num_ctx)
+    except BaseException as exc:
+        raise classify_linux_error(exc, peak_mib=peak_mib) from exc
     payload = {
         "model": model,
-        "prompt": prompt_text,
+        "prompt": ladder_prompt(words),
         "stream": False,
-        "options": {"num_ctx": prompt_tokens, "num_predict": num_predict, "temperature": 0.0},
+        "options": {"num_ctx": num_ctx, "num_predict": num_predict, "temperature": 0.0},
     }
     workers = max(1, concurrency)
     passes = ("warmup", *("repeat" for _ in range(max(1, repeats))))
@@ -1398,6 +1545,8 @@ def measure_linux_ollama_generate(
         "size": size,
         "size_vram": size_vram,
         "slots": slots,
+        "prompt_tokens_evaluated": evaluated,
+        "prompt_tokens_target": prompt_tokens,
     }
 
 
