@@ -584,7 +584,7 @@
           "path": ".python-version"
         },
         {
-          "hash": "d5585cd5b9899d1f4db97c7c139cb63bbe4ca158a011e76885b923aeaa401f49",
+          "hash": "aae73578b6278838e27559a744bbee756f7ba79f4b38a365cee5568dcf66cbd6",
           "path": "CHANGELOG.md"
         },
         {
@@ -600,35 +600,35 @@
           "path": "LICENSE"
         },
         {
-          "hash": "3c0b0f4d59e1adfc925d54ee91e5fa1b52d5f73871e9f66da241516b1f6615d0",
+          "hash": "143724e8ead22872acfcb1570cc7bbc1eb18a1ef4ac6a48fd30c89bfe3de6f44",
           "path": "README.es.md"
         },
         {
-          "hash": "17309d80c4f035495d5494fad2bf0c7b3283058b2a3511d1fe3bed4b366beb8d",
+          "hash": "2592d6abb840fe24cc8c38c31bcdecf6dca029d577a108046387fa9eeb0c5d5f",
           "path": "README.fr.md"
         },
         {
-          "hash": "77b8ce2a9e4a5c20f17dc1aa119adbf3c3d4c76dc85d918c0b6772b9ea086673",
+          "hash": "c017f3143ce37c107665b4b19042e7d36c13dfa48d0f07525d43b8b842ea0430",
           "path": "README.hi.md"
         },
         {
-          "hash": "8d5a184315d08d5163840072400032f303c8fddf2a848c57a4a7cecad337a989",
+          "hash": "56d0317b9ce5641d56d013e9a3d5d0c53c8616f6be7c347a465d30e02b105aab",
           "path": "README.it.md"
         },
         {
-          "hash": "91426773dab686f9e3a4194f4c1db293dd4beaa585b5d154ae580f3785c99290",
+          "hash": "4de7b9d7a5d44f6ee9a39009c89ef2ae256d1d90716215f88f5e5344604226d2",
           "path": "README.ja.md"
         },
         {
-          "hash": "c22bb8c0c9c143dc0f80f60d0384d37349716eeaa6d2764c7e7acafba3b09d7a",
+          "hash": "34bcd51048997aa9263d97d2ed4a66c93fdf608bc0feac7770c06d2ea9f32b6b",
           "path": "README.md"
         },
         {
-          "hash": "8c50759cba53c6f52ff2947efd1e39faefb8860b0dec47eb4482b33f674f2690",
+          "hash": "d52501d7bbe784d256aba2d7da55f4e412fc47488a2cf92e7ac4786357ed2e8e",
           "path": "README.pt-BR.md"
         },
         {
-          "hash": "bedf044a010db1df3b7503f1247b9fe38a47e50ac3b0a1030747e03aae3a5f51",
+          "hash": "93812eddffeb20f6b3ac896f1b754b18adada950f2a7d8ee308db6f46cfee186",
           "path": "README.zh.md"
         },
         {
@@ -648,11 +648,11 @@
           "path": "codecov.yml"
         },
         {
-          "hash": "bc28284caca1a2e8a7248f67b3d51ff59e6f23aa865c88282c567c89d2e128c5",
+          "hash": "d4f1af96b39b6de8aa0785cb6af3ee3f63c8cebc71f26168af035cb68e15c2a9",
           "path": "pyproject.toml"
         },
         {
-          "hash": "7b45f8e077b3238df64eb114eeddb0fb450ea19d609a4816d644107c5d6ef7d5",
+          "hash": "054221333194cda1581fe538ff38f60c8cb8332448f928f85ab1cfef9ba8a964",
           "path": "uv.lock"
         },
         {
@@ -882,7 +882,7 @@
       "files": [
         {
           "constantOnly": true,
-          "hash": "ac6b911b777bf1d4e38ab37a5a29e30aecc0ec754368164133e38c57f4701d13",
+          "hash": "905c4b2fa9e04142b06431e630332fc9fe0505069fcd40cf1b5c79cbe0bb4a75",
           "path": "src/interlock/__init__.py"
         },
         {
@@ -14175,7 +14175,7 @@
             "test_the_search_does_not_load_above_the_trained_length",
             "test_the_server_log_fills_the_four_fields"
           ],
-          "hash": "0481a12f168fd8b6510e2385ffc6666f1350120e11c5e4c8d79033dc4650afc5",
+          "hash": "7bdf31a225a96a6050087c68e48af4a20ca69ca01e55bf4d86660a1fed6c58e2",
           "importOrder": [
             "src/interlock/adapters/base.py",
             "src/interlock/adapters/ollama.py",
@@ -14853,11 +14853,12 @@
             "test_every_action_in_the_workflows_is_pinned_by_commit_sha_with_a_version_comment",
             "test_family_of_and_stamp_family_work_from_a_clean_venv_outside_the_repository",
             "test_family_table_lookup_names_both_places_it_tried",
+            "test_family_table_lookup_prefers_the_packaged_copy_then_the_source_table",
             "test_no_file_relative_read_leaves_the_package_except_the_named_lines",
             "test_the_sweep_fails_on_each_planted_climb",
             "test_the_wheel_carries_the_family_table_byte_for_byte"
           ],
-          "hash": "290e64777da16564ae8d906b3a761c60ed30a07fc7f3ce477b99bdadbf9e54fc",
+          "hash": "3e32c242e325d0173ab0514fdf7bfde85e2fdd0b7d62e5126c6873cbb6dc7c28",
           "importsFiles": [
             "src/interlock/__init__.py",
             "src/interlock/families.py"
@@ -16299,7 +16300,7 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "b99c46b9c63e385d07e67d950b6b7684bbc60575",
+    "commit": "a8fef21fbea8e3e6bcf089b17973ada2442d01ff",
     "tracked": 293
   },
   "landings": [
@@ -17033,7 +17034,7 @@
       "path": "site/src/content/docs/handbook/getting-started.md"
     },
     {
-      "hash": "dc13ae615c9b5e713ad41814d61988beaf22e68e84070a203a70bf25f69daaa6",
+      "hash": "8947b5daf56e462a4f3541a7b609c623b802208b43e096a0ddd378c91f0da9c4",
       "path": "site/src/content/docs/handbook/index.md"
     },
     {
@@ -17058,7 +17059,7 @@
     },
     {
       "constantOnly": true,
-      "hash": "79af6a19140396a54655f3f321336bf81240fa8fccb0463c3b9e92becb911a58",
+      "hash": "1e3a24a69667aa47e0d21f8183242170a23e64a153a22a1a2425f434aa4c6976",
       "path": "site/src/site-config.ts"
     },
     {
