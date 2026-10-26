@@ -18,6 +18,12 @@
     "provisional",
     "provenance"
   ],
+  "allOf": [
+    {
+      "if": {"required": ["device"], "properties": {"device": {"type": "string", "pattern": "^rig:"}}},
+      "then": {"required": ["not_for_import"]}
+    }
+  ],
   "properties": {
     "id": {"type": "string", "minLength": 1},
     "task": {
@@ -61,16 +67,23 @@
       "anyOf": [
         {"enum": ["NPU", "CPU", "iGPU", "5090"]},
         {"type": "string", "pattern": "^runpod:[A-Za-z0-9][A-Za-z0-9 ._+()-]{0,80}$"},
-        {"enum": ["colab:A100-40", "colab:A100-80", "colab:L4", "colab:T4", "colab:G4"]}
+        {"enum": ["colab:A100-40", "colab:A100-80", "colab:L4", "colab:T4", "colab:G4"]},
+        {"type": "string", "pattern": "^rig:[A-Za-z0-9][A-Za-z0-9._+()-]{0,40}$"}
       ]
     },
+    "not_for_import": {"const": true},
     "remote_device": {
       "type": ["object", "null"],
       "additionalProperties": false,
       "required": ["provider", "card", "vram_mib", "driver_version", "cuda_version", "pool"],
       "properties": {
-        "provider": {"enum": ["colab"]},
-        "card": {"enum": ["A100-40", "A100-80", "L4", "T4", "G4"]},
+        "provider": {"enum": ["colab", "rig"]},
+        "card": {
+          "anyOf": [
+            {"enum": ["A100-40", "A100-80", "L4", "T4", "G4"]},
+            {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._+()-]{0,40}$"}
+          ]
+        },
         "vram_mib": {"type": "integer", "minimum": 1},
         "driver_version": {"type": "string", "pattern": "^[0-9]+(\\.[0-9]+)+$"},
         "cuda_version": {"type": "string", "pattern": "^[0-9]+(\\.[0-9]+)+$"},

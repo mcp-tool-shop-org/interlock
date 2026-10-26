@@ -130,7 +130,7 @@
           "scripts"
         ]
       },
-      "cohesion": 0,
+      "cohesion": 0.427939,
       "cohesionDropped": false,
       "confidence": "full",
       "highWater": null,
@@ -217,8 +217,8 @@
         "path": ".python-version"
       },
       {
-        "commits": 65,
-        "lines": 346,
+        "commits": 64,
+        "lines": 321,
         "path": "CHANGELOG.md"
       },
       {
@@ -237,43 +237,43 @@
         "path": "LICENSE"
       },
       {
-        "commits": 16,
-        "lines": 652,
+        "commits": 15,
+        "lines": 650,
         "path": "README.es.md"
       },
       {
-        "commits": 16,
-        "lines": 732,
+        "commits": 15,
+        "lines": 730,
         "path": "README.fr.md"
       },
       {
-        "commits": 15,
-        "lines": 688,
+        "commits": 14,
+        "lines": 686,
         "path": "README.hi.md"
       },
       {
-        "commits": 16,
-        "lines": 666,
+        "commits": 15,
+        "lines": 664,
         "path": "README.it.md"
       },
       {
-        "commits": 16,
-        "lines": 788,
+        "commits": 15,
+        "lines": 786,
         "path": "README.ja.md"
       },
       {
-        "commits": 36,
-        "lines": 481,
+        "commits": 35,
+        "lines": 479,
         "path": "README.md"
       },
       {
-        "commits": 16,
-        "lines": 664,
+        "commits": 15,
+        "lines": 662,
         "path": "README.pt-BR.md"
       },
       {
-        "commits": 16,
-        "lines": 732,
+        "commits": 15,
+        "lines": 730,
         "path": "README.zh.md"
       },
       {
@@ -377,8 +377,8 @@
         "path": "assets/logo/switchyard_64.png"
       },
       {
-        "commits": 50,
-        "lines": 972,
+        "commits": 49,
+        "lines": 964,
         "path": "atlas/README.md"
       },
       {
@@ -387,18 +387,18 @@
         "path": "atlas/boundaries.yaml"
       },
       {
-        "commits": 50,
-        "lines": 3192,
+        "commits": 49,
+        "lines": 3204,
         "path": "atlas/page.json"
       },
       {
-        "commits": 50,
-        "lines": 10598,
+        "commits": 49,
+        "lines": 10306,
         "path": "atlas/statistics.json"
       },
       {
-        "commits": 50,
-        "lines": 51055,
+        "commits": 49,
+        "lines": 51272,
         "path": "atlas/structure.json"
       },
       {
@@ -852,8 +852,8 @@
         "path": "interlock}/tasks.py"
       },
       {
-        "commits": 29,
-        "lines": 216,
+        "commits": 28,
+        "lines": 214,
         "path": "pyproject.toml"
       },
       {
@@ -1312,8 +1312,8 @@
         "path": "site/src/content/docs/handbook/configuration.md"
       },
       {
-        "commits": 6,
-        "lines": 123,
+        "commits": 5,
+        "lines": 119,
         "path": "site/src/content/docs/handbook/experiments.md"
       },
       {
@@ -1322,8 +1322,8 @@
         "path": "site/src/content/docs/handbook/getting-started.md"
       },
       {
-        "commits": 13,
-        "lines": 55,
+        "commits": 12,
+        "lines": 53,
         "path": "site/src/content/docs/handbook/index.md"
       },
       {
@@ -1342,8 +1342,8 @@
         "path": "site/src/pages/index.astro"
       },
       {
-        "commits": 13,
-        "lines": 159,
+        "commits": 12,
+        "lines": 157,
         "path": "site/src/site-config.ts"
       },
       {
@@ -1362,8 +1362,8 @@
         "path": "site/tsconfig.json"
       },
       {
-        "commits": 12,
-        "lines": 28,
+        "commits": 11,
+        "lines": 26,
         "path": "src/interlock/__init__.py"
       },
       {
@@ -1392,13 +1392,13 @@
         "path": "src/interlock/calltrace.py"
       },
       {
-        "commits": 14,
-        "lines": 366,
+        "commits": 13,
+        "lines": 351,
         "path": "src/interlock/cli.py"
       },
       {
-        "commits": 2,
-        "lines": 194,
+        "commits": 3,
+        "lines": 232,
         "path": "src/interlock/devices.py"
       },
       {
@@ -1437,8 +1437,8 @@
         "path": "src/interlock/harness/lifecycle.py"
       },
       {
-        "commits": 11,
-        "lines": 3808,
+        "commits": 12,
+        "lines": 3719,
         "path": "src/interlock/harness/linux_cuda.py"
       },
       {
@@ -1517,8 +1517,8 @@
         "path": "src/interlock/importers/probe.py"
       },
       {
-        "commits": 4,
-        "lines": 326,
+        "commits": 5,
+        "lines": 336,
         "path": "src/interlock/importers/remote.py"
       },
       {
@@ -1537,8 +1537,8 @@
         "path": "src/interlock/paths.py"
       },
       {
-        "commits": 5,
-        "lines": 105,
+        "commits": 6,
+        "lines": 126,
         "path": "src/interlock/receipt.py"
       },
       {
@@ -1547,18 +1547,18 @@
         "path": "src/interlock/relay_sink.py"
       },
       {
-        "commits": 9,
-        "lines": 355,
+        "commits": 7,
+        "lines": 268,
         "path": "src/interlock/router/policy.py"
       },
       {
         "commits": 4,
-        "lines": 20,
+        "lines": 18,
         "path": "src/interlock/schema/route-decision.v1.json"
       },
       {
-        "commits": 4,
-        "lines": 44,
+        "commits": 5,
+        "lines": 63,
         "path": "src/interlock/schema/routing-row.schema.json"
       },
       {
@@ -1853,7 +1853,7 @@
       },
       {
         "commits": 3,
-        "lines": 306,
+        "lines": 238,
         "path": "tests/fake_ollama.py"
       },
       {
@@ -1972,24 +1972,19 @@
         "path": "tests/fixtures/ollama/0.35.1/version.json"
       },
       {
-        "commits": 2,
-        "lines": 24,
+        "commits": 1,
+        "lines": 12,
         "path": "tests/fixtures/ollama_logs/0.40.11/r3_killed_p8192_c8.log"
       },
       {
-        "commits": 2,
-        "lines": 24,
+        "commits": 1,
+        "lines": 12,
         "path": "tests/fixtures/ollama_logs/0.40.11/r3_partial_29_of_33.log"
       },
       {
-        "commits": 2,
-        "lines": 16,
-        "path": "tests/fixtures/ollama_logs/0.40.11/r3_resident.log"
-      },
-      {
         "commits": 1,
-        "lines": 49,
-        "path": "tests/fixtures/route/r3_table.jsonl"
+        "lines": 8,
+        "path": "tests/fixtures/ollama_logs/0.40.11/r3_resident.log"
       },
       {
         "commits": 1,
@@ -2037,8 +2032,8 @@
         "path": "tests/test_compile_rejected_rest.py"
       },
       {
-        "commits": 5,
-        "lines": 581,
+        "commits": 6,
+        "lines": 583,
         "path": "tests/test_devices.py"
       },
       {
@@ -2087,8 +2082,8 @@
         "path": "tests/test_fill_card_live.py"
       },
       {
-        "commits": 4,
-        "lines": 424,
+        "commits": 3,
+        "lines": 422,
         "path": "tests/test_generation_failure_kinds.py"
       },
       {
@@ -2117,23 +2112,23 @@
         "path": "tests/test_importers.py"
       },
       {
-        "commits": 4,
-        "lines": 478,
+        "commits": 2,
+        "lines": 459,
         "path": "tests/test_ladder_v3.py"
       },
       {
-        "commits": 2,
-        "lines": 961,
+        "commits": 1,
+        "lines": 471,
         "path": "tests/test_ladder_v4.py"
       },
       {
-        "commits": 3,
-        "lines": 187,
+        "commits": 2,
+        "lines": 178,
         "path": "tests/test_ladder_versions.py"
       },
       {
-        "commits": 8,
-        "lines": 2714,
+        "commits": 7,
+        "lines": 2713,
         "path": "tests/test_linux_cuda.py"
       },
       {
@@ -2223,17 +2218,12 @@
       },
       {
         "commits": 2,
-        "lines": 203,
-        "path": "tests/test_route_concurrency.py"
-      },
-      {
-        "commits": 3,
-        "lines": 327,
+        "lines": 322,
         "path": "tests/test_router_golden.py"
       },
       {
-        "commits": 5,
-        "lines": 891,
+        "commits": 4,
+        "lines": 880,
         "path": "tests/test_router_policy.py"
       },
       {
@@ -2252,13 +2242,23 @@
         "path": "tests/test_run_path.py"
       },
       {
+        "commits": 1,
+        "lines": 161,
+        "path": "tests/test_sampler_fallback.py"
+      },
+      {
         "commits": 13,
         "lines": 435,
         "path": "tests/test_task_scope.py"
       },
       {
-        "commits": 25,
-        "lines": 1730,
+        "commits": 2,
+        "lines": 322,
+        "path": "tests/test_wall_cap_and_hang.py"
+      },
+      {
+        "commits": 24,
+        "lines": 1728,
         "path": "uv.lock"
       },
       {
@@ -2272,9 +2272,9 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-10-26T19:43:23.424Z",
+  "generatedAt": "2026-10-26T20:27:57.879Z",
   "generatedFrom": {
-    "commit": "d2267a03fb2c8765a6393fc7f7145fa929064194"
+    "commit": "5bca251f2202be4416a605dba5ec93830a5c3583"
   },
   "pairs": [
     {
@@ -2650,10 +2650,66 @@
     },
     {
       "a": "src/interlock/harness/linux_cuda.py",
+      "b": "src/interlock/router/policy.py",
+      "either": 12,
+      "shared": 6,
+      "strength": 0.5
+    },
+    {
+      "a": "src/interlock/harness/linux_cuda.py",
       "b": "tests/test_linux_cuda.py",
-      "either": 10,
+      "either": 12,
       "shared": 7,
-      "strength": 0.7
+      "strength": 0.583333
+    },
+    {
+      "a": "src/interlock/importers/remote.py",
+      "b": "src/interlock/receipt.py",
+      "either": 7,
+      "shared": 4,
+      "strength": 0.571429
+    },
+    {
+      "a": "src/interlock/importers/remote.py",
+      "b": "src/interlock/router/policy.py",
+      "either": 7,
+      "shared": 4,
+      "strength": 0.571429
+    },
+    {
+      "a": "src/interlock/importers/remote.py",
+      "b": "src/interlock/schema/routing-row.schema.json",
+      "either": 6,
+      "shared": 4,
+      "strength": 0.666667
+    },
+    {
+      "a": "src/interlock/receipt.py",
+      "b": "src/interlock/router/policy.py",
+      "either": 8,
+      "shared": 4,
+      "strength": 0.5
+    },
+    {
+      "a": "src/interlock/receipt.py",
+      "b": "src/interlock/schema/routing-row.schema.json",
+      "either": 7,
+      "shared": 4,
+      "strength": 0.571429
+    },
+    {
+      "a": "src/interlock/router/policy.py",
+      "b": "src/interlock/schema/routing-row.schema.json",
+      "either": 7,
+      "shared": 4,
+      "strength": 0.571429
+    },
+    {
+      "a": "src/interlock/router/policy.py",
+      "b": "tests/test_packaging.py",
+      "either": 8,
+      "shared": 4,
+      "strength": 0.5
     },
     {
       "a": "src/switchyard/adapters/openvino.py",
@@ -2722,8 +2778,8 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-10-26T13:01:57-04:00",
-    "inScopeFiles": 308,
+    "headDate": "2026-10-26T16:23:15-04:00",
+    "inScopeFiles": 322,
     "pinnedStart": null,
     "priorFloor": "fallen",
     "qualifyingCommits": 149,
@@ -2731,7 +2787,7 @@
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-04-29T17:01:57.000Z",
+    "since": "2026-04-29T20:23:15.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",

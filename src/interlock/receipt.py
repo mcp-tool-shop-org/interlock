@@ -92,7 +92,9 @@ def validator() -> Draft202012Validator:
 
 
 def validate_row(row: dict, *, host_port: bool = False) -> None:
-    if isinstance(row, dict) and ("remote_device" in row or str(row.get("device", "")).startswith("colab:")):
+    if isinstance(row, dict) and (
+        "remote_device" in row or str(row.get("device", "")).startswith(("colab:", "rig:"))
+    ):
         _check_remote_device(row)
     errors = sorted(validator().iter_errors(row), key=lambda item: list(item.path))
     if errors:
@@ -377,8 +379,23 @@ def _check_remote_device(row: dict) -> None:
 
     device = row.get("device")
     remote_raw = row.get("remote_device")
-    is_remote = is_colab_device(device) or remote_raw is not None
+    is_rig_check = isinstance(device, str) and device.startswith("rig:")
+    is_remote = is_colab_device(device) or is_rig_check or remote_raw is not None
     _reject_unhashed_account_fields(row, row["id"], check_strings=is_remote)
+    if is_rig_check:
+        if not isinstance(remote_raw, dict):
+            raise ReceiptError(f"{row['id']}: rig check {device} requires remote_device identity")
+        if row.get("not_for_import") is not True:
+            raise ReceiptError(f"{row['id']}: a rig check row must carry not_for_import: true")
+        try:
+            identity = RemoteDeviceIdentity.from_dict(remote_raw)
+        except DeviceRefused as exc:
+            raise ReceiptError(f"{row['id']}: {exc}") from exc
+        if identity.provider != "rig" or identity.logical_device != device:
+            raise ReceiptError(
+                f"{row['id']}: remote_device {identity.logical_device!r} does not match device {device!r}"
+            )
+        return
     if is_rig_device(device):
         if remote_raw is not None:
             raise ReceiptError(

@@ -72,6 +72,8 @@ class FakeOllama:
         self.all_calls: list[dict[str, Any]] = []  # every request, probes included
         self.timeouts: list[float | None] = []
         self._load = {"on_gpu": layers_total, "cpu_kv": 0.0, "kv": 0.0, "killed": False}
+        self.version = "0.40.11"
+        self.kills = 0  # loads that ended in a SIGKILL
         self.num_parallel = 1
         self.restarts = 0
         self.prompts: list[str] = []  # the timed prompts: every call that asked for more than one token
@@ -163,7 +165,20 @@ class FakeOllama:
             return tokens
         return window - max((window - NUM_KEEP) // 2, 1)
 
-    def post(self, _path: str, payload: dict[str, Any], timeout: float | None = None) -> dict[str, Any]:
+    def start(self) -> FakeOllama:
+        return self
+
+    def stop(self) -> None:
+        return None
+
+    def unload(self, _model: str) -> None:
+        return None
+
+    def post(self, path: str, payload: dict[str, Any], timeout: float | None = None) -> dict[str, Any]:
+        if path != "/api/generate":
+            return {}
+        if "options" not in payload:  # an unload or a pull is not a generation
+            return {}
         options = payload["options"]
         num_predict = int(options.get("num_predict") or 1)
         words = payload["prompt"].split()
@@ -177,6 +192,7 @@ class FakeOllama:
                 self._last_words = []  # a reload drops the cache
                 self._log_load(options["num_ctx"])
             if self._load["killed"]:
+                self.kills += 1
                 raise RuntimeError(
                     "HTTP 500: llama-server process has terminated: signal: killed (the load needed more host memory)"
                 )

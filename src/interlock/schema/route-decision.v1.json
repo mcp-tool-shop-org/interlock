@@ -90,6 +90,7 @@
               "sampler_error",
               "generation_aborted",
               "unmeasured",
+              "rig_check",
               "fill_card"
             ]
           }

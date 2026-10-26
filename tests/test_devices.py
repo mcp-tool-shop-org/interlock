@@ -172,7 +172,7 @@ def test_remote_colab_cards_and_identity_validation():
         parse_remote_device,
     )
 
-    assert REMOTE_PROVIDERS == ("colab",)
+    assert REMOTE_PROVIDERS == ("colab", "rig")  # "rig" is the not-for-import identity of a harness check
     assert COLAB_CARDS == ("A100-40", "A100-80", "L4", "T4", "G4")
     assert REMOTE_DEVICES == (
         "colab:A100-40",

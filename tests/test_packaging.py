@@ -23,7 +23,7 @@ FAMILIES_RESOURCE = "interlock/data/model-families.json"
 # packaged copy. Each such line is named exactly; a new one, or a moved one, fails until it is reviewed and listed.
 ESCAPES_ALLOWED = {
     ("src/interlock/families.py", 23),
-    ("src/interlock/harness/linux_cuda.py", 75),
+    ("src/interlock/harness/linux_cuda.py", 77),
 }
 
 

@@ -32,7 +32,10 @@ IGPU = "iGPU"
 CARD_5090 = "5090"
 
 RIG_DEVICES = (NPU, IGPU, CPU, CARD_5090)
-REMOTE_PROVIDERS = ("colab",)
+REMOTE_PROVIDERS = ("colab", "rig")
+# A rig check: the Linux ladder run against the rig's own card to check the harness. It is not a measurement of any
+# Colab card, so its rows say `not_for_import` and no table takes them.
+RIG_CHECK_POOL = "rig-local"
 COLAB_CARDS = ("A100-40", "A100-80", "L4", "T4", "G4")
 REMOTE_DEVICES = tuple(f"colab:{card}" for card in COLAB_CARDS)
 
@@ -49,6 +52,7 @@ _ACCOUNT_PREFIX = re.compile(
     re.IGNORECASE,
 )
 _NUMERIC_VERSION = re.compile(r"^[0-9]+(?:\.[0-9]+)+$")
+_RIG_CARD = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._+()-]{0,40}$")
 
 
 
@@ -266,15 +270,21 @@ class RemoteDeviceIdentity:
             reject_unhashed_account_text(self.vram_mib, "remote_device.vram_mib")
         reject_unhashed_account_text(self.driver_version, "remote_device.driver_version")
         reject_unhashed_account_text(self.cuda_version, "remote_device.cuda_version")
-        validate_remote_pool(self.pool)
         if self.provider not in REMOTE_PROVIDERS:
             raise DeviceRefused(
                 f"unsupported remote provider {self.provider!r}; expected one of {REMOTE_PROVIDERS}"
             )
-        if self.card not in COLAB_CARDS:
-            raise DeviceRefused(
-                f"unsupported colab card {self.card!r}; expected one of {COLAB_CARDS}"
-            )
+        if self.provider == "rig":
+            if not isinstance(self.card, str) or not _RIG_CARD.fullmatch(self.card):
+                raise DeviceRefused(f"rig card {self.card!r} must be short free text such as 'RTX 5090'")
+            if self.pool != RIG_CHECK_POOL:
+                raise DeviceRefused(f"a rig check's pool must be {RIG_CHECK_POOL!r}, got {self.pool!r}")
+        else:
+            validate_remote_pool(self.pool)
+            if self.card not in COLAB_CARDS:
+                raise DeviceRefused(
+                    f"unsupported colab card {self.card!r}; expected one of {COLAB_CARDS}"
+                )
         if isinstance(self.vram_mib, bool) or not isinstance(self.vram_mib, int) or self.vram_mib <= 0:
             raise DeviceRefused("remote_device.vram_mib must be a positive integer")
         if not _NUMERIC_VERSION.fullmatch(self.driver_version):
@@ -288,7 +298,21 @@ class RemoteDeviceIdentity:
 
     @property
     def logical_device(self) -> str:
-        return f"{self.provider}:{self.card}"
+        card = self.card.replace(" ", "") if self.provider == "rig" else self.card
+        return f"{self.provider}:{card}"
+
+    @classmethod
+    def rig(cls, card: str, vram_mib: int, driver_version: str, cuda_version: str) -> RemoteDeviceIdentity:
+        """The identity of a rig check: the harness run on the rig's own card. Its rows are never imported."""
+
+        return cls(
+            provider="rig", card=card, vram_mib=vram_mib, driver_version=driver_version,
+            cuda_version=cuda_version, pool=RIG_CHECK_POOL,
+        )
+
+    @property
+    def not_for_import(self) -> bool:
+        return self.provider == "rig"
 
     def to_dict(self) -> dict[str, object]:
         return {
