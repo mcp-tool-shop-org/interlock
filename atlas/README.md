@@ -1,16 +1,20 @@
 # interlock: how it works
 
-Mapped at 2026-10-26 from commit 37eafad by Atlas 1.24.0.
+Mapped at 2026-10-26 from commit 18ff66e by Atlas 1.24.0.
 
 ## What this is
 
 interlock routes each job to a model, engine and device from a receipt-backed table. (written by a person)
 
-10 parts, mostly Python (111 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.
+10 parts, mostly Python (112 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.
 
-## What changed since 2026-10-26 (1ecf1db)
+## What changed since 2026-10-26 (37eafad)
 
-Nothing structural changed since 2026-10-26; 23 files changed content.
+- experiments/c2-generate/spec.yaml is now also read by tests/test_ladder_v4.py.
+- tests/fixtures/ollama_logs/0.40.11/r3_killed_p8192_c8.log is now read by tests/test_ladder_v4.py.
+- tests/fixtures/ollama_logs/0.40.11/r3_partial_29_of_33.log is now read by tests/test_ladder_v4.py.
+- And 1 more new writer or reader of a place.
+- 4 files added and 2 changed content, across 3 parts.
 
 ## What comes in
 
@@ -57,7 +61,7 @@ CI writes nothing this map can see.
 
 Confidence is low: fewer than 25 source files reach 10 revisions in the window.
 
-Window: 180 days; a pair counts from 3 shared commits, since 14 source files reach 10 revisions; the floor rises to 10 when 25 do.
+Window: 180 days; a pair counts from 3 shared commits, since 15 source files reach 10 revisions; the floor rises to 10 when 25 do.
 
 ## What no test touches
 

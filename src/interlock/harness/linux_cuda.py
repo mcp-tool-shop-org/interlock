@@ -665,6 +665,7 @@ def build_linux_failure_row(
     abort_mib: int | None = None,
     offload: dict[str, Any] | None = None,
     request_timeout_s: int | None = None,
+    num_ctx_sent: int | None = None,
 ) -> dict[str, Any]:
     """Build a schema-valid capability/failure row for a failed remote shape."""
 
@@ -711,6 +712,13 @@ def build_linux_failure_row(
     if concurrency is not None:
         settings["concurrency"] = concurrency
         settings["request_timeout_s"] = request_timeout_s  # the budget in force (None before one existed)
+        # `num_ctx` is the window the request sent, as on a measured row, and `cell_tokens` the nominal cell. A failure
+        # before any request was sent (a pre-registered refusal, a stub) never had a window: it keeps the nominal size
+        # in `num_ctx` and says so in `num_ctx_source`.
+        settings["cell_tokens"] = num_ctx
+        if num_ctx_sent is not None:
+            settings["num_ctx"] = num_ctx_sent
+        settings["num_ctx_source"] = "sent" if num_ctx_sent is not None else "nominal: no request was sent"
     if offload is not None:
         settings["offload"] = offload
     if peak_mib is not None:
@@ -1052,6 +1060,7 @@ def run_linux_generate_ladder(
                         concurrency=concurrency,
                         offload=(exc.evidence or {}).get("offload"),
                         request_timeout_s=(exc.evidence or {}).get("request_timeout_s"),
+                        num_ctx_sent=(exc.evidence or {}).get("num_ctx_sent"),
                         peak_mib=exc.peak_mib,
                         abort_mib=abort_mib,
                         engine_version=engine_version,
@@ -1092,6 +1101,7 @@ def run_linux_generate_ladder(
                         prompt_token_method=_evaluated_or_requested(measured, prompt_len)[1],
                         concurrency=concurrency,
                         request_timeout_s=measured.get("request_timeout_s"),
+                        num_ctx_sent=measured.get("num_ctx_sent"),
                         peak_mib=peak_mib,
                         abort_mib=abort_mib,
                         engine_version=engine_version,
@@ -1136,6 +1146,7 @@ def run_linux_generate_ladder(
                         prompt_token_method=token_method,
                         concurrency=concurrency,
                         request_timeout_s=measured.get("request_timeout_s"),
+                        num_ctx_sent=measured.get("num_ctx_sent"),
                         peak_mib=peak_mib,
                         abort_mib=abort_mib,
                         engine_version=engine_version,
@@ -1164,6 +1175,7 @@ def run_linux_generate_ladder(
                     "num_predict": num_predict,
                     "num_ctx": int(measured.get("num_ctx_sent") or prompt_len),  # what the request sent
                     "cell_tokens": prompt_len,  # the nominal cell size
+                    "num_ctx_source": "sent" if measured.get("num_ctx_sent") else "nominal: no request was sent",
                     "batch": None,
                     "static_shape": None,
                     "precision": None,
@@ -1829,13 +1841,14 @@ def measure_linux_ollama_generate(
     peak_mib = used_before
     num_ctx = ladder_window(prompt_tokens, num_predict)
     nonce = _cell_nonce(model, prompt_tokens, concurrency)
-    calibration_budget = {"request_timeout_s": CALIBRATION_TIMEOUT_S}
+    sent = {"num_ctx_sent": num_ctx}  # the first probe is sent with this window, so any failure below has one
+    calibration_budget = {**sent, "request_timeout_s": CALIBRATION_TIMEOUT_S}
     try:
         words, evaluated, verify_s = _calibrate_ladder_prompt(server, model, prompt_tokens, num_ctx, nonce, concurrency)
     except BaseException as exc:
         raise _failure_for(server, exc, peak_mib, calibration_budget) from exc
     budget_s = request_timeout_s(concurrency, verify_s)
-    budget = {"request_timeout_s": budget_s}
+    budget = {**sent, "request_timeout_s": budget_s}
     reported_slots = getattr(server, "effective_slots", lambda: None)()
     if isinstance(reported_slots, int) and not isinstance(reported_slots, bool):
         slot_count, slot_source = reported_slots, "llama-server log"

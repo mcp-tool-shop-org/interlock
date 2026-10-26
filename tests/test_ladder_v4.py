@@ -310,3 +310,59 @@ def test_a_verify_call_without_a_total_duration_is_unmeasured():
 def test_json_round_trip_of_an_oom_row_keeps_the_offload_evidence():
     (row,) = _ladder(_small_card(), (8192,), (4,))
     assert json.loads(json.dumps(row))["settings"]["offload"] == row["settings"]["offload"]
+
+
+# -- every failure row records the window that was sent, as a measured row does ----------------------------------------
+
+
+def _window_in(reason: str) -> int:
+    import re
+
+    return int(re.search(r"num_ctx (\d+)", reason).group(1))
+
+
+def test_an_oom_row_records_the_window_its_own_reason_names_and_the_nominal_cell(monkeypatch):
+    (row,) = _ladder(_small_card(), (8192,), (4,))
+    assert row["outcome"] == "oom"
+    assert row["settings"]["num_ctx"] == _window_in(row["notes"]) > 8192
+    assert row["settings"]["cell_tokens"] == 8192
+    assert row["settings"]["num_ctx_source"] == "sent"
+
+
+def test_a_timeout_row_records_the_window_sent_and_the_nominal_cell(monkeypatch):
+    monkeypatch.setattr(linux_cuda, "REQUEST_TIMEOUT_CEILING_S", 120)
+    server = FakeOllama(overhead_s=130.0)
+    (row,) = _ladder(server, (512,))
+    assert row["outcome"] == "timeout"
+    assert row["settings"]["num_ctx"] == linux_cuda.ladder_window(512, 128) and row["settings"]["cell_tokens"] == 512
+    assert row["settings"]["num_ctx_source"] == "sent"
+
+
+def test_a_host_ram_oom_and_an_unmeasured_row_record_the_window_too():
+    (killed,) = _ladder(_small_card(), (32768,), (8,))
+    assert killed["outcome"] == "oom" and killed["notes"].startswith("oom: host RAM")
+    assert killed["settings"]["num_ctx"] == linux_cuda.ladder_window(32768, 128)
+    assert killed["settings"]["cell_tokens"] == 32768
+
+    class Bare(FakeOllama):
+        def post(self, path, payload, timeout=None):
+            reply = super().post(path, payload, timeout)
+            reply.pop("total_duration")
+            return reply
+
+    (unmeasured,) = _ladder(Bare(), (512,))
+    assert unmeasured["outcome"] == "unmeasured"
+    assert unmeasured["settings"]["num_ctx"] == linux_cuda.ladder_window(512, 128)
+
+
+def test_a_failure_before_any_request_was_sent_keeps_the_nominal_size_and_says_so():
+    def refuses(length: int, concurrency: int) -> dict:
+        raise LinuxShapeFailure("load_refused", "model requires 22400 MiB, colab:T4 has 15360 MiB")
+
+    (row,) = run_linux_generate_ladder(
+        spec_id="C2-GENERATE", spec_rel="experiments/c2-generate/spec.yaml", run_id="t4-r4", date="2026-10-26",
+        remote_device=IDENT, model="gemma4:31b", revision_or_digest="d" * 64, measure_shape=refuses,
+        prompt_lengths=(2048,), concurrencies=(1,), quant="BF16", licence="gemma",
+    )
+    assert row["settings"]["num_ctx"] == 2048 == row["settings"]["cell_tokens"]
+    assert row["settings"]["num_ctx_source"] == "nominal: no request was sent"

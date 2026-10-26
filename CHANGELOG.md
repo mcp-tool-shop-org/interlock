@@ -14,6 +14,7 @@ T4 rung r3 (the log of its Ollama and the VM's `free -m`) showed that version 3 
 
 ### Changed
 
+- **A failure row records the window that was sent, as a measured row does.** `settings.num_ctx` is the `num_ctx` the request sent and `settings.cell_tokens` the nominal cell, on every failure path of the generate ladder (`oom` from a partial offload or host RAM, `timeout`, `unmeasured`, `load_refused`, `ctx_exceeded`); an `oom` row's `num_ctx` now equals the window its own reason names (it used to say the nominal 16384 beside a reason that said 16903 was sent). A failure before any request was sent (a pre-registered refusal, a failure outside the measurement) never had a window: it keeps the nominal size in `num_ctx`, and `settings.num_ctx_source` says `nominal: no request was sent` (it is `sent` otherwise).
 - `_ttft_does_not_scale` names the prefill, not the ttft, in its parameter and message (it has read `prefill_ms` since v3).
 - `tests/fake_ollama.py` now reports a partial offload (`/api/ps`, and the `offloaded N/M layers` and `CPU KV buffer size` log lines), simulates the SIGKILL when host buffers exceed the VM's RAM, raises `TimeoutError` past the timeout a call was sent with, and gives a slow fully resident cell. The parser tests read lines from T4 r3's own log (`tests/fixtures/ollama_logs/0.40.11/`).
 

@@ -130,12 +130,12 @@
           "scripts"
         ]
       },
-      "cohesion": 0,
+      "cohesion": 0.144695,
       "cohesionDropped": false,
       "confidence": "full",
       "highWater": null,
       "name": "src",
-      "qualifyingSourceCommits": 36,
+      "qualifyingSourceCommits": 37,
       "rebaseline": null
     },
     {
@@ -169,7 +169,7 @@
       "confidence": "full",
       "highWater": null,
       "name": "tests",
-      "qualifyingSourceCommits": 93,
+      "qualifyingSourceCommits": 94,
       "rebaseline": null
     }
   ],
@@ -217,8 +217,8 @@
         "path": ".python-version"
       },
       {
-        "commits": 60,
-        "lines": 284,
+        "commits": 61,
+        "lines": 299,
         "path": "CHANGELOG.md"
       },
       {
@@ -377,8 +377,8 @@
         "path": "assets/logo/switchyard_64.png"
       },
       {
-        "commits": 46,
-        "lines": 933,
+        "commits": 47,
+        "lines": 943,
         "path": "atlas/README.md"
       },
       {
@@ -387,18 +387,18 @@
         "path": "atlas/boundaries.yaml"
       },
       {
-        "commits": 46,
-        "lines": 3096,
+        "commits": 47,
+        "lines": 3116,
         "path": "atlas/page.json"
       },
       {
-        "commits": 46,
-        "lines": 9408,
+        "commits": 47,
+        "lines": 9752,
         "path": "atlas/statistics.json"
       },
       {
-        "commits": 46,
-        "lines": 49220,
+        "commits": 47,
+        "lines": 49801,
         "path": "atlas/structure.json"
       },
       {
@@ -1437,8 +1437,8 @@
         "path": "src/interlock/harness/lifecycle.py"
       },
       {
-        "commits": 9,
-        "lines": 3118,
+        "commits": 10,
+        "lines": 3418,
         "path": "src/interlock/harness/linux_cuda.py"
       },
       {
@@ -1547,8 +1547,8 @@
         "path": "src/interlock/relay_sink.py"
       },
       {
-        "commits": 5,
-        "lines": 255,
+        "commits": 6,
+        "lines": 264,
         "path": "src/interlock/router/policy.py"
       },
       {
@@ -1852,8 +1852,8 @@
         "path": "tests/conftest.py"
       },
       {
-        "commits": 1,
-        "lines": 134,
+        "commits": 2,
+        "lines": 207,
         "path": "tests/fake_ollama.py"
       },
       {
@@ -1973,6 +1973,21 @@
       },
       {
         "commits": 1,
+        "lines": 12,
+        "path": "tests/fixtures/ollama_logs/0.40.11/r3_killed_p8192_c8.log"
+      },
+      {
+        "commits": 1,
+        "lines": 12,
+        "path": "tests/fixtures/ollama_logs/0.40.11/r3_partial_29_of_33.log"
+      },
+      {
+        "commits": 1,
+        "lines": 8,
+        "path": "tests/fixtures/ollama_logs/0.40.11/r3_resident.log"
+      },
+      {
+        "commits": 1,
         "lines": 62,
         "path": "tests/fuzz_receipts.py"
       },
@@ -2067,8 +2082,8 @@
         "path": "tests/test_fill_card_live.py"
       },
       {
-        "commits": 2,
-        "lines": 420,
+        "commits": 3,
+        "lines": 422,
         "path": "tests/test_generation_failure_kinds.py"
       },
       {
@@ -2097,9 +2112,14 @@
         "path": "tests/test_importers.py"
       },
       {
-        "commits": 1,
-        "lines": 451,
+        "commits": 2,
+        "lines": 459,
         "path": "tests/test_ladder_v3.py"
+      },
+      {
+        "commits": 1,
+        "lines": 312,
+        "path": "tests/test_ladder_v4.py"
       },
       {
         "commits": 2,
@@ -2107,8 +2127,8 @@
         "path": "tests/test_ladder_versions.py"
       },
       {
-        "commits": 6,
-        "lines": 2712,
+        "commits": 7,
+        "lines": 2713,
         "path": "tests/test_linux_cuda.py"
       },
       {
@@ -2147,8 +2167,8 @@
         "path": "tests/test_openvino_adapter.py"
       },
       {
-        "commits": 4,
-        "lines": 338,
+        "commits": 5,
+        "lines": 340,
         "path": "tests/test_packaging.py"
       },
       {
@@ -2242,9 +2262,9 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-10-26T15:19:45.519Z",
+  "generatedAt": "2026-10-26T15:26:40.820Z",
   "generatedFrom": {
-    "commit": "37eafadb86067b3aefc28eab44968f847970d5aa"
+    "commit": "18ff66ea82e983600857d6732cf1ffbb94135219"
   },
   "pairs": [
     {
@@ -2502,43 +2522,43 @@
     {
       "a": "atlas/README.md",
       "b": "atlas/page.json",
-      "either": 42,
-      "shared": 42,
+      "either": 43,
+      "shared": 43,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/statistics.json",
-      "either": 42,
-      "shared": 42,
+      "either": 43,
+      "shared": 43,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/structure.json",
-      "either": 42,
-      "shared": 42,
+      "either": 43,
+      "shared": 43,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/statistics.json",
-      "either": 42,
-      "shared": 42,
+      "either": 43,
+      "shared": 43,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/structure.json",
-      "either": 42,
-      "shared": 42,
+      "either": 43,
+      "shared": 43,
       "strength": 1
     },
     {
       "a": "atlas/statistics.json",
       "b": "atlas/structure.json",
-      "either": 42,
-      "shared": 42,
+      "either": 43,
+      "shared": 43,
       "strength": 1
     },
     {
@@ -2613,10 +2633,24 @@
     },
     {
       "a": "src/interlock/harness/linux_cuda.py",
+      "b": "src/interlock/router/policy.py",
+      "either": 10,
+      "shared": 5,
+      "strength": 0.5
+    },
+    {
+      "a": "src/interlock/harness/linux_cuda.py",
       "b": "tests/test_linux_cuda.py",
-      "either": 9,
-      "shared": 6,
-      "strength": 0.666667
+      "either": 10,
+      "shared": 7,
+      "strength": 0.7
+    },
+    {
+      "a": "src/interlock/router/policy.py",
+      "b": "tests/test_linux_cuda.py",
+      "either": 8,
+      "shared": 4,
+      "strength": 0.5
     },
     {
       "a": "src/switchyard/adapters/openvino.py",
@@ -2685,16 +2719,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-10-26T06:52:12-04:00",
-    "inScopeFiles": 302,
+    "headDate": "2026-10-26T11:20:00-04:00",
+    "inScopeFiles": 306,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 145,
+    "qualifyingCommits": 146,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-04-29T10:52:12.000Z",
+    "since": "2026-04-29T15:20:00.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",
@@ -2710,7 +2744,7 @@
     ],
     "sourceFileReach": 20,
     "sourceFileRise": 25,
-    "sourceFilesReachingStrongFloor": 14,
+    "sourceFilesReachingStrongFloor": 15,
     "strength": 0.5,
     "windowDays": 180
   },
