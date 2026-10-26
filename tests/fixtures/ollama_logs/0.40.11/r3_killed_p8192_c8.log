@@ -1,0 +1,12 @@
+time=2026-10-26T14:38:55.050Z level=INFO source=sched.go:658 msg="system memory" total="12.7 GiB" free="12.3 GiB" free_swap="0 B"
+load_tensors: loading model tensors, this can take a while... (load_mode = mmap)
+load_tensors: offloading output layer to GPU
+load_tensors: offloading 14 repeating layers to GPU
+load_tensors: offloaded 15/33 layers to GPU
+load_tensors:   CPU_Mapped model buffer size =   731.45 MiB
+load_tensors:   CPU_Mapped model buffer size =    70.34 MiB
+load_tensors:   CPU_Mapped model buffer size =   461.41 MiB
+load_tensors:   CPU_Mapped model buffer size =     0.00 MiB
+load_tensors:        CUDA0 model buffer size =  1018.46 MiB
+llama_kv_cache:        CPU KV buffer size = 14688.00 MiB
+time=2026-10-26T14:39:04.530Z level=INFO source=sched.go:686 msg="Load failed" model=MODEL error="llama-server process has terminated: signal: killed"

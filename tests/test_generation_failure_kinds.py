@@ -113,7 +113,7 @@ def test_the_failure_rows_validate_carry_the_ladder_version_and_are_not_speeds(k
     row = _row(kind)
     validate_row(row)
     assert row["outcome"] == kind
-    assert row["settings"]["ladder_version"] == GENERATE_LADDER_VERSION == 3
+    assert row["settings"]["ladder_version"] == GENERATE_LADDER_VERSION == 4
     assert is_speed_row(row) is False
 
 

@@ -48,8 +48,8 @@
       }
     ],
     "since": {
-      "commit": "560f9974d666098584a7ce22f0796d809b406956",
-      "generatedAt": "2026-10-26T09:40:28.455Z"
+      "commit": "18ff66ea82e983600857d6732cf1ffbb94135219",
+      "generatedAt": "2026-10-26T15:26:40.820Z"
     },
     "unchanged": true
   },
@@ -72,7 +72,7 @@
     {
       "a": "site/src/site-config.ts",
       "b": "src/interlock/__init__.py",
-      "either": 11,
+      "either": 12,
       "partLabels": [
         null,
         "src"
@@ -82,7 +82,7 @@
         "src"
       ],
       "relation": "unassigned",
-      "shared": 7
+      "shared": 8
     },
     {
       "a": "src/interlock/harness/fill.py",
@@ -136,9 +136,9 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 15 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 2,
-  "commit": "1ecf1dbdb2f12b0ef8264b77ddb00dea429e5263",
+  "commit": "ba161964d5c72c9496917d6e55e84db8dc7c9ced",
   "defaultBranch": "main",
-  "derived": "10 parts, mostly Python (111 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
+  "derived": "10 parts, mostly Python (112 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
   "doors": [
     {
       "checks": [],
@@ -158,7 +158,7 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 53
+          "files": 54
         },
         {
           "boundary": "scripts",
@@ -301,7 +301,7 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-26T10:08:48.046Z",
+  "generatedAt": "2026-10-26T16:02:32.244Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "5 writes and 6 reads use paths built at run time and are not named here.",
@@ -336,10 +336,10 @@
   ],
   "summary": "interlock routes each job to a model, engine and device from a receipt-backed table.",
   "summaryFrom": "person",
-  "testFiles": 76,
+  "testFiles": 80,
   "testedBy": {
     "scripts": 2,
-    "src": 49
+    "src": 51
   },
   "unnamedWrites": 5,
   "unread": [],

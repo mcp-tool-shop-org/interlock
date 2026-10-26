@@ -1,14 +1,14 @@
 # interlock: how it works
 
-Mapped at 2026-10-26 from commit 1ecf1db by Atlas 1.24.0.
+Mapped at 2026-10-26 from commit ba16196 by Atlas 1.24.0.
 
 ## What this is
 
 interlock routes each job to a model, engine and device from a receipt-backed table. (written by a person)
 
-10 parts, mostly Python (111 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.
+10 parts, mostly Python (112 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.
 
-## What changed since 2026-10-26 (560f997)
+## What changed since 2026-10-26 (18ff66e)
 
 Nothing structural changed since 2026-10-26; 4 files changed content.
 
@@ -48,7 +48,7 @@ CI writes nothing this map can see.
 ## What tends to change together
 
 - **src/switchyard/adapters/openvino.py** and **tests/test_openvino_adapter.py** changed together in 17 of 23 commits.
-- **site/src/site-config.ts** and **src/interlock/__init__.py** changed together in 7 of 11 commits.
+- **site/src/site-config.ts** and **src/interlock/__init__.py** changed together in 8 of 12 commits.
 - **src/interlock/harness/fill.py** and **tests/test_e5_preflight.py** changed together in 5 of 9 commits, and the tests part imports the src part.
 - **src/switchyard/harness/receipts.py** and **src/switchyard/receipt.py** changed together in 7 of 13 commits.
 - **src/interlock/harness/fill.py** and **tests/test_fill_card_live.py** changed together in 8 of 15 commits, and the tests part imports the src part.

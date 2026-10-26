@@ -1140,6 +1140,7 @@ def test_measure_linux_ollama_generate_runs_concurrent_requests_full_prompt_and_
             "prompt_eval_duration": 20_000_000,
             "eval_count": 128,
             "eval_duration": 1_000_000_000,
+            "total_duration": 1_050_000_000,
         }
 
     srv = LinuxOllamaServer(
