@@ -18,7 +18,7 @@
 
 # interlock: roteador local de dispositivos de IA
 
-> **Versão 1.0.2: um instrumento de pesquisa.** A partir da versão 1.0, as versões seguem o versionamento semântico: uma alteração que prejudica a CLI, o formato do recibo ou o formato da especificação do experimento vem com uma nova versão principal. O interlock é apenas uma sugestão: ele sugere um modelo, um motor e um dispositivo, e nunca atende a solicitações. Cada número local foi medido em um único dispositivo (Intel Core Ultra 9 285K com sua NPU e iGPU, mais uma RTX 5090), e as linhas remotas `colab:<card>` estão em seu próprio conjunto de evidências separado, com identificação completa da placa (`provider`, `card`, `vram_mib`, `driver_version`, `cuda_version`, `pool`). Considere suas rotas como evidências medidas para esse conjunto de hardware específico, e não como um benchmark geral.
+> **Versão 1.0.3: um instrumento de pesquisa.** A partir da versão 1.0, as versões seguem o versionamento semântico: uma alteração que prejudica a CLI, o formato do recibo ou o formato da especificação do experimento vem com uma nova versão principal. O interlock é apenas uma sugestão: ele sugere um modelo, um motor e um dispositivo, e nunca atende a solicitações. Cada número local foi medido em um único dispositivo (Intel Core Ultra 9 285K com sua NPU e iGPU, mais uma RTX 5090), e as linhas remotas `colab:<card>` estão em seu próprio conjunto de evidências separado, com identificação completa da placa (`provider`, `card`, `vram_mib`, `driver_version`, `cuda_version`, `pool`). Considere suas rotas como evidências medidas para esse conjunto de hardware específico, e não como um benchmark geral.
 
 O intertravamento ferroviário impede que um trem seja direcionado para um caminho conflitante. Esta ferramenta faz isso para dispositivos: ela envia cada tarefa para um modelo, um motor e um dispositivo.
 
@@ -43,7 +43,7 @@ pip install mcptoolshop-interlock
 uv tool install mcptoolshop-interlock
 ```
 
-O nome da distribuição é `mcptoolshop-interlock`. O comando de importação é `interlock`. Apenas Python 3.12 (`requires-python` é `>=3.12,<3.13`). O CI executa os testes no Ubuntu. Uma execução de medição ao vivo no dispositivo é escrita para o dispositivo Windows no qual esta tabela foi medida. O caminho Linux CUDA (novo na versão 1.0.0) é executado em uma VM Colab remota.
+O nome da distribuição é `mcptoolshop-interlock`. O arquivo de importação e o comando são `interlock`. Python 3.13, 3.14 e 3.15 (`requires-python` é `>=3.13`; 3.13 é a versão que a imagem padrão do Colab executa). O CI executa os testes no Ubuntu em todas as três versões, com 3.15 como a versão principal. Na versão 3.15, o PyYAML é instalado a partir do código-fonte até que ele publique os pacotes cp315 (ele cria um pacote Python puro quando a libyaml não está presente). O `intel` extra requer o Python 3.13 ou 3.14: o OpenVINO 2026.4.1 ainda não possui pacotes cp315, portanto, na versão 3.15, o extra instala `transformers`, mas não `openvino*` (um marcador de ambiente); o núcleo funciona na versão 3.15. Uma execução de medição em tempo real no equipamento é escrita para o equipamento Windows, que é o equipamento no qual esta tabela foi medida. O caminho Linux CUDA (novo na versão 1.0.0) é executado em uma VM remota do Colab.
 
 O que este programa tem permissão para acessar está no [modelo de ameaças](#modelo-de-ameaças).
 
@@ -228,7 +228,7 @@ Cada reinício é registrado no marcador do processo e em `settings.ollama_resta
 
 ## Desenvolvimento
 
-Python 3.12. `uv sync --frozen` cria o ambiente do projeto a partir do arquivo de bloqueio. Ele não compartilha o ambiente da NPU. OpenVINO 2026.4.1 é o `intel` extra. Os testes não precisam dele.
+Python 3.15 (`.python-version`); as versões 3.13 e 3.14 também funcionam. `uv sync --frozen` cria o ambiente do projeto a partir do arquivo de bloqueio. Ele não compartilha o ambiente da NPU. OpenVINO 2026.4.1 é o `intel` adicional. Os testes não precisam dele.
 
 ```
 uv sync --frozen

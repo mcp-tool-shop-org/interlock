@@ -18,7 +18,7 @@
 
 # interlock: router per dispositivi AI locali
 
-> **Versione 1.0.2: uno strumento di ricerca.** A partire dalla 1.0, le versioni seguono la versione semantica: una modifica che interrompe la CLI, il formato della ricevuta o il formato delle specifiche dell'esperimento comporta una nuova versione principale. interlock è solo a scopo informativo: suggerisce un modello, un motore e un dispositivo e non gestisce mai il traffico. Ogni numero locale è stato misurato su un'unica configurazione (Intel Core Ultra 9 285K con la sua NPU e iGPU, più una RTX 5090) e le righe remote `colab:<card>` sono presenti nel proprio pool di dati separato con l'identità completa della scheda (`provider`, `card`, `vram_mib`, `driver_version`, `cuda_version`, `pool`). Considera i suoi percorsi come dati misurati per quella specifica configurazione hardware, non come un benchmark generale.
+> **Versione 1.0.3: uno strumento di ricerca.** A partire dalla 1.0, le versioni seguono la versione semantica: una modifica che interrompe la CLI, il formato della ricevuta o il formato delle specifiche dell'esperimento comporta una nuova versione principale. interlock è solo a scopo informativo: suggerisce un modello, un motore e un dispositivo e non gestisce mai il traffico. Ogni numero locale è stato misurato su un'unica configurazione (Intel Core Ultra 9 285K con la sua NPU e iGPU, più una RTX 5090) e le righe remote `colab:<card>` sono presenti nel proprio pool di dati separato con l'identità completa della scheda (`provider`, `card`, `vram_mib`, `driver_version`, `cuda_version`, `pool`). Considera i suoi percorsi come dati misurati per quella specifica configurazione hardware, non come un benchmark generale.
 
 L'interblocco ferroviario impedisce che un treno venga instradato su un percorso in conflitto. Questo strumento fa lo stesso per i dispositivi: invia ogni attività a un modello, un motore e un dispositivo.
 
@@ -43,7 +43,7 @@ pip install mcptoolshop-interlock
 uv tool install mcptoolshop-interlock
 ```
 
-Il nome della distribuzione è `mcptoolshop-interlock`. L'importazione e il comando sono `interlock`. Solo Python 3.12 (`requires-python` è `>=3.12,<3.13`). Il CI esegue i test su Ubuntu. Un test di misurazione in tempo reale sulla configurazione è stato scritto per la configurazione Windows su cui è stata eseguita la misurazione in questa tabella. Il percorso CUDA per Linux (novità nella versione 1.0.0) viene eseguito su una VM Colab remota.
+Il nome della distribuzione è `mcptoolshop-interlock`. L’import e il comando sono `interlock`. Python 3.13, 3.14 e 3.15 (`requires-python` è `>=3.13`; 3.13 è la versione predefinita utilizzata dall’immagine di Colab). Il sistema di integrazione continua esegue i test su Ubuntu, utilizzando tutte e tre le versioni, con la 3.15 come versione principale. Sulla versione 3.15, PyYAML viene installato dai sorgenti fino a quando non pubblica i pacchetti cp315 (in caso di assenza di libyaml, viene creato un pacchetto in puro Python). L’extra `intel` richiede Python 3.13 o 3.14: OpenVINO 2026.4.1 non dispone ancora di pacchetti cp315, quindi sulla versione 3.15 l’extra installa `transformers` ma non `openvino*` (un marcatore di ambiente); il nucleo funziona sulla versione 3.15. È stata creata una misurazione in tempo reale da eseguire sulla piattaforma, per la piattaforma Windows su cui è stata effettuata la misurazione in questa tabella. Il percorso Linux CUDA (novità nella versione 1.0.0) viene eseguito su una macchina virtuale Colab remota.
 
 A cosa questo programma può accedere è indicato nel [modello di minaccia](#modello-di-minaccia).
 
@@ -228,7 +228,7 @@ Ogni riavvio viene scritto nel marcatore di esecuzione e in `settings.ollama_res
 
 ## Sviluppo
 
-Python 3.12. `uv sync --frozen` crea l’ambiente del progetto dal file lock. Non condivide l’ambiente NPU. OpenVINO 2026.4.1 è l’aggiunta `intel`. I test non ne hanno bisogno.
+Python 3.15 (`.python-version`); funzionano anche le versioni 3.13 e 3.14. `uv sync --frozen` crea l’ambiente del progetto a partire dal file lock. Non condivide l’ambiente NPU. OpenVINO 2026.4.1 è l’elemento `intel` aggiuntivo. I test non ne hanno bisogno.
 
 ```
 uv sync --frozen
