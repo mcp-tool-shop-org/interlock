@@ -22,7 +22,7 @@ interlock route --task generate --model Phi --thinking off --ctx 1024 --busy 509
 | `--model` | Substring of the repo or tag. Hyphens and colons are ignored. |
 | `--min-<metric>` | Floor on a conservative bound. `--min-tok-s` is the minimum repeat-slot decode tok/s. Any other name is a quality metric, judged on the low end of its interval. |
 | `--max-latency-ms` | Maximum repeat-slot latency, or claim-wall max, in milliseconds. |
-| `--max-ttft-ms` | Maximum repeat-slot time to first token. Refuses unless every compared row records the same `settings.prefix_caching` (`on`, `off`, or `default`). Unset means unknown. |
+| `--max-ttft-ms` | Maximum repeat-slot time to first token. Only a version 3 ladder row's `ttft_ms` can pass it; an earlier row's ttft is never used. Refuses unless every compared row records the same `settings.prefix_caching` (`on`, `off`, or `default`). Unset means unknown. |
 | `--ctx` | Exact measured length when the row id has `lN`. A row with `num_ctx` and no `lN` tag qualifies when `num_ctx` is at least N. |
 | `--thinking` | `off` matches only off. `on` matches any recorded level, and the decision keeps that level. `low`, `medium`, and `high` match exactly when named. |
 | `--busy` | Repeatable. An input. interlock does not read a ledger, the watchdog, or a process list. |
