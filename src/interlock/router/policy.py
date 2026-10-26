@@ -177,6 +177,8 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
             # Before any floor: a v1 row must not win, or be listed, because the v2 row failed a floor.
             before = current
             current, version_notes = _newest_ladder_per_device_model(before)
+            current, across = _newest_ladder_version(current)  # and across devices: v1 is never ranked against v2
+            version_notes = [*version_notes, *across]
             dropped_ids = {id(row) for row in before} - {id(row) for row in current}
             pool = [row for row in pool if id(row) not in dropped_ids]
 
@@ -194,11 +196,6 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
     direction = "higher" if request.task == "generate" else "lower"
     metric = "decode_tok_s" if request.task == "generate" else "warm_latency_ms"
     ranked = [row for row in current if _rank_bound(row, request) is not None]
-    ranked, across = _newest_ladder_version(ranked)
-    version_notes = [*version_notes, *across]
-    if across:
-        newest = max(ladder_version(row) or 0 for row in ranked)
-        pool = [row for row in pool if ladder_version(row) in (None, newest)]
     if not ranked:
         return _empty(metric, None, current, excluded, request, failure_reasons=failure_reasons)
 

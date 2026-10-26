@@ -35,31 +35,23 @@
   "changes": {
     "fileCounts": {
       "added": 0,
-      "changed": 9,
+      "changed": 3,
       "moved": 0,
       "parts": 3,
       "removed": 0
     },
     "items": [
       {
-        "kind": "landing",
-        "sentence": "experiments/c2-fill-card/spec.yaml is now also read by tests/test_generation_failure_kinds.py.",
-        "subjects": [
-          "experiments/c2-fill-card/spec.yaml",
-          "tests/test_generation_failure_kinds.py"
-        ]
-      },
-      {
         "kind": "counts",
-        "sentence": "9 files changed content, across 3 parts.",
+        "sentence": "Nothing structural changed since 2026-10-26; 3 files changed content.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "578bb417d98f817eded8f12a3ca9344dbf1d750c",
-      "generatedAt": "2026-10-26T06:20:59.782Z"
+      "commit": "e982592d226c667fca75f98e90ca6f1bd377d8b4",
+      "generatedAt": "2026-10-26T06:51:38.955Z"
     },
-    "unchanged": false
+    "unchanged": true
   },
   "changesTogether": [
     {
@@ -76,6 +68,21 @@
       ],
       "relation": "unassigned",
       "shared": 17
+    },
+    {
+      "a": "src/interlock/receipt.py",
+      "b": "src/interlock/router/policy.py",
+      "either": 7,
+      "partLabels": [
+        "src",
+        "src"
+      ],
+      "parts": [
+        "src",
+        "src"
+      ],
+      "relation": "inside",
+      "shared": 5
     },
     {
       "a": "site/src/site-config.ts",
@@ -121,30 +128,15 @@
       ],
       "relation": "b-imports-a",
       "shared": 5
-    },
-    {
-      "a": "src/switchyard/harness/receipts.py",
-      "b": "src/switchyard/receipt.py",
-      "either": 13,
-      "partLabels": [
-        null,
-        null
-      ],
-      "parts": [
-        null,
-        null
-      ],
-      "relation": "unassigned",
-      "shared": 7
     }
   ],
   "changesTogetherNote": [
-    "2 files changed together with their own tests, as expected.",
+    "1 file changed together with its own test, as expected.",
     "Confidence is low: fewer than 25 source files reach 10 revisions in the window.",
     "Window: 180 days; a pair counts from 3 shared commits, since 14 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
-  "changesTogetherWithTests": 2,
-  "commit": "e982592d226c667fca75f98e90ca6f1bd377d8b4",
+  "changesTogetherWithTests": 1,
+  "commit": "0ee89bedb4a773f4b0f1463a421a0b2f0176934b",
   "defaultBranch": "main",
   "derived": "10 parts, mostly Python (109 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
   "doors": [
@@ -309,7 +301,7 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-26T06:51:38.955Z",
+  "generatedAt": "2026-10-26T07:25:11.147Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "5 writes and 6 reads use paths built at run time and are not named here.",

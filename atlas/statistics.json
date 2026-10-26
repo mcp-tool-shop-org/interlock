@@ -130,12 +130,12 @@
           "scripts"
         ]
       },
-      "cohesion": 0,
+      "cohesion": 0.412844,
       "cohesionDropped": false,
       "confidence": "full",
       "highWater": null,
       "name": "src",
-      "qualifyingSourceCommits": 35,
+      "qualifyingSourceCommits": 36,
       "rebaseline": null
     },
     {
@@ -169,7 +169,7 @@
       "confidence": "full",
       "highWater": null,
       "name": "tests",
-      "qualifyingSourceCommits": 92,
+      "qualifyingSourceCommits": 93,
       "rebaseline": null
     }
   ],
@@ -217,8 +217,8 @@
         "path": ".python-version"
       },
       {
-        "commits": 59,
-        "lines": 264,
+        "commits": 60,
+        "lines": 269,
         "path": "CHANGELOG.md"
       },
       {
@@ -377,8 +377,8 @@
         "path": "assets/logo/switchyard_64.png"
       },
       {
-        "commits": 46,
-        "lines": 924,
+        "commits": 47,
+        "lines": 934,
         "path": "atlas/README.md"
       },
       {
@@ -387,18 +387,18 @@
         "path": "atlas/boundaries.yaml"
       },
       {
-        "commits": 46,
-        "lines": 3028,
+        "commits": 47,
+        "lines": 3050,
         "path": "atlas/page.json"
       },
       {
-        "commits": 46,
-        "lines": 9058,
+        "commits": 47,
+        "lines": 9137,
         "path": "atlas/statistics.json"
       },
       {
-        "commits": 46,
-        "lines": 48682,
+        "commits": 47,
+        "lines": 49172,
         "path": "atlas/structure.json"
       },
       {
@@ -1437,8 +1437,8 @@
         "path": "src/interlock/harness/lifecycle.py"
       },
       {
-        "commits": 10,
-        "lines": 2844,
+        "commits": 11,
+        "lines": 2873,
         "path": "src/interlock/harness/linux_cuda.py"
       },
       {
@@ -1447,8 +1447,8 @@
         "path": "src/interlock/harness/ollama_serve.py"
       },
       {
-        "commits": 3,
-        "lines": 62,
+        "commits": 4,
+        "lines": 66,
         "path": "src/interlock/harness/receipts.py"
       },
       {
@@ -1517,8 +1517,8 @@
         "path": "src/interlock/importers/probe.py"
       },
       {
-        "commits": 3,
-        "lines": 311,
+        "commits": 4,
+        "lines": 326,
         "path": "src/interlock/importers/remote.py"
       },
       {
@@ -1537,8 +1537,8 @@
         "path": "src/interlock/paths.py"
       },
       {
-        "commits": 6,
-        "lines": 106,
+        "commits": 7,
+        "lines": 107,
         "path": "src/interlock/receipt.py"
       },
       {
@@ -1547,8 +1547,8 @@
         "path": "src/interlock/relay_sink.py"
       },
       {
-        "commits": 5,
-        "lines": 197,
+        "commits": 6,
+        "lines": 214,
         "path": "src/interlock/router/policy.py"
       },
       {
@@ -1557,8 +1557,8 @@
         "path": "src/interlock/schema/route-decision.v1.json"
       },
       {
-        "commits": 5,
-        "lines": 45,
+        "commits": 6,
+        "lines": 46,
         "path": "src/interlock/schema/routing-row.schema.json"
       },
       {
@@ -2062,8 +2062,8 @@
         "path": "tests/test_fill_card_live.py"
       },
       {
-        "commits": 3,
-        "lines": 323,
+        "commits": 4,
+        "lines": 364,
         "path": "tests/test_generation_failure_kinds.py"
       },
       {
@@ -2092,8 +2092,8 @@
         "path": "tests/test_importers.py"
       },
       {
-        "commits": 1,
-        "lines": 89,
+        "commits": 2,
+        "lines": 165,
         "path": "tests/test_ladder_versions.py"
       },
       {
@@ -2232,9 +2232,9 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-10-26T06:51:38.955Z",
+  "generatedAt": "2026-10-26T07:25:11.147Z",
   "generatedFrom": {
-    "commit": "e982592d226c667fca75f98e90ca6f1bd377d8b4"
+    "commit": "0ee89bedb4a773f4b0f1463a421a0b2f0176934b"
   },
   "pairs": [
     {
@@ -2492,43 +2492,43 @@
     {
       "a": "atlas/README.md",
       "b": "atlas/page.json",
-      "either": 42,
-      "shared": 42,
+      "either": 43,
+      "shared": 43,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/statistics.json",
-      "either": 42,
-      "shared": 42,
+      "either": 43,
+      "shared": 43,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/structure.json",
-      "either": 42,
-      "shared": 42,
+      "either": 43,
+      "shared": 43,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/statistics.json",
-      "either": 42,
-      "shared": 42,
+      "either": 43,
+      "shared": 43,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/structure.json",
-      "either": 42,
-      "shared": 42,
+      "either": 43,
+      "shared": 43,
       "strength": 1
     },
     {
       "a": "atlas/statistics.json",
       "b": "atlas/structure.json",
-      "either": 42,
-      "shared": 42,
+      "either": 43,
+      "shared": 43,
       "strength": 1
     },
     {
@@ -2617,17 +2617,31 @@
     },
     {
       "a": "src/interlock/harness/linux_cuda.py",
-      "b": "tests/test_linux_cuda.py",
-      "either": 10,
-      "shared": 5,
+      "b": "src/interlock/receipt.py",
+      "either": 12,
+      "shared": 6,
       "strength": 0.5
     },
     {
       "a": "src/interlock/receipt.py",
-      "b": "src/interlock/schema/routing-row.schema.json",
+      "b": "src/interlock/router/policy.py",
       "either": 7,
-      "shared": 4,
-      "strength": 0.571429
+      "shared": 5,
+      "strength": 0.714286
+    },
+    {
+      "a": "src/interlock/receipt.py",
+      "b": "src/interlock/schema/routing-row.schema.json",
+      "either": 8,
+      "shared": 5,
+      "strength": 0.625
+    },
+    {
+      "a": "src/interlock/router/policy.py",
+      "b": "src/interlock/schema/routing-row.schema.json",
+      "either": 6,
+      "shared": 5,
+      "strength": 0.833333
     },
     {
       "a": "src/switchyard/adapters/openvino.py",
@@ -2696,16 +2710,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-10-26T02:29:48-04:00",
+    "headDate": "2026-10-26T03:01:12-04:00",
     "inScopeFiles": 300,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 143,
+    "qualifyingCommits": 144,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-04-29T06:29:48.000Z",
+    "since": "2026-04-29T07:01:12.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",

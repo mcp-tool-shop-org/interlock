@@ -159,3 +159,18 @@ def test_the_legacy_envelope_importer_keeps_the_ladder_version_and_the_prompt_me
         raise AssertionError(f"envelope not accepted: {exc}") from exc
     assert rows[0]["settings"]["ladder_version"] == 2
     assert rows[0]["settings"]["prompt_token_method"] == "ollama_prompt_eval_count"  # noqa: S105
+
+
+def test_a_v1_row_on_another_device_cannot_win_because_the_v2_row_failed_a_floor():
+    l4_v1, t4_v2 = row("l4-v1", "colab:L4", 300.0), row("t4-v2", "colab:T4", 100.0, 2)
+    result = decide([l4_v1, t4_v2], request(min_metrics={"decode_tok_s": 200.0}))
+    assert isinstance(result, Refusal)  # not an L4 win
+    assert "l4-v1" not in json.dumps(result.document)
+
+
+def test_a_floored_v1_row_on_another_device_is_not_a_runner_up_beside_a_v2_winner():
+    rows = [row("l4-v1", "colab:L4", 300.0), row("t4-v2", "colab:T4", 120.0, 2), row("a100-v2", "colab:A100", 90.0, 2)]
+    result = decide(rows, request(min_metrics={"decode_tok_s": 100.0}))
+    assert winner(result) == "t4-v2"
+    assert "l4-v1" not in json.dumps(result.document)
+    assert any("ranked on ladder version 2 only" in note for note in result.document["notes"])

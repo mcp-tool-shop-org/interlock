@@ -584,7 +584,7 @@
           "path": ".python-version"
         },
         {
-          "hash": "cdf54ee0692793ce26f470ee34ef4c6a935859dbfe77cf44c920a4b7832807ea",
+          "hash": "2fbbe687249aeda33907be1c7833f6f58a42aed3acbb275300d30de50b4a4a92",
           "path": "CHANGELOG.md"
         },
         {
@@ -13021,10 +13021,10 @@
             {
               "in": "_is_stale",
               "kind": "except",
-              "line": 768
+              "line": 765
             }
           ],
-          "hash": "9631f61f0fb3dd0dbb8873b547dd6fb785fc5a60fe7180a45a29e081277c70bd",
+          "hash": "de2dde89a09bd39e513a548fc1e31316f28f76d6a45184a9b5f3a2e92aacaaf1",
           "importsFiles": [
             "src/interlock/devices.py"
           ],
@@ -13033,7 +13033,7 @@
             {
               "calls": [
                 {
-                  "line": 865,
+                  "line": 862,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13041,14 +13041,14 @@
                   "via": "_remote_eligible"
                 },
                 {
-                  "line": 795,
+                  "line": 792,
                   "name": "casefold",
                   "target": null,
                   "via": "_model_matches"
                 },
                 {
                   "branch": "constraint == \"device\"",
-                  "line": 575,
+                  "line": 572,
                   "name": "matches_device_filter",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13057,14 +13057,14 @@
                 },
                 {
                   "branch": "constraint == \"thinking\"",
-                  "line": 823,
+                  "line": 820,
                   "name": "casefold",
                   "target": null,
                   "via": "_thinking_matches"
                 },
                 {
                   "branch": "constraint == \"budget\"",
-                  "line": 861,
+                  "line": 858,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13073,13 +13073,13 @@
                 },
                 {
                   "branch": "constraint.startswith(\"min:\")",
-                  "line": 806,
+                  "line": 803,
                   "name": "casefold",
                   "target": null,
                   "via": "_norm"
                 },
                 {
-                  "line": 224,
+                  "line": 221,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13087,7 +13087,7 @@
                   "via": "ladder_version"
                 },
                 {
-                  "line": 376,
+                  "line": 373,
                   "name": "matches_device_filter",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13103,7 +13103,7 @@
             {
               "calls": [
                 {
-                  "line": 224,
+                  "line": 221,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13118,7 +13118,7 @@
             {
               "calls": [
                 {
-                  "line": 224,
+                  "line": 221,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13134,7 +13134,7 @@
             {
               "calls": [
                 {
-                  "line": 224,
+                  "line": 221,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13150,13 +13150,13 @@
             {
               "calls": [
                 {
-                  "line": 795,
+                  "line": 792,
                   "name": "casefold",
                   "target": null,
                   "via": "_model_matches"
                 },
                 {
-                  "line": 861,
+                  "line": 858,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13172,7 +13172,7 @@
             {
               "calls": [
                 {
-                  "line": 795,
+                  "line": 792,
                   "name": "casefold",
                   "target": null,
                   "via": "_model_matches"
@@ -13186,13 +13186,13 @@
             {
               "calls": [
                 {
-                  "line": 795,
+                  "line": 792,
                   "name": "casefold",
                   "target": null,
                   "via": "_model_matches"
                 },
                 {
-                  "line": 376,
+                  "line": 373,
                   "name": "matches_device_filter",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13200,13 +13200,13 @@
                   "via": "_why"
                 },
                 {
-                  "line": 823,
+                  "line": 820,
                   "name": "casefold",
                   "target": null,
                   "via": "_thinking_matches"
                 },
                 {
-                  "line": 861,
+                  "line": 858,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13214,7 +13214,7 @@
                   "via": "_is_remote"
                 },
                 {
-                  "line": 806,
+                  "line": 803,
                   "name": "casefold",
                   "target": null,
                   "via": "_norm"
@@ -13228,20 +13228,20 @@
             {
               "calls": [
                 {
-                  "line": 376,
+                  "line": 373,
                   "name": "matches_device_filter",
                   "target": {
                     "file": "src/interlock/devices.py"
                   }
                 },
                 {
-                  "line": 823,
+                  "line": 820,
                   "name": "casefold",
                   "target": null,
                   "via": "_thinking_matches"
                 },
                 {
-                  "line": 861,
+                  "line": 858,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13249,7 +13249,7 @@
                   "via": "_is_remote"
                 },
                 {
-                  "line": 806,
+                  "line": 803,
                   "name": "casefold",
                   "target": null,
                   "via": "_norm"
@@ -13264,7 +13264,7 @@
               "calls": [
                 {
                   "branch": "constraint.startswith(\"min:\") and isinstance(limit, (int, f…",
-                  "line": 806,
+                  "line": 803,
                   "name": "casefold",
                   "target": null,
                   "via": "_norm"
@@ -13279,7 +13279,7 @@
               "calls": [
                 {
                   "branch": "constraint.startswith(\"min:\") and isinstance(limit, (int, f…",
-                  "line": 806,
+                  "line": 803,
                   "name": "casefold",
                   "target": null,
                   "via": "_norm"
@@ -13293,7 +13293,7 @@
             {
               "calls": [
                 {
-                  "line": 806,
+                  "line": 803,
                   "name": "casefold",
                   "target": null,
                   "via": "_norm"
@@ -13308,14 +13308,14 @@
               "calls": [
                 {
                   "branch": "constraint == \"model\"",
-                  "line": 795,
+                  "line": 792,
                   "name": "casefold",
                   "target": null,
                   "via": "_model_matches"
                 },
                 {
                   "branch": "constraint == \"device\"",
-                  "line": 575,
+                  "line": 572,
                   "name": "matches_device_filter",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13324,14 +13324,14 @@
                 },
                 {
                   "branch": "constraint == \"thinking\"",
-                  "line": 823,
+                  "line": 820,
                   "name": "casefold",
                   "target": null,
                   "via": "_thinking_matches"
                 },
                 {
                   "branch": "constraint == \"budget\"",
-                  "line": 861,
+                  "line": 858,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13340,7 +13340,7 @@
                 },
                 {
                   "branch": "constraint.startswith(\"min:\")",
-                  "line": 806,
+                  "line": 803,
                   "name": "casefold",
                   "target": null,
                   "via": "_norm"
@@ -13355,14 +13355,14 @@
               "calls": [
                 {
                   "branch": "constraint == \"model\"",
-                  "line": 795,
+                  "line": 792,
                   "name": "casefold",
                   "target": null,
                   "via": "_model_matches"
                 },
                 {
                   "branch": "constraint == \"device\"",
-                  "line": 575,
+                  "line": 572,
                   "name": "matches_device_filter",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13370,14 +13370,14 @@
                 },
                 {
                   "branch": "constraint == \"thinking\"",
-                  "line": 823,
+                  "line": 820,
                   "name": "casefold",
                   "target": null,
                   "via": "_thinking_matches"
                 },
                 {
                   "branch": "constraint == \"budget\"",
-                  "line": 861,
+                  "line": 858,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13386,7 +13386,7 @@
                 },
                 {
                   "branch": "constraint.startswith(\"min:\")",
-                  "line": 806,
+                  "line": 803,
                   "name": "casefold",
                   "target": null,
                   "via": "_norm"
@@ -13401,7 +13401,7 @@
               "calls": [
                 {
                   "branch": "constraint.startswith(\"min:\")",
-                  "line": 806,
+                  "line": 803,
                   "name": "casefold",
                   "target": null,
                   "via": "_norm"
@@ -13415,7 +13415,7 @@
             {
               "calls": [
                 {
-                  "line": 806,
+                  "line": 803,
                   "name": "casefold",
                   "target": null,
                   "via": "_norm"
@@ -13429,7 +13429,7 @@
             {
               "calls": [
                 {
-                  "line": 806,
+                  "line": 803,
                   "name": "casefold",
                   "target": null,
                   "via": "_norm"
@@ -13443,7 +13443,7 @@
             {
               "calls": [
                 {
-                  "line": 806,
+                  "line": 803,
                   "name": "casefold",
                   "target": null,
                   "via": "_norm"
@@ -13457,7 +13457,7 @@
             {
               "calls": [
                 {
-                  "line": 795,
+                  "line": 792,
                   "name": "casefold",
                   "target": null,
                   "via": "_model_matches"
@@ -13471,7 +13471,7 @@
             {
               "calls": [
                 {
-                  "line": 795,
+                  "line": 792,
                   "name": "casefold",
                   "target": null
                 }
@@ -13484,7 +13484,7 @@
             {
               "calls": [
                 {
-                  "line": 802,
+                  "line": 799,
                   "name": "casefold",
                   "target": null
                 }
@@ -13497,7 +13497,7 @@
             {
               "calls": [
                 {
-                  "line": 806,
+                  "line": 803,
                   "name": "casefold",
                   "target": null
                 }
@@ -13510,7 +13510,7 @@
             {
               "calls": [
                 {
-                  "line": 823,
+                  "line": 820,
                   "name": "casefold",
                   "target": null
                 }
@@ -13523,7 +13523,7 @@
             {
               "calls": [
                 {
-                  "line": 861,
+                  "line": 858,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13538,7 +13538,7 @@
             {
               "calls": [
                 {
-                  "line": 865,
+                  "line": 862,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -14627,10 +14627,12 @@
             "row",
             "test_a_device_that_only_has_version_1_still_routes_when_it_is_the_one_asked_for",
             "test_a_fill_card_row_is_not_a_ladder_row_and_keeps_routing_beside_v2_rows",
+            "test_a_floored_v1_row_on_another_device_is_not_a_runner_up_beside_a_v2_winner",
             "test_a_rig_row_with_no_ladder_is_still_compared_with_the_newest_ladder_rows",
             "test_a_row_with_no_ladder_version_on_a_colab_device_is_version_1_and_a_rig_row_has_none",
             "test_a_v1_row_cannot_win_because_the_v2_row_failed_a_floor",
             "test_a_v1_row_is_not_listed_as_a_runner_up_when_the_v2_row_wins",
+            "test_a_v1_row_on_another_device_cannot_win_because_the_v2_row_failed_a_floor",
             "test_on_one_device_and_model_only_the_newest_version_is_a_candidate_even_when_the_old_one_is_faster",
             "test_the_legacy_envelope_importer_keeps_the_ladder_version_and_the_prompt_method",
             "test_the_table_copy_of_every_unmeasured_row_does_not_say_the_device_cannot",
@@ -14638,7 +14640,7 @@
             "test_v1_and_v2_rows_on_different_devices_are_never_ranked_against_each_other",
             "winner"
           ],
-          "hash": "379ab80c7e471e9eab6dee840f24c9b8caa2ae3e63957966581bc66c8612d336",
+          "hash": "4d22707ff90541513cca791c9dc569702723aa5faa4f3eae1151f77601cbbe77",
           "importOrder": [
             "src/interlock/cli.py",
             "src/interlock/devices.py",
@@ -16496,7 +16498,7 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "e982592d226c667fca75f98e90ca6f1bd377d8b4",
+    "commit": "0ee89bedb4a773f4b0f1463a421a0b2f0176934b",
     "tracked": 295
   },
   "landings": [
