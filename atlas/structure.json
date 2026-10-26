@@ -13,15 +13,15 @@
           "path": ".github/dependabot.yml"
         },
         {
-          "hash": "86c9dd0c6070086e930eafd7faecdf7870a5983d9eb4cf70b6797264f290588f",
+          "hash": "29b481bbafd2cc86250fc7efed99ada301da67a54e4de25d838d9fcec8533751",
           "path": ".github/workflows/ci.yml"
         },
         {
-          "hash": "fe047ac8989c33ceda994f7e84f33453d552781c5cc989883e3b72df12b3644d",
+          "hash": "186759944a5f149676ed74fa56af1ce15d77a355c81f2bf01149174c95598e75",
           "path": ".github/workflows/pages.yml"
         },
         {
-          "hash": "9dd1c8925383399566965affb1183e002f611f8a2b7f7b87f3fe684bbb3b44dd",
+          "hash": "46d1712fd91d49e2f06fb868e40b743e6e1547c14b209e2c2c14658b1a09eaa6",
           "path": ".github/workflows/release.yml"
         },
         {
@@ -584,7 +584,7 @@
           "path": ".python-version"
         },
         {
-          "hash": "37136f236e36296b126ea993d9f4068a2e7a9f36dbb9901a16b42886368d56bb",
+          "hash": "a2cdf723aa58d9a5a8921f1f798c890ea1ad8076b2886b441496e8300fb7bbd0",
           "path": "CHANGELOG.md"
         },
         {
@@ -600,35 +600,35 @@
           "path": "LICENSE"
         },
         {
-          "hash": "c4b71084a4681dc43b599047df3918d9820536f35d4b136e0c0ff7480f760b17",
+          "hash": "3c0b0f4d59e1adfc925d54ee91e5fa1b52d5f73871e9f66da241516b1f6615d0",
           "path": "README.es.md"
         },
         {
-          "hash": "d6ec57c00c568243595f8071809592695540d52e613565f126ad08a6a52c3d18",
+          "hash": "17309d80c4f035495d5494fad2bf0c7b3283058b2a3511d1fe3bed4b366beb8d",
           "path": "README.fr.md"
         },
         {
-          "hash": "6cd08e02809e8ea2f4fcaf9d3ca1980421c0fa32d7f33cace41e0bc29ce9bd71",
+          "hash": "77b8ce2a9e4a5c20f17dc1aa119adbf3c3d4c76dc85d918c0b6772b9ea086673",
           "path": "README.hi.md"
         },
         {
-          "hash": "f6edc9e49ea8cc9844b08675e36e393d2dafea8aa595552c20732263a05bc3a0",
+          "hash": "8d5a184315d08d5163840072400032f303c8fddf2a848c57a4a7cecad337a989",
           "path": "README.it.md"
         },
         {
-          "hash": "f4feab264dd6f0f5176b0e48513952a968609a34c4e5da841f27316548f8f551",
+          "hash": "91426773dab686f9e3a4194f4c1db293dd4beaa585b5d154ae580f3785c99290",
           "path": "README.ja.md"
         },
         {
-          "hash": "3cedc92d91b55c224127351e85a378b4869d28456833e7fe375b503d2768980b",
+          "hash": "c22bb8c0c9c143dc0f80f60d0384d37349716eeaa6d2764c7e7acafba3b09d7a",
           "path": "README.md"
         },
         {
-          "hash": "47e869ef511013bfe2351b3dd55f80cb40800f5847f0c3fbb64ac9daef9543fd",
+          "hash": "8c50759cba53c6f52ff2947efd1e39faefb8860b0dec47eb4482b33f674f2690",
           "path": "README.pt-BR.md"
         },
         {
-          "hash": "1772dd749c0583305339fc2b2935f5eddfae9e0c700bfec9829d83925ba9726b",
+          "hash": "bedf044a010db1df3b7503f1247b9fe38a47e50ac3b0a1030747e03aae3a5f51",
           "path": "README.zh.md"
         },
         {
@@ -648,11 +648,11 @@
           "path": "codecov.yml"
         },
         {
-          "hash": "a4254927d3e3f813283a5ee65f373530ec831d930523da1af76133a6cc43ad41",
+          "hash": "bc28284caca1a2e8a7248f67b3d51ff59e6f23aa865c88282c567c89d2e128c5",
           "path": "pyproject.toml"
         },
         {
-          "hash": "07cf454c641345e5dcb6609136844f852ba6b4f247f052090929869fd4a2f878",
+          "hash": "7b45f8e077b3238df64eb114eeddb0fb450ea19d609a4816d644107c5d6ef7d5",
           "path": "uv.lock"
         },
         {
@@ -882,7 +882,7 @@
       "files": [
         {
           "constantOnly": true,
-          "hash": "9329ac74c013e7b6f2256fe3afe5a7439c169b57d3703e35a77d122437895849",
+          "hash": "ac6b911b777bf1d4e38ab37a5a29e30aecc0ec754368164133e38c57f4701d13",
           "path": "src/interlock/__init__.py"
         },
         {
@@ -2764,30 +2764,30 @@
             {
               "in": "load_families",
               "kind": "except",
-              "line": 26
+              "line": 35
             },
             {
               "in": "load_families",
               "kind": "raise",
-              "line": 27
+              "line": 36
             },
             {
               "in": "load_families",
               "kind": "raise",
-              "line": 29
+              "line": 38
             },
             {
               "in": "load_families",
               "kind": "raise",
-              "line": 33
+              "line": 42
             },
             {
               "in": "family_of",
               "kind": "raise",
-              "line": 42
+              "line": 51
             }
           ],
-          "hash": "179c7d95d15dce9011a6ec6f11a5b83bde64e4de178242fed129e566efc41fce",
+          "hash": "659bd5dca4858e3756502d2af9b45c743860c97c042aded56ffe734288feb667",
           "path": "src/interlock/families.py"
         },
         {
@@ -14818,7 +14818,7 @@
             "test_unreadable_perf_metrics_are_recorded_not_dropped",
             "test_warm_reload_compile_recorded_on_fresh_cache"
           ],
-          "hash": "92bfc90f14a1be62d2ac9064d7157a62d977ee93df3202b39f750c5807ae3d18",
+          "hash": "0aa7cb4bd3efbc486f23097128c2efedf7b06c73ce2ce3f26a792b7ab57959b2",
           "importOrder": [
             "src/interlock/adapters/__init__.py",
             "src/interlock/adapters/openvino.py",
@@ -16273,7 +16273,7 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "bbe78ceb144ff5755ce8934b6c2ad311bca0e63d",
+    "commit": "132aa3c8147d985c38a5491cec50284fb1852915",
     "tracked": 292
   },
   "landings": [
@@ -16795,6 +16795,11 @@
     {
       "readers": [
         {
+          "by": "pyproject.toml",
+          "call": "configuration",
+          "confidence": "config"
+        },
+        {
           "by": "src/interlock/families.py",
           "call": "read_text",
           "confidence": "ast"
@@ -16978,7 +16983,7 @@
       "path": "site/src/content/docs/handbook/getting-started.md"
     },
     {
-      "hash": "507c178bf223a2011c3eb5c6c5ffe809845d4905113c8ac675e041cc7adba40b",
+      "hash": "dc13ae615c9b5e713ad41814d61988beaf22e68e84070a203a70bf25f69daaa6",
       "path": "site/src/content/docs/handbook/index.md"
     },
     {
@@ -17003,7 +17008,7 @@
     },
     {
       "constantOnly": true,
-      "hash": "377958b9f91f4582b54139145b629d1a0cfc165f123c79f385718c621a7156ce",
+      "hash": "79af6a19140396a54655f3f321336bf81240fa8fccb0463c3b9e92becb911a58",
       "path": "site/src/site-config.ts"
     },
     {

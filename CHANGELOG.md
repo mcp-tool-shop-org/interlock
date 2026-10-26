@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **The wheel now carries the model family table.** `interlock.families` read `table/model-families.json` relative to the source tree (`parents[2]`), which is not in the wheel, so `family_of` and `stamp_family` raised `FamilyError` on every installed copy (1.0.3 and earlier). The file ships as package data (`interlock/data/model-families.json`, a hatch force-include) and is read through `importlib.resources`; a source checkout still reads `table/`.
+
+### Added
+
+- `tests/test_packaging.py`: the wheel's copy is byte-equal to `table/model-families.json`; a wheel installed into a clean venv, run from outside the repository with `-I`, answers `family_of` and `stamp_family` (it runs on every CI Python leg and fails on 1.0.3 with `FamilyError`); a sweep fails on any `__file__`-relative read that climbs out of the package in a module with no `importlib.resources` packaged copy; every workflow action is pinned by commit SHA with a version comment (the SLSA generator is a reusable workflow that must be called by tag).
+
+### Changed
+
+- CI actions moved to current majors, SHA-pinned (setup-uv v10.3.2, setup-node v7.1.0, upload-pages-artifact v5.0.0, deploy-pages v5.0.1; read 2026-10-25).
+
 ## [1.0.3] - 2026-10-25
 
 ### Changed

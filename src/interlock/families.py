@@ -8,6 +8,8 @@ to ``table/model-families.json``.
 from __future__ import annotations
 
 import json
+from importlib import resources
+from importlib.resources.abc import Traversable
 from pathlib import Path
 
 
@@ -15,8 +17,15 @@ class FamilyError(Exception):
     """The committed family table cannot be read."""
 
 
-def families_path() -> Path:
-    return Path(__file__).resolve().parents[2] / "table" / "model-families.json"
+# The wheel carries the table as package data (pyproject force-include); a source checkout or an
+# editable install has only the committed copy under table/.
+FAMILIES_RESOURCE = "data/model-families.json"
+_FAMILIES_SOURCE_PATH = Path(__file__).resolve().parents[2] / "table" / "model-families.json"
+
+
+def families_path() -> Path | Traversable:
+    packaged = resources.files("interlock").joinpath(FAMILIES_RESOURCE)
+    return packaged if packaged.is_file() else _FAMILIES_SOURCE_PATH
 
 
 def load_families() -> dict[str, str]:
