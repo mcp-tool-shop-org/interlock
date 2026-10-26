@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.0.9] - 2026-10-26
+
 ### Fixed
 
 - **A cell epoch, and a server restart when a cell's outer deadline fires.** When `CELL_DEADLINE_S` fires, `run_linux_generate_ladder` records an `unmeasured` row and moves on, but the abandoned cell's thread (or its pass workers) can still be inside an `/api/generate` call; when it returns, the thread carried on with the old cell's loop and sent requests during the next cell, with the old cell's `num_ctx`, through shared slots, KV and prefill. `ensure_parallel` returns early on an unchanged slot count and nothing tied a call to a cell. Now `LinuxOllamaServer.begin_cell()` increments an epoch; a cell's thread and its pass workers carry the epoch they began with; and `post`/`get` refuse a call from an older epoch with `StaleCell`, which is never recorded as a row. When a cell's deadline fires the ladder also restarts the harness's own server (`restart_after_deadline`) before the next cell, so no in-flight runner request survives, logs a phase marker, and the first row after the restart records `settings.server_restarted_after_deadline: true`. A normal run restarts nothing. On 1.0.8 the same scenario (a cell that outlives its deadline, then a second cell) accepted three requests from the abandoned cell after the second one began.
@@ -12,6 +14,10 @@
 - **The `nvidia-smi` fallback bounds its answer.** `used` must be at least 0, `total` over 0 and finite, and `used` at most `total` (`20000, 15360` and `-0.5, 15360` are `unmeasured`); more than one non-empty output line is `unmeasured` too (a multi-GPU answer is a reading of some other card). `0, 81920` and `15360, 15360` are still accepted.
 - **The first VRAM sample of a window or batch cell has a deadline,** as the generate cell's does (it was protected inside `run_linux_spec`, not when the function was called directly). Only the deadline is added: a sampler that raises still propagates as it did (a lost run keeps the cells it finished), where the generate cell turns it into a `sampler_error` row.
 - **The `nvidia-smi` fallback parse is strict:** exactly two columns, `used >= 0`, `total > 0`, and `inf`/`nan` and overflow are caught. Anything else is `unmeasured` with the text it got.
+
+### Docs
+
+- The handbook's experiments page notes the server restart when a cell's deadline fires, and that the projection is an expected wall time.
 
 ## [1.0.8] - 2026-10-26
 
