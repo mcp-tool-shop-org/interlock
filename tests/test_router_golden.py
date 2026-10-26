@@ -92,7 +92,10 @@ def test_phi_without_busy_picks_igpu_and_says_no_5090_row(capsys):
     assert err == ""
     assert code == 0
     assert document["device"] == "iGPU"
-    assert document["notes"] == ["no 5090 row"]
+    assert document["notes"] == [
+        "no 5090 row",
+        "ranked at concurrency 1 on decode_tok_s, the pass aggregate across 1 concurrent request(s)",
+    ]
     assert document["receipts"][0].startswith("E3/phi-35-mini-igpu-l1024")
     assert_decision(document)
     phi_5090 = [

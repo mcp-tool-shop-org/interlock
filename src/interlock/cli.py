@@ -21,6 +21,13 @@ constraints:
   --max-ttft-ms      maximum repeat-slot time to first token. Refuses unless
                      every compared row records the same settings.prefix_caching
                      (on, off, or default). Unset means unknown.
+  --concurrency N    generate only, default 1. Ranks and floors rows measured at
+                     N concurrent requests (decode_tok_s is the pass aggregate).
+                     A row with no concurrency counts as 1. No match: a refusal
+                     naming the concurrencies that exist. The margin is between
+                     distinct candidates (device, model, quant), never between
+                     two shapes of one model. Fill-card rows are load probes and
+                     never rank in generate (excluded: fill_card).
   --ctx N            exact measured length when the row id has lN. A row with
                      num_ctx and no lN tag qualifies when num_ctx is at least N.
   --thinking         family of settings.thinking_level. off matches only off.
@@ -214,6 +221,13 @@ def main(argv: list[str] | None = None) -> int:
     route.add_argument("--busy", action="append", default=None, metavar="DEVICE")
     route.add_argument("--quote-rule", type=int)
     route.add_argument("--num-predict", type=int)
+    route.add_argument(
+        "--concurrency",
+        type=_at_least_one,
+        default=1,
+        help="generate only: rank and floor rows measured at this concurrency (default 1). A row is the pass "
+            "aggregate across that many requests; a row with no concurrency counts as 1",
+    )
     route.add_argument("--budget-left-usd", type=float)
     route.add_argument("--device", help="exact device or provider wildcard such as colab:L4 or colab:*")
     route.add_argument(
@@ -613,6 +627,18 @@ def _cmd_c2_sources(args: argparse.Namespace) -> int:
     return 0
 
 
+def _at_least_one(text: str) -> int:
+    """argparse type for --concurrency: a whole number of concurrent requests, at least 1."""
+
+    try:
+        value = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"--concurrency must be a whole number, got {text!r}") from None
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"--concurrency must be at least 1 (one request at a time), got {value}")
+    return value
+
+
 def _cmd_route(args: argparse.Namespace) -> int:
     from interlock.router.policy import Request, decide
 
@@ -651,6 +677,7 @@ def _cmd_route(args: argparse.Namespace) -> int:
         budget_left_usd=args.budget_left_usd,
         allow_remote=bool(args.allow_remote),
         device=args.device,
+        concurrency=args.concurrency,
     )
     outcome = decide(rows, request)
     document = outcome.document

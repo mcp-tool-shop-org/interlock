@@ -391,11 +391,11 @@ def winner(result) -> str:
     return result.document["receipts"][0]
 
 
-def test_pre_v3_throughput_above_one_slot_is_never_used_and_the_note_says_so():
+def test_pre_v3_throughput_above_one_slot_is_never_used_even_when_that_concurrency_is_asked_for():
     rows = [row("t4-v2-c1", "colab:T4", 50.0, version=2), row("t4-v2-c4", "colab:T4", 400.0, version=2, concurrency=4)]
-    result = decide(rows, request())
-    assert winner(result) == "t4-v2-c1"  # the inflated c4 figure did not win
-    assert any("1 pre-v3 row(s) with concurrency > 1 not used" in note for note in result.document["notes"])
+    assert winner(decide(rows, request())) == "t4-v2-c1"  # the default concurrency never meets the inflated c4 figure
+    asked = decide(rows, request(concurrency=4))
+    assert isinstance(asked, Refusal)  # the c4 row is the only candidate and its throughput was not measured
     assert not throughput_measured(rows[1]) and throughput_measured(rows[0])
 
 
@@ -407,7 +407,8 @@ def test_a_pre_v3_row_with_an_inflated_floor_figure_cannot_pass_a_decode_floor()
 
 def test_v3_throughput_above_one_slot_is_used():
     rows = [row("t4-v3-c1", "colab:T4", 50.0, version=3), row("t4-v3-c4", "colab:T4", 180.0, version=3, concurrency=4)]
-    assert winner(decide(rows, request())) == "t4-v3-c4"
+    assert winner(decide(rows, request(concurrency=4))) == "t4-v3-c4"
+    assert winner(decide(rows, request())) == "t4-v3-c1"
 
 
 def test_a_pre_v3_ttft_never_passes_a_ttft_floor_and_a_v3_ttft_does():
