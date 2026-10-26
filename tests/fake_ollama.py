@@ -33,6 +33,8 @@ class FakeOllama:
         honour_parallel: bool = True,
         report_slots: bool = True,
         long_prompt_bias: float = 0.0,
+        overhead_s: float = 0.0,
+        overhead_s_per_ktok: float = 0.0,
     ) -> None:
         self.tokens_per_word = tokens_per_word
         self.prefill_tok_s = prefill_tok_s
@@ -40,6 +42,8 @@ class FakeOllama:
         self.cache = cache
         self.honour_parallel = honour_parallel
         self.report_slots = report_slots
+        self.overhead_s = overhead_s  # time that is neither prefill nor decode (Ollama's Go side)
+        self.overhead_s_per_ktok = overhead_s_per_ktok
         self.long_prompt_bias = long_prompt_bias  # T4 r2: long prompts ran ~1.2% over the probes
         self.num_parallel = 1
         self.restarts = 0
@@ -111,9 +115,11 @@ class FakeOllama:
             decode_s = num_predict / self.decode_tok_s
             index = min(range(len(self._slot_free)), key=self._slot_free.__getitem__)
             start = max(self._slot_free[index], self._arrival)
-            finish = start + prefill_s + decode_s
+            overhead = self.overhead_s + self.overhead_s_per_ktok * evaluated / 1000.0
+            finish = start + overhead + prefill_s + decode_s
             self._slot_free[index] = finish
             self._now = max(self._now, finish)
+            total_s = finish - self._arrival  # Ollama's total_duration counts the wait for a free slot
             if num_predict > 1:
                 self.prompts.append(payload["prompt"])
                 self.contexts.append(options["num_ctx"])
@@ -123,4 +129,6 @@ class FakeOllama:
             "prompt_eval_duration": int(prefill_s * 1e9),
             "eval_count": num_predict,
             "eval_duration": int(decode_s * 1e9),
+            "load_duration": 0,
+            "total_duration": int(total_s * 1e9),
         }

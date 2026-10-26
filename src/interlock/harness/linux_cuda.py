@@ -1041,9 +1041,10 @@ def run_linux_generate_ladder(
             )
             repeats = sum(1 for s in slots if isinstance(s, Mapping) and s.get("phase") == "repeat") or 1
             evaluated_tokens, token_method = _evaluated_or_requested(measured, prompt_len)
-            reason = _ttft_does_not_scale(baseline, prompt_len, ttft_ms)
+            prefill_ms = float(measured.get("prefill_ms", ttft_ms))
+            reason = _ttft_does_not_scale(baseline, prompt_len, prefill_ms)
             if reason is None and baseline is None:
-                baseline = (prompt_len, ttft_ms)
+                baseline = (prompt_len, prefill_ms)
             if reason is not None:
                 rows.append(
                     build_linux_failure_row(
@@ -1102,8 +1103,10 @@ def run_linux_generate_ladder(
                     "prefix_caching": "off",  # every timed call has its own prefix, so no prefix is cached
                     "parallel_slots": measured.get("parallel_slots", concurrency),
                     "parallel_slots_source": measured.get("parallel_slots_source", "requested"),
-                    "throughput_method": measured.get("throughput_method", "decode_phase_wall_clock_aggregate"),
+                    "throughput_method": measured.get("throughput_method", "ollama_durations_decode_window"),
                     "end_to_end_tok_s": measured.get("end_to_end_tok_s"),
+                    "prefill_ms": prefill_ms,
+                    "overhead_ms": measured.get("overhead_ms"),
                     "per_request_decode_tok_s": measured.get("per_request_decode_tok_s"),
                     "ttft_ms": ttft_ms,
                     "decode_tok_s": decode_tok_s,
@@ -1677,19 +1680,34 @@ def measure_linux_ollama_generate(
             wall_s = max(clock() - started, 1e-9)
             used_now, _ = _sample_during_cell(sample_vram_mib)
             peak_mib = max(peak_mib, used_now)
-            ttfts_ns = [int(r.get("prompt_eval_duration") or 0) for r in pass_resps]
-            if min(ttfts_ns) <= 0:
-                raise LinuxShapeFailure("unmeasured", "Ollama reported no prompt_eval_duration; the ttft is unknown")
-            prefill_tok_s = evaluated / (min(ttfts_ns) / 1_000_000_000.0)
+            prefill_ns = [int(r.get("prompt_eval_duration") or 0) for r in pass_resps]
+            if min(prefill_ns) <= 0:
+                raise LinuxShapeFailure("unmeasured", "Ollama reported no prompt_eval_duration; the prefill is unknown")
+            prefill_tok_s = evaluated / (min(prefill_ns) / 1_000_000_000.0)
             if prefill_tok_s > PREFILL_TOK_S_CEILING:
                 raise LinuxShapeFailure(
                     "unmeasured",
-                    f"a prefill of {evaluated} tokens in {min(ttfts_ns) / 1e6:.2f} ms is {prefill_tok_s:,.0f} tok/s, "
+                    f"a prefill of {evaluated} tokens in {min(prefill_ns) / 1e6:.2f} ms is {prefill_tok_s:,.0f} tok/s, "
                     f"over the {PREFILL_TOK_S_CEILING:,.0f} tok/s ceiling: the prompt came from llama-server's cache",
                     peak_mib=peak_mib,
                 )
             eval_counts = [max(1, int(r.get("eval_count") or num_predict)) for r in pass_resps]
             eval_durations_ns = [max(1, int(r.get("eval_duration") or 50_000_000)) for r in pass_resps]
+            load_ns = [int(r.get("load_duration") or 0) for r in pass_resps]
+            # Ollama's own clock for each request. Between the request and the first token there is time that is
+            # neither prefill nor decode (T4 r2, the rig: up to 2.3 s at 16k), so the client's wall clock cannot give a
+            # clean decode rate; the replies' durations can.
+            total_ns = [
+                int(r.get("total_duration") or 0) or (load + prefill + decode)
+                for r, load, prefill, decode in zip(pass_resps, load_ns, prefill_ns, eval_durations_ns, strict=True)
+            ]
+            decode_window_s = max(
+                (max(total_ns) - min(t - e for t, e in zip(total_ns, eval_durations_ns, strict=True))) / 1e9, 1e-9
+            )
+            ttft_ns = [t - e - ld for t, e, ld in zip(total_ns, eval_durations_ns, load_ns, strict=True)]
+            overhead_ns = [
+                t - ld - p - e for t, ld, p, e in zip(total_ns, load_ns, prefill_ns, eval_durations_ns, strict=True)
+            ]
             rates = [
                 count / (duration / 1_000_000_000.0)
                 for count, duration in zip(eval_counts, eval_durations_ns, strict=True)
@@ -1699,13 +1717,18 @@ def measure_linux_ollama_generate(
             slots.append(
                 {
                     "phase": phase,
-                    # The aggregate decode rate: the pass's generated tokens over its decode phase, which runs from the
-                    # earliest first token (the shortest prefill, all requests having been sent together) to the end of
-                    # the pass. Prefill is not decode.
-                    "throughput": round(sum(eval_counts) / max(wall_s - min(ttfts_ns) / 1e9, 1e-9), 3),
-                    "end_to_end_tok_s": round(sum(eval_counts) / wall_s, 3),  # the same tokens over the whole pass
+                    # The aggregate decode rate: the pass's generated tokens over its decode window, from the earliest
+                    # decode start to the latest end, all on Ollama's own durations. At one request it is exactly
+                    # eval_count / eval_duration.
+                    "throughput": round(sum(eval_counts) / decode_window_s, 3),
+                    "end_to_end_tok_s": round(sum(eval_counts) / wall_s, 3),  # the same tokens over the client's pass
                     "latency_ms": round(wall_s * 1000.0, 3),
-                    "ttft_ms": round((sum(ttfts_ns) / len(ttfts_ns)) / 1_000_000.0, 3),
+                    # The time to the first token the user waits for: Ollama's total less the decode and the load. It
+                    # includes the time that is neither prefill nor decode. The prefill alone is `prefill_ms`, and the
+                    # cache check reads that one.
+                    "ttft_ms": round((sum(ttft_ns) / len(ttft_ns)) / 1_000_000.0, 3),
+                    "prefill_ms": round((sum(prefill_ns) / len(prefill_ns)) / 1_000_000.0, 3),
+                    "overhead_ms": round((sum(overhead_ns) / len(overhead_ns)) / 1_000_000.0, 3),
                     "tokens": sum(eval_counts),
                     "requests": workers,
                 }
@@ -1717,10 +1740,14 @@ def measure_linux_ollama_generate(
     repeat_slots = [s for s in slots if s["phase"] == "repeat"]
     mid = len(repeat_slots) // 2
     ttft_ms = float(sorted(float(s["ttft_ms"]) for s in repeat_slots)[mid])
+    prefill_ms = float(sorted(float(s["prefill_ms"]) for s in repeat_slots)[mid])
+    overhead_ms = float(sorted(float(s["overhead_ms"]) for s in repeat_slots)[mid])
     decode_tok_s = float(sorted(float(s["throughput"]) for s in repeat_slots)[mid])
     total_ms = float(sorted(float(s["latency_ms"]) for s in repeat_slots)[mid])
     return {
         "ttft_ms": ttft_ms,
+        "prefill_ms": prefill_ms,
+        "overhead_ms": overhead_ms,
         "decode_tok_s": decode_tok_s,
         "latency_ms": total_ms,
         "peak_mib": peak_mib,
@@ -1732,7 +1759,7 @@ def measure_linux_ollama_generate(
         "num_ctx_sent": num_ctx,
         "parallel_slots": slot_count,
         "parallel_slots_source": slot_source,
-        "throughput_method": "decode_phase_wall_clock_aggregate",
+        "throughput_method": "ollama_durations_decode_window",
         "end_to_end_tok_s": round(float(sorted(float(s["end_to_end_tok_s"]) for s in repeat_slots)[mid]), 3),
         "per_request_decode_tok_s": round(sum(per_request) / len(per_request), 3) if per_request else None,
     }

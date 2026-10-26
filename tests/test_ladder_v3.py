@@ -162,7 +162,7 @@ def test_with_a_slot_per_request_the_aggregate_is_about_the_concurrency_times_on
     assert result["decode_tok_s"] == pytest.approx(4 * single, rel=0.1)
     assert result["parallel_slots"] == 4
     assert result["parallel_slots_source"] == "llama-server log"
-    assert result["throughput_method"] == "decode_phase_wall_clock_aggregate"
+    assert result["throughput_method"] == "ollama_durations_decode_window"
     assert result["per_request_decode_tok_s"] == pytest.approx(50.0, rel=0.01)  # a separate field, per stream
 
 
@@ -172,6 +172,64 @@ def test_at_concurrency_1_the_decode_aggregate_is_the_per_request_decode_rate_at
     result = _measure(server, target, concurrency=1)
     assert result["decode_tok_s"] == pytest.approx(server.decode_tok_s, rel=0.01)  # prefill is not in it
     assert result["per_request_decode_tok_s"] == pytest.approx(server.decode_tok_s, rel=0.01)
+
+
+# Time that is neither prefill nor decode (Ollama's Go side; the rig measured 0.1 s at 512, 1.4 s at 8k, 2.3 s at 16k,
+# 0.15 s at 32k) is in neither the decode rate nor the prefill, so the fake adds a non-monotonic amount of it.
+def _go_side(length: int) -> float:
+    return {512: 0.11, 2048: 0.5, 8192: 1.36, 16384: 2.27, 32768: 0.15}.get(length, 0.3)
+
+
+@pytest.mark.parametrize("target", [512, 2048, 8192, 16384, 32768])
+def test_the_decode_aggregate_at_c1_is_the_per_request_rate_whatever_time_the_go_side_adds(target):
+    server = FakeOllama(overhead_s=_go_side(target))
+    result = _measure(server, target)
+    assert result["decode_tok_s"] == pytest.approx(server.decode_tok_s, rel=0.001)
+    assert result["per_request_decode_tok_s"] == pytest.approx(server.decode_tok_s, rel=0.001)
+    assert result["overhead_ms"] == pytest.approx(_go_side(target) * 1000, rel=0.01)  # recorded per row
+
+
+@pytest.mark.parametrize("concurrency", [4, 8])
+def test_the_decode_aggregate_with_slots_is_c_streams_whatever_the_go_side_adds(concurrency):
+    server = FakeOllama(overhead_s=1.36)
+    result = _measure(server, 2048, concurrency=concurrency)
+    assert result["decode_tok_s"] == pytest.approx(concurrency * server.decode_tok_s, rel=0.01)
+
+
+def test_a_queued_server_reads_about_one_stream_even_without_the_slot_log():
+    single = _measure(FakeOllama(overhead_s=0.5), 512)["decode_tok_s"]
+    queued = FakeOllama(overhead_s=0.5, honour_parallel=False, report_slots=False)
+    assert _measure(queued, 512, concurrency=4)["decode_tok_s"] == pytest.approx(single, rel=0.2)
+
+
+def test_ttft_is_the_time_to_the_first_token_and_the_prefill_is_its_own_field():
+    server = FakeOllama(overhead_s=1.0)
+    result = _measure(server, 2048)
+    prefill_ms = 2048 / server.prefill_tok_s * 1000
+    assert result["prefill_ms"] == pytest.approx(prefill_ms, rel=0.05)
+    assert result["ttft_ms"] == pytest.approx(prefill_ms + 1000.0, rel=0.05)  # what a user waits through
+    assert result["ttft_ms"] > result["prefill_ms"]
+
+
+def test_a_ttft_floor_reads_the_time_to_the_first_token_and_the_cache_check_reads_the_prefill():
+    server = FakeOllama(overhead_s=1.0)
+    (row,) = run_linux_generate_ladder(
+        spec_id="C2-GENERATE", spec_rel="experiments/c2-generate/spec.yaml", run_id="t4-r3", date="2026-10-26",
+        remote_device=IDENT, model="phi3.5:3.8b", revision_or_digest="d" * 64,
+        measure_shape=lambda length, conc: _measure(server, length, conc),
+        prompt_lengths=(2048,), concurrencies=(1,), quant="Q4_K_M", licence="mit",
+    )
+    assert row["settings"]["prefill_ms"] < 600 < row["settings"]["ttft_ms"] < 1600
+    assert row["settings"]["overhead_ms"] == pytest.approx(1000.0, rel=0.01)
+    assert isinstance(decide([row], request(max_ttft_ms=2000.0)), Decision)
+    assert isinstance(decide([row], request(max_ttft_ms=1000.0)), Refusal)  # the prefill (512 ms) would pass
+
+
+def test_the_cache_check_still_reads_the_prefill_when_the_go_side_adds_time(monkeypatch):
+    monkeypatch.setattr(linux_cuda, "ladder_prefix", lambda nonce, call: "0001abcd ")
+    with pytest.raises(LinuxShapeFailure) as caught:
+        _measure(FakeOllama(overhead_s=2.0), 2048)  # a long total hides nothing: the prefill is still a cache hit
+    assert "prompt came from llama-server's cache" in caught.value.reason
 
 
 def test_the_end_to_end_rate_is_its_own_field_and_falls_with_the_prompt_length():

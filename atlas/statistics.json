@@ -135,7 +135,7 @@
       "confidence": "full",
       "highWater": null,
       "name": "src",
-      "qualifyingSourceCommits": 35,
+      "qualifyingSourceCommits": 36,
       "rebaseline": null
     },
     {
@@ -169,7 +169,7 @@
       "confidence": "full",
       "highWater": null,
       "name": "tests",
-      "qualifyingSourceCommits": 93,
+      "qualifyingSourceCommits": 94,
       "rebaseline": null
     }
   ],
@@ -217,8 +217,8 @@
         "path": ".python-version"
       },
       {
-        "commits": 59,
-        "lines": 277,
+        "commits": 60,
+        "lines": 280,
         "path": "CHANGELOG.md"
       },
       {
@@ -377,8 +377,8 @@
         "path": "assets/logo/switchyard_64.png"
       },
       {
-        "commits": 46,
-        "lines": 930,
+        "commits": 47,
+        "lines": 940,
         "path": "atlas/README.md"
       },
       {
@@ -387,18 +387,18 @@
         "path": "atlas/boundaries.yaml"
       },
       {
-        "commits": 46,
-        "lines": 3087,
+        "commits": 47,
+        "lines": 3120,
         "path": "atlas/page.json"
       },
       {
-        "commits": 46,
-        "lines": 9386,
+        "commits": 47,
+        "lines": 9490,
         "path": "atlas/statistics.json"
       },
       {
-        "commits": 46,
-        "lines": 49150,
+        "commits": 47,
+        "lines": 49468,
         "path": "atlas/structure.json"
       },
       {
@@ -1437,8 +1437,8 @@
         "path": "src/interlock/harness/lifecycle.py"
       },
       {
-        "commits": 9,
-        "lines": 3076,
+        "commits": 10,
+        "lines": 3099,
         "path": "src/interlock/harness/linux_cuda.py"
       },
       {
@@ -2097,8 +2097,8 @@
         "path": "tests/test_importers.py"
       },
       {
-        "commits": 1,
-        "lines": 341,
+        "commits": 2,
+        "lines": 395,
         "path": "tests/test_ladder_v3.py"
       },
       {
@@ -2242,9 +2242,9 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-10-26T09:40:28.455Z",
+  "generatedAt": "2026-10-26T10:08:48.046Z",
   "generatedFrom": {
-    "commit": "560f9974d666098584a7ce22f0796d809b406956"
+    "commit": "1ecf1dbdb2f12b0ef8264b77ddb00dea429e5263"
   },
   "pairs": [
     {
@@ -2502,43 +2502,43 @@
     {
       "a": "atlas/README.md",
       "b": "atlas/page.json",
-      "either": 42,
-      "shared": 42,
+      "either": 43,
+      "shared": 43,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/statistics.json",
-      "either": 42,
-      "shared": 42,
+      "either": 43,
+      "shared": 43,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/structure.json",
-      "either": 42,
-      "shared": 42,
+      "either": 43,
+      "shared": 43,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/statistics.json",
-      "either": 42,
-      "shared": 42,
+      "either": 43,
+      "shared": 43,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/structure.json",
-      "either": 42,
-      "shared": 42,
+      "either": 43,
+      "shared": 43,
       "strength": 1
     },
     {
       "a": "atlas/statistics.json",
       "b": "atlas/structure.json",
-      "either": 42,
-      "shared": 42,
+      "either": 43,
+      "shared": 43,
       "strength": 1
     },
     {
@@ -2628,9 +2628,9 @@
     {
       "a": "src/interlock/harness/linux_cuda.py",
       "b": "tests/test_linux_cuda.py",
-      "either": 9,
+      "either": 10,
       "shared": 6,
-      "strength": 0.666667
+      "strength": 0.6
     },
     {
       "a": "src/switchyard/adapters/openvino.py",
@@ -2699,16 +2699,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-10-26T05:26:19-04:00",
+    "headDate": "2026-10-26T05:50:37-04:00",
     "inScopeFiles": 302,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 144,
+    "qualifyingCommits": 145,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-04-29T09:26:19.000Z",
+    "since": "2026-04-29T09:50:37.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",
@@ -2724,7 +2724,7 @@
     ],
     "sourceFileReach": 20,
     "sourceFileRise": 25,
-    "sourceFilesReachingStrongFloor": 14,
+    "sourceFilesReachingStrongFloor": 15,
     "strength": 0.5,
     "windowDays": 180
   },
