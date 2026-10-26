@@ -34,30 +34,30 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 1,
-      "changed": 2,
+      "added": 3,
+      "changed": 7,
       "moved": 0,
       "parts": 3,
-      "removed": 0
+      "removed": 2
     },
     "items": [
       {
         "kind": "landing",
-        "sentence": "experiments/c2-generate/spec.yaml is now also read by tests/test_wall_cap_and_hang.py.",
+        "sentence": "tests/fixtures/route/r3_table.jsonl is now read by tests/test_route_concurrency.py.",
         "subjects": [
-          "experiments/c2-generate/spec.yaml",
-          "tests/test_wall_cap_and_hang.py"
+          "tests/fixtures/route/r3_table.jsonl",
+          "tests/test_route_concurrency.py"
         ]
       },
       {
         "kind": "counts",
-        "sentence": "1 file added and 2 changed content, across 3 parts.",
+        "sentence": "3 files added, 2 removed and 7 changed content, across 3 parts.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "c1d95581361e5d68d8e6079cde25351f02c442ba",
-      "generatedAt": "2026-10-26T19:15:29.951Z"
+      "commit": "1296f138af8df38c10213e4398240e35c0a1a6ea",
+      "generatedAt": "2026-10-26T20:23:00.840Z"
     },
     "unchanged": false
   },
@@ -144,9 +144,9 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 16 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 2,
-  "commit": "1296f138af8df38c10213e4398240e35c0a1a6ea",
+  "commit": "5bca251f2202be4416a605dba5ec93830a5c3583",
   "defaultBranch": "main",
-  "derived": "10 parts, mostly Python (113 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
+  "derived": "10 parts, mostly Python (115 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
   "doors": [
     {
       "checks": [],
@@ -166,7 +166,7 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 55
+          "files": 57
         },
         {
           "boundary": "scripts",
@@ -309,7 +309,7 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-26T20:23:00.840Z",
+  "generatedAt": "2026-10-26T20:27:57.879Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "5 writes and 6 reads use paths built at run time and are not named here.",
@@ -344,10 +344,10 @@
   ],
   "summary": "interlock routes each job to a model, engine and device from a receipt-backed table.",
   "summaryFrom": "person",
-  "testFiles": 81,
+  "testFiles": 84,
   "testedBy": {
     "scripts": 2,
-    "src": 52
+    "src": 54
   },
   "unnamedWrites": 5,
   "unread": [],

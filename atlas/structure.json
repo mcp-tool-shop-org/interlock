@@ -584,10 +584,6 @@
           "path": ".python-version"
         },
         {
-          "hash": "a2ebe9bf4ab3a78bb02d095bc06c33547e9d502abf0a25704cf4d049c9ac879d",
-          "path": "CHANGELOG.md"
-        },
-        {
           "hash": "39f3dcc6915c9a974b20aa424493b56ff830ee5b47630a85a2359eceb326c24b",
           "path": "CONTRIBUTING.md"
         },
@@ -1928,65 +1924,80 @@
             {
               "in": "main",
               "kind": "except",
-              "line": 57
+              "line": 64
             },
             {
               "in": "_take_min_metrics",
               "kind": "raise",
-              "line": 243
+              "line": 257
             },
             {
               "in": "_take_min_metrics",
               "kind": "except",
-              "line": 247
+              "line": 261
             },
             {
               "in": "_take_min_metrics",
               "kind": "raise",
-              "line": 248
+              "line": 262
             },
             {
               "in": "_refuse_duplicate_ids",
               "kind": "raise",
-              "line": 327
+              "line": 341
             },
             {
               "in": "_merge_rebuild",
               "kind": "raise",
-              "line": 350
+              "line": 364
             },
             {
               "in": "_cmd_import",
               "kind": "except",
-              "line": 437
+              "line": 451
             },
             {
               "in": "_cmd_runs_quarantine",
               "kind": "except",
-              "line": 497
+              "line": 511
             },
             {
               "in": "_cmd_runs_quarantine",
               "kind": "except",
-              "line": 501
+              "line": 515
             },
             {
               "in": "_cmd_run",
               "kind": "except",
-              "line": 564
+              "line": 578
             },
             {
               "in": "_cmd_c2_sources",
               "kind": "except",
-              "line": 610
+              "line": 624
+            },
+            {
+              "in": "_at_least_one",
+              "kind": "except",
+              "line": 635
+            },
+            {
+              "in": "_at_least_one",
+              "kind": "raise",
+              "line": 636
+            },
+            {
+              "in": "_at_least_one",
+              "kind": "raise",
+              "line": 638
             },
             {
               "in": "_cmd_route",
               "kind": "except",
-              "line": 635
+              "line": 661
             }
           ],
-          "hash": "dc402b37ea8b83f7006ea1a7a1d89e0b991776e2fcf9c1e6829629375eb593af",
+          "hash": "44ffddbe104e4e4b585e40c9bc396ee1ec28bb630d1c997755f5da783772037e",
           "importOrder": [
             "src/interlock/receipt.py",
             "src/interlock/tasks.py",
@@ -2038,7 +2049,7 @@
             {
               "calls": [
                 {
-                  "line": 200,
+                  "line": 207,
                   "name": "TASKS",
                   "passed": true,
                   "target": {
@@ -2054,14 +2065,14 @@
             {
               "calls": [
                 {
-                  "line": 258,
+                  "line": 272,
                   "name": "check_tree",
                   "target": {
                     "file": "src/interlock/receipt.py"
                   }
                 },
                 {
-                  "line": 712,
+                  "line": 739,
                   "name": "receipt_paths",
                   "target": {
                     "file": "src/interlock/receipt.py"
@@ -2069,7 +2080,7 @@
                   "via": "_count_rows"
                 },
                 {
-                  "line": 714,
+                  "line": 741,
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/interlock/receipt.py"
@@ -2085,35 +2096,35 @@
             {
               "calls": [
                 {
-                  "line": 274,
+                  "line": 288,
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/interlock/receipt.py"
                   }
                 },
                 {
-                  "line": 278,
+                  "line": 292,
                   "name": "matches_device_filter",
                   "target": {
                     "file": "src/interlock/devices.py"
                   }
                 },
                 {
-                  "line": 283,
+                  "line": 297,
                   "name": "ladder_version",
                   "target": {
                     "file": "src/interlock/router/policy.py"
                   }
                 },
                 {
-                  "line": 294,
+                  "line": 308,
                   "name": "ttft_measured",
                   "target": {
                     "file": "src/interlock/router/policy.py"
                   }
                 },
                 {
-                  "line": 296,
+                  "line": 310,
                   "name": "throughput_measured",
                   "target": {
                     "file": "src/interlock/router/policy.py"
@@ -2129,7 +2140,7 @@
               "calls": [
                 {
                   "branch": "repeated",
-                  "line": 327,
+                  "line": 341,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/interlock/importers/common.py"
@@ -2144,7 +2155,7 @@
             {
               "calls": [
                 {
-                  "line": 345,
+                  "line": 359,
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/interlock/receipt.py"
@@ -2152,7 +2163,7 @@
                 },
                 {
                   "branch": "repeated",
-                  "line": 327,
+                  "line": 341,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/interlock/importers/common.py"
@@ -2161,14 +2172,14 @@
                 },
                 {
                   "branch": "dropped and not allow_shrink",
-                  "line": 350,
+                  "line": 364,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/interlock/importers/common.py"
                   }
                 },
                 {
-                  "line": 358,
+                  "line": 372,
                   "name": "_unique",
                   "target": {
                     "file": "src/interlock/importers/assemble.py"
@@ -2183,14 +2194,14 @@
             {
               "calls": [
                 {
-                  "line": 372,
+                  "line": 386,
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/interlock/receipt.py"
                   }
                 },
                 {
-                  "line": 375,
+                  "line": 389,
                   "name": "import_remote_window",
                   "target": {
                     "file": "src/interlock/importers/remote.py"
@@ -2198,7 +2209,7 @@
                 },
                 {
                   "branch": "repeated",
-                  "line": 327,
+                  "line": 341,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/interlock/importers/common.py"
@@ -2206,7 +2217,7 @@
                   "via": "_refuse_duplicate_ids"
                 },
                 {
-                  "line": 378,
+                  "line": 392,
                   "name": "_unique",
                   "target": {
                     "file": "src/interlock/importers/assemble.py"
@@ -2222,7 +2233,7 @@
               "calls": [
                 {
                   "branch": "args.remote_window and args.offers is None",
-                  "line": 372,
+                  "line": 386,
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/interlock/receipt.py"
@@ -2231,7 +2242,7 @@
                 },
                 {
                   "branch": "args.remote_window and args.offers is None",
-                  "line": 375,
+                  "line": 389,
                   "name": "import_remote_window",
                   "target": {
                     "file": "src/interlock/importers/remote.py"
@@ -2240,7 +2251,7 @@
                 },
                 {
                   "branch": "args.remote_window and args.offers is None",
-                  "line": 327,
+                  "line": 341,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/interlock/importers/common.py"
@@ -2249,7 +2260,7 @@
                 },
                 {
                   "branch": "args.remote_window and args.offers is None",
-                  "line": 378,
+                  "line": 392,
                   "name": "_unique",
                   "target": {
                     "file": "src/interlock/importers/assemble.py"
@@ -2257,28 +2268,28 @@
                   "via": "_import_remote_windows"
                 },
                 {
-                  "line": 402,
+                  "line": 416,
                   "name": "resolve_sources",
                   "target": {
                     "file": "src/interlock/importers/sources.py"
                   }
                 },
                 {
-                  "line": 403,
+                  "line": 417,
                   "name": "require_all_sources",
                   "target": {
                     "file": "src/interlock/importers/sources.py"
                   }
                 },
                 {
-                  "line": 404,
+                  "line": 418,
                   "name": "import_receipts",
                   "target": {
                     "file": "src/interlock/importers/assemble.py"
                   }
                 },
                 {
-                  "line": 345,
+                  "line": 359,
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/interlock/receipt.py"
@@ -2287,7 +2298,7 @@
                 },
                 {
                   "branch": "dropped and not allow_shrink",
-                  "line": 350,
+                  "line": 364,
                   "name": "ImportError_",
                   "target": {
                     "file": "src/interlock/importers/common.py"
@@ -2295,7 +2306,7 @@
                   "via": "_merge_rebuild"
                 },
                 {
-                  "line": 358,
+                  "line": 372,
                   "name": "_unique",
                   "target": {
                     "file": "src/interlock/importers/assemble.py"
@@ -2303,28 +2314,28 @@
                   "via": "_merge_rebuild"
                 },
                 {
-                  "line": 415,
+                  "line": 429,
                   "name": "load_candidates",
                   "target": {
                     "file": "src/interlock/importers/gaps.py"
                   }
                 },
                 {
-                  "line": 425,
+                  "line": 439,
                   "name": "items",
                   "target": {
                     "file": "src/interlock/importers/sources.py"
                   }
                 },
                 {
-                  "line": 427,
+                  "line": 441,
                   "name": "render_gaps",
                   "target": {
                     "file": "src/interlock/importers/gaps.py"
                   }
                 },
                 {
-                  "line": 434,
+                  "line": 448,
                   "name": "write_atomic",
                   "target": {
                     "file": "src/interlock/harness/receipts.py"
@@ -2339,14 +2350,14 @@
             {
               "calls": [
                 {
-                  "line": 482,
+                  "line": 496,
                   "name": "list_runs",
                   "target": {
                     "file": "src/interlock/harness/lifecycle.py"
                   }
                 },
                 {
-                  "line": 482,
+                  "line": 496,
                   "name": "format_runs",
                   "target": {
                     "file": "src/interlock/harness/lifecycle.py"
@@ -2361,14 +2372,14 @@
             {
               "calls": [
                 {
-                  "line": 494,
+                  "line": 508,
                   "name": "read_git",
                   "target": {
                     "file": "src/interlock/harness/e4b.py"
                   }
                 },
                 {
-                  "line": 494,
+                  "line": 508,
                   "name": "capture_run",
                   "passed": true,
                   "target": {
@@ -2376,7 +2387,7 @@
                   }
                 },
                 {
-                  "line": 500,
+                  "line": 514,
                   "name": "quarantine_stray",
                   "target": {
                     "file": "src/interlock/harness/lifecycle.py"
@@ -2391,21 +2402,21 @@
             {
               "calls": [
                 {
-                  "line": 519,
+                  "line": 533,
                   "name": "parse_pairs",
                   "target": {
                     "file": "src/interlock/harness/e4b.py"
                   }
                 },
                 {
-                  "line": 520,
+                  "line": 534,
                   "name": "parse_models",
                   "target": {
                     "file": "src/interlock/harness/runner.py"
                   }
                 },
                 {
-                  "line": 521,
+                  "line": 535,
                   "name": "parse_quants",
                   "target": {
                     "file": "src/interlock/harness/runner.py"
@@ -2413,49 +2424,49 @@
                 },
                 {
                   "branch": "args.dry_run",
-                  "line": 523,
+                  "line": 537,
                   "name": "dry_run",
                   "target": {
                     "file": "src/interlock/harness/runner.py"
                   }
                 },
                 {
-                  "line": 526,
+                  "line": 540,
                   "name": "load_spec",
                   "target": {
                     "file": "src/interlock/harness/spec.py"
                   }
                 },
                 {
-                  "line": 530,
+                  "line": 544,
                   "name": "resolve_run_id",
                   "target": {
                     "file": "src/interlock/harness/lifecycle.py"
                   }
                 },
                 {
-                  "line": 542,
+                  "line": 556,
                   "name": "heartbeat_path",
                   "target": {
                     "file": "src/interlock/harness/runner.py"
                   }
                 },
                 {
-                  "line": 552,
+                  "line": 566,
                   "name": "real_seams",
                   "target": {
                     "file": "src/interlock/ollama_supervisor.py"
                   }
                 },
                 {
-                  "line": 551,
+                  "line": 565,
                   "name": "OllamaSupervisor",
                   "target": {
                     "file": "src/interlock/ollama_supervisor.py"
                   }
                 },
                 {
-                  "line": 543,
+                  "line": 557,
                   "name": "run_spec",
                   "target": {
                     "file": "src/interlock/harness/runner.py"
@@ -2470,7 +2481,7 @@
             {
               "calls": [
                 {
-                  "line": 584,
+                  "line": 598,
                   "name": "health_report",
                   "target": {
                     "file": "src/interlock/ollama_supervisor.py"
@@ -2485,35 +2496,35 @@
             {
               "calls": [
                 {
-                  "line": 600,
+                  "line": 614,
                   "name": "load_spec",
                   "target": {
                     "file": "src/interlock/harness/spec.py"
                   }
                 },
                 {
-                  "line": 603,
+                  "line": 617,
                   "name": "verify_c2_sources_live",
                   "target": {
                     "file": "src/interlock/harness/linux_cuda.py"
                   }
                 },
                 {
-                  "line": 605,
+                  "line": 619,
                   "name": "format_c2_sources_live",
                   "target": {
                     "file": "src/interlock/harness/linux_cuda.py"
                   }
                 },
                 {
-                  "line": 607,
+                  "line": 621,
                   "name": "resolve_c2_sources",
                   "target": {
                     "file": "src/interlock/harness/linux_cuda.py"
                   }
                 },
                 {
-                  "line": 609,
+                  "line": 623,
                   "name": "format_c2_sources",
                   "target": {
                     "file": "src/interlock/harness/linux_cuda.py"
@@ -2528,20 +2539,20 @@
             {
               "calls": [
                 {
-                  "line": 702,
+                  "line": 729,
                   "name": "read_text",
                   "target": null,
                   "via": "_load_jsonl"
                 },
                 {
-                  "line": 639,
+                  "line": 665,
                   "name": "Request",
                   "target": {
                     "file": "src/interlock/router/policy.py"
                   }
                 },
                 {
-                  "line": 655,
+                  "line": 682,
                   "name": "decide",
                   "target": {
                     "file": "src/interlock/router/policy.py"
@@ -2556,7 +2567,7 @@
             {
               "calls": [
                 {
-                  "line": 702,
+                  "line": 729,
                   "name": "read_text",
                   "target": null
                 }
@@ -2569,14 +2580,14 @@
             {
               "calls": [
                 {
-                  "line": 712,
+                  "line": 739,
                   "name": "receipt_paths",
                   "target": {
                     "file": "src/interlock/receipt.py"
                   }
                 },
                 {
-                  "line": 714,
+                  "line": 741,
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/interlock/receipt.py"
@@ -13291,13 +13302,16 @@
           "entry": "decide",
           "entryRule": 4,
           "exports": [
+            "candidate_of",
             "decide",
             "decode_bound",
             "experiment_of",
+            "is_fill_card",
             "ladder_version",
             "latency_bound_ms",
             "prefix_mode",
             "quality_bound",
+            "row_concurrency",
             "throughput_measured",
             "ttft_bound_ms",
             "ttft_measured"
@@ -13306,10 +13320,10 @@
             {
               "in": "_is_stale",
               "kind": "except",
-              "line": 830
+              "line": 896
             }
           ],
-          "hash": "93d07e8af09b9f1392058df43bd00b0b48e042f71398ce2b673128f090f9137e",
+          "hash": "9b79c14a02139b4675facb0e091d83ef5d6a7093b4ec82b7a78c3d9b2167dcfa",
           "importsFiles": [
             "src/interlock/devices.py"
           ],
@@ -13318,7 +13332,7 @@
             {
               "calls": [
                 {
-                  "line": 927,
+                  "line": 993,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13326,14 +13340,14 @@
                   "via": "_remote_eligible"
                 },
                 {
-                  "line": 857,
+                  "line": 923,
                   "name": "casefold",
                   "target": null,
                   "via": "_model_matches"
                 },
                 {
                   "branch": "constraint == \"device\"",
-                  "line": 633,
+                  "line": 697,
                   "name": "matches_device_filter",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13342,14 +13356,14 @@
                 },
                 {
                   "branch": "constraint == \"thinking\"",
-                  "line": 885,
+                  "line": 951,
                   "name": "casefold",
                   "target": null,
                   "via": "_thinking_matches"
                 },
                 {
                   "branch": "constraint == \"budget\"",
-                  "line": 923,
+                  "line": 989,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13358,13 +13372,13 @@
                 },
                 {
                   "branch": "constraint.startswith(\"min:\")",
-                  "line": 868,
+                  "line": 934,
                   "name": "casefold",
                   "target": null,
                   "via": "_norm"
                 },
                 {
-                  "line": 282,
+                  "line": 302,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13372,7 +13386,7 @@
                   "via": "ladder_version"
                 },
                 {
-                  "line": 434,
+                  "line": 486,
                   "name": "matches_device_filter",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13388,7 +13402,7 @@
             {
               "calls": [
                 {
-                  "line": 282,
+                  "line": 302,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13403,7 +13417,7 @@
             {
               "calls": [
                 {
-                  "line": 282,
+                  "line": 302,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13419,7 +13433,7 @@
             {
               "calls": [
                 {
-                  "line": 282,
+                  "line": 302,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13435,13 +13449,13 @@
             {
               "calls": [
                 {
-                  "line": 857,
+                  "line": 923,
                   "name": "casefold",
                   "target": null,
                   "via": "_model_matches"
                 },
                 {
-                  "line": 923,
+                  "line": 989,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13457,7 +13471,7 @@
             {
               "calls": [
                 {
-                  "line": 857,
+                  "line": 923,
                   "name": "casefold",
                   "target": null,
                   "via": "_model_matches"
@@ -13471,13 +13485,13 @@
             {
               "calls": [
                 {
-                  "line": 857,
+                  "line": 923,
                   "name": "casefold",
                   "target": null,
                   "via": "_model_matches"
                 },
                 {
-                  "line": 434,
+                  "line": 486,
                   "name": "matches_device_filter",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13485,13 +13499,13 @@
                   "via": "_why"
                 },
                 {
-                  "line": 885,
+                  "line": 951,
                   "name": "casefold",
                   "target": null,
                   "via": "_thinking_matches"
                 },
                 {
-                  "line": 923,
+                  "line": 989,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13499,7 +13513,7 @@
                   "via": "_is_remote"
                 },
                 {
-                  "line": 868,
+                  "line": 934,
                   "name": "casefold",
                   "target": null,
                   "via": "_norm"
@@ -13513,20 +13527,20 @@
             {
               "calls": [
                 {
-                  "line": 434,
+                  "line": 486,
                   "name": "matches_device_filter",
                   "target": {
                     "file": "src/interlock/devices.py"
                   }
                 },
                 {
-                  "line": 885,
+                  "line": 951,
                   "name": "casefold",
                   "target": null,
                   "via": "_thinking_matches"
                 },
                 {
-                  "line": 923,
+                  "line": 989,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13534,7 +13548,7 @@
                   "via": "_is_remote"
                 },
                 {
-                  "line": 868,
+                  "line": 934,
                   "name": "casefold",
                   "target": null,
                   "via": "_norm"
@@ -13549,7 +13563,7 @@
               "calls": [
                 {
                   "branch": "constraint.startswith(\"min:\") and isinstance(limit, (int, f…",
-                  "line": 868,
+                  "line": 934,
                   "name": "casefold",
                   "target": null,
                   "via": "_norm"
@@ -13564,7 +13578,7 @@
               "calls": [
                 {
                   "branch": "constraint.startswith(\"min:\") and isinstance(limit, (int, f…",
-                  "line": 868,
+                  "line": 934,
                   "name": "casefold",
                   "target": null,
                   "via": "_norm"
@@ -13578,7 +13592,7 @@
             {
               "calls": [
                 {
-                  "line": 868,
+                  "line": 934,
                   "name": "casefold",
                   "target": null,
                   "via": "_norm"
@@ -13593,14 +13607,14 @@
               "calls": [
                 {
                   "branch": "constraint == \"model\"",
-                  "line": 857,
+                  "line": 923,
                   "name": "casefold",
                   "target": null,
                   "via": "_model_matches"
                 },
                 {
                   "branch": "constraint == \"device\"",
-                  "line": 633,
+                  "line": 697,
                   "name": "matches_device_filter",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13609,14 +13623,14 @@
                 },
                 {
                   "branch": "constraint == \"thinking\"",
-                  "line": 885,
+                  "line": 951,
                   "name": "casefold",
                   "target": null,
                   "via": "_thinking_matches"
                 },
                 {
                   "branch": "constraint == \"budget\"",
-                  "line": 923,
+                  "line": 989,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13625,7 +13639,7 @@
                 },
                 {
                   "branch": "constraint.startswith(\"min:\")",
-                  "line": 868,
+                  "line": 934,
                   "name": "casefold",
                   "target": null,
                   "via": "_norm"
@@ -13640,14 +13654,14 @@
               "calls": [
                 {
                   "branch": "constraint == \"model\"",
-                  "line": 857,
+                  "line": 923,
                   "name": "casefold",
                   "target": null,
                   "via": "_model_matches"
                 },
                 {
                   "branch": "constraint == \"device\"",
-                  "line": 633,
+                  "line": 697,
                   "name": "matches_device_filter",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13655,14 +13669,14 @@
                 },
                 {
                   "branch": "constraint == \"thinking\"",
-                  "line": 885,
+                  "line": 951,
                   "name": "casefold",
                   "target": null,
                   "via": "_thinking_matches"
                 },
                 {
                   "branch": "constraint == \"budget\"",
-                  "line": 923,
+                  "line": 989,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13671,7 +13685,7 @@
                 },
                 {
                   "branch": "constraint.startswith(\"min:\")",
-                  "line": 868,
+                  "line": 934,
                   "name": "casefold",
                   "target": null,
                   "via": "_norm"
@@ -13686,7 +13700,7 @@
               "calls": [
                 {
                   "branch": "constraint.startswith(\"min:\")",
-                  "line": 868,
+                  "line": 934,
                   "name": "casefold",
                   "target": null,
                   "via": "_norm"
@@ -13700,7 +13714,7 @@
             {
               "calls": [
                 {
-                  "line": 868,
+                  "line": 934,
                   "name": "casefold",
                   "target": null,
                   "via": "_norm"
@@ -13714,7 +13728,7 @@
             {
               "calls": [
                 {
-                  "line": 868,
+                  "line": 934,
                   "name": "casefold",
                   "target": null,
                   "via": "_norm"
@@ -13728,7 +13742,7 @@
             {
               "calls": [
                 {
-                  "line": 868,
+                  "line": 934,
                   "name": "casefold",
                   "target": null,
                   "via": "_norm"
@@ -13742,7 +13756,7 @@
             {
               "calls": [
                 {
-                  "line": 857,
+                  "line": 923,
                   "name": "casefold",
                   "target": null,
                   "via": "_model_matches"
@@ -13756,7 +13770,7 @@
             {
               "calls": [
                 {
-                  "line": 857,
+                  "line": 923,
                   "name": "casefold",
                   "target": null
                 }
@@ -13769,7 +13783,7 @@
             {
               "calls": [
                 {
-                  "line": 864,
+                  "line": 930,
                   "name": "casefold",
                   "target": null
                 }
@@ -13782,7 +13796,7 @@
             {
               "calls": [
                 {
-                  "line": 868,
+                  "line": 934,
                   "name": "casefold",
                   "target": null
                 }
@@ -13795,7 +13809,7 @@
             {
               "calls": [
                 {
-                  "line": 885,
+                  "line": 951,
                   "name": "casefold",
                   "target": null
                 }
@@ -13808,7 +13822,7 @@
             {
               "calls": [
                 {
-                  "line": 923,
+                  "line": 989,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13823,7 +13837,7 @@
             {
               "calls": [
                 {
-                  "line": 927,
+                  "line": 993,
                   "name": "is_colab_device",
                   "target": {
                     "file": "src/interlock/devices.py"
@@ -13836,10 +13850,6 @@
               "name": "_remote_eligible"
             }
           ]
-        },
-        {
-          "hash": "0a419a9c09a510ac1d4a7b74b614bfa5c1fa43aaaaeabf47b66540aa9029f8e3",
-          "path": "src/interlock/schema/route-decision.v1.json"
         },
         {
           "hash": "ada1ee89ea1921e6cd946725ecd3e10797df56a38a2b4520ba85b32ee623aee5",
@@ -13916,7 +13926,7 @@
         "pytest",
         "python"
       ],
-      "testedBy": 52,
+      "testedBy": 54,
       "unresolvedSites": 0
     },
     {
@@ -14081,6 +14091,10 @@
         {
           "hash": "ed3f0aaa27925c82ebd2b018722791d982b3e718904f35ad015c31e8bb9b66ec",
           "path": "tests/fixtures/ollama_logs/0.40.11/r3_resident.log"
+        },
+        {
+          "hash": "22ddc80b6d0580321ab65c200f23166cf8de2e2beef42be02559c9696a465a4a",
+          "path": "tests/fixtures/route/r3_table.jsonl"
         },
         {
           "entry": "main",
@@ -14942,7 +14956,7 @@
             "test_concurrent_workers_in_one_pass_get_different_prefixes",
             "test_each_readiness_poll_is_short_so_one_hung_request_cannot_use_the_budget",
             "test_every_timed_call_starts_with_a_prefix_of_its_own_so_the_cache_cannot_answer",
-            "test_pre_v3_throughput_above_one_slot_is_never_used_and_the_note_says_so",
+            "test_pre_v3_throughput_above_one_slot_is_never_used_even_when_that_concurrency_is_asked_for",
             "test_the_cache_check_still_reads_the_prefill_when_the_go_side_adds_time",
             "test_the_calibration_verify_call_differs_from_every_timed_call",
             "test_the_decode_aggregate_at_c1_is_the_per_request_rate_whatever_time_the_go_side_adds",
@@ -14964,7 +14978,7 @@
             "test_with_one_slot_the_requests_queue_and_the_wall_clock_aggregate_is_about_one_stream",
             "winner"
           ],
-          "hash": "aa902679551eec53e501b85bb2fdb846430fb8cdb392bd41c8351fa6bd7da6ad",
+          "hash": "73b96dbe572f22f11af7a6d2b4db7511868877c8d66a5d2ab1f1fdf18caf43f6",
           "importsFiles": [
             "src/interlock/cli.py",
             "src/interlock/devices.py",
@@ -14981,7 +14995,7 @@
           "exports": [
             "test_a_cell_killed_before_its_own_block_is_unmeasured_never_oom_with_the_last_cells_numbers",
             "test_a_failure_before_any_request_was_sent_keeps_the_nominal_size_and_says_so",
-            "test_a_fill_card_row_beside_v3_rows_no_longer_makes_a_ttft_floor_refuse",
+            "test_a_fill_card_row_beside_v3_rows_is_excluded_as_fill_card_and_the_floor_decides_on_a_v3_row",
             "test_a_fully_resident_cell_is_not_called_a_partial_offload",
             "test_a_host_ram_oom_and_an_unmeasured_row_record_the_window_too",
             "test_a_kill_with_host_buffers_over_the_vm_ram_is_oom_host_ram",
@@ -14991,6 +15005,7 @@
             "test_a_partial_offload_is_found_from_api_ps_alone_when_the_log_says_nothing",
             "test_a_partial_offload_is_oom_with_its_evidence_and_no_verify_or_timed_call_is_sent",
             "test_a_reply_without_total_or_eval_duration_is_unmeasured_and_nothing_is_guessed",
+            "test_a_row_without_a_measured_ttft_beside_a_v3_row_no_longer_makes_a_ttft_floor_refuse",
             "test_a_slow_fully_resident_cell_measures_under_the_scaled_budget",
             "test_a_system_memory_line_with_no_block_after_it_is_an_empty_load_not_the_block_before",
             "test_a_timeout_row_records_the_window_sent_and_the_nominal_cell",
@@ -15010,7 +15025,7 @@
             "test_the_server_post_takes_a_timeout_and_passes_it_to_the_request",
             "test_the_version_is_4_and_the_router_guard_stays_at_3"
           ],
-          "hash": "5075141078f5fe2e6ebcab59ae9d48374520d8aef3e43e99771cdd50b290a37a",
+          "hash": "b83831460282bae264f9c4c6816f38ce75aa954e072e5d2826acc52c03dd26ed",
           "importsFiles": [
             "src/interlock/devices.py",
             "src/interlock/harness/__init__.py",
@@ -15028,7 +15043,7 @@
             "request",
             "row",
             "test_a_device_that_only_has_version_1_still_routes_when_it_is_the_one_asked_for",
-            "test_a_fill_card_row_is_not_a_ladder_row_and_keeps_routing_beside_v2_rows",
+            "test_a_fill_card_row_is_not_a_ladder_row_and_never_ranks_in_generate",
             "test_a_floored_v1_row_on_another_device_is_not_a_runner_up_beside_a_v2_winner",
             "test_a_rig_row_with_no_ladder_is_still_compared_with_the_newest_ladder_rows",
             "test_a_row_with_no_ladder_version_on_a_colab_device_is_version_1_and_a_rig_row_has_none",
@@ -15042,7 +15057,7 @@
             "test_v1_and_v2_rows_on_different_devices_are_never_ranked_against_each_other",
             "winner"
           ],
-          "hash": "a02c5fb51503f2addb334e7f381a8ea755fe5d36973c0f01cfe3b1408ba46f6b",
+          "hash": "9f9e373c6b7e81a1c58c5799a64addb4e084e02b500cff59e54521748288ea47",
           "importOrder": [
             "src/interlock/cli.py",
             "src/interlock/devices.py",
@@ -15828,6 +15843,32 @@
         },
         {
           "exports": [
+            "test_a_concurrency_with_no_rows_is_a_structured_refusal_naming_the_concurrencies_that_exist",
+            "test_a_fill_card_row_never_wins_generate_and_is_listed_as_excluded",
+            "test_a_refusal_gives_each_measured_failure_reason_once_with_a_count",
+            "test_a_table_with_only_a_fill_card_row_has_no_generate_candidate",
+            "test_concurrency_4_picks_a_c4_row",
+            "test_concurrency_8_picks_the_c8_aggregate_and_says_what_it_ranked",
+            "test_concurrency_below_one_or_not_a_whole_number_is_rejected_at_the_flag",
+            "test_one_model_has_no_margin_between_its_own_shapes",
+            "test_other_shapes_of_the_winners_own_candidate_are_not_listed_as_runners_up",
+            "test_other_tasks_ignore_the_concurrency",
+            "test_pre_v3_rows_keep_their_guard_under_a_requested_concurrency",
+            "test_the_default_is_one_stream_and_picks_a_c1_row",
+            "test_the_json_decision_validates_against_the_schema",
+            "test_the_margin_uses_each_candidates_best_row_at_the_requested_shape",
+            "test_with_two_models_the_margin_is_between_them_not_between_two_shapes_of_one"
+          ],
+          "hash": "50478dfb43e208a1ec1ce46e2868e9ae9e5ad5d206407f9f05f3df733479dc0d",
+          "importsFiles": [
+            "src/interlock/cli.py",
+            "src/interlock/router/policy.py"
+          ],
+          "path": "tests/test_route_concurrency.py",
+          "testFramework": "pytest"
+        },
+        {
+          "exports": [
             "assert_decision",
             "invoke",
             "load_table",
@@ -15841,7 +15882,7 @@
             "test_ttft_on_the_committed_table_refuses_unset_prefix_caching",
             "test_verify_quote_rule_2_refuses_unregistered"
           ],
-          "hash": "53a4444dc69c35678c55456c417d2ea367c3705507ab597a32e6833ac90f1c3c",
+          "hash": "bc12ef1288f39656fb88af90587c8a120e0aa6186b7c116a6967d7cf7962438d",
           "importsFiles": [
             "src/interlock/cli.py",
             "src/interlock/router/policy.py"
@@ -15881,7 +15922,7 @@
             "test_ttft_mixed_prefix_caching_refuses",
             "test_ttft_with_one_known_mode_uses_the_repeat_slot_max"
           ],
-          "hash": "a79e470d2e4824103c1a63ba0c23a77de7993aeff48dbe403fdbbc3c035f35ff",
+          "hash": "4a8650f72a27b152e0e03bdfdd94140722a0c31a57c3b91b531dd6eb071287aa",
           "importsFiles": [
             "src/interlock/router/policy.py",
             "tests/router_rows.py"
@@ -16029,6 +16070,37 @@
             "src/interlock/receipt.py"
           ],
           "path": "tests/test_run_path.py",
+          "testFramework": "pytest"
+        },
+        {
+          "exports": [
+            "quick",
+            "test_a_cell_records_the_sampler_it_used_and_why_the_run_switched",
+            "test_a_fallback_answer_that_is_not_used_and_total_is_unmeasured",
+            "test_a_fallback_that_hangs_or_fails_is_unmeasured_with_the_real_reason_every_time",
+            "test_a_run_that_never_timed_out_records_its_primary_sampler",
+            "test_the_first_timeout_is_unmeasured_and_the_run_then_samples_through_nvidia_smi",
+            "test_the_real_fallback_runs_nvidia_smi_as_a_subprocess_with_a_timeout",
+            "test_the_t4_r5_run_holds_nvml_wedged_after_a_host_ram_kill_the_first_cell_is_lost_and_later_cells_measure"
+          ],
+          "hash": "f4e3370a440e3a6d0449fbda18e021e867929a68e97f1065df2fe6352ad7bb0e",
+          "importOrder": [
+            "src/interlock/harness/__init__.py",
+            "src/interlock/harness/linux_cuda.py",
+            "src/interlock/receipt.py",
+            "tests/fake_ollama.py",
+            "tests/test_wall_cap_and_hang.py",
+            "src/interlock/harness/runner.py"
+          ],
+          "importsFiles": [
+            "src/interlock/harness/__init__.py",
+            "src/interlock/harness/linux_cuda.py",
+            "src/interlock/harness/runner.py",
+            "src/interlock/receipt.py",
+            "tests/fake_ollama.py",
+            "tests/test_wall_cap_and_hang.py"
+          ],
+          "path": "tests/test_sampler_fallback.py",
           "testFramework": "pytest"
         },
         {
@@ -16330,7 +16402,7 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 55
+          "files": 57
         },
         {
           "boundary": "scripts",
@@ -16406,7 +16478,7 @@
         {
           "config": "pyproject.toml",
           "coverage": true,
-          "files": 55,
+          "files": 57,
           "job": "test",
           "runner": "pytest",
           "step": "Test"
@@ -16414,7 +16486,7 @@
         {
           "config": "pyproject.toml",
           "coverage": true,
-          "files": 55,
+          "files": 57,
           "job": "test-py313",
           "runner": "pytest",
           "step": "Test"
@@ -16422,7 +16494,7 @@
         {
           "config": "pyproject.toml",
           "coverage": true,
-          "files": 55,
+          "files": 57,
           "job": "test-py314",
           "runner": "pytest",
           "step": "Test"
@@ -16950,22 +17022,10 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "1296f138af8df38c10213e4398240e35c0a1a6ea",
-    "tracked": 302
+    "commit": "5bca251f2202be4416a605dba5ec93830a5c3583",
+    "tracked": 303
   },
   "landings": [
-    {
-      "readers": [
-        {
-          "by": "tests/test_old_name.py",
-          "call": "literal",
-          "confidence": "ast",
-          "fromTests": true
-        }
-      ],
-      "target": "CHANGELOG.md",
-      "writers": []
-    },
     {
       "readers": [
         {
@@ -17595,6 +17655,18 @@
     {
       "readers": [
         {
+          "by": "tests/test_route_concurrency.py",
+          "call": "read_text",
+          "confidence": "ast",
+          "fromTests": true
+        }
+      ],
+      "target": "tests/fixtures/route/r3_table.jsonl",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
           "by": "pyproject.toml",
           "call": "configuration",
           "confidence": "config"
@@ -17712,7 +17784,7 @@
   "overlaps": [],
   "submodules": [],
   "symlinks": [],
-  "testFiles": 81,
+  "testFiles": 84,
   "unassigned": [
     {
       "hash": "75850ad95072b8a51fa832b381c4cf6bfea4a3ba8456a242aec0ab79ff0db466",

@@ -1,17 +1,17 @@
 # interlock: how it works
 
-Mapped at 2026-10-26 from commit 1296f13 by Atlas 1.24.0.
+Mapped at 2026-10-26 from commit 5bca251 by Atlas 1.24.0.
 
 ## What this is
 
 interlock routes each job to a model, engine and device from a receipt-backed table. (written by a person)
 
-10 parts, mostly Python (113 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.
+10 parts, mostly Python (115 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.
 
-## What changed since 2026-10-26 (c1d9558)
+## What changed since 2026-10-26 (1296f13)
 
-- experiments/c2-generate/spec.yaml is now also read by tests/test_wall_cap_and_hang.py.
-- 1 file added and 2 changed content, across 3 parts.
+- tests/fixtures/route/r3_table.jsonl is now read by tests/test_route_concurrency.py.
+- 3 files added, 2 removed and 7 changed content, across 3 parts.
 
 ## What comes in
 

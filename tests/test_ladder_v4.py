@@ -266,16 +266,35 @@ def _fill_card_row() -> dict:
     return row
 
 
-def test_a_fill_card_row_beside_v3_rows_no_longer_makes_a_ttft_floor_refuse():
-    rows = [_v3_row("v3-c1", 67.0, 900.0), _v3_row("v3-c4", 120.0, 4200.0, concurrency=4), _fill_card_row()]
-    request = Request(
+def _ttft_request(**extra) -> Request:
+    return Request(
         task="generate", as_of=date(2026, 10, 26), model="phi3.5:3.8b", allow_remote=True, device="colab:T4",
-        max_ttft_ms=5000.0,
+        max_ttft_ms=5000.0, **extra,
     )
-    result = decide(rows, request)
+
+
+def test_a_row_without_a_measured_ttft_beside_a_v3_row_no_longer_makes_a_ttft_floor_refuse():
+    """F2. A rig-style generate row (unversioned, not a ladder cell, no prefix_caching) records a cached ttft."""
+
+    rig = _v3_row("rig-style-c1", 200.0, 3.7)
+    rig["device"] = "5090"
+    rig["settings"] = {"thinking_level": "off", "num_predict": 128, "num_ctx": 2240}  # a single stream, no version
+    rows = [_v3_row("v3-c1", 67.0, 900.0), rig]
+    request = Request(
+        task="generate", as_of=date(2026, 10, 26), model="phi3.5:3.8b", allow_remote=True, max_ttft_ms=5000.0
+    )
+    result = decide(rows, request)  # before F2 this refused with prefix_caching_unknown
     assert isinstance(result, Decision)
-    assert result.document["receipts"][0].startswith("v3-")
+    assert result.document["receipts"][0] == "v3-c1"
     assert any("without a measured ttft not considered" in note for note in result.document["notes"])
+
+
+def test_a_fill_card_row_beside_v3_rows_is_excluded_as_fill_card_and_the_floor_decides_on_a_v3_row():
+    rows = [_v3_row("v3-c1", 67.0, 900.0), _v3_row("v3-c4", 120.0, 4200.0, concurrency=4), _fill_card_row()]
+    result = decide(rows, _ttft_request())
+    assert isinstance(result, Decision)
+    assert result.document["receipts"][0] == "v3-c1"  # the default concurrency is 1
+    assert {"id": "fill-card", "code": "fill_card"} in result.document["excluded"]
 
 
 # -- F3: a missing total or eval duration is unmeasured ---------------------------------------------------------------

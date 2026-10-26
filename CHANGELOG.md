@@ -15,6 +15,16 @@
 
 - **A rig-check identity.** The Linux ladder only accepted Colab identities, so rig checks of the harness had to pass a placeholder `colab:L4` and their rows were labelled as L4 data. `RemoteDeviceIdentity.rig(card, vram_mib, driver_version, cuda_version)` is provider `rig` with a free-text card (`RTX 5090`), pool `rig-local`, and device `rig:RTX5090`. Every row built with it carries `not_for_import: true`. The routing-row schema allows the rig form only with `not_for_import: true` (a `rig:` row without it fails validation); Colab identities and rows are unchanged. `interlock import` refuses a rig row or a rig-provider envelope, naming `not_for_import`, and `route` excludes one that reaches a table with the new code `rig_check` (in the route-decision schema) and never ranks it.
 
+- **`route --concurrency N` (default 1).** A generate row is the pass aggregate across its N requests, so a c8 row and a c1 row answer different questions; before this, `route` ranked every shape of a model against every other and picked the c8 aggregate for a single caller (T4 r3: p512 c8, decode bound 115.67, where a c1 request gets about 67 tok/s). Generate rows are now ranked and floored only at the requested concurrency (a row with no `settings.concurrency`, the rig's single-stream harnesses, counts as 1). When no row matches, the refusal names the concurrencies that exist (`Rows exist at concurrency 1, 4, 8; none at 2.`). The decision, text and `--json`, records `concurrency` and `ranked_field` (`decode_tok_s`) and says so in `notes`. Other tasks ignore the flag. `--concurrency` below 1 (or not a whole number) is rejected at the flag with a usage error, not turned into a table refusal.
+
+### Changed
+
+- **The margin is between distinct candidates.** A candidate is a device, a model with its revision, and its quant. The margin is the winner's bound against the best row of the best other candidate, never against another shape of the same model (r3's "delta 18.343 over 97.325" was phi's c8 row against phi's own c4 row). With one candidate there is no margin: `next_bound`, `delta` and `next_id` are null and `notes` says `no other candidate`.
+- **Fill-card rows never rank in generate.** A fill-card row (`max_resident_ctx`, or the fill-card spec) is a load probe, not a generate shape. It is listed under `excluded` with the new code `fill_card` and takes no part in the ranking or the floors. The route-decision schema gains the `fill_card` code and the optional `concurrency` and `ranked_field` fields.
+- Another shape of the winner's own candidate is no longer listed under `runners_up` for generate (it is not an alternative to it), and a refusal gives each measured failure reason once with a count (`(x20)`) instead of repeating it for every row.
+- The pre-v3 guard is unchanged: a pre-v3 row's concurrency-above-1 throughput and ttft are still never used.
+
+
 ## [1.0.7] - 2026-10-26
 
 ### Fixed
@@ -29,11 +39,14 @@ T4 rung r3 (the log of its Ollama and the VM's `free -m`) showed that version 3 
 - **A missing `total_duration` or `eval_duration` is `unmeasured`.** v3 fell back to load + prefill + decode, which hides the queue wait and the overhead and would bring back the concurrency inflation. The verify call's `total_duration` is required too.
 - **`route --max-ttft-ms` no longer refuses on rows that have no measured ttft.** The unversioned fill-card rows (`prefix_caching` unset) made `_ttft_refusal` answer `prefix_caching_unknown` even beside v3 generate rows (reproduced in r3). When at least one row has a measured ttft, the rows without one are dropped before the comparison, and `notes` says how many.
 
+
+
 ### Changed
 
 - **A failure row records the window that was sent, as a measured row does.** `settings.num_ctx` is the `num_ctx` the request sent and `settings.cell_tokens` the nominal cell, on every failure path of the generate ladder (`oom` from a partial offload or host RAM, `timeout`, `unmeasured`, `load_refused`, `ctx_exceeded`); an `oom` row's `num_ctx` now equals the window its own reason names (it used to say the nominal 16384 beside a reason that said 16903 was sent). A failure before any request was sent (a pre-registered refusal, a failure outside the measurement) never had a window: it keeps the nominal size in `num_ctx`, and `settings.num_ctx_source` says `nominal: no request was sent` (it is `sent` otherwise).
 - `_ttft_does_not_scale` names the prefill, not the ttft, in its parameter and message (it has read `prefill_ms` since v3).
 - `tests/fake_ollama.py` now reports a partial offload (`/api/ps`, and the `offloaded N/M layers` and `CPU KV buffer size` log lines), simulates the SIGKILL when host buffers exceed the VM's RAM, raises `TimeoutError` past the timeout a call was sent with, and gives a slow fully resident cell. The parser tests read lines from T4 r3's own log (`tests/fixtures/ollama_logs/0.40.11/`).
+
 
 ### Docs
 

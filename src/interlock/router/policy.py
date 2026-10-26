@@ -23,6 +23,14 @@ and no ``lN`` tag meets the request when its window is at least N.
 
 Ties break toward a device other than the 5090, then toward the lower row id.
 
+``--concurrency N`` (default 1) ranks and floors generate rows at that concurrency only: a generate row's
+``settings.concurrency`` must equal N, and a row with none (the rig's single-stream harnesses) counts as 1. A generate
+row is the pass aggregate across its N requests (``decode_tok_s``), so a c8 row and a c1 row are different questions.
+When no row matches, the refusal names the concurrencies that exist. The margin is between distinct candidates
+(device, model with revision, quant): each candidate's best row, the winner against the best other candidate, never
+between two shapes of one model; with one candidate there is no margin ("no other candidate"). A fill-card row is a
+load probe, never a generate shape: it is listed as excluded (``fill_card``) and does not rank.
+
 A row dated more than 30 days before ``as_of`` is stale. A row with
 ``provisional`` set, or ``repeats`` below 2, is provisional. Both are flags.
 They stay eligible.
@@ -101,6 +109,7 @@ class Request:
     budget_left_usd: float | None = None
     allow_remote: bool = False
     device: str | None = None
+    concurrency: int = 1
 
 
 @dataclass(frozen=True)
@@ -138,6 +147,9 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
                 failure_reasons.append(f"{row.get('device')}: {measured}")
         elif outcome in EXCLUDED_OUTCOMES:
             continue
+        elif request.task == "generate" and is_fill_card(row):
+            if _task_model(row, request):
+                excluded.append({"id": str(row["id"]), "code": "fill_card"})  # a load probe, not a generate shape
         elif row.get("parity_valid") is False and _task_model(row, request):
             excluded.append({"id": str(row["id"]), "code": "parity_invalid"})
         elif row.get("parity_valid") is False:
@@ -150,6 +162,8 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
     steps: list[tuple[str, object]] = [("task", None), ("model", None)]
     if request.device is not None:
         steps.append(("device", request.device))
+    if request.task == "generate":
+        steps.append(("concurrency", request.concurrency))
     if request.thinking is not None:
         steps.append(("thinking", request.thinking))
     if request.ctx is not None:
@@ -171,7 +185,7 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
         later.append(("max_ttft_ms", request.max_ttft_ms))
 
     current = pool
-    identity = [name for name, _ in steps if name in {"task", "model", "device"}][-1]
+    identity = [name for name, _ in steps if name in {"task", "model", "device", "concurrency"}][-1]
     for constraint, limit in steps:
         kept, dropped = _split(current, request, constraint, limit)
         if not kept:
@@ -179,6 +193,11 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
         current = kept
         if constraint == identity:
             # Before any floor: a v1 row must not win, or be listed, because the v2 row failed a floor.
+            if request.task == "generate":  # other concurrencies are other questions, not runners-up
+                pool = [
+                    row for row in pool
+                    if not _task_model(row, request) or row_concurrency(row) == request.concurrency
+                ]
             before = current
             current, version_notes = _newest_ladder_per_device_model(before)
             current, across = _newest_ladder_version(current)  # and across devices: v1 is never ranked against v2
@@ -215,9 +234,10 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
 
     ranked.sort(key=lambda row: _rank_key(row, request))
     winner = ranked[0]
+    rival = next((row for row in ranked[1:] if candidate_of(row) != candidate_of(winner)), None)
     runners = _runners(pool, winner, ranked, request)
     return Decision(
-        _document(winner, ranked, runners, excluded, request, direction, metric, pool, version_notes)
+        _document(winner, rival, ranked, runners, excluded, request, direction, metric, pool, version_notes)
     )
 
 
@@ -315,8 +335,31 @@ def _newest_ladder_version(ranked: list[Mapping]) -> tuple[list[Mapping], list[s
     return kept, [f"ranked on ladder version {newest} only; version(s) {', '.join(map(str, older))} not compared"]
 
 
+def is_fill_card(row: Mapping) -> bool:
+    """A fill-card row is a load probe (``max_resident_ctx``), not a generate shape."""
+
+    settings = row.get("settings") or {}
+    spec = str((row.get("provenance") or {}).get("experiment_spec", ""))
+    row_id = str(row.get("id", "")).lower()
+    return "max_resident_ctx" in settings or "fill-card" in spec.lower() or "fill-card" in row_id
+
+
+def row_concurrency(row: Mapping) -> int:
+    """The concurrency a generate row was measured at. A row with none is a single stream."""
+
+    value = (row.get("settings") or {}).get("concurrency")
+    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 1 else 1
+
+
+def candidate_of(row: Mapping) -> tuple[str, str, str]:
+    """What a margin compares: a device, a model with its revision, and its quant. A shape of one is not another."""
+
+    return (str(row.get("device")), _model_label(row), str((row.get("model") or {}).get("quant") or ""))
+
+
 def _document(
     winner: Mapping,
+    rival: Mapping | None,
     ranked: list[Mapping],
     runners: list[dict],
     excluded: list[dict],
@@ -328,17 +371,17 @@ def _document(
 ) -> dict:
     bound = _rank_bound(winner, request)
     assert bound is not None  # noqa: S101  # rank only sees a row that has a bound
-    if len(ranked) > 1:
-        nxt = ranked[1]
-        next_bound = _rank_bound(nxt, request)
+    notes: list[str] = list(version_notes)
+    if rival is not None:
+        next_bound = _rank_bound(rival, request)
         assert next_bound is not None  # noqa: S101  # rank only sees a row that has a bound
         delta = (bound - next_bound) if direction == "higher" else (next_bound - bound)
-        next_id: str | None = str(nxt["id"])
+        next_id: str | None = str(rival["id"])
     else:
         next_bound = None
         delta = None
         next_id = None
-    notes: list[str] = list(version_notes)
+        notes.append("no other candidate")  # the margin is between distinct candidates, never between two shapes
     if "5090" not in request.busy and not _any_5090(pool, request):
         notes.append("no 5090 row")
     remote = _is_remote(winner)
@@ -375,6 +418,13 @@ def _document(
         "notes": notes,
         "budget": budget,
     }
+    if request.task == "generate":
+        document["concurrency"] = request.concurrency
+        document["ranked_field"] = "decode_tok_s"
+        notes.append(
+            f"ranked at concurrency {request.concurrency} on decode_tok_s, the pass aggregate across "
+            f"{request.concurrency} concurrent request(s)"
+        )
     if remote:
         document["remote"] = True
         remote_ident = winner.get("remote_device")
@@ -425,6 +475,8 @@ def _runners(pool: Sequence[Mapping], winner: Mapping, ranked: list[Mapping], re
     rest.sort(key=lambda row: str(row["id"]))
     found: list[dict] = []
     for row in ordered + rest:
+        if request.task == "generate" and candidate_of(row) == candidate_of(winner):
+            continue  # another shape of the winner's own candidate is not an alternative to it
         constraint, reason = _why(row, winner, request)
         found.append({"id": str(row["id"]), "constraint": constraint, "reason": reason})
     return found
@@ -498,8 +550,11 @@ def _empty(
     if constraint.startswith("min:") or constraint in {"decode_tok_s", "warm_latency_ms", "max_latency_ms",
         "max_ttft_ms"}:
         hint += " The bound is the conservative end of the measured spread, not the median."
+    if constraint == "concurrency":
+        available = sorted({row_concurrency(row) for row in dropped})
+        hint += f" Rows exist at concurrency {', '.join(map(str, available))}; none at {limit}."
     if failure_reasons:
-        hint += " Measured failure reasons: " + "; ".join(failure_reasons) + "."
+        hint += " Measured failure reasons: " + "; ".join(_counted(failure_reasons)) + "."
     return Refusal(
         {
             "code": "no_candidate",
@@ -511,6 +566,15 @@ def _empty(
             "excluded": excluded,
         }
     )
+
+
+def _counted(reasons: Sequence[str]) -> list[str]:
+    """Each distinct reason once, with how many rows gave it (a refusal used to repeat one reason about 20 times)."""
+
+    counts: dict[str, int] = {}
+    for reason in reasons:
+        counts[reason] = counts.get(reason, 0) + 1
+    return [reason if n == 1 else f"{reason} (x{n})" for reason, n in counts.items()]
 
 
 def _ttft_refusal(rows: Sequence[Mapping], request: Request, excluded: list[dict]) -> Refusal | None:
@@ -633,6 +697,8 @@ def _keeps(row: Mapping, request: Request, constraint: str, limit: object) -> bo
         return matches_device_filter(row.get("device"), str(limit))
     if constraint == "thinking":
         return _thinking_matches(_thinking(row), str(limit))
+    if constraint == "concurrency":
+        return row_concurrency(row) == limit
     if constraint == "ctx":
         return _meets_ctx(row, int(limit))  # type: ignore[arg-type]
     if constraint == "quote_rule":
