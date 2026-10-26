@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.0.6] - 2026-10-26
+
 ### Fixed
 
 T4 rung r2 showed three defects in the generate ladder (`GENERATE_LADDER_VERSION` 2 and 1). All three are in Ollama v0.40.11's source and in r2's llama-server log.
@@ -17,6 +19,10 @@ T4 rung r2 showed three defects in the generate ladder (`GENERATE_LADDER_VERSION
 - **`route` never reads what earlier ladders could not measure.** A ttft from a row that did not come from a version 3 ladder is never used for `--max-ttft-ms` (the floor cannot pass), and the throughput of a row with a concurrency above 1 from before version 3 is never used (it cannot rank or pass a decode floor). `route` says so in `notes` ("N pre-v3 row(s) with concurrency > 1 not used", "ttft of N pre-v3 row(s) not used"). `table` shows `ttft: not measured` and `throughput: not measured` on those rows. A decode figure at concurrency 1 is unaffected.
 - **Rig harnesses, audited.** No row in `table/routing.jsonl` carries a ttft in its slots or settings, and the rig's generate rows (E3 OpenVINO, E3-REF and E4 Ollama) record end-to-end latency, not a ttft; none has a concurrency above 1. Read, not run: `harness/runner.py` generate steps repeat one prompt across warmups and repeats, and `harness/fill.py` resends its prompt in the confirm call after the load call, so a ttft from them would be a cache hit as well; `harness/e4b.py` takes its figures from the adapter and was not traced further. A row cannot be told which harness made it, so the router reads no ttft from a row without a version 3 stamp, whatever its harness.
 - `tests/fake_ollama.py`: a fake that caches by longest common prefix, queues unless it has the slots, truncates by `contextShiftPromptLimit`, and keeps virtual time. The tests for each fix fail against 1.0.5.
+
+### Docs
+
+- README and handbook carry a correction notice: the generate ladder's time to first token and concurrency-above-1 throughput in 1.0.5 and earlier were not valid measures, and interlock no longer uses them. The handbook describes ladder version 3.
 
 ## [1.0.5] - 2026-10-26
 
