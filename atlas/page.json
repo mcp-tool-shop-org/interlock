@@ -34,32 +34,24 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 1,
-      "changed": 3,
+      "added": 0,
+      "changed": 4,
       "moved": 0,
       "parts": 3,
       "removed": 0
     },
     "items": [
       {
-        "kind": "landing",
-        "sentence": "experiments/c2-generate/spec.yaml is now also read by tests/test_cell_epoch.py.",
-        "subjects": [
-          "experiments/c2-generate/spec.yaml",
-          "tests/test_cell_epoch.py"
-        ]
-      },
-      {
         "kind": "counts",
-        "sentence": "1 file added and 3 changed content, across 3 parts.",
+        "sentence": "Nothing structural changed since 2026-10-26; 4 files changed content.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "4eb14887b8f744eaace46dc93389b53b2350599b",
-      "generatedAt": "2026-10-26T22:12:25.511Z"
+      "commit": "50238e13fd021c4c37d0c154336d1330c073c945",
+      "generatedAt": "2026-10-26T22:39:15.435Z"
     },
-    "unchanged": false
+    "unchanged": true
   },
   "changesTogether": [
     {
@@ -144,7 +136,7 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 16 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 2,
-  "commit": "50238e13fd021c4c37d0c154336d1330c073c945",
+  "commit": "2d1f6c041a91d8fccca56883af901a008da804e8",
   "defaultBranch": "main",
   "derived": "10 parts, mostly Python (116 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
   "doors": [
@@ -309,7 +301,7 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-26T22:39:15.435Z",
+  "generatedAt": "2026-10-26T22:56:06.131Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "5 writes and 6 reads use paths built at run time and are not named here.",

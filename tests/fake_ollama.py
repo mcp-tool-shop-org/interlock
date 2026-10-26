@@ -107,6 +107,7 @@ class FakeOllama:
         self._log_start = len(self.log_text)
 
     def restart_after_deadline(self) -> None:
+        self.epoch += 1  # as the real server: stale from the restart on
         self.restarts_after_deadline += 1
         self._slot_free = [self._now] * self.num_parallel
         self._last_words = []

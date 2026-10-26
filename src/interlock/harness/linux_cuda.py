@@ -627,6 +627,7 @@ class LinuxOllamaServer:
     def restart_after_deadline(self) -> None:
         """Restart the harness's own server so no runner request from an abandoned cell survives."""
 
+        self.epoch += 1  # a call from the abandoned cell is stale from here, not only from the next begin_cell()
         self.stop()
         self.start()
 
@@ -1125,12 +1126,19 @@ def run_linux_generate_ladder(
             except LinuxShapeFailure as exc:
                 _phase(f"cell p{prompt_len} c{concurrency}: end, {exc.failure_class}")
                 deadline_fired = bool((exc.evidence or {}).get("cell_deadline"))
+                restarted_now = False
                 if deadline_fired:
                     # The abandoned cell's thread may still be inside a request. The epoch refuses what it sends next;
                     # restarting the server kills the request it is in, so nothing of it reaches the next cell.
-                    _phase(f"cell p{prompt_len} c{concurrency}: outer deadline fired; restarting the server")
                     if recover is not None:
+                        _phase(f"cell p{prompt_len} c{concurrency}: outer deadline fired; restarting the server")
                         recover()
+                        restarted_now = True
+                    else:
+                        _phase(
+                            f"cell p{prompt_len} c{concurrency}: outer deadline fired; no recover hook, server not "
+                            "restarted"
+                        )
                 append_row(
                     build_linux_failure_row(
                         spec_id=spec_id,
@@ -1159,7 +1167,7 @@ def run_linux_generate_ladder(
                         licence=licence,
                     )
                 )
-                restarted["pending"] = deadline_fired  # the next row is the first after the restart
+                restarted["pending"] = restarted_now  # the next row is the first after a restart that happened
                 continue
 
             ttft_ms = float(measured["ttft_ms"])
@@ -1832,20 +1840,23 @@ class GuardedSampler:
             raise LinuxShapeFailure("unmeasured", f"nvidia-smi did not answer within {seconds:g} s") from None
         except (OSError, subprocess.CalledProcessError) as exc:
             raise LinuxShapeFailure("unmeasured", f"nvidia-smi failed: {exc}") from exc
-        lines = text.strip().splitlines()
-        parts = [part.strip() for part in lines[0].split(",")] if lines else []
+        lines = [line for line in text.strip().splitlines() if line.strip()]
         answer = text.strip()[:80]
+        if len(lines) != 1:  # one GPU, one line: several lines would be a reading of some other card
+            raise LinuxShapeFailure("unmeasured", f"nvidia-smi answered {answer!r}, not one line 'used, total'")
+        parts = [part.strip() for part in lines[0].split(",")]
         if len(parts) != 2:
             raise LinuxShapeFailure("unmeasured", f"nvidia-smi answered {answer!r}, not 'used, total'")
         try:
-            used, total = int(float(parts[0])), int(float(parts[1]))
-        except (ValueError, OverflowError):
+            used_f, total_f = float(parts[0]), float(parts[1])
+        except ValueError:
             raise LinuxShapeFailure("unmeasured", f"nvidia-smi answered {answer!r}, not 'used, total'") from None
-        if used < 0 or total <= 0:
+        if not (used_f >= 0 and total_f > 0 and used_f <= total_f and math.isfinite(total_f)):
             raise LinuxShapeFailure(
-                "unmeasured", f"nvidia-smi answered {answer!r}: used must be at least 0 and total over 0"
+                "unmeasured",
+                f"nvidia-smi answered {answer!r}: need 0 <= used <= total and total > 0 (and finite)",
             )
-        return used, total
+        return int(used_f), int(total_f)
 
 
 def _sampler_evidence(sample_vram_mib: Any) -> dict[str, Any]:

@@ -82,7 +82,7 @@ def _two_cells_the_first_outliving_its_deadline(monkeypatch) -> tuple[FakeOllama
             if state["calls"] == 2:  # its second probe never comes back, until the next cell is under way
                 blocked.set()
                 release.wait(30)
-        elif _CELL_EPOCH.get() == 2:
+        elif (_CELL_EPOCH.get() or 0) >= 2:  # the restart advanced the epoch, then the next cell began
             release.set()  # the next cell has begun: the old thread wakes inside it
         return original(path, payload, timeout)
 
@@ -111,7 +111,8 @@ def test_after_a_cells_deadline_the_next_cell_sees_no_request_from_the_old_one_a
     assert server.restarts_after_deadline == 1
     # every request the server accepted after the next cell began belongs to that cell
     accepted = [call["epoch"] for call in server.all_calls]
-    assert accepted[-1] == 2 and set(accepted[accepted.index(2) :]) == {2}
+    newest = accepted[-1]
+    assert newest > 1 and set(accepted[accepted.index(newest) :]) == {newest}
     assert rows[0]["settings"].get("server_restarted_after_deadline") is None
     assert rows[1]["settings"]["server_restarted_after_deadline"] is True  # the next row says so
 
@@ -190,3 +191,74 @@ def test_the_nvidia_smi_fallback_accepts_two_numbers(monkeypatch):
     with pytest.raises(LinuxShapeFailure):
         sampler()
     assert sampler() == (0, 81920)  # used may be 0
+
+
+# -- card jb's follow-ups ----------------------------------------------------------------------------------------------
+
+
+def test_a_deadline_with_no_recover_hook_does_not_claim_a_restart(monkeypatch, capsys):
+    monkeypatch.setattr(linux_cuda, "CELL_DEADLINE_S", 0.3)
+    hung = threading.Event()
+    calls = {"n": 0}
+
+    def measure(length: int, concurrency: int) -> dict:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            hung.wait(10)  # the first cell never returns in time
+        return {"ttft_ms": 100.0, "prefill_ms": 90.0, "decode_tok_s": 20.0, "peak_mib": 9000, "size": 5,
+                "size_vram": 5, "prompt_tokens_evaluated": length}
+
+    rows = run_linux_generate_ladder(
+        spec_id="C2-GENERATE", spec_rel="experiments/c2-generate/spec.yaml", run_id="a100-r1", date="2026-10-26",
+        remote_device=IDENT, model="qwen3:30b", revision_or_digest="d" * 64, measure_shape=measure,
+        prompt_lengths=(512, 1024), concurrencies=(1,), quant="Q4_K_M", licence="apache-2.0",
+    )  # recover is None: a direct caller
+    hung.set()
+    assert rows[0]["outcome"] == "unmeasured" and "outcome" not in rows[1]
+    assert "server_restarted_after_deadline" not in rows[1]["settings"]  # nothing restarted, so nothing is claimed
+    err = capsys.readouterr().err
+    assert "outer deadline fired; no recover hook, server not restarted" in err
+    assert "restarting the server" not in err
+
+
+def test_a_call_from_the_abandoned_cell_after_the_restart_but_before_the_next_cell_is_refused(tmp_path):
+    server = LinuxOllamaServer(
+        log_path=tmp_path / "ollama.log", popen=lambda *a, **k: _Proc(), http_get=lambda _u: {"version": "x"},
+        http_post=lambda _u, _p: {"ok": True},
+    )
+    server.start()
+    server.begin_cell()
+    token = _CELL_EPOCH.set(server.epoch)  # the abandoned cell's thread
+    try:
+        assert server.post("/api/generate", {}) == {"ok": True}
+        server.restart_after_deadline()  # the ladder restarts after the deadline; the next begin_cell() has not run yet
+        with pytest.raises(StaleCell):
+            server.post("/api/generate", {})
+        with pytest.raises(StaleCell):
+            server.get("/api/ps")
+    finally:
+        _CELL_EPOCH.reset(token)
+    server.stop()
+
+
+@pytest.mark.parametrize(
+    "answer",
+    ["20000, 15360\n", "-0.5, 15360\n", "1000, 15360\n2000, 15360\n", "1000, 15360\n\n3, 4\n", "15361, 15360\n",
+     "1000, 1e999\n"],
+)
+def test_the_nvidia_smi_fallback_bounds_used_against_total_and_takes_one_line(monkeypatch, answer):
+    monkeypatch.setattr(linux_cuda, "_nvidia_smi_query", lambda timeout_s: answer)
+    sampler = GuardedSampler(_hangs)
+    with pytest.raises(LinuxShapeFailure):
+        sampler()
+    with pytest.raises(LinuxShapeFailure) as caught:
+        sampler()
+    assert caught.value.failure_class == "unmeasured" and "nvidia-smi answered" in caught.value.reason
+
+
+def test_the_nvidia_smi_fallback_still_accepts_used_equal_to_total_and_a_blank_trailing_line(monkeypatch):
+    monkeypatch.setattr(linux_cuda, "_nvidia_smi_query", lambda timeout_s: "15360, 15360\n\n")
+    sampler = GuardedSampler(_hangs)
+    with pytest.raises(LinuxShapeFailure):
+        sampler()
+    assert sampler() == (15360, 15360)
