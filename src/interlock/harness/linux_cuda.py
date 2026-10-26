@@ -24,6 +24,8 @@ import os
 import re
 import socket
 import subprocess
+import sys
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -731,6 +733,7 @@ def build_linux_failure_row(
     if concurrency is not None:
         settings["concurrency"] = concurrency
         settings["request_timeout_s"] = request_timeout_s  # the budget in force (None before one existed)
+        settings["cell_wall_s"] = CELL_WALL_S
         # `num_ctx` is the window the request sent, as on a measured row, and `cell_tokens` the nominal cell. A failure
         # before any request was sent (a pre-registered refusal, a stub) never had a window: it keeps the nominal size
         # in `num_ctx` and says so in `num_ctx_source`.
@@ -775,6 +778,7 @@ def build_linux_failure_row(
         "notes": note,
     }
     stamp_family(row)
+    _mark_rig_check(row, remote_device)
     validate_row(row)
     return row
 
@@ -1009,6 +1013,7 @@ def run_linux_fill_card(
         "notes": f"resident up to num_ctx {best_ctx} (peak {peak_mib} MiB < abort {abort_mib} MiB)",
     }
     stamp_family(row)
+    _mark_rig_check(row, remote_device)
     validate_row(row)
     return row
 
@@ -1059,8 +1064,19 @@ def run_linux_generate_ladder(
         baseline: tuple[int, float] | None = None  # (target tokens, ttft ms) of the first measured cell at this count
         for prompt_len in sorted(prompt_lengths):
             try:
-                measured = measure_shape(prompt_len, concurrency)
+                deadline_s = CELL_DEADLINE_S
+                measured = _with_deadline(
+                    lambda plen=prompt_len, conc=concurrency: measure_shape(plen, conc),
+                    deadline_s,
+                    lambda plen=prompt_len, conc=concurrency, limit=deadline_s: LinuxShapeFailure(
+                        "unmeasured",
+                        f"cell p{plen} c{conc} did not finish within its {limit:g} s outer deadline (a call did not "
+                        "return)",
+                        evidence={"num_ctx_sent": None, "request_timeout_s": None},
+                    ),
+                )
             except LinuxShapeFailure as exc:
+                _phase(f"cell p{prompt_len} c{concurrency}: end, {exc.failure_class}")
                 rows.append(
                     build_linux_failure_row(
                         spec_id=spec_id,
@@ -1205,6 +1221,7 @@ def run_linux_generate_ladder(
                     "concurrency": concurrency,
                     "prefix_caching": "off",  # every timed call has its own prefix, so no prefix is cached
                     "request_timeout_s": measured.get("request_timeout_s"),
+                    "cell_wall_s": CELL_WALL_S,
                     "parallel_slots": measured.get("parallel_slots", concurrency),
                     "parallel_slots_source": measured.get("parallel_slots_source", "requested"),
                     "throughput_method": measured.get("throughput_method", "ollama_durations_decode_window"),
@@ -1233,6 +1250,7 @@ def run_linux_generate_ladder(
                 "provenance": {"experiment_spec": spec_rel, "run_id": run_id},
             }
             stamp_family(row)
+            _mark_rig_check(row, remote_device)
             validate_row(row)
             rows.append(row)
     return rows
@@ -1392,6 +1410,7 @@ def run_linux_throughput_ladder(
                     "provenance": {"experiment_spec": spec_rel, "run_id": run_id},
                 }
                 stamp_family(row)
+                _mark_rig_check(row, remote_device)
                 validate_row(row)
                 rows.append(row)
     return rows
@@ -1486,7 +1505,9 @@ def _sample_during_cell(sample_vram_mib: Callable[[], tuple[int, int]]) -> tuple
     """A VRAM reading taken inside a cell. A sampler failure is a failed measurement, never a load refusal."""
 
     try:
-        return sample_vram_mib()
+        return _sample_with_deadline(sample_vram_mib)
+    except LinuxShapeFailure:
+        raise  # the sampler did not answer in time: the cell is unmeasured, not a sampler error
     except Exception as exc:
         raise LinuxShapeFailure("sampler_error", f"VRAM sampler failed: {exc}") from exc
 
@@ -1582,11 +1603,25 @@ TTFT_SCALING_FLOOR = 0.6
 # One request's budget. Calibration calls are single requests (a partial offload is caught before they matter). A timed
 # call gets three times what `concurrency` verify-sized requests need, plus decode, clamped; the budget is recorded in
 # every generate row. After the residency check a timeout can only be a fully resident cell that is slow.
-CALIBRATION_TIMEOUT_S = 900
+# Calibration calls are single requests with a one-token reply. The slowest fully resident one on record is T4 r3's
+# p16384 verify at 25.1 s (Ollama's Go side costs about 0.57 ms per prompt token on 2 vCPUs, so p32768 projects to about
+# 70 s); the rig's 33k prefill takes 3.7 s. 300 s is more than four times the slowest projection. It was 900 s, and a
+# cell makes up to six calibration calls, so the bound on a stuck cell's calibration was 90 minutes; it is now 30.
+CALIBRATION_TIMEOUT_S = 300
 REQUEST_TIMEOUT_FACTOR = 3
 REQUEST_TIMEOUT_DECODE_ALLOWANCE_S = 60
 REQUEST_TIMEOUT_FLOOR_S = 120
 REQUEST_TIMEOUT_CEILING_S = 900
+# The whole cell, calibration and timed passes, gets this much wall time. A slow, fully resident c8 cell could take four
+# passes at the 900 s ceiling (an hour), and a 3-quant window on an 80 or 96 GB card is bounded by Colab's roughly 4 h
+# VM-loss line, so a cell whose calibrated projection ((1 warmup + repeats) x the unclamped budget) is over it is
+# refused before its timed passes. `CELL_DEADLINE_S` is the outer bound: whatever call is blocked, the cell ends as a
+# row. The harness cannot see the window's wall, so the launcher's wall stays the outer bound of the window.
+CELL_WALL_S = 1800
+CELL_DEADLINE_S = 2 * CELL_WALL_S
+# One VRAM sample (NVML has no timeout of its own; T4 r4 hung for 56 minutes right after the kernel's OOM killer took a
+# CUDA process). A wedged NVML costs this many seconds per cell, not the window.
+SAMPLER_TIMEOUT_S = 30.0
 _LADDER_INSTRUCTION = "In two or three sentences, describe a quiet town by a river."
 _CELL_COUNTER = itertools.count(1)
 
@@ -1629,6 +1664,56 @@ def ladder_prompt(prompt_tokens: int, prefix: str = "") -> str:
     size = len(_LADDER_WORDS)
     words = [_LADDER_WORDS[(i * 7 + (i // size) * 13 + i // (size * size)) % size] for i in range(count)]
     return prefix + " ".join(words) + "\n\n" + _LADDER_INSTRUCTION
+
+
+def _mark_rig_check(row: dict[str, Any], remote_device: RemoteDeviceIdentity) -> None:
+    """A row built with a rig identity is a check of the harness on the rig's own card, never a Colab measurement."""
+
+    if remote_device.not_for_import:
+        row["not_for_import"] = True
+
+
+def _phase(message: str) -> None:
+    """One line per phase on stderr (the run's log), so a hang names its own call."""
+
+    stamp = time.strftime("%H:%M:%S", time.gmtime())
+    print(f"[interlock {stamp}Z] {message}", file=sys.stderr, flush=True)
+
+
+def _with_deadline(call: Callable[[], Any], seconds: float, on_expiry: Callable[[], BaseException]) -> Any:
+    """Run ``call`` on a daemon thread. If it has not returned in ``seconds``, raise what ``on_expiry`` builds.
+
+    A thread that is stuck in a driver call cannot be stopped; it is abandoned (it is a daemon, so it does not keep the
+    process alive) and the caller carries on.
+    """
+
+    outcome: dict[str, Any] = {}
+
+    def run() -> None:
+        try:
+            outcome["value"] = call()
+        except BaseException as exc:  # noqa: BLE001  # carried to the caller's thread
+            outcome["error"] = exc
+
+    worker = threading.Thread(target=run, daemon=True)
+    worker.start()
+    worker.join(seconds)
+    if worker.is_alive():
+        raise on_expiry()
+    if "error" in outcome:
+        raise outcome["error"]
+    return outcome["value"]
+
+
+def _sample_with_deadline(sample_vram_mib: Callable[[], tuple[int, int]]) -> tuple[int, int]:
+    """A VRAM reading that cannot hang the run: no answer in ``SAMPLER_TIMEOUT_S`` makes the cell unmeasured."""
+
+    seconds = SAMPLER_TIMEOUT_S
+    return _with_deadline(
+        sample_vram_mib,
+        seconds,
+        lambda: LinuxShapeFailure("unmeasured", f"VRAM sampler did not answer within {seconds:g} s"),
+    )
 
 
 def _post(server: Any, path: str, payload: dict[str, Any], timeout: float) -> Any:
@@ -1756,8 +1841,8 @@ def _failure_for(
             failure = LinuxShapeFailure(
                 "oom",
                 f"host RAM: the load needed {cpu_kv + mapped:.0f} MiB in host RAM (CPU KV {cpu_kv:.0f} + mapped "
-                f"weights {mapped:.0f}); the VM has {system:.0f} MiB (Ollama system memory, to 0.1 GiB: a margin of "
-                f"{margin:.1f} MiB was required)",
+                f"weights {mapped:.0f}); the VM has {system:.0f} MiB (Ollama system memory"
+                + (f", to 0.1 GiB: a margin of {margin:.1f} MiB was required)" if margin > 0 else ")"),
                 peak_mib=peak_mib,
                 evidence={"offload": {**report, "source": "llama-server log"}},
             )
@@ -1791,8 +1876,11 @@ def _calibrate_ladder_prompt(
     """
 
     small, large = LADDER_PROBE_WORDS
+    _phase(f"probe 9001 sent (num_ctx {num_ctx}, {small} words)")
     low, _ = _evaluated_tokens(server, model, ladder_prompt(small, ladder_prefix(nonce, 9001)), num_ctx)
+    _phase("probe 9001 answered; checking residency")
     _check_fully_resident(server, model, num_ctx, concurrency, None)
+    _phase(f"probe 9002 sent ({large} words)")
     high, _ = _evaluated_tokens(server, model, ladder_prompt(large, ladder_prefix(nonce, 9002)), num_ctx)
     ratio = (high - low) / (large - small)
     if ratio <= 0 or high >= num_ctx * 0.9:
@@ -1807,6 +1895,7 @@ def _calibrate_ladder_prompt(
     evaluated = 0
     for attempt in range(4):
         prompt = ladder_prompt(words, ladder_prefix(nonce, 9100 + attempt))
+        _phase(f"verify {attempt + 1} sent ({words} words)")
         evaluated, verify_s = _evaluated_tokens(server, model, prompt, num_ctx)
         expected = fixed + ratio * words
         if evaluated < expected * 0.9:
@@ -1869,18 +1958,39 @@ def measure_linux_ollama_generate(
     begin_cell = getattr(server, "begin_cell", None)
     if callable(begin_cell):
         begin_cell()  # the log is read from here: this cell's load, not an earlier cell's
-    used_before, _ = sample_vram_mib()
+    cell_started = clock()
+    cell = f"cell p{prompt_tokens} c{concurrency}"
+    _phase(f"{cell}: start, sampling VRAM")
+    used_before, _ = _sample_during_cell(sample_vram_mib)
     peak_mib = used_before
     num_ctx = ladder_window(prompt_tokens, num_predict)
     nonce = _cell_nonce(model, prompt_tokens, concurrency)
     sent = {"num_ctx_sent": num_ctx}  # the first probe is sent with this window, so any failure below has one
     calibration_budget = {**sent, "request_timeout_s": CALIBRATION_TIMEOUT_S}
+    _phase(f"{cell}: calibrating (num_ctx {num_ctx}, {concurrency} slot(s))")
     try:
         words, evaluated, verify_s = _calibrate_ladder_prompt(server, model, prompt_tokens, num_ctx, nonce, concurrency)
     except BaseException as exc:
         raise _failure_for(server, exc, peak_mib, calibration_budget) from exc
     budget_s = request_timeout_s(concurrency, verify_s)
     budget = {**sent, "request_timeout_s": budget_s}
+    unclamped_s = (
+        math.ceil(REQUEST_TIMEOUT_FACTOR * max(1, concurrency) * verify_s) + REQUEST_TIMEOUT_DECODE_ALLOWANCE_S
+    )
+    projected_s = (1 + max(1, repeats)) * unclamped_s
+    _phase(
+        f"{cell}: calibrated in {clock() - cell_started:.1f} s (verify {verify_s:.1f} s); projected {projected_s} s "
+        f"for {1 + max(1, repeats)} passes"
+    )
+    if projected_s > CELL_WALL_S:
+        raise LinuxShapeFailure(
+            "timeout",
+            f"projected {projected_s} s > cell wall {CELL_WALL_S} s; not run "
+            f"({1 + max(1, repeats)} passes of up to {unclamped_s} s, from a {verify_s:.1f} s verify call at "
+            f"concurrency {concurrency})",
+            peak_mib=peak_mib,
+            evidence=budget,
+        )
     reported_slots = getattr(server, "effective_slots", lambda: None)()
     if isinstance(reported_slots, int) and not isinstance(reported_slots, bool):
         slot_count, slot_source = reported_slots, "llama-server log"
@@ -1913,6 +2023,7 @@ def measure_linux_ollama_generate(
     try:
         for pass_no, phase in enumerate(passes):
             first = pass_no * workers + 1  # every call in the cell has its own number, hence its own prefix
+            _phase(f"{cell}: pass {pass_no + 1} of {len(passes)} ({phase}) sent")
             started = clock()
             if workers == 1:
                 pass_resps = [_call_once(first)]
@@ -1920,6 +2031,7 @@ def measure_linux_ollama_generate(
                 with ThreadPoolExecutor(max_workers=workers) as pool:
                     pass_resps = list(pool.map(_call_once, range(first, first + workers)))
             wall_s = max(clock() - started, 1e-9)
+            _phase(f"{cell}: pass {pass_no + 1} answered in {wall_s:.1f} s, sampling VRAM")
             used_now, _ = _sample_during_cell(sample_vram_mib)
             peak_mib = max(peak_mib, used_now)
             prefill_ns = [int(r.get("prompt_eval_duration") or 0) for r in pass_resps]
@@ -1979,6 +2091,7 @@ def measure_linux_ollama_generate(
                 }
             )
         size, size_vram = _query_ps_entry(server, model)
+        _phase(f"{cell}: end, measured")
     except BaseException as exc:
         failure = _failure_for(server, exc, peak_mib, budget)
         if failure.failure_class == "timeout":
@@ -2014,6 +2127,7 @@ def measure_linux_ollama_generate(
         "throughput_method": "ollama_durations_decode_window",
         "end_to_end_tok_s": round(float(sorted(float(s["end_to_end_tok_s"]) for s in repeat_slots)[mid]), 3),
         "request_timeout_s": budget_s,
+        "cell_wall_s": CELL_WALL_S,
         "per_request_decode_tok_s": round(sum(per_request) / len(per_request), 3) if per_request else None,
     }
 

@@ -125,6 +125,10 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
     failure_reasons: list[str] = []
     pool: list[Mapping] = []
     for row in visible_rows:
+        if row.get("not_for_import") is True or str(row.get("device", "")).startswith("rig:"):
+            if _task_model(row, request):
+                excluded.append({"id": str(row["id"]), "code": "rig_check"})  # the harness on the rig's own card
+            continue
         outcome = row.get("outcome")
         if outcome in EXCLUDED_OUTCOMES and _task_model(row, request):
             excluded.append({"id": str(row["id"]), "code": str(outcome)})

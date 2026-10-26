@@ -56,6 +56,11 @@ def import_remote_window(
         ident = RemoteDeviceIdentity.from_dict(remote_raw)
     except DeviceRefused as exc:
         raise ImportError_(f"{source_path}: {exc}") from exc
+    if ident.not_for_import:
+        raise ImportError_(
+            f"{source_path}: remote_device.provider is {ident.provider!r}: a rig check of the harness, not a "
+            "measurement of a Colab card (not_for_import), and is never imported"
+        )
 
     provenance = source_provenance(source_path, commit_sha, raw)
     doc_engine_version = str(doc.get("engine_version") or "").strip()
@@ -104,6 +109,11 @@ def _routing_rows(docs: list[Any], source_path: str) -> list[dict[str, Any]]:
         if not isinstance(doc, Mapping):
             raise ImportError_(f"{where}: a routing row must be a JSON object")
         row = dict(doc)
+        if row.get("not_for_import") is not False and "not_for_import" in row:
+            raise ImportError_(
+                f"{where}: not_for_import is {row.get('not_for_import')!r}: this row is a rig check of the harness, "
+                "not a measurement of a Colab card, and is never imported"
+            )
         device = row.get("device")
         if not isinstance(device, str) or not device.startswith("colab:"):
             raise ImportError_(f"{where}: device {device!r} is not a remote colab:<card> device")

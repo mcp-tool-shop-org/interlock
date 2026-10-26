@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **A per-cell wall cap.** `request_timeout_s` is clamped to 120 to 900 s per request, so a slow, fully resident c4 or c8 cell could take four passes of 900 s (an hour) plus up to six calibration calls, and a few such cells in a 3-quant window on an 80 or 96 GB card could pass Colab's roughly 4 h VM-loss line. A cell now has `CELL_WALL_S = 1800` (`settings.cell_wall_s` on every generate-ladder row). After calibration, a cell whose projected wall, `(1 warmup + repeats) x (ceil(3 x concurrency x t_verify_s) + 60)` from the real unclamped estimate, is over the cap is refused before any timed pass and recorded as `timeout` (`projected N s > cell wall 1800 s; not run`). `CELL_DEADLINE_S` (2 x the cap) is the outer bound over the whole cell: whatever call is blocked, the cell ends as an `unmeasured` row and the ladder carries on. The harness cannot see the window's wall; the launcher's wall stays the outer bound of the window.
+- **`CALIBRATION_TIMEOUT_S` is 300 s (was 900).** A calibration call is a single request with a one-token reply. The slowest fully resident one on record is T4 r3's p16384 verify at 25.1 s (Ollama's Go side costs about 0.57 ms per prompt token on 2 vCPUs, so p32768 projects to about 70 s); the rig's 33k prefill takes 3.7 s. 300 s is more than four times the slowest projection, and a stuck cell's calibration is now bounded at 30 minutes instead of 90.
+- **The T4 r4 hang: a VRAM sample has a deadline.** After the c4 16k cell's host-RAM `oom` row the run sent nothing for 56 minutes and its run record stayed `closed: false`; the likely place is the NVML sample at the start of the next cell, which has no timeout of its own and ran just after the kernel's OOM killer took a CUDA process (not proven; the r4 run printed no per-phase marker). Every VRAM sample now runs on a daemon thread with `SAMPLER_TIMEOUT_S = 30`; on expiry the cell is `unmeasured` (`VRAM sampler did not answer within 30 s`) and the ladder continues, so a wedged NVML costs 30 s a cell, not the window. A sampler that fails (rather than hangs) is still a `sampler_error`; the first sample of a cell used to propagate its exception raw and now follows the same rule.
+- **Phase markers.** The harness writes one line per phase to stderr (`[interlock HH:MM:SSZ] cell p32768 c4: start, sampling VRAM`, each probe and verify sent, calibrated, each pass sent and answered, VRAM sampled, cell end), so the next hang names its own call.
+- **No "margin of 0.0 MiB" clause.** When Ollama gave the system memory in MiB there is no GiB rounding margin, and the host-RAM reason no longer prints one.
+
+### Added
+
+- **A rig-check identity.** The Linux ladder only accepted Colab identities, so rig checks of the harness had to pass a placeholder `colab:L4` and their rows were labelled as L4 data. `RemoteDeviceIdentity.rig(card, vram_mib, driver_version, cuda_version)` is provider `rig` with a free-text card (`RTX 5090`), pool `rig-local`, and device `rig:RTX5090`. Every row built with it carries `not_for_import: true`. The routing-row schema allows the rig form only with `not_for_import: true` (a `rig:` row without it fails validation); Colab identities and rows are unchanged. `interlock import` refuses a rig row or a rig-provider envelope, naming `not_for_import`, and `route` excludes one that reaches a table with the new code `rig_check` (in the route-decision schema) and never ranks it.
+
 ## [1.0.7] - 2026-10-26
 
 ### Fixed

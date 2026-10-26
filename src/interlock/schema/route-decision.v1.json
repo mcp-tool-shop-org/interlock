@@ -87,7 +87,8 @@
               "ctx_exceeded",
               "sampler_error",
               "generation_aborted",
-              "unmeasured"
+              "unmeasured",
+              "rig_check"
             ]
           }
         }
