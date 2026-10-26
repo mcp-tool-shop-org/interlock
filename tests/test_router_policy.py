@@ -25,6 +25,9 @@ ROOT = Path(__file__).resolve().parents[1]
 _QUIET = settings(max_examples=25, deadline=None, database=None)
 
 
+SINGLE_STREAM_NOTE = "ranked at concurrency 1 on decode_tok_s, the pass aggregate across 1 concurrent request(s)"
+
+
 def ask(**kwargs):
     if "busy" in kwargs and not isinstance(kwargs["busy"], frozenset):
         kwargs["busy"] = frozenset(kwargs["busy"])
@@ -194,7 +197,7 @@ def test_a_synthetic_5090_phi_row_wins_when_one_exists():
 
     missing = decide([igpu], ask(model="Phi"))
     assert isinstance(missing, Decision)
-    assert missing.document["notes"] == ["no 5090 row"]
+    assert missing.document["notes"] == ["no other candidate", "no 5090 row", SINGLE_STREAM_NOTE]
 
     weak = measured("phi/5090", "5090", throughput=3, repo="phi:mini")
     lost = decide([igpu, weak], ask(model="Phi"))
@@ -336,7 +339,7 @@ def test_thinking_on_matches_any_level_and_keeps_the_recorded_one():
     quiet = decide([intel, card], ask(model="Phi", thinking="off"))
     assert isinstance(quiet, Decision)
     assert quiet.document["device"] == "iGPU"
-    assert quiet.document["notes"] == ["no 5090 row"]
+    assert quiet.document["notes"] == ["no other candidate", "no 5090 row", SINGLE_STREAM_NOTE]
 
 
 def test_parity_invalid_is_excluded_and_a_capability_code_wins():
@@ -600,7 +603,7 @@ def test_mismatched_5090_rows_and_thin_runners_are_named():
     missed = decide(cards + [igpu], ask(model="Phi", thinking="off", ctx=1024, quote_rule=2, num_predict=64))
     assert isinstance(missed, Decision)
     assert missed.document["device"] == "iGPU"
-    assert missed.document["notes"] == ["no 5090 row"]
+    assert missed.document["notes"] == ["no other candidate", "no 5090 row", SINGLE_STREAM_NOTE]
 
     wide = measured("wide", "iGPU", task="embed", num_ctx=4096, slots="empty", claim_wall=2)
     narrow = measured("narrow", "CPU", task="embed", num_ctx=128, slots="empty", claim_wall=1)
@@ -856,5 +859,5 @@ def test_shape_no_card_fits_refuses_with_the_measured_reason():
     assert "22400 MiB" in refused.document["hint"]
     assert "20730 MiB" in refused.document["hint"]
     excluded_codes = {item["id"]: item["code"] for item in refused.document["excluded"]}
-    assert excluded_codes == {"c2/t4-31b": "load_refused", "c2/l4-31b": "oom"}
+    assert excluded_codes == {"c2/t4-31b": "load_refused", "c2/l4-31b": "oom", "c2/a100-31b": "fill_card"}
 

@@ -96,12 +96,13 @@ def fill_card_row(row_id: str, device: str, max_ctx: int) -> dict:
     return body
 
 
-def test_a_fill_card_row_is_not_a_ladder_row_and_keeps_routing_beside_v2_rows():
+def test_a_fill_card_row_is_not_a_ladder_row_and_never_ranks_in_generate():
     fill = fill_card_row("t4-fill", "colab:T4", 22528)
-    assert ladder_version(fill) is None
+    assert ladder_version(fill) is None  # not a ladder row, so the v2 filter does not drop it...
     rows = [fill, row("t4-v2", "colab:T4", 100.0, 2)]
-    result = decide(rows, request(ctx=16384))
-    assert winner(result) == "t4-fill"
+    result = decide(rows, request())
+    assert winner(result) == "t4-v2"  # ...but it is a load probe, so it is not a generate candidate either
+    assert {"id": "t4-fill", "code": "fill_card"} in result.document["excluded"]
 
 
 def test_a_v1_row_cannot_win_because_the_v2_row_failed_a_floor():

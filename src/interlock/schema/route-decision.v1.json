@@ -22,6 +22,8 @@
   "properties": {
     "version": {"const": 1},
     "task": {"type": "string", "minLength": 1},
+    "concurrency": {"type": "integer", "minimum": 1},
+    "ranked_field": {"type": "string", "minLength": 1},
     "model": {"type": "string", "minLength": 1},
     "engine": {
       "type": "object",
@@ -87,7 +89,8 @@
               "ctx_exceeded",
               "sampler_error",
               "generation_aborted",
-              "unmeasured"
+              "unmeasured",
+              "fill_card"
             ]
           }
         }
