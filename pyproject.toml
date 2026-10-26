@@ -67,9 +67,10 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/interlock"]
 
-# The C2 throughput inputs are one committed file; the wheel gets it as package data.
+# The C2 throughput inputs and the model family table are one committed file each; the wheel gets them as package data.
 [tool.hatch.build.targets.wheel.force-include]
 "experiments/c2-throughput/inputs.json" = "interlock/harness/data/c2-throughput-inputs.json"
+"table/model-families.json" = "interlock/data/model-families.json"
 
 [tool.uv]
 default-groups = ["dev"]

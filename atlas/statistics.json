@@ -135,7 +135,7 @@
       "confidence": "low",
       "highWater": null,
       "name": "src",
-      "qualifyingSourceCommits": 28,
+      "qualifyingSourceCommits": 29,
       "rebaseline": null
     },
     {
@@ -169,7 +169,7 @@
       "confidence": "full",
       "highWater": null,
       "name": "tests",
-      "qualifyingSourceCommits": 89,
+      "qualifyingSourceCommits": 87,
       "rebaseline": null
     }
   ],
@@ -187,8 +187,8 @@
         "path": ".github/dependabot.yml"
       },
       {
-        "commits": 12,
-        "lines": 299,
+        "commits": 11,
+        "lines": 291,
         "path": ".github/workflows/ci.yml"
       },
       {
@@ -237,43 +237,43 @@
         "path": "LICENSE"
       },
       {
-        "commits": 10,
-        "lines": 630,
+        "commits": 11,
+        "lines": 636,
         "path": "README.es.md"
       },
       {
-        "commits": 10,
-        "lines": 710,
+        "commits": 11,
+        "lines": 716,
         "path": "README.fr.md"
       },
       {
-        "commits": 9,
-        "lines": 666,
+        "commits": 10,
+        "lines": 672,
         "path": "README.hi.md"
       },
       {
-        "commits": 10,
-        "lines": 644,
+        "commits": 11,
+        "lines": 650,
         "path": "README.it.md"
       },
       {
-        "commits": 10,
-        "lines": 766,
+        "commits": 11,
+        "lines": 772,
         "path": "README.ja.md"
       },
       {
-        "commits": 30,
-        "lines": 463,
+        "commits": 31,
+        "lines": 465,
         "path": "README.md"
       },
       {
-        "commits": 10,
-        "lines": 642,
+        "commits": 11,
+        "lines": 648,
         "path": "README.pt-BR.md"
       },
       {
-        "commits": 10,
-        "lines": 710,
+        "commits": 11,
+        "lines": 716,
         "path": "README.zh.md"
       },
       {
@@ -288,7 +288,7 @@
       },
       {
         "commits": 4,
-        "lines": 102,
+        "lines": 104,
         "path": "SHIP_GATE.md"
       },
       {
@@ -377,8 +377,8 @@
         "path": "assets/logo/switchyard_64.png"
       },
       {
-        "commits": 40,
-        "lines": 859,
+        "commits": 41,
+        "lines": 873,
         "path": "atlas/README.md"
       },
       {
@@ -387,18 +387,18 @@
         "path": "atlas/boundaries.yaml"
       },
       {
-        "commits": 40,
-        "lines": 2752,
+        "commits": 41,
+        "lines": 2816,
         "path": "atlas/page.json"
       },
       {
-        "commits": 40,
-        "lines": 7622,
+        "commits": 41,
+        "lines": 8103,
         "path": "atlas/statistics.json"
       },
       {
-        "commits": 40,
-        "lines": 46977,
+        "commits": 41,
+        "lines": 47380,
         "path": "atlas/structure.json"
       },
       {
@@ -853,7 +853,7 @@
       },
       {
         "commits": 23,
-        "lines": 199,
+        "lines": 203,
         "path": "pyproject.toml"
       },
       {
@@ -1322,8 +1322,8 @@
         "path": "site/src/content/docs/handbook/getting-started.md"
       },
       {
-        "commits": 7,
-        "lines": 43,
+        "commits": 8,
+        "lines": 45,
         "path": "site/src/content/docs/handbook/index.md"
       },
       {
@@ -1342,8 +1342,8 @@
         "path": "site/src/pages/index.astro"
       },
       {
-        "commits": 7,
-        "lines": 147,
+        "commits": 8,
+        "lines": 149,
         "path": "site/src/site-config.ts"
       },
       {
@@ -1362,8 +1362,8 @@
         "path": "site/tsconfig.json"
       },
       {
-        "commits": 6,
-        "lines": 16,
+        "commits": 7,
+        "lines": 18,
         "path": "src/interlock/__init__.py"
       },
       {
@@ -2012,7 +2012,7 @@
         "path": "tests/test_devices.py"
       },
       {
-        "commits": 4,
+        "commits": 3,
         "lines": 92,
         "path": "tests/test_distribution.py"
       },
@@ -2118,7 +2118,7 @@
       },
       {
         "commits": 20,
-        "lines": 1404,
+        "lines": 1418,
         "path": "tests/test_openvino_adapter.py"
       },
       {
@@ -2198,7 +2198,7 @@
       },
       {
         "commits": 20,
-        "lines": 1718,
+        "lines": 1720,
         "path": "uv.lock"
       },
       {
@@ -2212,241 +2212,255 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-10-25T21:53:30.801Z",
+  "generatedAt": "2026-10-26T02:44:18.776Z",
   "generatedFrom": {
-    "commit": "bbe78ceb144ff5755ce8934b6c2ad311bca0e63d"
+    "commit": "132aa3c8147d985c38a5491cec50284fb1852915"
   },
   "pairs": [
     {
       "a": "README.es.md",
       "b": "README.fr.md",
-      "either": 10,
-      "shared": 10,
+      "either": 11,
+      "shared": 11,
       "strength": 1
     },
     {
       "a": "README.es.md",
       "b": "README.hi.md",
-      "either": 10,
-      "shared": 9,
-      "strength": 0.9
+      "either": 11,
+      "shared": 10,
+      "strength": 0.909091
     },
     {
       "a": "README.es.md",
       "b": "README.it.md",
-      "either": 10,
-      "shared": 10,
+      "either": 11,
+      "shared": 11,
       "strength": 1
     },
     {
       "a": "README.es.md",
       "b": "README.ja.md",
-      "either": 10,
-      "shared": 10,
+      "either": 11,
+      "shared": 11,
       "strength": 1
     },
     {
       "a": "README.es.md",
       "b": "README.pt-BR.md",
-      "either": 10,
-      "shared": 10,
+      "either": 11,
+      "shared": 11,
       "strength": 1
     },
     {
       "a": "README.es.md",
       "b": "README.zh.md",
-      "either": 10,
-      "shared": 10,
+      "either": 11,
+      "shared": 11,
       "strength": 1
     },
     {
       "a": "README.es.md",
       "b": "site/src/content/docs/handbook/index.md",
-      "either": 11,
-      "shared": 6,
-      "strength": 0.545455
+      "either": 12,
+      "shared": 7,
+      "strength": 0.583333
     },
     {
       "a": "README.es.md",
       "b": "site/src/site-config.ts",
-      "either": 11,
-      "shared": 6,
-      "strength": 0.545455
+      "either": 12,
+      "shared": 7,
+      "strength": 0.583333
     },
     {
       "a": "README.fr.md",
       "b": "README.hi.md",
-      "either": 10,
-      "shared": 9,
-      "strength": 0.9
+      "either": 11,
+      "shared": 10,
+      "strength": 0.909091
     },
     {
       "a": "README.fr.md",
       "b": "README.it.md",
-      "either": 10,
-      "shared": 10,
+      "either": 11,
+      "shared": 11,
       "strength": 1
     },
     {
       "a": "README.fr.md",
       "b": "README.ja.md",
-      "either": 10,
-      "shared": 10,
+      "either": 11,
+      "shared": 11,
       "strength": 1
     },
     {
       "a": "README.fr.md",
       "b": "README.pt-BR.md",
-      "either": 10,
-      "shared": 10,
+      "either": 11,
+      "shared": 11,
       "strength": 1
     },
     {
       "a": "README.fr.md",
       "b": "README.zh.md",
-      "either": 10,
-      "shared": 10,
+      "either": 11,
+      "shared": 11,
       "strength": 1
     },
     {
       "a": "README.fr.md",
       "b": "site/src/content/docs/handbook/index.md",
-      "either": 11,
-      "shared": 6,
-      "strength": 0.545455
+      "either": 12,
+      "shared": 7,
+      "strength": 0.583333
     },
     {
       "a": "README.fr.md",
       "b": "site/src/site-config.ts",
-      "either": 11,
-      "shared": 6,
-      "strength": 0.545455
+      "either": 12,
+      "shared": 7,
+      "strength": 0.583333
     },
     {
       "a": "README.hi.md",
       "b": "README.it.md",
-      "either": 10,
-      "shared": 9,
-      "strength": 0.9
+      "either": 11,
+      "shared": 10,
+      "strength": 0.909091
     },
     {
       "a": "README.hi.md",
       "b": "README.ja.md",
-      "either": 10,
-      "shared": 9,
-      "strength": 0.9
+      "either": 11,
+      "shared": 10,
+      "strength": 0.909091
     },
     {
       "a": "README.hi.md",
       "b": "README.pt-BR.md",
-      "either": 10,
-      "shared": 9,
-      "strength": 0.9
+      "either": 11,
+      "shared": 10,
+      "strength": 0.909091
     },
     {
       "a": "README.hi.md",
       "b": "README.zh.md",
-      "either": 10,
-      "shared": 9,
-      "strength": 0.9
+      "either": 11,
+      "shared": 10,
+      "strength": 0.909091
+    },
+    {
+      "a": "README.hi.md",
+      "b": "site/src/content/docs/handbook/index.md",
+      "either": 12,
+      "shared": 6,
+      "strength": 0.5
+    },
+    {
+      "a": "README.hi.md",
+      "b": "site/src/site-config.ts",
+      "either": 12,
+      "shared": 6,
+      "strength": 0.5
     },
     {
       "a": "README.it.md",
       "b": "README.ja.md",
-      "either": 10,
-      "shared": 10,
+      "either": 11,
+      "shared": 11,
       "strength": 1
     },
     {
       "a": "README.it.md",
       "b": "README.pt-BR.md",
-      "either": 10,
-      "shared": 10,
+      "either": 11,
+      "shared": 11,
       "strength": 1
     },
     {
       "a": "README.it.md",
       "b": "README.zh.md",
-      "either": 10,
-      "shared": 10,
+      "either": 11,
+      "shared": 11,
       "strength": 1
     },
     {
       "a": "README.it.md",
       "b": "site/src/content/docs/handbook/index.md",
-      "either": 11,
-      "shared": 6,
-      "strength": 0.545455
+      "either": 12,
+      "shared": 7,
+      "strength": 0.583333
     },
     {
       "a": "README.it.md",
       "b": "site/src/site-config.ts",
-      "either": 11,
-      "shared": 6,
-      "strength": 0.545455
+      "either": 12,
+      "shared": 7,
+      "strength": 0.583333
     },
     {
       "a": "README.ja.md",
       "b": "README.pt-BR.md",
-      "either": 10,
-      "shared": 10,
+      "either": 11,
+      "shared": 11,
       "strength": 1
     },
     {
       "a": "README.ja.md",
       "b": "README.zh.md",
-      "either": 10,
-      "shared": 10,
+      "either": 11,
+      "shared": 11,
       "strength": 1
     },
     {
       "a": "README.ja.md",
       "b": "site/src/content/docs/handbook/index.md",
-      "either": 11,
-      "shared": 6,
-      "strength": 0.545455
+      "either": 12,
+      "shared": 7,
+      "strength": 0.583333
     },
     {
       "a": "README.ja.md",
       "b": "site/src/site-config.ts",
-      "either": 11,
-      "shared": 6,
-      "strength": 0.545455
+      "either": 12,
+      "shared": 7,
+      "strength": 0.583333
     },
     {
       "a": "README.pt-BR.md",
       "b": "README.zh.md",
-      "either": 10,
-      "shared": 10,
+      "either": 11,
+      "shared": 11,
       "strength": 1
     },
     {
       "a": "README.pt-BR.md",
       "b": "site/src/content/docs/handbook/index.md",
-      "either": 11,
-      "shared": 6,
-      "strength": 0.545455
+      "either": 12,
+      "shared": 7,
+      "strength": 0.583333
     },
     {
       "a": "README.pt-BR.md",
       "b": "site/src/site-config.ts",
-      "either": 11,
-      "shared": 6,
-      "strength": 0.545455
+      "either": 12,
+      "shared": 7,
+      "strength": 0.583333
     },
     {
       "a": "README.zh.md",
       "b": "site/src/content/docs/handbook/index.md",
-      "either": 11,
-      "shared": 6,
-      "strength": 0.545455
+      "either": 12,
+      "shared": 7,
+      "strength": 0.583333
     },
     {
       "a": "README.zh.md",
       "b": "site/src/site-config.ts",
-      "either": 11,
-      "shared": 6,
-      "strength": 0.545455
+      "either": 12,
+      "shared": 7,
+      "strength": 0.583333
     },
     {
       "a": "SECURITY.md",
@@ -2458,43 +2472,43 @@
     {
       "a": "atlas/README.md",
       "b": "atlas/page.json",
-      "either": 36,
-      "shared": 36,
+      "either": 37,
+      "shared": 37,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/statistics.json",
-      "either": 36,
-      "shared": 36,
+      "either": 37,
+      "shared": 37,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/structure.json",
-      "either": 36,
-      "shared": 36,
+      "either": 37,
+      "shared": 37,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/statistics.json",
-      "either": 36,
-      "shared": 36,
+      "either": 37,
+      "shared": 37,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/structure.json",
-      "either": 36,
-      "shared": 36,
+      "either": 37,
+      "shared": 37,
       "strength": 1
     },
     {
       "a": "atlas/statistics.json",
       "b": "atlas/structure.json",
-      "either": 36,
-      "shared": 36,
+      "either": 37,
+      "shared": 37,
       "strength": 1
     },
     {
@@ -2535,37 +2549,37 @@
     {
       "a": "site/src/content/docs/handbook/index.md",
       "b": "site/src/content/docs/handbook/security.md",
-      "either": 7,
+      "either": 8,
       "shared": 5,
-      "strength": 0.714286
+      "strength": 0.625
     },
     {
       "a": "site/src/content/docs/handbook/index.md",
       "b": "site/src/site-config.ts",
-      "either": 7,
-      "shared": 7,
+      "either": 8,
+      "shared": 8,
       "strength": 1
     },
     {
       "a": "site/src/content/docs/handbook/index.md",
       "b": "src/interlock/__init__.py",
-      "either": 8,
-      "shared": 4,
-      "strength": 0.5
+      "either": 9,
+      "shared": 5,
+      "strength": 0.555556
     },
     {
       "a": "site/src/content/docs/handbook/security.md",
       "b": "site/src/site-config.ts",
-      "either": 7,
+      "either": 8,
       "shared": 5,
-      "strength": 0.714286
+      "strength": 0.625
     },
     {
       "a": "site/src/site-config.ts",
       "b": "src/interlock/__init__.py",
-      "either": 8,
-      "shared": 4,
-      "strength": 0.5
+      "either": 9,
+      "shared": 5,
+      "strength": 0.555556
     },
     {
       "a": "src/interlock/harness/fill.py",
@@ -2648,16 +2662,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-10-25T17:50:16-04:00",
+    "headDate": "2026-10-25T20:58:13-04:00",
     "inScopeFiles": 297,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 138,
+    "qualifyingCommits": 137,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-04-28T21:50:16.000Z",
+    "since": "2026-04-29T00:58:13.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",

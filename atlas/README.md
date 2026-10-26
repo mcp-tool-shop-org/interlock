@@ -1,6 +1,6 @@
 # interlock: how it works
 
-Mapped at 2026-10-25 from commit bbe78ce by Atlas 1.24.0.
+Mapped at 2026-10-26 from commit 132aa3c by Atlas 1.24.0.
 
 ## What this is
 
@@ -8,9 +8,10 @@ interlock routes each job to a model, engine and device from a receipt-backed ta
 
 10 parts, mostly Python (106 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.
 
-## What changed since 2026-10-25 (fc864e4)
+## What changed since 2026-10-25 (bbe78ce)
 
-Nothing structural changed since 2026-10-25; 22 files changed content.
+- table/model-families.json is now also read by pyproject.toml.
+- 19 files changed content, across 4 parts.
 
 ## What comes in
 
@@ -49,9 +50,9 @@ CI writes nothing this map can see.
 
 - **src/switchyard/adapters/openvino.py** and **tests/test_openvino_adapter.py** changed together in 17 of 23 commits.
 - **src/interlock/harness/fill.py** and **tests/test_fill_card_live.py** changed together in 8 of 14 commits, and the tests part imports the src part.
+- **site/src/site-config.ts** and **src/interlock/__init__.py** changed together in 5 of 9 commits.
 - **src/interlock/harness/fill.py** and **tests/test_e5_preflight.py** changed together in 5 of 9 commits, and the tests part imports the src part.
 - **src/switchyard/harness/receipts.py** and **src/switchyard/receipt.py** changed together in 7 of 13 commits.
-- **site/src/site-config.ts** and **src/interlock/__init__.py** changed together in 4 of 8 commits.
 
 1 file changed together with its own test, as expected.
 

@@ -35,23 +35,31 @@
   "changes": {
     "fileCounts": {
       "added": 0,
-      "changed": 22,
+      "changed": 19,
       "moved": 0,
       "parts": 4,
       "removed": 0
     },
     "items": [
       {
+        "kind": "landing",
+        "sentence": "table/model-families.json is now also read by pyproject.toml.",
+        "subjects": [
+          "table/model-families.json",
+          "pyproject.toml"
+        ]
+      },
+      {
         "kind": "counts",
-        "sentence": "Nothing structural changed since 2026-10-25; 22 files changed content.",
+        "sentence": "19 files changed content, across 4 parts.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "fc864e402f5ce1ae717f39128a3dbb24229ddd86",
-      "generatedAt": "2026-10-25T18:33:37.959Z"
+      "commit": "bbe78ceb144ff5755ce8934b6c2ad311bca0e63d",
+      "generatedAt": "2026-10-25T21:53:30.801Z"
     },
-    "unchanged": true
+    "unchanged": false
   },
   "changesTogether": [
     {
@@ -85,6 +93,21 @@
       "shared": 8
     },
     {
+      "a": "site/src/site-config.ts",
+      "b": "src/interlock/__init__.py",
+      "either": 9,
+      "partLabels": [
+        null,
+        "src"
+      ],
+      "parts": [
+        null,
+        "src"
+      ],
+      "relation": "unassigned",
+      "shared": 5
+    },
+    {
       "a": "src/interlock/harness/fill.py",
       "b": "tests/test_e5_preflight.py",
       "either": 9,
@@ -113,21 +136,6 @@
       ],
       "relation": "unassigned",
       "shared": 7
-    },
-    {
-      "a": "site/src/site-config.ts",
-      "b": "src/interlock/__init__.py",
-      "either": 8,
-      "partLabels": [
-        null,
-        "src"
-      ],
-      "parts": [
-        null,
-        "src"
-      ],
-      "relation": "unassigned",
-      "shared": 4
     }
   ],
   "changesTogetherNote": [
@@ -136,7 +144,7 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 13 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 1,
-  "commit": "bbe78ceb144ff5755ce8934b6c2ad311bca0e63d",
+  "commit": "132aa3c8147d985c38a5491cec50284fb1852915",
   "defaultBranch": "main",
   "derived": "10 parts, mostly Python (106 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
   "doors": [
@@ -301,7 +309,7 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-25T21:53:30.801Z",
+  "generatedAt": "2026-10-26T02:44:18.776Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "5 writes and 6 reads use paths built at run time and are not named here.",
