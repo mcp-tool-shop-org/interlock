@@ -38,7 +38,7 @@ Generate ranks by the lowest repeat-slot decode tok/s. Every other task ranks by
 
 A row older than 30 days is stale. A row marked provisional, or with fewer than two repeats, is provisional. Both stay eligible and are flagged.
 
-`native_binary_rejected`, `compile_rejected`, `compile_timeout`, `hang`, `device_lost`, `oom`, `load_refused`, `timeout`, `ctx_exceeded`, and a row with `parity_valid` false are listed under excluded. They are not candidates. When no row meets the constraints the command exits 1 and names the constraint and any measured failure reason. It does not fall back.
+`native_binary_rejected`, `compile_rejected`, `compile_timeout`, `hang`, `device_lost`, `oom`, `load_refused`, `timeout`, `ctx_exceeded`, the unmeasured kinds (`sampler_error`, `generation_aborted`, `unmeasured`), and a row with `parity_valid` false are listed under excluded. Generate-ladder rows are ranked only within the newest `ladder_version` present, and `notes` says how many older rows were not compared. They are not candidates. When no row meets the constraints the command exits 1 and names the constraint and any measured failure reason. It does not fall back.
 
 Remote `colab:<card>` cards are opt-in: a default `interlock route` request never selects a remote card unless `--allow-remote` or `--device colab:<card>` is passed.
 

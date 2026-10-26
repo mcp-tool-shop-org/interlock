@@ -40,6 +40,6 @@ OpenVINO runs, when a run is actually started, use `NPU`, `CPU`, or the Intel iG
 
 ## What a route is not
 
-A route is not a server, a proxy, or a launch. A remote `colab:<card>` row is eligible only when the request opts in (`--allow-remote` or `--device colab:<card>`), and failed remote shapes (`oom`, `load_refused`, `timeout`, `ctx_exceeded`) are recorded as capability rows so refusals name the measured reason. A remote row can also carry an `offrig_plan` object so a later tool could price a pod. interlock does not call that tool and does not spend.
+A route is not a server, a proxy, or a launch. A remote `colab:<card>` row is eligible only when the request opts in (`--allow-remote` or `--device colab:<card>`), and failed remote shapes (`oom`, `load_refused`, `timeout`, `ctx_exceeded`) are recorded as capability rows so refusals name the measured reason. A cell that was not measured (`generation_aborted`, `unmeasured`) is recorded too, but makes no capability claim, and the router never ranks it. Generate-ladder rows carry `settings.ladder_version`, and the router ranks them only within the newest version present. A remote row can also carry an `offrig_plan` object so a later tool could price a pod. interlock does not call that tool and does not spend.
 
 The schema for a `--json` decision is `src/interlock/schema/route-decision.v1.json`.

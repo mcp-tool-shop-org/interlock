@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-10-26
+
 ### Fixed
 
 - **A looped generation and a request timeout were recorded as `load_refused`.** `classify_linux_error` sent every error it did not recognise to `load_refused` (and still did, until this change), so Ollama's "prediction aborted, token repeat limit reached" and a Go-style "HTTP 500 after 2m0s" became rows saying the card refused to load the model (T4 rung r1: 10 phi3.5 cells and 3 ctx-32768 cells). A looped generation is now `generation_aborted` and a request timeout is `timeout` (the existing kind; not a new `timed_out`). `load_refused` is left for real load and VRAM refusals.
@@ -14,6 +16,11 @@
 - The table copy of every unmeasured row (`sampler_error`, `generation_aborted`, `unmeasured`) no longer says "this device can't do this setting".
 - `unmeasured`, a second kind for a cell that was not measured, with the same rules as `generation_aborted` (schemas, receipt, router `excluded`). It is what an unrecognised error and an un-calibratable prompt become.
 - `settings.ladder_version` on every generate-ladder row, success or failure (`GENERATE_LADDER_VERSION`, now 2). A row without the field is version 1 (a Colab generate row; the rig's own harness rows have no version). `interlock route` considers only the newest version present for a device and model, ranks only within the newest version across devices, and says so in `notes` ("N older-ladder row(s) not compared", "ranked on ladder version 2 only; version(s) 1 not compared"); a device that has only version 1 still routes when asked for with `--device`. `interlock table` groups ladder rows by device, model and version and shows `ladder vN`. Only ladder cells (rows with a `concurrency`) carry a version: a fill-card row has none and keeps routing beside v2 rows. The newest-version filter runs right after the task, model and device steps, before any floor (within a device and model, and across devices), so a v1 row cannot win or be listed because a v2 row failed a floor. `settings.num_ctx` on a ladder row is the nominal prompt length; the request sent prompt + `num_predict` + 64. `settings.prompt_tokens_target` is the requested length; a failure row that has only a request says `prompt_token_method: requested_not_verified`. The legacy envelope importer keeps `ladder_version`, `prompt_tokens_target` and `prompt_token_method`.
+
+### Docs
+
+- README and handbook describe the unmeasured kinds (`generation_aborted`, `unmeasured`), generate ladder version 2 and its calibrated prompt length, and ranking within the newest `ladder_version`.
+- `test_a_floored_v1_row_on_another_device_is_not_a_runner_up_beside_a_v2_winner`: the L4 v1 row is at 90 tok/s, under the 100 floor, so it is actually floored.
 
 ## [1.0.4] - 2026-10-26
 
