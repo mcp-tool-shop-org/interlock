@@ -29,9 +29,10 @@ They stay eligible.
 
 Capability rows (``native_binary_rejected``, ``compile_rejected``,
 ``compile_timeout``, ``hang``, ``device_lost``, ``oom``, ``load_refused``,
-``timeout``, ``ctx_exceeded``) are excluded, with those codes, and never
-ranked. A row with ``parity_valid`` false is excluded the same way, code
-``parity_invalid``. When a row is both, the capability code is the one shown.
+``timeout``, ``ctx_exceeded``) and unmeasured cells (``sampler_error``,
+``generation_aborted``) are excluded, with those codes, and never ranked. A row
+with ``parity_valid`` false is excluded the same way, code ``parity_invalid``.
+When a row is both, the capability code is the one shown.
 Missing ``parity_valid`` stays eligible.
 
 ``thinking`` matches a family. ``off`` matches only ``off``. ``on`` matches
@@ -72,6 +73,7 @@ EXCLUDED_OUTCOMES = (
     "timeout",
     "ctx_exceeded",
     "sampler_error",
+    "generation_aborted",
 )
 
 _KNOWN_PREFIX = frozenset({"on", "off", "default"})
@@ -125,7 +127,7 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
         outcome = row.get("outcome")
         if outcome in EXCLUDED_OUTCOMES and _task_model(row, request):
             excluded.append({"id": str(row["id"]), "code": str(outcome)})
-            measured = None if outcome == "sampler_error" else _measured_failure_reason(row)
+            measured = None if outcome in {"sampler_error", "generation_aborted"} else _measured_failure_reason(row)
             if measured is not None:
                 failure_reasons.append(f"{row.get('device')}: {measured}")
         elif outcome in EXCLUDED_OUTCOMES:

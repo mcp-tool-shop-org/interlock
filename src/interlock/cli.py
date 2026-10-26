@@ -41,7 +41,7 @@ constraints:
 A row with no repeat spread is not ranked on that metric. The margin is the
 gap between conservative bounds, never a median. Capability rows
 (native_binary_rejected, compile_rejected, compile_timeout, hang,
-device_lost, oom, load_refused, timeout, ctx_exceeded, sampler_error) and a row with
+device_lost, oom, load_refused, timeout, ctx_exceeded, sampler_error, generation_aborted) and a row with
 parity_valid false (parity_invalid) are listed under excluded and are not
 candidates. No row meets the constraints: exit 1 and a structured error. It
 does not fall back.

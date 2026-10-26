@@ -34,40 +34,24 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 1,
-      "changed": 2,
+      "added": 0,
+      "changed": 21,
       "moved": 0,
       "parts": 3,
       "removed": 0
     },
     "items": [
       {
-        "kind": "landing",
-        "sentence": "src/interlock/families.py is now read by tests/test_packaging.py.",
-        "subjects": [
-          "src/interlock/families.py",
-          "tests/test_packaging.py"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": "src/interlock/harness/linux_cuda.py is now read by tests/test_packaging.py.",
-        "subjects": [
-          "src/interlock/harness/linux_cuda.py",
-          "tests/test_packaging.py"
-        ]
-      },
-      {
         "kind": "counts",
-        "sentence": "1 file added and 2 changed content, across 3 parts.",
+        "sentence": "Nothing structural changed since 2026-10-26; 21 files changed content.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "132aa3c8147d985c38a5491cec50284fb1852915",
-      "generatedAt": "2026-10-26T02:44:18.776Z"
+      "commit": "b99c46b9c63e385d07e67d950b6b7684bbc60575",
+      "generatedAt": "2026-10-26T03:15:18.115Z"
     },
-    "unchanged": false
+    "unchanged": true
   },
   "changesTogether": [
     {
@@ -86,6 +70,21 @@
       "shared": 17
     },
     {
+      "a": "site/src/site-config.ts",
+      "b": "src/interlock/__init__.py",
+      "either": 10,
+      "partLabels": [
+        null,
+        "src"
+      ],
+      "parts": [
+        null,
+        "src"
+      ],
+      "relation": "unassigned",
+      "shared": 6
+    },
+    {
       "a": "src/interlock/harness/fill.py",
       "b": "tests/test_fill_card_live.py",
       "either": 14,
@@ -99,21 +98,6 @@
       ],
       "relation": "b-imports-a",
       "shared": 8
-    },
-    {
-      "a": "site/src/site-config.ts",
-      "b": "src/interlock/__init__.py",
-      "either": 9,
-      "partLabels": [
-        null,
-        "src"
-      ],
-      "parts": [
-        null,
-        "src"
-      ],
-      "relation": "unassigned",
-      "shared": 5
     },
     {
       "a": "src/interlock/harness/fill.py",
@@ -152,7 +136,7 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 13 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 1,
-  "commit": "b99c46b9c63e385d07e67d950b6b7684bbc60575",
+  "commit": "a8fef21fbea8e3e6bcf089b17973ada2442d01ff",
   "defaultBranch": "main",
   "derived": "10 parts, mostly Python (107 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
   "doors": [
@@ -317,7 +301,7 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-26T03:15:18.115Z",
+  "generatedAt": "2026-10-26T05:31:38.551Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "5 writes and 6 reads use paths built at run time and are not named here.",

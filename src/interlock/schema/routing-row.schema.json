@@ -94,6 +94,7 @@
         "price_snapshot": {"type": ["string", "null"], "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
         "prompt_tokens": {"type": ["integer", "null"], "minimum": 0},
         "prompt_token_method": {"type": ["string", "null"]},
+        "ladder_version": {"type": ["integer", "null"], "minimum": 1},
         "prompt_token_search": {"type": ["integer", "null"], "minimum": 0},
         "prompt_token_cold": {"type": ["integer", "null"], "minimum": 0},
         "truncated_tokens": {"type": ["integer", "null"], "minimum": 0}
@@ -138,7 +139,8 @@
         "load_refused",
         "timeout",
         "ctx_exceeded",
-        "sampler_error"
+        "sampler_error",
+        "generation_aborted"
       ]
     },
     "parity_valid": {"type": "boolean"},

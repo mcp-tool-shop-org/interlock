@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **A looped generation and a request timeout were recorded as `load_refused`.** `classify_linux_error` sent every error it did not recognise to `load_refused`, so Ollama's "prediction aborted, token repeat limit reached" and a Go-style "HTTP 500 after 2m0s" became rows saying the card refused to load the model (T4 rung r1: 10 phi3.5 cells and 3 ctx-32768 cells). A looped generation is now `generation_aborted` and a request timeout is `timeout` (the existing kind; not a new `timed_out`). `load_refused` is left for real load and VRAM refusals.
+- **The generate ladder's prompt made some models loop.** Version 1 sent `"token "` repeated; phi3.5 repeated it until Ollama aborted, so those cells timed a loop, not decode. Version 2 sends varied, deterministic text that ends in an instruction (`ladder_prompt`).
+
+### Added
+
+- `generation_aborted`, a failure kind for a cell that was not measured. It sits beside `sampler_error`: it says nothing about what the card can load, so a spec cannot pre-register it, the receipt reads it as untimed and never as a speed or a capability, and the router lists it under `excluded` and never ranks it. It is in the routing-row and route-decision schemas.
+- `settings.ladder_version` on every generate-ladder row, success or failure (`GENERATE_LADDER_VERSION`, now 2). A row without the field is version 1, the repeated-token prompt; v1 and v2 speeds must not be compared. No router check enforces that yet.
+
 ## [1.0.4] - 2026-10-26
 
 ### Fixed

@@ -7,7 +7,9 @@ total VRAM, driver version, and CUDA version come from NVML (``pynvml`` /
 ``nvidia-ml-py``) or ``nvidia-smi --query-gpu``.
 
 Failed shapes (``oom``, ``load_refused``, ``timeout``, ``ctx_exceeded``) are
-recorded as validated routing rows, never silently skipped.
+recorded as validated routing rows, never silently skipped. A cell that was not
+measured (``sampler_error``, ``generation_aborted``) is recorded the same way and
+says nothing about what the card can load.
 """
 
 from __future__ import annotations
@@ -42,10 +44,15 @@ UNRECORDED = "unrecorded"
 FAILURE_CLASSES = ("oom", "load_refused", "timeout", "ctx_exceeded")
 # A cell that was not measured. It says nothing about what the card can load, so it is not a capability outcome and
 # a spec cannot pre-register it (spec.py checks FAILURE_CLASSES, which stays the capability set).
-MEASUREMENT_FAILURE_CLASSES = ("sampler_error",)
+MEASUREMENT_FAILURE_CLASSES = ("sampler_error", "generation_aborted")
 ROW_FAILURE_CLASSES = FAILURE_CLASSES + MEASUREMENT_FAILURE_CLASSES
 GENERATE_PROMPT_LENGTHS = (512, 1024, 2048, 4096, 8192, 16384, 32768)
 GENERATE_CONCURRENCIES = (1, 4, 8)
+# The generate ladder's version, recorded in every generate row's settings (`ladder_version`). A row with no field is
+# version 1: the prompt was "token " repeated, which makes some models loop until Ollama aborts the prediction (T4 r1,
+# phi3.5 at ctx 2048-16384), so those cells timed a loop. Version 2 sends varied text (`ladder_prompt`). A speed read
+# from one version must not be compared with the other.
+GENERATE_LADDER_VERSION = 2
 THROUGHPUT_TASKS = ("embed", "rerank", "nli")
 THROUGHPUT_BATCH_SIZES = (1, 8, 32)
 THROUGHPUT_TOKEN_LENGTHS = (128, 510)
@@ -570,6 +577,8 @@ def build_linux_failure_row(
         "failure_class": failure_class,
         "failure_reason": clean_reason,
     }
+    if task == "generate":
+        settings["ladder_version"] = GENERATE_LADDER_VERSION
     if prompt_tokens is not None:
         settings["prompt_tokens"] = prompt_tokens
     elif token_length is not None:
@@ -998,6 +1007,7 @@ def run_linux_generate_ladder(
                     "static_shape": None,
                     "precision": None,
                     "prompt_tokens": prompt_len,
+                    "ladder_version": GENERATE_LADDER_VERSION,
                     "concurrency": concurrency,
                     "ttft_ms": ttft_ms,
                     "decode_tok_s": decode_tok_s,
@@ -1185,13 +1195,22 @@ def run_linux_throughput_ladder(
 
 
 def classify_linux_error(exc: BaseException, peak_mib: int | None = None) -> LinuxShapeFailure:
-    """Classify an HTTP or runtime error into one of the four Linux failure classes."""
+    """Classify an HTTP or runtime error. Only a real load or VRAM refusal is `load_refused`."""
 
     if isinstance(exc, LinuxShapeFailure):
         return exc
     msg = str(exc).strip() or exc.__class__.__name__
     low = msg.lower()
-    if isinstance(exc, TimeoutError) or "timed out" in low or "timeout" in low:
+    # The model loaded and generated; Ollama stopped a prediction that looped. Not a refusal, and not a speed.
+    if "repeat limit" in low or "prediction aborted" in low:
+        return LinuxShapeFailure("generation_aborted", msg, peak_mib=peak_mib)
+    if (
+        isinstance(exc, TimeoutError)
+        or "timed out" in low
+        or "timeout" in low
+        or "deadline exceeded" in low
+        or re.search(r"http \d{3}.*after \d+(?:\.\d+)?(?:ms|s|m|h)", low)  # Go's "HTTP 500 after 2m0s"
+    ):
         return LinuxShapeFailure("timeout", msg, peak_mib=peak_mib)
     if "context" in low and ("exceed" in low or "limit" in low or "too long" in low):
         return LinuxShapeFailure("ctx_exceeded", msg, peak_mib=peak_mib)
@@ -1323,6 +1342,28 @@ def measure_linux_ollama_window(
     }
 
 
+_LADDER_WORDS = (
+    "river stone market lantern copper garden window harbor bridge forest letter engine ribbon valley candle "
+    "mirror anchor meadow thread summit orchard compass velvet harvest signal marble island kettle pepper "
+    "falcon ladder quartz meadow saddle timber violet walnut yarrow zephyr amber basket cobalt dune ember "
+    "fjord glacier hollow indigo jasper kiln lagoon mosaic nectar opal prairie quiver reef sparrow tundra"
+).split()
+
+
+def ladder_prompt(prompt_tokens: int) -> str:
+    """Varied, deterministic text of about ``prompt_tokens`` words, ending in an instruction.
+
+    Version 1 sent ``"token " * n``. Some models answer that by repeating it until Ollama aborts the prediction, and the
+    cell then timed a loop. Here the word order shifts every pass over the list, so no short period repeats, and the
+    closing line asks for prose. ``GENERATE_LADDER_VERSION`` names this text.
+    """
+
+    count = max(1, prompt_tokens)
+    size = len(_LADDER_WORDS)
+    words = [_LADDER_WORDS[(i * 7 + (i // size) * 13 + i // (size * size)) % size] for i in range(count)]
+    return " ".join(words) + "\n\nIn two or three sentences, describe a quiet town by a river."
+
+
 def measure_linux_ollama_generate(
     server: LinuxOllamaServer,
     sample_vram_mib: Callable[[], tuple[int, int]],
@@ -1337,7 +1378,7 @@ def measure_linux_ollama_generate(
 
     used_before, _ = sample_vram_mib()
     peak_mib = used_before
-    prompt_text = "token " * max(1, prompt_tokens)
+    prompt_text = ladder_prompt(prompt_tokens)
     payload = {
         "model": model,
         "prompt": prompt_text,
