@@ -1,17 +1,18 @@
 # interlock: how it works
 
-Mapped at 2026-10-26 from commit 132aa3c by Atlas 1.24.0.
+Mapped at 2026-10-26 from commit b99c46b by Atlas 1.24.0.
 
 ## What this is
 
 interlock routes each job to a model, engine and device from a receipt-backed table. (written by a person)
 
-10 parts, mostly Python (106 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.
+10 parts, mostly Python (107 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.
 
-## What changed since 2026-10-25 (bbe78ce)
+## What changed since 2026-10-26 (132aa3c)
 
-- table/model-families.json is now also read by pyproject.toml.
-- 19 files changed content, across 4 parts.
+- src/interlock/families.py is now read by tests/test_packaging.py.
+- src/interlock/harness/linux_cuda.py is now read by tests/test_packaging.py.
+- 1 file added and 2 changed content, across 3 parts.
 
 ## What comes in
 

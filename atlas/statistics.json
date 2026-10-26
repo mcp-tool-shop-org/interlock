@@ -132,10 +132,10 @@
       },
       "cohesion": 0,
       "cohesionDropped": false,
-      "confidence": "low",
+      "confidence": "full",
       "highWater": null,
       "name": "src",
-      "qualifyingSourceCommits": 29,
+      "qualifyingSourceCommits": 30,
       "rebaseline": null
     },
     {
@@ -169,7 +169,7 @@
       "confidence": "full",
       "highWater": null,
       "name": "tests",
-      "qualifyingSourceCommits": 87,
+      "qualifyingSourceCommits": 88,
       "rebaseline": null
     }
   ],
@@ -187,18 +187,18 @@
         "path": ".github/dependabot.yml"
       },
       {
-        "commits": 11,
-        "lines": 291,
+        "commits": 12,
+        "lines": 297,
         "path": ".github/workflows/ci.yml"
       },
       {
-        "commits": 2,
-        "lines": 56,
+        "commits": 3,
+        "lines": 62,
         "path": ".github/workflows/pages.yml"
       },
       {
-        "commits": 4,
-        "lines": 124,
+        "commits": 5,
+        "lines": 126,
         "path": ".github/workflows/release.yml"
       },
       {
@@ -217,8 +217,8 @@
         "path": ".python-version"
       },
       {
-        "commits": 53,
-        "lines": 223,
+        "commits": 54,
+        "lines": 237,
         "path": "CHANGELOG.md"
       },
       {
@@ -377,8 +377,8 @@
         "path": "assets/logo/switchyard_64.png"
       },
       {
-        "commits": 41,
-        "lines": 873,
+        "commits": 42,
+        "lines": 882,
         "path": "atlas/README.md"
       },
       {
@@ -387,18 +387,18 @@
         "path": "atlas/boundaries.yaml"
       },
       {
-        "commits": 41,
-        "lines": 2816,
+        "commits": 42,
+        "lines": 2868,
         "path": "atlas/page.json"
       },
       {
-        "commits": 41,
-        "lines": 8103,
+        "commits": 42,
+        "lines": 8421,
         "path": "atlas/statistics.json"
       },
       {
-        "commits": 41,
-        "lines": 47380,
+        "commits": 42,
+        "lines": 47435,
         "path": "atlas/structure.json"
       },
       {
@@ -852,8 +852,8 @@
         "path": "interlock}/tasks.py"
       },
       {
-        "commits": 23,
-        "lines": 203,
+        "commits": 24,
+        "lines": 206,
         "path": "pyproject.toml"
       },
       {
@@ -1400,6 +1400,11 @@
         "commits": 2,
         "lines": 194,
         "path": "src/interlock/devices.py"
+      },
+      {
+        "commits": 1,
+        "lines": 13,
+        "path": "src/interlock/families.py"
       },
       {
         "commits": 1,
@@ -2122,6 +2127,11 @@
         "path": "tests/test_openvino_adapter.py"
       },
       {
+        "commits": 1,
+        "lines": 130,
+        "path": "tests/test_packaging.py"
+      },
+      {
         "commits": 4,
         "lines": 1235,
         "path": "tests/test_phi_storage.py"
@@ -2212,9 +2222,9 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-10-26T02:44:18.776Z",
+  "generatedAt": "2026-10-26T03:15:18.115Z",
   "generatedFrom": {
-    "commit": "132aa3c8147d985c38a5491cec50284fb1852915"
+    "commit": "b99c46b9c63e385d07e67d950b6b7684bbc60575"
   },
   "pairs": [
     {
@@ -2472,43 +2482,43 @@
     {
       "a": "atlas/README.md",
       "b": "atlas/page.json",
-      "either": 37,
-      "shared": 37,
+      "either": 38,
+      "shared": 38,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/statistics.json",
-      "either": 37,
-      "shared": 37,
+      "either": 38,
+      "shared": 38,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/structure.json",
-      "either": 37,
-      "shared": 37,
+      "either": 38,
+      "shared": 38,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/statistics.json",
-      "either": 37,
-      "shared": 37,
+      "either": 38,
+      "shared": 38,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/structure.json",
-      "either": 37,
-      "shared": 37,
+      "either": 38,
+      "shared": 38,
       "strength": 1
     },
     {
       "a": "atlas/statistics.json",
       "b": "atlas/structure.json",
-      "either": 37,
-      "shared": 37,
+      "either": 38,
+      "shared": 38,
       "strength": 1
     },
     {
@@ -2542,9 +2552,9 @@
     {
       "a": "pyproject.toml",
       "b": "uv.lock",
-      "either": 21,
+      "either": 22,
       "shared": 16,
-      "strength": 0.761905
+      "strength": 0.727273
     },
     {
       "a": "site/src/content/docs/handbook/index.md",
@@ -2662,16 +2672,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-10-25T20:58:13-04:00",
-    "inScopeFiles": 297,
+    "headDate": "2026-10-25T23:02:27-04:00",
+    "inScopeFiles": 298,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 137,
+    "qualifyingCommits": 138,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-04-29T00:58:13.000Z",
+    "since": "2026-04-29T03:02:27.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",
