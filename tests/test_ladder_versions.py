@@ -169,7 +169,7 @@ def test_a_v1_row_on_another_device_cannot_win_because_the_v2_row_failed_a_floor
 
 
 def test_a_floored_v1_row_on_another_device_is_not_a_runner_up_beside_a_v2_winner():
-    rows = [row("l4-v1", "colab:L4", 300.0), row("t4-v2", "colab:T4", 120.0, 2), row("a100-v2", "colab:A100", 90.0, 2)]
+    rows = [row("l4-v1", "colab:L4", 90.0), row("t4-v2", "colab:T4", 120.0, 2), row("a100-v2", "colab:A100", 90.0, 2)]
     result = decide(rows, request(min_metrics={"decode_tok_s": 100.0}))
     assert winner(result) == "t4-v2"
     assert "l4-v1" not in json.dumps(result.document)

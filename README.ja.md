@@ -18,7 +18,7 @@
 
 # interlock：ローカルAIデバイスルーター
 
-> **バージョン1.0.4：研究用ツール。** 1.0から、バージョンはセマンティックバージョニングに従います。CLI、レシート形式、または実験仕様形式に互換性のない変更があった場合、新しいメジャーバージョンがリリースされます。interlockはあくまで推奨ツールであり、モデル、エンジン、およびデバイスを提案するだけで、実際にトラフィックを処理することはありません。すべてのローカル番号は、1つの環境（Intel Core Ultra 9 285K、NPU、およびiGPU、さらにRTX 5090）で測定されており、リモートの`colab:<card>`行は、完全なカードID（`provider`、`card`、`vram_mib`、`driver_version`、`cuda_version`、`pool`）を持つ独自の個別の証拠プールに存在します。そのルーティングを、特定のハードウェアプールの測定された証拠として扱い、一般的なベンチマークとしては扱わないでください。
+> **バージョン1.0.5：研究用ツール。** 1.0から、バージョンはセマンティックバージョニングに従います。CLI、レシート形式、または実験仕様形式に互換性のない変更があった場合、新しいメジャーバージョンがリリースされます。interlockはあくまで推奨ツールであり、モデル、エンジン、およびデバイスを提案するだけで、実際にトラフィックを処理することはありません。すべてのローカル番号は、1つの環境（Intel Core Ultra 9 285K、NPU、およびiGPU、さらにRTX 5090）で測定されており、リモートの`colab:<card>`行は、完全なカードID（`provider`、`card`、`vram_mib`、`driver_version`、`cuda_version`、`pool`）を持つ独自の個別の証拠プールに存在します。そのルーティングを、特定のハードウェアプールの測定された証拠として扱い、一般的なベンチマークとしては扱わないでください。
 
 鉄道のinterlockシステムは、列車が競合する経路に進入しないように制御します。このツールは、デバイスに対して同様の制御を行います。各ジョブをモデル、エンジン、およびデバイスに送信します。
 
@@ -54,7 +54,7 @@ uv tool install mcptoolshop-interlock
 1.0.0は、0.2.0の後に続きます。0.3.0という個別のリリースはありません。その変更は、1.0.0に含められています。
 
 - **リモートColabカードをデバイスとして使用。** `colab:A100-40`、`colab:A100-80`、`colab:L4`、`colab:T4`、および`colab:G4`の行には、カードのID（`provider`、`card`、`vram_mib`、ドライバーおよびCUDAバージョン、およびゾーン`pool`）が含まれており、それらは独自のプールに存在し、環境の行とは分離されています。[デバイス](#デバイス)を参照してください。
-- **これらのカード用のLinux CUDA測定パス**（`interlock run`、仕様は`platform: linux-cuda`）、および3つの事前登録された仕様：`experiments/c2-fill-card/`、`experiments/c2-generate/`、および`experiments/c2-throughput/`。失敗した形状（`oom`、`load_refused`、`timeout`、`ctx_exceeded`）は、機能行として保持されます。
+- **Linux CUDA を使用した測定パス**。対象のカード（`interlock run`、特定の `platform: linux-cuda` 仕様を持つもの）に対して、事前に登録された3つの仕様（`experiments/c2-fill-card/`、`experiments/c2-generate/`、`experiments/c2-throughput/`）を用いて測定を行います。測定に失敗した形状（`oom`、`load_refused`、`timeout`、`ctx_exceeded`）は、対応する機能の行として保持されます。測定されなかったセル（`generation_aborted`、Ollama による生成が中断された場合、または `unmeasured`、認識されないエラー、または指定された長さに達しなかったプロンプト）も保持されますが、カードがどのような処理を実行できるかについては何も示しません。各生成ラダーの行には、`settings.ladder_version`と、モデルが実際に評価したプロンプトの長さが記録されます。
 - **すべてのC2モデルは、検証済みのソースを指します。** Ollamaタグとそのレジストリマニフェストダイジェスト、またはGGUFファイルとそのHugging Faceリポジトリ、コミット、およびsha256。Gemma 4 31Bは、OllamaライブラリのQ4_K_M、Q8_0、およびBF16ビルドを使用します。公開されているQ6_Kビルドはないため、そのセルは事前に`load_refused`として登録されています。`interlock c2-sources <spec>`は、各エントリのソースとプルコマンドを出力し、`--verify-live`は、すべてのソース、ダイジェスト、および量子化ラベルを`registry.ollama.ai`および`huggingface.co`と比較して検証します。
 - **スループット入力は、正確なトークン長です。** 各スループットモデルは、固定の128トークンおよび510トークンの入力を使用します。これらは、固定されたリビジョンで独自のトークナイザーを使用して構築されます（512トークンの制限内で、特殊トークンに余裕を持たせるために510を使用します）。これは`experiments/c2-throughput/inputs.json`にコミットされています。再ランキングとNLIは、C2では対象外です。標準のOllamaではどちらもサポートされていないため、これらのセルは事前に`load_refused`として登録され、その理由も記載されています。
 - **オプションのリモートルーティング。** `interlock route`は、リクエストが`--allow-remote`または`--device colab:<card>`に合格しない限り、リモート行を無視します。リモートの勝者は、その`remote_device`とともに`remote: true`としてマークされます。[ルート](#ルート)を参照してください。
@@ -90,7 +90,7 @@ interlockは、トラフィックを処理したり、リクエストをプロ�
 
 `GPU.1`は、この環境でOpenVINOが5090をどのように認識するかを示しています。リゾルバーは、名前やベンダーが変更されても、そのインデックスを拒否します。また、単純な`GPU`、`AUTO`、`HETERO`、`MULTI`、およびベンダーが`0x8086`と`INTEGRATED`でないGPUも拒否します。デバイスのプロパティを持たないリストであっても、完全な名前には「Intel」が含まれている必要があります。デバイスが存在しない場合はエラーとなります。interlockは、より性能の低いものに置き換えられることはありません。
 
-リモートの行には、`remote_device`の識別情報（`provider: "colab"`、`card`、`vram_mib`、`driver_version`、`cuda_version`、およびゾーン文字列`pool`—アカウントIDではない）が含まれます。リモートの行は、ローカルの行とは別に保持され、リソースプールにまとめられることはありません。`interlock table --device colab:<card>`（または`colab:*`）は、リモートの行をリストし、`interlock route`は、オプションが有効になっている場合（`--allow-remote`または`--device colab:<card>`）にのみ、リモートのカードを考慮します。失敗したリモートの形状（`oom`、`load_refused`、`timeout`、`ctx_exceeded`）は、スキップされるのではなく、測定された理由とともに、機能行として記録されます。
+リモートの行には、`remote_device` の識別情報（`provider: "colab"`、`card`、`vram_mib`、`driver_version`、`cuda_version`、およびゾーンを示す `pool` 文字列が含まれます。アカウントIDは含まれません）。 リモートの行は、ローカルの装置の行とは分離されており、装置プールに統合されることはありません。 `interlock table --device colab:<card>`（または`colab:*`）は、リモートの行を一覧表示し、`interlock route`は、オプションが有効になっている場合（`--allow-remote`または`--device colab:<card>`）にのみ、リモートのカードを考慮します。 リモートシェイプの処理に失敗した場合（`oom`、`load_refused`、`timeout`、`ctx_exceeded`のエラーが発生した場合）、その原因が記録された状態で、スキップされるのではなく、対応する機能の行として記録されます。 `interlock route`は、最新の`ladder_version`に存在する行のみを対象に、生成ラダーの行をランク付けし、その注釈には、比較しなかった古い行の数が記載されています。
 
 NPUは排他的に使用されます。5090ステップは、パブリッシャーの許可範囲内でのみ実行されます。ランナーは、その許可を記録します。CPU負荷の高い処理は、パブリッシャーが発表するウィンドウを待ちます。
 
@@ -155,7 +155,7 @@ interlock route --task generate --model Phi --thinking off --ctx 1024 --busy 509
 
 最も低いリピートスロットデコードtok/sでランクを生成します。他のすべてのタスクは、最も高いリピートスロット遅延、または行にリピートスロットがない場合は、最大クレームウォールでランク付けされます。マージンは、これらの保守的な境界間のギャップであり、中央値ではありません。タイの場合、5090は空きになります。30日以上経過した行は、古いと見なされます。一時的とマークされた行、またはリピートが2つ未満の行は、一時的です。どちらも引き続き有効であり、フラグが立てられます。
 
-`native_binary_rejected`、`compile_rejected`、`compile_timeout`、`hang`、`device_lost`、`oom`、`load_refused`、`timeout`、`ctx_exceeded`、および`parity_valid`がfalse（`parity_invalid`）である行は、それらのコードとともに、除外リストにリストされます。これらは候補になりません。リモート行は、リクエストで明示的に許可しない限り（`--allow-remote`または`--device colab:...`）、結果ループの前にフィルタリングされるため、リグ専用のリクエストの除外リストまたは拒否理由には表示されません。機能の成果は、行がパリティが無効な場合にも表示されるコードです。どの行も制約を満たさない場合、コマンドは1を終了し、セットを空にした制約の名前を表示します。フォールバックはありません。`--json`は、`src/interlock/schema/route-decision.v1.json`に対して有効なドキュメントを出力します（リモートの勝者を`remote: true`および`remote_device`でマークします）。`--max-ttft-ms`は、比較されたすべての行が同じ`settings.prefix_caching`（`on`、`off`、または`default`）を記録しない場合、拒否します。未設定は不明を意味します。
+`native_binary_rejected`、`compile_rejected`、`compile_timeout`、`hang`、`device_lost`、`oom`、`load_refused`、`timeout`、`ctx_exceeded`、測定されていない種類（`sampler_error`、`generation_aborted`、`unmeasured`）と、`parity_valid`がfalse（`parity_invalid`）である行が、それらのコードとともに、除外リストに記載されています。これらは候補ではありません。リモート行は、リクエストで明示的に許可されない限り（`--allow-remote`または`--device colab:...`）、結果ループの前にフィルタリングされるため、リグ専用リクエストの除外リストや拒否理由には決して表示されません。機能の実行結果は、その行がパリティチェックに失敗した場合に表示されるコードです。制約を満たす行がない場合、コマンドは1を返して終了し、空になったセットの原因となった制約の名前を表示します。フォールバックは行われません。`--json`は、`src/interlock/schema/route-decision.v1.json`に対して有効なドキュメントを出力します（リモートで勝った行には`remote: true`と`remote_device`を付加します）。`--max-ttft-ms`は、比較されたすべての行が同じ`settings.prefix_caching`（`on`、`off`、または`default`）を記録している場合にのみ、リクエストを受け入れます。未設定は不明を意味します。
 
 リモートの提案には、RunPodのオファーによってバックアップされている場合は`offrig_plan`オブジェクト、または`colab:<card>`行によってバックアップされている場合は`remote: true`および`remote_device`が含まれます。interlockは`offrig_plan`または`offrig_launch`を呼び出したり、支出したりすることはありません。`docs/offrig-integration.md`を参照してください。
 

@@ -18,7 +18,7 @@
 
 # interlock：本地 AI 设备路由器
 
-> **版本 1.0.4：一种研究工具。** 从 1.0 开始，版本遵循语义版本控制：如果某个更改破坏了 CLI、收据格式或实验规范格式，则会发布一个全新的主要版本。互锁仅提供建议：它会建议一个模型、引擎和设备，并且它绝不会处理实际流量。其中的每个本地编号都曾在同一测试平台上进行测量（Intel Core Ultra 9 285K 及其 NPU 和 iGPU，以及一张 RTX 5090），而远程 `colab:<card>` 行则位于各自独立的证据池中，并具有完整的设备标识（`provider`、`card`、`vram_mib`、`driver_version`、`cuda_version`、`pool`）。将它的路由视为针对特定硬件池的测量证据，而不是通用的基准测试。
+> **版本 1.0.5：一种研究工具。** 从 1.0 开始，版本遵循语义版本控制：如果某个更改破坏了 CLI、收据格式或实验规范格式，则会发布一个全新的主要版本。互锁仅提供建议：它会建议一个模型、引擎和设备，并且它绝不会处理实际流量。其中的每个本地编号都曾在同一测试平台上进行测量（Intel Core Ultra 9 285K 及其 NPU 和 iGPU，以及一张 RTX 5090），而远程 `colab:<card>` 行则位于各自独立的证据池中，并具有完整的设备标识（`provider`、`card`、`vram_mib`、`driver_version`、`cuda_version`、`pool`）。将它的路由视为针对特定硬件池的测量证据，而不是通用的基准测试。
 
 铁路互锁系统可以防止列车被引导到冲突的轨道上。此工具对设备执行相同的操作：它将每个任务发送到模型、引擎和设备。
 
@@ -54,7 +54,7 @@ uv tool install mcptoolshop-interlock
 1.0.0 遵循 0.2.0 版本。没有单独的 0.3.0 版本；其更改包含在 1.0.0 版本中。
 
 - **远程 Colab 设备。** `colab:A100-40`、`colab:A100-80`、`colab:L4`、`colab:T4` 和 `colab:G4` 行包含设备的标识（`provider`、`card`、`vram_mib`、驱动程序和 CUDA 版本，以及一个区域 `pool`），并且位于各自的池中，与测试平台上的行分开。请参阅 [设备](#设备)。
-- **针对这些设备的 Linux CUDA 测量路径**（`interlock run`，具有 `platform: linux-cuda` 规范），其中包含三个预注册的规范：`experiments/c2-fill-card/`、`experiments/c2-generate/` 和 `experiments/c2-throughput/`。失败的形状（`oom`、`load_refused`、`timeout`、`ctx_exceeded`）作为能力行保留。
+- **适用于这些显卡的 Linux CUDA 测试路径**（`interlock run`，具有 `platform: linux-cuda` 规格），包含三个预先注册的规格：`experiments/c2-fill-card/`、`experiments/c2-generate/` 和 `experiments/c2-throughput/`。失败的形状（`oom`、`load_refused`、`timeout`、`ctx_exceeded`）会作为能力行保留。未进行测试的单元（`generation_aborted`，一个已中止的 Ollama 生成过程，或 `unmeasured`，一个未识别的错误或无法达到其长度的提示）也会保留，但无法说明该显卡可以执行哪些操作。每个生成阶梯行都会记录 `settings.ladder_version` 以及模型实际评估的提示长度。
 - **每个 C2 模型都指定了一个经过检查的来源：**一个带有其注册表清单摘要的 Ollama 标签，或者一个带有其 Hugging Face 仓库、提交信息和 sha256 的 GGUF 文件。Gemma 4 31B 使用 Ollama 库的 Q4_K_M、Q8_0 和 BF16 构建；它没有发布的 Q6_K 构建，因此该单元预先注册为 `load_refused`。`interlock c2-sources <spec>` 打印每个条目的来源和拉取命令，并且 `--verify-live` 检查每个来源、摘要和量化标签是否与 `registry.ollama.ai` 和 `huggingface.co` 匹配。
 - **吞吐量输入是精确的令牌长度。**每个吞吐量模型都会获得固定的 128 令牌和 510 令牌输入，这些输入使用其自身的令牌器在固定的修订版本中构建（510 令牌留出空间用于 512 令牌限制内的特殊令牌），并在 `experiments/c2-throughput/inputs.json` 中提交。重新排序和自然语言推理不在 C2 的范围内：默认的 Ollama 不支持这两者，因此这些单元预先注册为 `load_refused`，并注明了原因。
 - **可选的远程路由。** `interlock route` 除非请求通过 `--allow-remote` 或 `--device colab:<card>`，否则会忽略远程行。远程获胜者会被标记为 `remote: true`，并带有其 `remote_device`。请参阅 [路由](#路由)。
@@ -90,7 +90,7 @@ interlock 不处理实际流量，也不充当代理。它不训练模型。它�
 
 `GPU.1` 是在此配置中 OpenVINO 看到的 5090。即使名称或供应商发生更改，解析器也会拒绝该索引，拒绝一个简单的 `GPU`，拒绝 `AUTO`、`HETERO` 和 `MULTI`，并拒绝不是供应商 `0x8086` 和 `INTEGRATED` 的 GPU。即使设备属性列表中没有，也仍然需要完整名称中包含“Intel”。缺少设备是一个错误。互锁机制不会降级到较弱的设备。
 
-远程行携带 `remote_device` 标识（`provider: "colab"`、`card`、`vram_mib`、`driver_version`、`cuda_version`，以及一个区域 `pool` 字符串——绝不会是帐户 ID）。远程行与本地配置行分开，并且绝不会合并到配置池中。`interlock table --device colab:<card>`（或 `colab:*`）列出远程行，并且 `interlock route` 仅在启用时（`--allow-remote` 或 `--device colab:<card>`）才会考虑远程卡。失败的远程形状（`oom`、`load_refused`、`timeout`、`ctx_exceeded`）会被记录为能力行，并记录其测量的原因，而不是跳过。
+远程行包含身份信息（`remote_device`、`provider: "colab"`、`card`、`vram_mib`、`driver_version`、`cuda_version`，以及一个区域字符串 `pool`——绝不会是账户 ID）。远程行与本地设备行分开，并且绝不会合并到设备池中。`interlock table --device colab:<card>`（或`colab:*`）列出远程行，并且只有在启用时（`--allow-remote`或`--device colab:<card>`），`interlock route`才会考虑远程卡。失败的远程形状（`oom`、`load_refused`、`timeout`、`ctx_exceeded`）会被记录为能力行，并记录其测量的原因，而不是跳过。`interlock route`仅在最新的`ladder_version`中生成阶梯行，并且其注释说明它没有比较多少个较旧的行。
 
 NPU 是独占的。5090 步骤仅在发布者授权内运行。运行器记录该授权。CPU 密集型任务等待发布者宣布的时间窗口。
 
@@ -155,7 +155,7 @@ interlock route --task generate --model Phi --thinking off --ctx 1024 --busy 509
 
 按最低重复槽解码 tok/s 生成排名。所有其他任务按最高的重复槽延迟或按最大声明时间进行排名，如果该行没有重复槽。边际是这些保守边界之间的差距，而不是中位数。平局会使 5090 保持空闲。超过 30 天的行将被视为过时。标记为临时或重复次数少于两次的行将被视为临时。两者都仍然符合条件，并且会被标记。
 
-`native_binary_rejected`、`compile_rejected`、`compile_timeout`、`hang`、`device_lost`、`oom`、`load_refused`、`timeout`、`ctx_exceeded` 以及一个 `parity_valid` 为 false（`parity_invalid`）的行，都将以这些代码的形式列在排除列表中。它们不是候选。远程行会在结果循环之前被过滤掉，除非请求选择加入（`--allow-remote` 或 `--device colab:...`），因此它们不会出现在仅设备请求的排除列表中或拒绝原因中。能力结果是在该行也为奇偶校验无效时显示的。如果没有行满足约束条件，该命令将退出并返回 1，并说明哪个约束条件清空了该集合。它不会回退。`--json` 打印一个与 `src/interlock/schema/route-decision.v1.json` 有效的文档（标记远程获胜者为 `remote: true` 和 `remote_device`）。`--max-ttft-ms` 拒绝，除非每个比较的行都记录了相同的 `settings.prefix_caching`（`on`、`off` 或 `default`）。未设置表示未知。
+`native_binary_rejected`、`compile_rejected`、`compile_timeout`、`hang`、`device_lost`、`oom`、`load_refused`、`timeout`、`ctx_exceeded`，未测量的类型（`sampler_error`、`generation_aborted`、`unmeasured`）以及包含`parity_valid`个“false”（`parity_invalid`）的行，都列在排除列表中，并附带相应的代码。它们不属于候选对象。在结果循环之前，远程行会被过滤掉，除非请求明确选择（`--allow-remote`或`--device colab:...`），因此它们永远不会出现在仅针对特定配置的请求的排除列表或拒绝理由中。当某一行同时不满足奇偶校验要求时，会显示相应的代码，这即为能力结果。当没有行满足约束条件时，命令会退出并返回 1，同时指出导致集合为空的约束条件。它不会回退。`--json`会打印一份与`src/interlock/schema/route-decision.v1.json`相符的文档（用`remote: true`和`remote_device`标记远程获胜者）。`--max-ttft-ms`会拒绝，除非每行比较的行都记录了相同的`settings.prefix_caching`（`on`、`off`或`default`）。“未设置”表示未知。
 
 当远程建议由 RunPod 提案支持时，它会包含一个 `offrig_plan` 对象，或者当由 `colab:<card>` 行支持时，它会包含 `remote: true` 和 `remote_device`。interlock 不会调用 `offrig_plan` 或 `offrig_launch`，也不会进行任何支出。请参见 `docs/offrig-integration.md`。
 
