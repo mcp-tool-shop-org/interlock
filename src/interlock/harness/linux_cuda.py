@@ -1198,15 +1198,13 @@ def run_linux_throughput_ladder(
     return rows
 
 
-# Ollama's own wording for a model it will not load, or cannot fit (read from its server logs and error replies).
+# Ollama's own wording for a model it will not load, or cannot fit (checked against the 0.40.9 binary). "resource
+# limitations" is the runner-crash message, which can come mid-generation, so it is not here.
 _LOAD_REFUSAL_PHRASES = (
     "unable to load",
-    "failed to load",
-    "model failed to load",
-    "requires more system memory",
-    "requires more memory",
+    "error loading model",
+    "failed to load model",  # not "failed to load manifest": that is a pull or registry error
     "insufficient",
-    "resource limitations",
     "not resident",
     "too large for",
 )
@@ -1230,7 +1228,9 @@ def classify_linux_error(exc: BaseException, peak_mib: int | None = None) -> Lin
         or re.search(r"http \d{3}.*after \d+(?:\.\d+)?(?:ms|s|m|h)", low)  # Go's "HTTP 500 after 2m0s"
     ):
         return LinuxShapeFailure("timeout", msg, peak_mib=peak_mib)
-    if "context" in low and ("exceed" in low or "limit" in low or "too long" in low):
+    if "longer than the context length" in low or (
+        "context" in low and ("exceed" in low or "limit" in low or "too long" in low)
+    ):
         return LinuxShapeFailure("ctx_exceeded", msg, peak_mib=peak_mib)
     if "out of memory" in low or "cuda error" in low or re.search(r"\boom\b", low) or "alloc" in low:
         return LinuxShapeFailure("oom", msg, peak_mib=peak_mib)
@@ -1372,6 +1372,7 @@ _LADDER_WORDS = (
 
 
 LADDER_CTX_MARGIN = 64
+LADDER_PROBE_WORDS = (64, 192)  # small enough never to overflow a window
 LADDER_TOKEN_TOLERANCE = 0.02  # the evaluated prompt must be within 2% of the target, never below it by more
 _LADDER_INSTRUCTION = "In two or three sentences, describe a quiet town by a river."
 
@@ -1390,36 +1391,59 @@ def ladder_prompt(prompt_tokens: int) -> str:
     return " ".join(words) + "\n\n" + _LADDER_INSTRUCTION
 
 
+def _evaluated_tokens(server: LinuxOllamaServer, model: str, words: int, num_ctx: int) -> int:
+    """Ollama's ``prompt_eval_count`` for a ``words``-word ladder prompt (a one-token reply keeps this cheap)."""
+
+    payload = {
+        "model": model,
+        "prompt": ladder_prompt(words),
+        "stream": False,
+        "options": {"num_ctx": num_ctx, "num_predict": 1, "temperature": 0.0},
+    }
+    resp = server.post("/api/generate", payload)
+    if isinstance(resp, Mapping) and resp.get("error"):
+        raise RuntimeError(str(resp["error"]))
+    evaluated = int(resp.get("prompt_eval_count") or 0) if isinstance(resp, Mapping) else 0
+    if evaluated <= 0:
+        raise LinuxShapeFailure("unmeasured", "Ollama reported no prompt_eval_count; the prompt length is unknown")
+    return evaluated
+
+
 def _calibrate_ladder_prompt(server: LinuxOllamaServer, model: str, target: int, num_ctx: int) -> tuple[int, int]:
     """The word count whose prompt Ollama evaluates to ``target`` tokens, and the count it evaluated.
 
-    Ollama reports ``prompt_eval_count`` for the prompt it actually read, after any truncation to ``num_ctx``. The first
-    reply sizes the prompt; one-token replies keep the calibration cheap. A prompt that cannot be brought within
+    Ollama truncates a prompt that overflows ``num_ctx`` to about half of it, and reports the count it kept, so a
+    reading from an overflowing prompt says nothing about its length. Two small prompts that cannot overflow give the
+    tokens-per-word ratio and the instruction's tokens; the word count follows, and is then verified with the real
+    ``num_ctx``. A reading well under what the ratio predicts means truncation. A prompt that cannot be brought within
     tolerance of the target is a cell that was not measured, never a row that records a length it did not time.
     """
 
-    words = max(1, target)
+    small, large = LADDER_PROBE_WORDS
+    low = _evaluated_tokens(server, model, small, num_ctx)
+    high = _evaluated_tokens(server, model, large, num_ctx)
+    ratio = (high - low) / (large - small)
+    if ratio <= 0 or high >= num_ctx * 0.9:
+        raise LinuxShapeFailure(
+            "unmeasured",
+            f"could not size the prompt: {low} tokens for {small} words and {high} for {large} (num_ctx {num_ctx})",
+        )
+    instruction = max(0.0, low - ratio * small)
     tolerance = max(1, int(target * LADDER_TOKEN_TOLERANCE))
+    words = max(1, round((target - instruction) / ratio))
     evaluated = 0
-    for _ in range(4):
-        payload = {
-            "model": model,
-            "prompt": ladder_prompt(words),
-            "stream": False,
-            "options": {"num_ctx": num_ctx, "num_predict": 1, "temperature": 0.0},
-        }
-        resp = server.post("/api/generate", payload)
-        if isinstance(resp, Mapping) and resp.get("error"):
-            raise RuntimeError(str(resp["error"]))
-        evaluated = int(resp.get("prompt_eval_count") or 0) if isinstance(resp, Mapping) else 0
-        if evaluated <= 0:
-            raise LinuxShapeFailure("unmeasured", "Ollama reported no prompt_eval_count; the prompt length is unknown")
+    for _ in range(3):
+        evaluated = _evaluated_tokens(server, model, words, num_ctx)
+        expected = instruction + ratio * words
+        if evaluated < expected * 0.9:
+            raise LinuxShapeFailure(
+                "unmeasured",
+                f"the prompt was truncated: {words} words should evaluate to about {round(expected)} tokens "
+                f"and evaluated to {evaluated} (num_ctx {num_ctx})",
+            )
         if abs(evaluated - target) <= tolerance:
             return words, evaluated
-        if evaluated >= num_ctx:  # the window was full: the reading is a floor, not a count, so halve and look again
-            words = max(1, words // 2)
-        else:
-            words = max(1, round(words * target / evaluated))
+        words = max(1, round(words + (target - evaluated) / ratio))
     raise LinuxShapeFailure(
         "unmeasured",
         f"the prompt evaluated to {evaluated} tokens, not the target {target} (num_ctx {num_ctx}); "

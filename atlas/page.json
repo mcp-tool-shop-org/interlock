@@ -35,7 +35,7 @@
   "changes": {
     "fileCounts": {
       "added": 1,
-      "changed": 9,
+      "changed": 3,
       "moved": 0,
       "parts": 3,
       "removed": 0
@@ -43,21 +43,21 @@
     "items": [
       {
         "kind": "landing",
-        "sentence": "experiments/c2-generate/spec.yaml is now also read by tests/test_generation_failure_kinds.py.",
+        "sentence": "experiments/c2-generate/spec.yaml is now also read by tests/test_ladder_versions.py.",
         "subjects": [
           "experiments/c2-generate/spec.yaml",
-          "tests/test_generation_failure_kinds.py"
+          "tests/test_ladder_versions.py"
         ]
       },
       {
         "kind": "counts",
-        "sentence": "1 file added and 9 changed content, across 3 parts.",
+        "sentence": "1 file added and 3 changed content, across 3 parts.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "a8fef21fbea8e3e6bcf089b17973ada2442d01ff",
-      "generatedAt": "2026-10-26T05:31:38.551Z"
+      "commit": "a0b66c8b3c385a2759fa755fd61d2d223f22a120",
+      "generatedAt": "2026-10-26T05:57:46.184Z"
     },
     "unchanged": false
   },
@@ -139,14 +139,14 @@
     }
   ],
   "changesTogetherNote": [
-    "1 file changed together with its own test, as expected.",
+    "2 files changed together with their own tests, as expected.",
     "Confidence is low: fewer than 25 source files reach 10 revisions in the window.",
     "Window: 180 days; a pair counts from 3 shared commits, since 13 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
-  "changesTogetherWithTests": 1,
-  "commit": "a0b66c8b3c385a2759fa755fd61d2d223f22a120",
+  "changesTogetherWithTests": 2,
+  "commit": "578bb417d98f817eded8f12a3ca9344dbf1d750c",
   "defaultBranch": "main",
-  "derived": "10 parts, mostly Python (108 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
+  "derived": "10 parts, mostly Python (109 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
   "doors": [
     {
       "checks": [],
@@ -166,7 +166,7 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 50
+          "files": 51
         },
         {
           "boundary": "scripts",
@@ -309,7 +309,7 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-26T05:57:46.184Z",
+  "generatedAt": "2026-10-26T06:20:59.782Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "5 writes and 6 reads use paths built at run time and are not named here.",
@@ -344,10 +344,10 @@
   ],
   "summary": "interlock routes each job to a model, engine and device from a receipt-backed table.",
   "summaryFrom": "person",
-  "testFiles": 73,
+  "testFiles": 74,
   "testedBy": {
     "scripts": 2,
-    "src": 47
+    "src": 48
   },
   "unnamedWrites": 5,
   "unread": [],

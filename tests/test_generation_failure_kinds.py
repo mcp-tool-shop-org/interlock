@@ -35,9 +35,10 @@ LOOP = "prediction aborted, token repeat limit reached"
         ("HTTP 500 after 2m0s", "timeout"),
         ("Post http://127.0.0.1:11434/api/generate: context deadline exceeded", "timeout"),
         ("the read timed out", "timeout"),
-        ("model failed to load: resource limitations", "load_refused"),
+        ("error loading model: unsupported architecture", "load_refused"),
         ("unable to load model", "load_refused"),
-        ("model requires more system memory (12.0 GiB) than is available", "load_refused"),
+        ("model is too large for system memory", "load_refused"),
+        ("the prompt is longer than the context length currently available to the model", "ctx_exceeded"),
         ("something else broke", "unmeasured"),
         ("the room was a bloom", "unmeasured"),
         ("oom-killer fired", "oom"),
@@ -48,10 +49,13 @@ def test_each_generation_error_gets_its_own_kind(message, kind):
     assert classify_linux_error(RuntimeError(message)).failure_class == kind
 
 
+INSTRUCTION_TOKENS = 14
+
+
 class _Server:
     """A stub Ollama that returns whatever the test says."""
 
-    def __init__(self, reply: dict[str, Any], tokens_per_word: int = 1) -> None:
+    def __init__(self, reply: dict[str, Any], tokens_per_word: float = 1.0) -> None:
         self.reply = reply
         self.tokens_per_word = tokens_per_word
         self.prompts: list[str] = []
@@ -65,9 +69,18 @@ class _Server:
             self.prompts.append(payload["prompt"])
         if "error" in self.reply:
             return self.reply
-        # Ollama reads at most num_ctx tokens of the prompt, and reports what it read.
-        evaluated = min(len(payload["prompt"].split()) * self.tokens_per_word, options["num_ctx"])
-        return {"prompt_eval_count": evaluated, **self.reply}
+        return {"prompt_eval_count": self.evaluated(payload), **self.reply}
+
+    def evaluated(self, payload: dict[str, Any]) -> int:
+        """What real Ollama reports: the prompt's tokens, or about half the window when the prompt overflows it."""
+
+        body = payload["prompt"].split(chr(10) * 2)[0]
+        tokens = int(len(body.split()) * self.tokens_per_word) + INSTRUCTION_TOKENS
+        window = payload["options"]["num_ctx"]
+        if tokens <= window - 1:
+            return tokens
+        # Ollama's contextShiftPromptLimit (llama_server.go, v0.40.9 and v0.40.11): num_keep is 4.
+        return window - max((window - 4) // 2, 1)
 
 
 def _measure(reply: dict[str, Any]) -> dict[str, Any]:
@@ -91,7 +104,7 @@ def test_a_stub_backend_that_times_out_yields_timeout_not_load_refused():
 
 def test_a_stub_backend_that_cannot_load_the_model_still_yields_load_refused():
     with pytest.raises(LinuxShapeFailure) as caught:
-        _measure({"error": "model failed to load, this may be due to resource limitations"})
+        _measure({"error": "unable to load full model on GPU"})
     assert caught.value.failure_class == "load_refused"
 
 
@@ -179,11 +192,13 @@ def test_the_generate_cell_sends_the_ladder_prompt():
     (prompt,) = set(server.prompts)
     assert prompt == ladder_prompt(len(prompt.split()) - 12)  # the calibrated word count plus the instruction's words
     assert abs(result["prompt_tokens_evaluated"] - 256) <= 5
+    assert result["prompt_tokens_evaluated"] == server.evaluated({"prompt": prompt, "options": {"num_ctx": 10**6}})
 
 
+@pytest.mark.parametrize("tokens_per_word", [1.0, 1.5, 2.0])
 @pytest.mark.parametrize("target", [512, 2048, 8192])
-def test_the_recorded_prompt_length_is_what_ollama_evaluated_and_num_ctx_has_room_for_it(target):
-    server = _Server({"prompt_eval_duration": 1, "eval_count": 8, "eval_duration": 1}, tokens_per_word=1)
+def test_the_recorded_prompt_length_is_what_ollama_evaluated_and_num_ctx_has_room_for_it(target, tokens_per_word):
+    server = _Server({"prompt_eval_duration": 1, "eval_count": 8, "eval_duration": 1}, tokens_per_word=tokens_per_word)
     result = measure_linux_ollama_generate(
         server, lambda: (1000, 15360), model="m", prompt_tokens=target, concurrency=1, repeats=1, num_predict=128
     )
@@ -191,12 +206,40 @@ def test_the_recorded_prompt_length_is_what_ollama_evaluated_and_num_ctx_has_roo
     assert result["prompt_tokens_target"] == target
 
 
-def test_a_calibrated_prompt_with_two_tokens_per_word_still_lands_on_the_target():
-    server = _Server({"prompt_eval_duration": 1, "eval_count": 8, "eval_duration": 1}, tokens_per_word=2)
-    result = measure_linux_ollama_generate(
-        server, lambda: (1000, 15360), model="m", prompt_tokens=1024, concurrency=1, repeats=1
+def test_the_fake_server_truncates_the_way_ollama_does():
+    server = _Server({})
+    window = {"num_ctx": 2240}
+    body = " ".join(["w"] * 3000) + chr(10) * 2 + "x"
+    assert server.evaluated({"prompt": body, "options": window}) == 1122  # measured on Ollama 0.40.9
+    assert server.evaluated({"prompt": "w " * 100, "options": window}) == 114
+
+
+def test_the_calibration_never_sends_an_overflowing_prompt_to_size_the_prompt():
+    server = _Server({"prompt_eval_duration": 1, "eval_count": 8, "eval_duration": 1}, tokens_per_word=1.5)
+    sent: list[int] = []
+    original = server.post
+
+    def post(path, payload):
+        sent.append(server.evaluated(payload))
+        return original(path, payload)
+
+    server.post = post
+    measure_linux_ollama_generate(
+        server, lambda: (1000, 15360), model="m", prompt_tokens=2048, concurrency=1, repeats=1
     )
-    assert abs(result["prompt_tokens_evaluated"] - 1024) <= 21
+    window = 2048 + 128 + 64
+    assert all(count <= window for count in sent)  # a reading of window // 2 would mean a truncated prompt
+
+
+def test_a_phrase_list_load_refusal_is_not_the_runner_crash_or_a_pull_error():
+    for text, kind in (
+        ("model runner has unexpectedly stopped, this may be due to resource limitations", "unmeasured"),
+        ("failed to load manifest for registry.ollama.ai/library/x", "unmeasured"),
+        ("error loading model: tensor mismatch", "load_refused"),
+        ("failed to load model: out of space", "load_refused"),
+        ("insufficient memory", "load_refused"),
+    ):
+        assert classify_linux_error(RuntimeError(text)).failure_class == kind, text
 
 
 def test_a_prompt_that_ollama_truncates_below_the_target_is_unmeasured_not_a_short_row():
@@ -205,12 +248,14 @@ def test_a_prompt_that_ollama_truncates_below_the_target_is_unmeasured_not_a_sho
             return {"prompt_eval_count": payload["options"]["num_ctx"] // 2, "prompt_eval_duration": 1,
                     "eval_count": 8, "eval_duration": 1}
 
+        evaluated = None
+
     with pytest.raises(LinuxShapeFailure) as caught:
         measure_linux_ollama_generate(
             Truncating({}), lambda: (1000, 15360), model="m", prompt_tokens=2048, concurrency=1, repeats=1
         )
     assert caught.value.failure_class == "unmeasured"
-    assert "not the target 2048" in caught.value.reason
+    assert "could not size the prompt" in caught.value.reason
 
 
 def test_a_reply_with_no_prompt_eval_count_is_unmeasured():

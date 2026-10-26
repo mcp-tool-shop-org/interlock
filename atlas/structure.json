@@ -584,7 +584,7 @@
           "path": ".python-version"
         },
         {
-          "hash": "160f4724ee98df16b3caa7b0fb332be54c7ea9afa27f91c97b4ec740b60c6c57",
+          "hash": "50a2f02278b5c662b39029cc4905763a2c2fd227f5ace07c3c001399a505d7c8",
           "path": "CHANGELOG.md"
         },
         {
@@ -6117,217 +6117,227 @@
               "line": 1347
             },
             {
-              "in": "_calibrate_ladder_prompt",
+              "in": "_evaluated_tokens",
               "kind": "raise",
-              "line": 1413
+              "line": 1405
+            },
+            {
+              "in": "_evaluated_tokens",
+              "kind": "raise",
+              "line": 1408
             },
             {
               "in": "_calibrate_ladder_prompt",
               "kind": "raise",
-              "line": 1416
+              "line": 1427
             },
             {
               "in": "_calibrate_ladder_prompt",
               "kind": "raise",
-              "line": 1423
+              "line": 1439
             },
             {
-              "in": "measure_linux_ollama_generate",
-              "kind": "except",
+              "in": "_calibrate_ladder_prompt",
+              "kind": "raise",
               "line": 1447
             },
             {
               "in": "measure_linux_ollama_generate",
+              "kind": "except",
+              "line": 1471
+            },
+            {
+              "in": "measure_linux_ollama_generate",
               "kind": "raise",
-              "line": 1448
+              "line": 1472
             },
             {
               "in": "_call_once",
               "kind": "raise",
-              "line": 1462
+              "line": 1486
             },
             {
               "in": "measure_linux_ollama_generate",
               "kind": "except",
-              "line": 1493
+              "line": 1517
             },
             {
               "in": "measure_linux_ollama_generate",
               "kind": "raise",
-              "line": 1494
+              "line": 1518
             },
             {
               "in": "_build_fixed_token_item",
               "kind": "raise",
-              "line": 1522
+              "line": 1546
             },
             {
               "in": "_batch_endpoint_and_payload",
               "kind": "raise",
-              "line": 1543
+              "line": 1567
             },
             {
               "in": "_batch_endpoint_and_payload",
-              "kind": "raise",
-              "line": 1547
-            },
-            {
-              "in": "measure_linux_ollama_batch",
               "kind": "raise",
               "line": 1571
             },
             {
               "in": "measure_linux_ollama_batch",
+              "kind": "raise",
+              "line": 1595
+            },
+            {
+              "in": "measure_linux_ollama_batch",
               "kind": "except",
-              "line": 1579
+              "line": 1603
             },
             {
               "in": "measure_linux_ollama_batch",
               "kind": "raise",
-              "line": 1580
+              "line": 1604
             },
             {
               "in": "_unloaded_after",
               "kind": "except",
-              "line": 1629
+              "line": 1653
             },
             {
               "in": "run_linux_spec",
               "kind": "raise",
-              "line": 1890
+              "line": 1914
             },
             {
               "in": "resolve_c2_sources",
               "kind": "raise",
-              "line": 1900
+              "line": 1924
             },
             {
               "in": "resolve_c2_sources",
               "kind": "raise",
-              "line": 1903
+              "line": 1927
             },
             {
               "in": "resolve_c2_sources",
               "kind": "raise",
-              "line": 1923
+              "line": 1947
             },
             {
               "in": "resolve_c2_sources",
               "kind": "raise",
-              "line": 1928
+              "line": 1952
             },
             {
               "in": "resolve_c2_sources",
               "kind": "raise",
-              "line": 1932
+              "line": 1956
             },
             {
               "in": "resolve_c2_sources",
               "kind": "raise",
-              "line": 1959
+              "line": 1983
             },
             {
               "in": "resolve_c2_sources",
               "kind": "raise",
-              "line": 1963
+              "line": 1987
             },
             {
               "in": "resolve_c2_sources",
               "kind": "raise",
-              "line": 2000
+              "line": 2024
             },
             {
               "in": "_default_live_fetch",
               "kind": "raise",
-              "line": 2034
-            },
-            {
-              "in": "_default_live_fetch",
-              "kind": "except",
-              "line": 2042
+              "line": 2058
             },
             {
               "in": "_default_live_fetch",
               "kind": "except",
-              "line": 2044
+              "line": 2066
+            },
+            {
+              "in": "_default_live_fetch",
+              "kind": "except",
+              "line": 2068
             },
             {
               "in": "_default_live_fetch",
               "kind": "raise",
-              "line": 2045
+              "line": 2069
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2089
+              "line": 2113
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2092
+              "line": 2116
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2100
+              "line": 2124
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2105
+              "line": 2129
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2119
+              "line": 2143
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2142
+              "line": 2166
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2149
+              "line": 2173
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2153
+              "line": 2177
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2180
+              "line": 2204
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2183
+              "line": 2207
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2191
+              "line": 2215
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2211
+              "line": 2235
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2240
+              "line": 2264
             },
             {
               "in": "verify_c2_sources_live",
               "kind": "raise",
-              "line": 2243
+              "line": 2267
             }
           ],
-          "hash": "f9dad41207a5088011afba34904ec0a141f3a6dac01aebfbf88e8f59c43aae48",
+          "hash": "ab320228e216293a805e999941e16eaba7138f96fa3fd06c0d26c865faf6e912",
           "importsFiles": [
             "src/interlock/__init__.py",
             "src/interlock/devices.py",
@@ -6730,9 +6740,23 @@
             {
               "calls": [
                 {
-                  "line": 1411,
+                  "line": 1403,
                   "name": "post",
                   "target": null
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "_evaluated_tokens"
+            },
+            {
+              "calls": [
+                {
+                  "line": 1403,
+                  "name": "post",
+                  "target": null,
+                  "via": "_evaluated_tokens"
                 }
               ],
               "exported": false,
@@ -6743,10 +6767,10 @@
             {
               "calls": [
                 {
-                  "line": 1411,
+                  "line": 1403,
                   "name": "post",
                   "target": null,
-                  "via": "_calibrate_ladder_prompt"
+                  "via": "_evaluated_tokens"
                 }
               ],
               "exported": true,
@@ -6757,7 +6781,7 @@
             {
               "calls": [
                 {
-                  "line": 1569,
+                  "line": 1593,
                   "name": "post",
                   "target": null
                 }
@@ -6770,12 +6794,12 @@
             {
               "calls": [
                 {
-                  "line": 1617,
+                  "line": 1641,
                   "name": "is_absolute",
                   "target": null
                 },
                 {
-                  "line": 1617,
+                  "line": 1641,
                   "name": "as_posix",
                   "target": null
                 }
@@ -6788,7 +6812,7 @@
             {
               "calls": [
                 {
-                  "line": 1628,
+                  "line": 1652,
                   "name": "unload",
                   "target": null
                 }
@@ -6850,13 +6874,13 @@
                   "via": "probe_nvml"
                 },
                 {
-                  "line": 1617,
+                  "line": 1641,
                   "name": "is_absolute",
                   "target": null,
                   "via": "_relative_spec_posix"
                 },
                 {
-                  "line": 1617,
+                  "line": 1641,
                   "name": "as_posix",
                   "target": null,
                   "via": "_relative_spec_posix"
@@ -6888,7 +6912,7 @@
                 },
                 {
                   "branch": "mode == \"fill-card\"",
-                  "line": 1628,
+                  "line": 1652,
                   "name": "unload",
                   "target": null,
                   "via": "_unloaded_after"
@@ -6952,10 +6976,10 @@
                 },
                 {
                   "branch": "mode == \"generate-ladder\"",
-                  "line": 1411,
+                  "line": 1403,
                   "name": "post",
                   "target": null,
-                  "via": "_calibrate_ladder_prompt"
+                  "via": "_evaluated_tokens"
                 },
                 {
                   "branch": "mode == \"batch-ladder\"",
@@ -13607,7 +13631,7 @@
         "pytest",
         "python"
       ],
-      "testedBy": 47,
+      "testedBy": 48,
       "unresolvedSites": 0
     },
     {
@@ -14307,22 +14331,24 @@
         },
         {
           "exports": [
-            "test_a_calibrated_prompt_with_two_tokens_per_word_still_lands_on_the_target",
             "test_a_generate_ladder_row_records_the_ladder_version_and_an_aborted_cell_is_its_own_row",
             "test_a_ladder_row_records_the_evaluated_length_and_how_it_was_counted",
+            "test_a_phrase_list_load_refusal_is_not_the_runner_crash_or_a_pull_error",
             "test_a_prompt_that_ollama_truncates_below_the_target_is_unmeasured_not_a_short_row",
             "test_a_reply_with_no_prompt_eval_count_is_unmeasured",
             "test_a_stub_backend_that_aborts_a_loop_yields_generation_aborted_not_load_refused",
             "test_a_stub_backend_that_cannot_load_the_model_still_yields_load_refused",
             "test_a_stub_backend_that_times_out_yields_timeout_not_load_refused",
             "test_each_generation_error_gets_its_own_kind",
+            "test_the_calibration_never_sends_an_overflowing_prompt_to_size_the_prompt",
             "test_the_failure_rows_validate_carry_the_ladder_version_and_are_not_speeds",
+            "test_the_fake_server_truncates_the_way_ollama_does",
             "test_the_generate_cell_sends_the_ladder_prompt",
             "test_the_ladder_prompt_is_varied_deterministic_and_does_not_repeat_the_old_token",
             "test_the_recorded_prompt_length_is_what_ollama_evaluated_and_num_ctx_has_room_for_it",
             "test_the_router_excludes_the_new_kinds_as_it_excludes_load_refused"
           ],
-          "hash": "d0b000ea4a7e44c5ed742fb6036cb27f5d972176b8f5d3e77cdf05ed7afe1a7b",
+          "hash": "1524eaa814b6436dcfe14ce9e88d1b29c74ff46338d23cb1a6c432eb71ea09bf",
           "importsFiles": [
             "src/interlock/devices.py",
             "src/interlock/harness/linux_cuda.py",
@@ -14589,6 +14615,25 @@
           ],
           "path": "tests/test_importers.py",
           "testFramework": "pytest"
+        },
+        {
+          "exports": [
+            "request",
+            "row",
+            "test_a_device_that_only_has_version_1_still_routes_when_it_is_the_one_asked_for",
+            "test_a_rig_row_with_no_ladder_is_still_compared_with_the_newest_ladder_rows",
+            "test_a_row_with_no_ladder_version_on_a_colab_device_is_version_1_and_a_rig_row_has_none",
+            "test_on_one_device_and_model_only_the_newest_version_is_a_candidate_even_when_the_old_one_is_faster",
+            "test_the_table_groups_ladder_rows_and_shows_the_version",
+            "test_v1_and_v2_rows_on_different_devices_are_never_ranked_against_each_other",
+            "winner"
+          ],
+          "hash": "2acb1abc1ded252d000b3f501a43389e74873328587776c3cf6e80c44f3738c0",
+          "importsFiles": [
+            "src/interlock/cli.py",
+            "src/interlock/router/policy.py"
+          ],
+          "path": "tests/test_ladder_versions.py"
         },
         {
           "exports": [
@@ -15809,7 +15854,7 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 50
+          "files": 51
         },
         {
           "boundary": "scripts",
@@ -15885,7 +15930,7 @@
         {
           "config": "pyproject.toml",
           "coverage": true,
-          "files": 50,
+          "files": 51,
           "job": "test",
           "runner": "pytest",
           "step": "Test"
@@ -15893,7 +15938,7 @@
         {
           "config": "pyproject.toml",
           "coverage": true,
-          "files": 50,
+          "files": 51,
           "job": "test-py313",
           "runner": "pytest",
           "step": "Test"
@@ -15901,7 +15946,7 @@
         {
           "config": "pyproject.toml",
           "coverage": true,
-          "files": 50,
+          "files": 51,
           "job": "test-py314",
           "runner": "pytest",
           "step": "Test"
@@ -16429,8 +16474,8 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "a0b66c8b3c385a2759fa755fd61d2d223f22a120",
-    "tracked": 294
+    "commit": "578bb417d98f817eded8f12a3ca9344dbf1d750c",
+    "tracked": 295
   },
   "landings": [
     {
@@ -16544,6 +16589,12 @@
         },
         {
           "by": "tests/test_importers.py",
+          "call": "literal",
+          "confidence": "ast",
+          "fromTests": true
+        },
+        {
+          "by": "tests/test_ladder_versions.py",
           "call": "literal",
           "confidence": "ast",
           "fromTests": true
@@ -17125,7 +17176,7 @@
   "overlaps": [],
   "submodules": [],
   "symlinks": [],
-  "testFiles": 73,
+  "testFiles": 74,
   "unassigned": [
     {
       "hash": "75850ad95072b8a51fa832b381c4cf6bfea4a3ba8456a242aec0ab79ff0db466",
