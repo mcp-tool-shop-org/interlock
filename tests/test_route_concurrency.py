@@ -183,3 +183,21 @@ def test_the_json_decision_validates_against_the_schema(tmp_path, capsys):
     rows = _rows()
     _, document = _route(tmp_path, capsys, rows=rows + _second_model(rows, 0.5))
     Draft202012Validator(schema).validate(document)
+
+
+def test_other_shapes_of_the_winners_own_candidate_are_not_listed_as_runners_up(tmp_path, capsys):
+    _, document = _route(tmp_path, capsys, "--concurrency", "8")
+    assert document["runners_up"] == []  # phi's p1024/p2048 c8 rows are shapes of the winner, not alternatives
+    rows = _rows()
+    _, with_rival = _route(tmp_path, capsys, "--concurrency", "8", rows=rows + _second_model(rows, 0.5))
+    assert with_rival["runners_up"]
+    assert all("qwen3" in item["id"] for item in with_rival["runners_up"])
+
+
+def test_a_refusal_gives_each_measured_failure_reason_once_with_a_count(tmp_path, capsys):
+    _, document = _route(tmp_path, capsys, "--concurrency", "2")
+    hint = document["hint"]
+    measured = hint.split("Measured failure reasons: ", 1)[1]
+    reasons = measured.rstrip(".").split("; ")
+    assert len(reasons) == len(set(reasons))  # no reason repeated
+    assert any("(x" in reason for reason in reasons)  # the repeated Gemma reason, counted

@@ -10,6 +10,7 @@
 
 - **The margin is between distinct candidates.** A candidate is a device, a model with its revision, and its quant. The margin is the winner's bound against the best row of the best other candidate, never against another shape of the same model (r3's "delta 18.343 over 97.325" was phi's c8 row against phi's own c4 row). With one candidate there is no margin: `next_bound`, `delta` and `next_id` are null and `notes` says `no other candidate`.
 - **Fill-card rows never rank in generate.** A fill-card row (`max_resident_ctx`, or the fill-card spec) is a load probe, not a generate shape. It is listed under `excluded` with the new code `fill_card` and takes no part in the ranking or the floors. The route-decision schema gains the `fill_card` code and the optional `concurrency` and `ranked_field` fields.
+- Another shape of the winner's own candidate is no longer listed under `runners_up` for generate (it is not an alternative to it), and a refusal gives each measured failure reason once with a count (`(x20)`) instead of repeating it for every row.
 - The pre-v3 guard is unchanged: a pre-v3 row's concurrency-above-1 throughput and ttft are still never used.
 
 ## [1.0.6] - 2026-10-26

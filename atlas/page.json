@@ -34,24 +34,32 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 0,
-      "changed": 22,
+      "added": 2,
+      "changed": 3,
       "moved": 0,
       "parts": 3,
       "removed": 0
     },
     "items": [
       {
+        "kind": "landing",
+        "sentence": "tests/fixtures/route/r3_table.jsonl is now read by tests/test_route_concurrency.py.",
+        "subjects": [
+          "tests/fixtures/route/r3_table.jsonl",
+          "tests/test_route_concurrency.py"
+        ]
+      },
+      {
         "kind": "counts",
-        "sentence": "Nothing structural changed since 2026-10-26; 22 files changed content.",
+        "sentence": "2 files added and 3 changed content, across 3 parts.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "1ecf1dbdb2f12b0ef8264b77ddb00dea429e5263",
-      "generatedAt": "2026-10-26T10:08:48.046Z"
+      "commit": "37eafadb86067b3aefc28eab44968f847970d5aa",
+      "generatedAt": "2026-10-26T15:47:42.627Z"
     },
-    "unchanged": true
+    "unchanged": false
   },
   "changesTogether": [
     {
@@ -136,9 +144,9 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 14 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 2,
-  "commit": "37eafadb86067b3aefc28eab44968f847970d5aa",
+  "commit": "e29cd60488cb78f406b31d5896f797a6f9173973",
   "defaultBranch": "main",
-  "derived": "10 parts, mostly Python (111 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
+  "derived": "10 parts, mostly Python (112 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
   "doors": [
     {
       "checks": [],
@@ -158,7 +166,7 @@
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 53
+          "files": 54
         },
         {
           "boundary": "scripts",
@@ -301,7 +309,7 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-26T15:47:42.627Z",
+  "generatedAt": "2026-10-26T16:00:39.924Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "5 writes and 6 reads use paths built at run time and are not named here.",
@@ -336,10 +344,10 @@
   ],
   "summary": "interlock routes each job to a model, engine and device from a receipt-backed table.",
   "summaryFrom": "person",
-  "testFiles": 76,
+  "testFiles": 78,
   "testedBy": {
     "scripts": 2,
-    "src": 49
+    "src": 50
   },
   "unnamedWrites": 5,
   "unread": [],

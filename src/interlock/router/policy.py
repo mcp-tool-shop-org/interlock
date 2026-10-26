@@ -462,6 +462,8 @@ def _runners(pool: Sequence[Mapping], winner: Mapping, ranked: list[Mapping], re
     rest.sort(key=lambda row: str(row["id"]))
     found: list[dict] = []
     for row in ordered + rest:
+        if request.task == "generate" and candidate_of(row) == candidate_of(winner):
+            continue  # another shape of the winner's own candidate is not an alternative to it
         constraint, reason = _why(row, winner, request)
         found.append({"id": str(row["id"]), "constraint": constraint, "reason": reason})
     return found
@@ -539,7 +541,7 @@ def _empty(
         available = sorted({row_concurrency(row) for row in dropped})
         hint += f" Rows exist at concurrency {', '.join(map(str, available))}; none at {limit}."
     if failure_reasons:
-        hint += " Measured failure reasons: " + "; ".join(failure_reasons) + "."
+        hint += " Measured failure reasons: " + "; ".join(_counted(failure_reasons)) + "."
     return Refusal(
         {
             "code": "no_candidate",
@@ -551,6 +553,15 @@ def _empty(
             "excluded": excluded,
         }
     )
+
+
+def _counted(reasons: Sequence[str]) -> list[str]:
+    """Each distinct reason once, with how many rows gave it (a refusal used to repeat one reason about 20 times)."""
+
+    counts: dict[str, int] = {}
+    for reason in reasons:
+        counts[reason] = counts.get(reason, 0) + 1
+    return [reason if n == 1 else f"{reason} (x{n})" for reason, n in counts.items()]
 
 
 def _ttft_refusal(rows: Sequence[Mapping], request: Request, excluded: list[dict]) -> Refusal | None:
