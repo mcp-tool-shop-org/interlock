@@ -201,3 +201,12 @@ def test_a_refusal_gives_each_measured_failure_reason_once_with_a_count(tmp_path
     reasons = measured.rstrip(".").split("; ")
     assert len(reasons) == len(set(reasons))  # no reason repeated
     assert any("(x" in reason for reason in reasons)  # the repeated Gemma reason, counted
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "-8", "two", "1.5"])
+def test_concurrency_below_one_or_not_a_whole_number_is_rejected_at_the_flag(tmp_path, capsys, value):
+    with pytest.raises(SystemExit) as caught:
+        main(["route", "--task", "generate", "--concurrency", value, "--root", str(tmp_path)])
+    assert caught.value.code == 2  # argparse's usage error, not a table refusal
+    err = capsys.readouterr().err
+    assert "--concurrency must be" in err

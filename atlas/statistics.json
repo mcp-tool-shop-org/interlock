@@ -169,7 +169,7 @@
       "confidence": "full",
       "highWater": null,
       "name": "tests",
-      "qualifyingSourceCommits": 97,
+      "qualifyingSourceCommits": 96,
       "rebaseline": null
     }
   ],
@@ -217,8 +217,8 @@
         "path": ".python-version"
       },
       {
-        "commits": 64,
-        "lines": 317,
+        "commits": 65,
+        "lines": 346,
         "path": "CHANGELOG.md"
       },
       {
@@ -237,43 +237,43 @@
         "path": "LICENSE"
       },
       {
-        "commits": 15,
-        "lines": 650,
+        "commits": 16,
+        "lines": 652,
         "path": "README.es.md"
       },
       {
-        "commits": 15,
-        "lines": 730,
+        "commits": 16,
+        "lines": 732,
         "path": "README.fr.md"
       },
       {
-        "commits": 14,
-        "lines": 686,
+        "commits": 15,
+        "lines": 688,
         "path": "README.hi.md"
       },
       {
-        "commits": 15,
-        "lines": 664,
+        "commits": 16,
+        "lines": 666,
         "path": "README.it.md"
       },
       {
-        "commits": 15,
-        "lines": 786,
+        "commits": 16,
+        "lines": 788,
         "path": "README.ja.md"
       },
       {
-        "commits": 35,
-        "lines": 479,
+        "commits": 36,
+        "lines": 481,
         "path": "README.md"
       },
       {
-        "commits": 15,
-        "lines": 662,
+        "commits": 16,
+        "lines": 664,
         "path": "README.pt-BR.md"
       },
       {
-        "commits": 15,
-        "lines": 730,
+        "commits": 16,
+        "lines": 732,
         "path": "README.zh.md"
       },
       {
@@ -377,8 +377,8 @@
         "path": "assets/logo/switchyard_64.png"
       },
       {
-        "commits": 47,
-        "lines": 941,
+        "commits": 50,
+        "lines": 972,
         "path": "atlas/README.md"
       },
       {
@@ -387,18 +387,18 @@
         "path": "atlas/boundaries.yaml"
       },
       {
-        "commits": 47,
-        "lines": 3116,
+        "commits": 50,
+        "lines": 3192,
         "path": "atlas/page.json"
       },
       {
-        "commits": 47,
-        "lines": 9803,
+        "commits": 50,
+        "lines": 10598,
         "path": "atlas/statistics.json"
       },
       {
-        "commits": 47,
-        "lines": 49917,
+        "commits": 50,
+        "lines": 51055,
         "path": "atlas/structure.json"
       },
       {
@@ -852,8 +852,8 @@
         "path": "interlock}/tasks.py"
       },
       {
-        "commits": 28,
-        "lines": 214,
+        "commits": 29,
+        "lines": 216,
         "path": "pyproject.toml"
       },
       {
@@ -1312,8 +1312,8 @@
         "path": "site/src/content/docs/handbook/configuration.md"
       },
       {
-        "commits": 5,
-        "lines": 119,
+        "commits": 6,
+        "lines": 123,
         "path": "site/src/content/docs/handbook/experiments.md"
       },
       {
@@ -1322,8 +1322,8 @@
         "path": "site/src/content/docs/handbook/getting-started.md"
       },
       {
-        "commits": 12,
-        "lines": 53,
+        "commits": 13,
+        "lines": 55,
         "path": "site/src/content/docs/handbook/index.md"
       },
       {
@@ -1342,8 +1342,8 @@
         "path": "site/src/pages/index.astro"
       },
       {
-        "commits": 12,
-        "lines": 157,
+        "commits": 13,
+        "lines": 159,
         "path": "site/src/site-config.ts"
       },
       {
@@ -1362,8 +1362,8 @@
         "path": "site/tsconfig.json"
       },
       {
-        "commits": 11,
-        "lines": 26,
+        "commits": 12,
+        "lines": 28,
         "path": "src/interlock/__init__.py"
       },
       {
@@ -1437,8 +1437,8 @@
         "path": "src/interlock/harness/lifecycle.py"
       },
       {
-        "commits": 10,
-        "lines": 3463,
+        "commits": 11,
+        "lines": 3808,
         "path": "src/interlock/harness/linux_cuda.py"
       },
       {
@@ -1547,8 +1547,8 @@
         "path": "src/interlock/relay_sink.py"
       },
       {
-        "commits": 8,
-        "lines": 346,
+        "commits": 9,
+        "lines": 355,
         "path": "src/interlock/router/policy.py"
       },
       {
@@ -1852,8 +1852,8 @@
         "path": "tests/conftest.py"
       },
       {
-        "commits": 2,
-        "lines": 220,
+        "commits": 3,
+        "lines": 306,
         "path": "tests/fake_ollama.py"
       },
       {
@@ -1972,18 +1972,18 @@
         "path": "tests/fixtures/ollama/0.35.1/version.json"
       },
       {
-        "commits": 1,
-        "lines": 12,
+        "commits": 2,
+        "lines": 24,
         "path": "tests/fixtures/ollama_logs/0.40.11/r3_killed_p8192_c8.log"
       },
       {
-        "commits": 1,
-        "lines": 12,
+        "commits": 2,
+        "lines": 24,
         "path": "tests/fixtures/ollama_logs/0.40.11/r3_partial_29_of_33.log"
       },
       {
-        "commits": 1,
-        "lines": 8,
+        "commits": 2,
+        "lines": 16,
         "path": "tests/fixtures/ollama_logs/0.40.11/r3_resident.log"
       },
       {
@@ -2087,8 +2087,8 @@
         "path": "tests/test_fill_card_live.py"
       },
       {
-        "commits": 3,
-        "lines": 422,
+        "commits": 4,
+        "lines": 424,
         "path": "tests/test_generation_failure_kinds.py"
       },
       {
@@ -2117,13 +2117,13 @@
         "path": "tests/test_importers.py"
       },
       {
-        "commits": 3,
-        "lines": 470,
+        "commits": 4,
+        "lines": 478,
         "path": "tests/test_ladder_v3.py"
       },
       {
         "commits": 2,
-        "lines": 502,
+        "lines": 961,
         "path": "tests/test_ladder_v4.py"
       },
       {
@@ -2132,8 +2132,8 @@
         "path": "tests/test_ladder_versions.py"
       },
       {
-        "commits": 7,
-        "lines": 2713,
+        "commits": 8,
+        "lines": 2714,
         "path": "tests/test_linux_cuda.py"
       },
       {
@@ -2172,8 +2172,8 @@
         "path": "tests/test_openvino_adapter.py"
       },
       {
-        "commits": 5,
-        "lines": 340,
+        "commits": 6,
+        "lines": 342,
         "path": "tests/test_packaging.py"
       },
       {
@@ -2257,8 +2257,8 @@
         "path": "tests/test_task_scope.py"
       },
       {
-        "commits": 24,
-        "lines": 1728,
+        "commits": 25,
+        "lines": 1730,
         "path": "uv.lock"
       },
       {
@@ -2272,9 +2272,9 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-10-26T16:51:13.332Z",
+  "generatedAt": "2026-10-26T19:43:23.424Z",
   "generatedFrom": {
-    "commit": "7d86f192ad7a73ba4a390672c05c61bec401cb5b"
+    "commit": "d2267a03fb2c8765a6393fc7f7145fa929064194"
   },
   "pairs": [
     {
@@ -2532,43 +2532,43 @@
     {
       "a": "atlas/README.md",
       "b": "atlas/page.json",
-      "either": 43,
-      "shared": 43,
+      "either": 45,
+      "shared": 45,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/statistics.json",
-      "either": 43,
-      "shared": 43,
+      "either": 45,
+      "shared": 45,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/structure.json",
-      "either": 43,
-      "shared": 43,
+      "either": 45,
+      "shared": 45,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/statistics.json",
-      "either": 43,
-      "shared": 43,
+      "either": 45,
+      "shared": 45,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/structure.json",
-      "either": 43,
-      "shared": 43,
+      "either": 45,
+      "shared": 45,
       "strength": 1
     },
     {
       "a": "atlas/statistics.json",
       "b": "atlas/structure.json",
-      "either": 43,
-      "shared": 43,
+      "either": 45,
+      "shared": 45,
       "strength": 1
     },
     {
@@ -2722,16 +2722,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-10-26T12:50:29-04:00",
+    "headDate": "2026-10-26T13:01:57-04:00",
     "inScopeFiles": 308,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 150,
+    "qualifyingCommits": 149,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-04-29T16:50:29.000Z",
+    "since": "2026-04-29T17:01:57.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",

@@ -223,7 +223,7 @@ def main(argv: list[str] | None = None) -> int:
     route.add_argument("--num-predict", type=int)
     route.add_argument(
         "--concurrency",
-        type=int,
+        type=_at_least_one,
         default=1,
         help="generate only: rank and floor rows measured at this concurrency (default 1). A row is the pass "
             "aggregate across that many requests; a row with no concurrency counts as 1",
@@ -625,6 +625,18 @@ def _cmd_c2_sources(args: argparse.Namespace) -> int:
         print(str(exc), file=sys.stderr)
         return 1
     return 0
+
+
+def _at_least_one(text: str) -> int:
+    """argparse type for --concurrency: a whole number of concurrent requests, at least 1."""
+
+    try:
+        value = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"--concurrency must be a whole number, got {text!r}") from None
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"--concurrency must be at least 1 (one request at a time), got {value}")
+    return value
 
 
 def _cmd_route(args: argparse.Namespace) -> int:

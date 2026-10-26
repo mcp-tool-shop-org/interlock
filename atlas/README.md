@@ -1,6 +1,6 @@
 # interlock: how it works
 
-Mapped at 2026-10-26 from commit 7d86f19 by Atlas 1.24.0.
+Mapped at 2026-10-26 from commit d2267a0 by Atlas 1.24.0.
 
 ## What this is
 
@@ -8,10 +8,9 @@ interlock routes each job to a model, engine and device from a receipt-backed ta
 
 10 parts, mostly Python (113 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.
 
-## What changed since 2026-10-26 (ba16196)
+## What changed since 2026-10-26 (7d86f19)
 
-- tests/fixtures/route/r3_table.jsonl is now read by tests/test_route_concurrency.py.
-- 2 files added and 23 changed content, across 3 parts.
+Nothing structural changed since 2026-10-26; 3 files changed content.
 
 ## What comes in
 

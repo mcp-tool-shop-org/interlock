@@ -584,7 +584,7 @@
           "path": ".python-version"
         },
         {
-          "hash": "e6b8562d4f1ce6578355229cc392781322e5812330b5dc42f6b9d8c394a5c443",
+          "hash": "ab6df4193d917407d3a7ebb6ebe78c8c440e8c1e00d8d5bad0dc73a164242b88",
           "path": "CHANGELOG.md"
         },
         {
@@ -1981,12 +1981,27 @@
               "line": 624
             },
             {
+              "in": "_at_least_one",
+              "kind": "except",
+              "line": 635
+            },
+            {
+              "in": "_at_least_one",
+              "kind": "raise",
+              "line": 636
+            },
+            {
+              "in": "_at_least_one",
+              "kind": "raise",
+              "line": 638
+            },
+            {
               "in": "_cmd_route",
               "kind": "except",
-              "line": 649
+              "line": 661
             }
           ],
-          "hash": "39681a55904d8a6d8a0d6ab359395af001b69b46c6b8bc80af41ad1782266a0d",
+          "hash": "44ffddbe104e4e4b585e40c9bc396ee1ec28bb630d1c997755f5da783772037e",
           "importOrder": [
             "src/interlock/receipt.py",
             "src/interlock/tasks.py",
@@ -2061,7 +2076,7 @@
                   }
                 },
                 {
-                  "line": 727,
+                  "line": 739,
                   "name": "receipt_paths",
                   "target": {
                     "file": "src/interlock/receipt.py"
@@ -2069,7 +2084,7 @@
                   "via": "_count_rows"
                 },
                 {
-                  "line": 729,
+                  "line": 741,
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/interlock/receipt.py"
@@ -2528,20 +2543,20 @@
             {
               "calls": [
                 {
-                  "line": 717,
+                  "line": 729,
                   "name": "read_text",
                   "target": null,
                   "via": "_load_jsonl"
                 },
                 {
-                  "line": 653,
+                  "line": 665,
                   "name": "Request",
                   "target": {
                     "file": "src/interlock/router/policy.py"
                   }
                 },
                 {
-                  "line": 670,
+                  "line": 682,
                   "name": "decide",
                   "target": {
                     "file": "src/interlock/router/policy.py"
@@ -2556,7 +2571,7 @@
             {
               "calls": [
                 {
-                  "line": 717,
+                  "line": 729,
                   "name": "read_text",
                   "target": null
                 }
@@ -2569,14 +2584,14 @@
             {
               "calls": [
                 {
-                  "line": 727,
+                  "line": 739,
                   "name": "receipt_paths",
                   "target": {
                     "file": "src/interlock/receipt.py"
                   }
                 },
                 {
-                  "line": 729,
+                  "line": 741,
                   "name": "load_jsonl",
                   "target": {
                     "file": "src/interlock/receipt.py"
@@ -15673,6 +15688,7 @@
             "test_a_table_with_only_a_fill_card_row_has_no_generate_candidate",
             "test_concurrency_4_picks_a_c4_row",
             "test_concurrency_8_picks_the_c8_aggregate_and_says_what_it_ranked",
+            "test_concurrency_below_one_or_not_a_whole_number_is_rejected_at_the_flag",
             "test_one_model_has_no_margin_between_its_own_shapes",
             "test_other_shapes_of_the_winners_own_candidate_are_not_listed_as_runners_up",
             "test_other_tasks_ignore_the_concurrency",
@@ -15682,7 +15698,7 @@
             "test_the_margin_uses_each_candidates_best_row_at_the_requested_shape",
             "test_with_two_models_the_margin_is_between_them_not_between_two_shapes_of_one"
           ],
-          "hash": "2d7ff76a336a2a77ccdddadb2b7bb3aa79119bdbb3ebe887038a9cb0619f2aa8",
+          "hash": "50478dfb43e208a1ec1ce46e2868e9ae9e5ad5d206407f9f05f3df733479dc0d",
           "importsFiles": [
             "src/interlock/cli.py",
             "src/interlock/router/policy.py"
@@ -16764,7 +16780,7 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "7d86f192ad7a73ba4a390672c05c61bec401cb5b",
+    "commit": "d2267a03fb2c8765a6393fc7f7145fa929064194",
     "tracked": 303
   },
   "landings": [

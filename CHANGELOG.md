@@ -4,7 +4,7 @@
 
 ### Added
 
-- **`route --concurrency N` (default 1).** A generate row is the pass aggregate across its N requests, so a c8 row and a c1 row answer different questions; before this, `route` ranked every shape of a model against every other and picked the c8 aggregate for a single caller (T4 r3: p512 c8, decode bound 115.67, where a c1 request gets about 67 tok/s). Generate rows are now ranked and floored only at the requested concurrency (a row with no `settings.concurrency`, the rig's single-stream harnesses, counts as 1). When no row matches, the refusal names the concurrencies that exist (`Rows exist at concurrency 1, 4, 8; none at 2.`). The decision, text and `--json`, records `concurrency` and `ranked_field` (`decode_tok_s`) and says so in `notes`. Other tasks ignore the flag.
+- **`route --concurrency N` (default 1).** A generate row is the pass aggregate across its N requests, so a c8 row and a c1 row answer different questions; before this, `route` ranked every shape of a model against every other and picked the c8 aggregate for a single caller (T4 r3: p512 c8, decode bound 115.67, where a c1 request gets about 67 tok/s). Generate rows are now ranked and floored only at the requested concurrency (a row with no `settings.concurrency`, the rig's single-stream harnesses, counts as 1). When no row matches, the refusal names the concurrencies that exist (`Rows exist at concurrency 1, 4, 8; none at 2.`). The decision, text and `--json`, records `concurrency` and `ranked_field` (`decode_tok_s`) and says so in `notes`. Other tasks ignore the flag. `--concurrency` below 1 (or not a whole number) is rejected at the flag with a usage error, not turned into a table refusal.
 
 ### Changed
 
