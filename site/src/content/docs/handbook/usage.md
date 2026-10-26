@@ -26,6 +26,7 @@ interlock route --task generate --model Phi --thinking off --ctx 1024 --busy 509
 | `--ctx` | Exact measured length when the row id has `lN`. A row with `num_ctx` and no `lN` tag qualifies when `num_ctx` is at least N. |
 | `--thinking` | `off` matches only off. `on` matches any recorded level, and the decision keeps that level. `low`, `medium`, and `high` match exactly when named. |
 | `--busy` | Repeatable. An input. interlock does not read a ledger, the watchdog, or a process list. |
+| `--concurrency` | How many requests run at once (default 1, at least 1). A generate row is the pass aggregate across its requests, so only rows measured at this concurrency compete; with no row at it, the request is refused and the measured concurrencies are named. |
 | `--allow-remote` | Allow remote `colab:<card>` rows to compete (default off). |
 | `--device` | Exact device or provider wildcard such as `colab:L4` or `colab:*`. |
 | `--budget-left-usd` | An input, like `--busy`. A remote row whose worst case exceeds it is a runner-up. With no flag, a remote suggestion is marked budget unchecked. |
@@ -38,7 +39,7 @@ Generate ranks by the lowest repeat-slot decode tok/s. Every other task ranks by
 
 A row older than 30 days is stale. A row marked provisional, or with fewer than two repeats, is provisional. Both stay eligible and are flagged.
 
-`native_binary_rejected`, `compile_rejected`, `compile_timeout`, `hang`, `device_lost`, `oom`, `load_refused`, `timeout`, `ctx_exceeded`, the unmeasured kinds (`sampler_error`, `generation_aborted`, `unmeasured`), and a row with `parity_valid` false are listed under excluded. Generate-ladder rows are ranked only within the newest `ladder_version` present, and `notes` says how many older rows were not compared. They are not candidates. When no row meets the constraints the command exits 1 and names the constraint and any measured failure reason. It does not fall back.
+`native_binary_rejected`, `compile_rejected`, `compile_timeout`, `hang`, `device_lost`, `oom`, `load_refused`, `timeout`, `ctx_exceeded`, the unmeasured kinds (`sampler_error`, `generation_aborted`, `unmeasured`), a fill-card row in a generate request (`fill_card`), a rig check row (`rig_check`), and a row with `parity_valid` false are listed under excluded. The margin is measured only against a different candidate (another device, model revision or quant), never against the same model's other shapes. Generate-ladder rows are ranked only within the newest `ladder_version` present, and `notes` says how many older rows were not compared. They are not candidates. When no row meets the constraints the command exits 1 and names the constraint and any measured failure reason. It does not fall back.
 
 Remote `colab:<card>` cards are opt-in: a default `interlock route` request never selects a remote card unless `--allow-remote` or `--device colab:<card>` is passed.
 
