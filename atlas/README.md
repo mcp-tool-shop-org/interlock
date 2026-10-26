@@ -1,6 +1,6 @@
 # interlock: how it works
 
-Mapped at 2026-10-26 from commit 1a8953f by Atlas 1.24.0.
+Mapped at 2026-10-26 from commit 4a85b14 by Atlas 1.24.0.
 
 ## What this is
 
@@ -8,9 +8,9 @@ interlock routes each job to a model, engine and device from a receipt-backed ta
 
 10 parts, mostly Python (109 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.
 
-## What changed since 2026-10-26 (0ee89be)
+## What changed since 2026-10-26 (1a8953f)
 
-Nothing structural changed since 2026-10-26; 1 file changed content.
+Nothing structural changed since 2026-10-26; 25 files changed content.
 
 ## What comes in
 
@@ -48,12 +48,12 @@ CI writes nothing this map can see.
 ## What tends to change together
 
 - **src/switchyard/adapters/openvino.py** and **tests/test_openvino_adapter.py** changed together in 17 of 23 commits.
-- **src/interlock/receipt.py** and **src/interlock/router/policy.py** changed together in 5 of 8 commits, inside the src part.
-- **site/src/site-config.ts** and **src/interlock/__init__.py** changed together in 6 of 10 commits.
-- **src/interlock/harness/fill.py** and **tests/test_fill_card_live.py** changed together in 8 of 14 commits, and the tests part imports the src part.
+- **site/src/site-config.ts** and **src/interlock/__init__.py** changed together in 7 of 11 commits.
 - **src/interlock/harness/fill.py** and **tests/test_e5_preflight.py** changed together in 5 of 9 commits, and the tests part imports the src part.
+- **src/switchyard/harness/receipts.py** and **src/switchyard/receipt.py** changed together in 7 of 13 commits.
+- **src/interlock/harness/fill.py** and **tests/test_fill_card_live.py** changed together in 8 of 15 commits, and the tests part imports the src part.
 
-1 file changed together with its own test, as expected.
+2 files changed together with their own tests, as expected.
 
 Confidence is low: fewer than 25 source files reach 10 revisions in the window.
 
@@ -90,6 +90,7 @@ Read those in order to follow one pull request end to end.
 ## What this map cannot see
 
 - 1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.
+- 1 import could not be resolved: `tests/test_generation_failure_kinds.py` imports `tests.fake_ollama`, which is no module on its import path and no declared dependency.
 - 5 writes and 6 reads use paths built at run time and are not named here.
 - 17 writes and 46 reads go to a path their caller passes, not to this repository.
 - 5 reads go to the directory the command is run in (experiments/, interlock.toml and receipts/), not to this repository.

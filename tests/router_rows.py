@@ -44,6 +44,8 @@ def measured(
         settings["num_ctx"] = num_ctx
     if prefix is not None:
         settings["prefix_caching"] = prefix
+    if ttft is not None:
+        settings["ladder_version"] = 3  # a ttft the router may read comes from a ladder that busts the prompt cache
     if worst is not None:
         settings["worst_case_usd"] = worst
     if plan is not None:

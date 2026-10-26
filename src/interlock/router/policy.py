@@ -181,6 +181,7 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
             version_notes = [*version_notes, *across]
             dropped_ids = {id(row) for row in before} - {id(row) for row in current}
             pool = [row for row in pool if id(row) not in dropped_ids]
+            version_notes = [*version_notes, *_unmeasured_notes(current, request)]
 
     if request.max_ttft_ms is not None and current:
         refusal = _ttft_refusal(current, request, excluded)
@@ -205,6 +206,53 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
     return Decision(
         _document(winner, ranked, runners, excluded, request, direction, metric, pool, version_notes)
     )
+
+
+LADDER_MEASURED_FROM = 3  # the first ladder whose ttft and concurrency throughput were measured (T4 r2 diagnosis)
+
+
+def _from_measuring_ladder(row: Mapping) -> bool:
+    value = (row.get("settings") or {}).get("ladder_version")
+    return isinstance(value, int) and not isinstance(value, bool) and value >= LADDER_MEASURED_FROM
+
+
+def _slot_ttft(row: Mapping) -> bool:
+    return any(slot.get("ttft_ms") is not None for slot in _repeat_slots(row))
+
+
+def ttft_measured(row: Mapping) -> bool:
+    """False for a ttft that cannot be read: every pre-v3 prompt was resent identically, so llama-server answered it
+    from its prompt cache (Ollama cannot switch that off), and the figure is a cache hit, not a prefill.
+
+    A row with no ttft is not "unmeasured" in this sense. A row from a rig harness (fill, runner, e4b) that records a
+    ttft is held to the same rule: those harnesses resend the same prompt across timed calls too, and no rig row can be
+    told apart from a cached one, so none is read until it comes from a ladder that busts the cache.
+    """
+
+    has_ttft = _slot_ttft(row) or (row.get("settings") or {}).get("ttft_ms") is not None
+    return not has_ttft or _from_measuring_ladder(row)
+
+
+def throughput_measured(row: Mapping) -> bool:
+    """False for the throughput of a concurrency above 1 before v3: it ran through one slot and the aggregate was
+    ``sum(eval_count) / max(eval_duration)``, which reads about the concurrency times too high."""
+
+    concurrency = (row.get("settings") or {}).get("concurrency")
+    if not isinstance(concurrency, int) or isinstance(concurrency, bool) or concurrency <= 1:
+        return True
+    return _from_measuring_ladder(row)
+
+
+def _unmeasured_notes(rows: Sequence[Mapping], request: Request) -> list[str]:
+    notes = []
+    queued = sum(1 for row in rows if not throughput_measured(row))
+    if queued:
+        notes.append(f"{queued} pre-v3 row(s) with concurrency > 1 not used: their throughput was not measured")
+    if request.max_ttft_ms is not None:
+        cached = sum(1 for row in rows if not ttft_measured(row))
+        if cached:
+            notes.append(f"ttft of {cached} pre-v3 row(s) not used: it was a prompt-cache hit, not a prefill")
+    return notes
 
 
 def ladder_version(row: Mapping) -> int | None:
@@ -663,8 +711,10 @@ def _rank_key(row: Mapping, request: Request) -> tuple:
 
 
 def decode_bound(row: Mapping) -> float | None:
-    """Minimum repeat-slot decode throughput. Cold and warmup do not count."""
+    """Minimum repeat-slot decode throughput. Cold and warmup do not count. None when it was not measured."""
 
+    if not throughput_measured(row):
+        return None
     samples = [
         float(slot["throughput"])
         for slot in _repeat_slots(row)
@@ -692,8 +742,10 @@ def latency_bound_ms(row: Mapping) -> float | None:
 
 
 def ttft_bound_ms(row: Mapping) -> float | None:
-    """Maximum repeat-slot TTFT. A median on the row is not a bound."""
+    """Maximum repeat-slot TTFT. A median on the row is not a bound. None when the ttft was not measured."""
 
+    if not ttft_measured(row):
+        return None
     samples = [
         float(slot["ttft_ms"])
         for slot in _repeat_slots(row)
