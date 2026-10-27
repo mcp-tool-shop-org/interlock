@@ -17,12 +17,12 @@
 ### Limits
 
 - **False refusals are possible in the band** between `limit / factor` and `limit`: on a T4, a projected anonymous KV of 12,337 to 12,954 MiB. The projection overstates a partial load, because Ollama hands the VRAM freed by offloading fewer weight layers to the KV (s1b load 45: projected 12,021 MiB, actual 10,184). The closest completed load on record is s1b qwen3:8b Q8_0 p16384 c8, projected 12,021, which clears the 12,337 line by 316 MiB (331 MiB under the limit once multiplied). **The live check:** any `projected host RAM:` row on a cell that loaded as a partial offload in rep s1 is a false refusal.
-- **The first cell of each run is never projected,** because there is no earlier load to scale from. The one kill of that shape on record is T4 s1r, phi3.5 FP16 c8, `num_ctx` 270336 (host need 30,767 MiB). The C2 launcher's dead-harness halt (v4p) is the cover for it.
+- **The first cell of each run is never projected,** because there is no earlier load to scale from. The ladder starts at p512 c1, and no first load on record was killed (all 34 kills in the seven T4 windows had a projection). The C2 launcher's dead-harness halt (v4p) is the cover if one ever is.
 - **A completed run records the factor it used.** A row from an earlier version has no `host_ram_projection`; one with `{"mode": "off"}` was run with the projection off.
 
 ### Coverage
 
-- Measured 93.94% line coverage (full run, 1,296 passed); the enforced floor is 90 (`--cov-fail-under=90` in `pyproject.toml`).
+- Measured 93.94% line coverage (full run, 1,299 passed); the enforced floor is 90 (`--cov-fail-under=90` in `pyproject.toml`).
 
 ## [1.0.10] - 2026-10-27
 
