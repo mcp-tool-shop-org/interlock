@@ -84,6 +84,7 @@ def test_the_parser_returns_none_for_everything_it_does_not_find_and_uses_the_la
     assert parse_load_report("") == {
         "layers_on_gpu": None, "layers_total": None, "cpu_kv_mib": None, "cpu_mapped_mib": None,
         "system_total_mib": None, "system_total_margin_mib": 0.0,
+        "n_ctx": None, "kv_total_mib": None, "gpu_kv_mib": None,  # 1.0.11
     }
     two = (FIXTURES / "r3_killed_p8192_c8.log").read_text(encoding="utf-8") + (
         FIXTURES / "r3_resident.log"

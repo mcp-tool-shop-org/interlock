@@ -139,11 +139,18 @@ class FakeOllama:
             "load_tensors: loading model tensors, this can take a while... (load_mode = mmap)",
             f"load_tensors: offloaded {on_gpu}/{self.layers_total} layers to GPU",
             f"load_tensors:   CPU_Mapped model buffer size =   {self.mapped_mib:.2f} MiB",
+            f"llama_context: n_seq_max             = {self.num_parallel}",
+            f"llama_context: n_ctx                 = {num_ctx * self.num_parallel}",
         ]
         if cpu_kv > 0:
             lines.append(f"llama_kv_cache:        CPU KV buffer size = {cpu_kv:.2f} MiB")
         if fraction > 0:
             lines.append(f"llama_kv_cache:      CUDA0 KV buffer size = {kv * fraction:.2f} MiB")
+        if not killed:  # llama-server prints the size only for a load that got through its KV cache
+            lines.append(
+                f"llama_kv_cache: size = {kv:.2f} MiB ( {num_ctx} cells,  32 layers,  "
+                f"{self.num_parallel}/{self.num_parallel} seqs)"
+            )
         if killed:
             lines.append(
                 'time=2026-10-26T14:00:11.000Z level=INFO source=sched.go:686 msg="Load failed" '

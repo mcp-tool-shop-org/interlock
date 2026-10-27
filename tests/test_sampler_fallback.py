@@ -136,6 +136,7 @@ def test_the_t4_r5_run_holds_nvml_wedged_after_a_host_ram_kill_the_first_cell_is
             outcome["rows"] = run_spec(
                 spec, root=tmp_path, run_id="c2-r5", date="2026-10-26",
                 python_path=str(tmp_path.parent / "external-python"), models=["qwen3:8b"],
+                host_ram_projection="off",  # the real kills this test needs are what the projection now refuses
                 seams={"server": server, "remote_device": IDENT, "sample_vram_mib": nvml},
             )
         except BaseException as exc:  # noqa: BLE001  # surfaced below

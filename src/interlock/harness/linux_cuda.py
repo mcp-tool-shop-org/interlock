@@ -66,6 +66,12 @@ GENERATE_CONCURRENCIES = (1, 4, 8)
 # when the log's numbers say so (`oom`; v3 recorded `unmeasured`), and scales each cell's request timeout from its own
 # verify call and records it.
 GENERATE_LADDER_VERSION = 4
+# 1.0.11: a generate cell is refused before its model loads when the anonymous KV it is projected to put in host RAM,
+# times this factor, is over the VM's memory (the Ollama-reported system memory less its rounding, or the cgroup's
+# memory.max when that is lower). T4 replay over 7 windows: the largest completed projection is 12,021.2 MiB, the
+# smallest killed one 14,804.2 MiB, against a limit of 12,953.6 MiB, so any factor from 0.875 to 1.077 separates them.
+HOST_RAM_PROJECTION_SAFETY = 1.05
+CGROUP_MEMORY_MAX = Path("/sys/fs/cgroup/memory.max")
 THROUGHPUT_TASKS = ("embed", "rerank", "nli")
 THROUGHPUT_BATCH_SIZES = (1, 8, 32)
 THROUGHPUT_TOKEN_LENGTHS = (128, 510)
@@ -468,6 +474,9 @@ _OFFLOADED = re.compile(r"offloaded\s+(\d+)\s*/\s*(\d+)\s+layers")
 _CPU_KV = re.compile(r"CPU KV buffer size\s*=\s*([\d.]+)\s*MiB")
 _CPU_MAPPED = re.compile(r"CPU_Mapped model buffer size\s*=\s*([\d.]+)\s*MiB")
 _SYSTEM_MEMORY = re.compile(r'msg="system memory"[^\n]*?total="([\d.]+)\s*(GiB|MiB)"')
+_N_CTX = re.compile(r"llama_context:\s*n_ctx\s*=\s*(\d+)")
+_KV_SIZE = re.compile(r"llama_kv_cache:\s*size\s*=\s*([\d.]+)\s*MiB")
+_GPU_KV = re.compile(r"CUDA\d+ KV buffer size\s*=\s*([\d.]+)\s*MiB")
 
 
 def parse_load_report(text: str) -> dict[str, Any]:
@@ -496,6 +505,9 @@ def parse_load_report(text: str) -> dict[str, Any]:
     layers = _OFFLOADED.findall(block)
     cpu_kv = [float(v) for v in _CPU_KV.findall(block)]
     mapped = [float(v) for v in _CPU_MAPPED.findall(block)]
+    n_ctx = _N_CTX.search(block)
+    kv_size = _KV_SIZE.search(block)
+    gpu_kv = [float(v) for v in _GPU_KV.findall(block)]
     system_mib, margin = None, 0.0
     if system:
         amount, unit = system[-1]
@@ -508,7 +520,173 @@ def parse_load_report(text: str) -> dict[str, Any]:
         "cpu_mapped_mib": sum(mapped) if mapped else None,
         "system_total_mib": system_mib,
         "system_total_margin_mib": margin,
+        "n_ctx": int(n_ctx.group(1)) if n_ctx else None,
+        # llama-server prints the size line only for a load that got as far as its KV cache; a load that was killed
+        # first has none, and that is what tells the projection not to scale from it.
+        "kv_total_mib": float(kv_size.group(1)) if kv_size else None,
+        "gpu_kv_mib": sum(gpu_kv) if gpu_kv else (0.0 if kv_size else None),
     }
+
+
+class HostRamSafetyError(LinuxCudaError):
+    """The host-RAM safety factor is not a finite number above 0. It carries the repo's code, message and hint."""
+
+    def __init__(self, message: str, hint: str, code: str = "host_ram_safety_invalid") -> None:
+        super().__init__(f"{code}: {message}\nhint: {hint}")
+        self.code = code
+        self.message = message
+        self.hint = hint
+
+
+def parse_host_ram_safety(value: Any) -> float:
+    """The factor, ``HOST_RAM_PROJECTION_SAFETY`` when none is given; a finite number greater than 0 otherwise."""
+
+    if value is None:
+        return HOST_RAM_PROJECTION_SAFETY
+    hint = "pass a factor such as 1.05; 1.0 projects without a margin, a larger one refuses earlier"
+    if isinstance(value, bool):
+        raise HostRamSafetyError(f"the host-RAM safety factor must be a number greater than 0, got {value!r}", hint)
+    try:
+        factor = float(value)
+    except (TypeError, ValueError):
+        raise HostRamSafetyError(
+            f"the host-RAM safety factor must be a number greater than 0, got {value!r}", hint
+        ) from None
+    if not math.isfinite(factor) or factor <= 0:
+        raise HostRamSafetyError(
+            f"the host-RAM safety factor must be a finite number greater than 0, got {value!r}", hint
+        )
+    return factor
+
+
+def cgroup_memory_limit_mib(path: Path | None = None) -> float | None:
+    """The cgroup's ``memory.max`` in MiB, or None when it is unreadable, ``max`` or not a positive whole number."""
+
+    try:
+        text = (path if path is not None else CGROUP_MEMORY_MAX).read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeDecodeError):
+        return None
+    if not text.isdigit() or int(text) <= 0:
+        return None
+    return int(text) / (1024.0 * 1024.0)
+
+
+def load_record(
+    report: Mapping[str, Any], *, cell: str, num_ctx_req: int, slots_req: int
+) -> dict[str, Any] | None:
+    """The last load a cell made, as the next cell's projection scales from it; None when the load printed no size line.
+
+    ``report`` is ``parse_load_report`` of the cell's own part of the server log. The ratio the next cell scales by is
+    the harness's requested ``num_ctx`` times the slots, not llama's ``n_ctx`` (which pads each sequence), so both are
+    kept.
+    """
+
+    kv_total, system = report.get("kv_total_mib"), report.get("system_total_mib")
+    if kv_total is None or system is None:
+        return None
+    return {
+        "cell": cell,
+        "num_ctx_req": num_ctx_req,
+        "slots_req": slots_req,
+        "req_total": num_ctx_req * slots_req,
+        "n_ctx": report.get("n_ctx"),
+        "kv_total_mib": float(kv_total),
+        "kv_gpu_mib": float(report.get("gpu_kv_mib") or 0.0),
+        "mapped_mib": float(report.get("cpu_mapped_mib") or 0.0),
+        "system_total_mib": float(system),
+        "margin_mib": float(report.get("system_total_margin_mib") or 0.0),
+    }
+
+
+@dataclass
+class HostRamState:
+    """The host-RAM projection's state for one ladder run (one model and quant), across its concurrency changes.
+
+    ``prev_load`` is replaced only by a load that printed ``llama_kv_cache: size``: a refused cell or a killed one
+    leaves it as it was, so the cell after a refusal still scales from the last load that happened.
+    """
+
+    mode: str = "on"
+    factor: float = HOST_RAM_PROJECTION_SAFETY
+    prev_load: dict[str, Any] | None = None
+    cells: int = 0
+
+    def __post_init__(self) -> None:
+        if self.mode not in ("on", "off"):
+            raise LinuxCudaError(f"--host-ram-projection is on or off, got {self.mode!r}")
+        self.factor = parse_host_ram_safety(self.factor)
+
+    def skipped(self, why: str) -> dict[str, Any]:
+        """What a row records for a cell that was not projected."""
+
+        if self.mode == "off":
+            return {"mode": "off"}
+        return {"mode": "on", "decision": "skipped", "skipped": why, "factor": self.factor}
+
+
+def project_host_ram(
+    prev: Mapping[str, Any],
+    *,
+    num_ctx_next: int,
+    slots_next: int,
+    factor: float,
+    cgroup_max_mib: float | None = None,
+) -> tuple[dict[str, Any], str | None]:
+    """Project the anonymous KV the next cell would put in host RAM; refuse it when over the limit.
+
+    The next load's KV is the previous load's scaled by the requested ``num_ctx`` times the slots; the GPU is assumed
+    to hold what it held. The mapped weights are file-backed pages the kernel can evict, and the cgroup kills on
+    anonymous memory, so they are recorded and not tested. The limit is Ollama's system memory less its rounding, or
+    the cgroup's ``memory.max`` when that is lower. Returns the row dict and, for a refusal, its reason.
+    """
+
+    req_next = num_ctx_next * slots_next
+    kv_total_next = prev["kv_total_mib"] * req_next / prev["req_total"]
+    projkv = max(0.0, kv_total_next - prev["kv_gpu_mib"])
+    ollama_limit = prev["system_total_mib"] - prev["margin_mib"]
+    binds = cgroup_max_mib is not None and cgroup_max_mib < ollama_limit
+    limit = cgroup_max_mib if binds else ollama_limit
+    host_projected = projkv * factor
+    refuse = host_projected > limit
+    row = {
+        "mode": "on",
+        "decision": "refuse" if refuse else "allow",
+        "source_load": prev["cell"],
+        "num_ctx_req_prev": prev["num_ctx_req"],
+        "slots_req_prev": prev["slots_req"],
+        "req_total_prev": prev["req_total"],
+        "n_ctx_prev": prev.get("n_ctx"),
+        "num_ctx_req_next": num_ctx_next,
+        "slots_req_next": slots_next,
+        "req_total_next": req_next,
+        "kv_total_prev": prev["kv_total_mib"],
+        "kv_gpu_prev": prev["kv_gpu_mib"],
+        "mapped_prev": prev["mapped_mib"],  # information only: file-backed, evictable
+        "kv_total_next": round(kv_total_next, 1),
+        "projkv_mib": round(projkv, 1),
+        "proj_mapped_mib": round(projkv + prev["mapped_mib"], 1),  # information only
+        "factor": factor,
+        "host_projected_mib": round(host_projected, 1),
+        "system_total_mib": prev["system_total_mib"],
+        "margin_mib": prev["margin_mib"],
+        "cgroup_max_mib": cgroup_max_mib,
+        "limit_mib": round(limit, 1),
+        "bound_by": "cgroup_memory_max" if binds else "ollama_system_memory",
+    }
+    if not refuse:
+        return row, None
+    where = (
+        f"cgroup memory.max {cgroup_max_mib:.0f} MiB; Ollama system memory {prev['system_total_mib']:.0f} MiB less "
+        f"{prev['margin_mib']:.1f} MiB margin would allow {ollama_limit:.0f}"
+        if binds
+        else f"Ollama system memory {prev['system_total_mib']:.0f} MiB less {prev['margin_mib']:.1f} MiB margin"
+    )
+    reason = (
+        f"projected host RAM: {host_projected:.0f} MiB (CPU KV {projkv:.0f} MiB x {factor:g}, from {prev['cell']} KV "
+        f"{prev['kv_total_mib']:.0f} MiB at {prev['req_total']} -> {req_next} requested tokens less "
+        f"{prev['kv_gpu_mib']:.0f} MiB GPU KV) > limit {limit:.0f} MiB ({where})"
+    )
+    return row, reason
 
 
 class LinuxOllamaServer:
@@ -717,6 +895,7 @@ def build_linux_failure_row(
     num_ctx_sent: int | None = None,
     vram_sampler: str | None = None,
     vram_sampler_reason: str | None = None,
+    host_ram_projection: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a schema-valid capability/failure row for a failed remote shape."""
 
@@ -765,6 +944,7 @@ def build_linux_failure_row(
         settings["request_timeout_s"] = request_timeout_s  # the budget in force (None before one existed)
         settings["cell_wall_s"] = CELL_WALL_S
         settings["ttft_floor"] = "off"  # 1.0.10: no gate on the scaling of the prefill; a row from 1.0.9 has no field
+        settings["host_ram_projection"] = host_ram_projection or HostRamState(mode="off").skipped("")
         if vram_sampler is not None:  # which sampler took this cell's readings, and why the run switched
             settings["vram_sampler"] = vram_sampler
             settings["vram_sampler_reason"] = vram_sampler_reason
@@ -1089,13 +1269,18 @@ def run_linux_generate_ladder(
     licence: str = UNRECORDED,
     on_progress: Callable[[list[dict[str, Any]]], None] | None = None,
     recover: Callable[[], None] | None = None,
+    host_ram: HostRamState | None = None,
 ) -> list[dict[str, Any]]:
     """Sweep generate TTFT and decode tok/s across prompt lengths 512..32k at concurrencies 1, 4, 8.
 
     ``recover`` restarts the harness's server after a cell's outer deadline fired, before the next cell.
+    ``host_ram`` is the run's projection state (the caller hands the same one to the measure function); a ladder
+    started without one records that no projection ran.
     """
 
     abort_mib = compute_abort_mib(remote_device.vram_mib, abort_fraction)
+    host_ram = host_ram or HostRamState(mode="off")
+    not_run = host_ram.skipped("the measure function reported no projection")
     rows: list[dict[str, Any]] = _ProgressRows(on_progress)
     restarted = {"pending": False}
 
@@ -1157,6 +1342,7 @@ def run_linux_generate_ladder(
                         num_ctx_sent=(exc.evidence or {}).get("num_ctx_sent"),
                         vram_sampler=(exc.evidence or {}).get("vram_sampler"),
                         vram_sampler_reason=(exc.evidence or {}).get("vram_sampler_reason"),
+                        host_ram_projection=(exc.evidence or {}).get("host_ram_projection") or not_run,
                         peak_mib=exc.peak_mib,
                         abort_mib=abort_mib,
                         engine_version=engine_version,
@@ -1201,6 +1387,7 @@ def run_linux_generate_ladder(
                         num_ctx_sent=measured.get("num_ctx_sent"),
                         vram_sampler=measured.get("vram_sampler"),
                         vram_sampler_reason=measured.get("vram_sampler_reason"),
+                        host_ram_projection=measured.get("host_ram_projection") or not_run,
                         peak_mib=peak_mib,
                         abort_mib=abort_mib,
                         engine_version=engine_version,
@@ -1276,6 +1463,7 @@ def run_linux_generate_ladder(
                     "prefill_ms_passes": repeat_prefills,
                     "prefill_spread": prefill_spread,
                     "ttft_floor": "off",
+                    "host_ram_projection": measured.get("host_ram_projection") or not_run,
                     "overhead_ms": measured.get("overhead_ms"),
                     "per_request_decode_tok_s": measured.get("per_request_decode_tok_s"),
                     "ttft_ms": ttft_ms,
@@ -2071,21 +2259,50 @@ def measure_linux_ollama_generate(
     num_predict: int = 128,
     repeats: int = 3,
     clock: Callable[[], float] = time.perf_counter,
+    host_ram: HostRamState | None = None,
+    cgroup_path: Path | None = None,
 ) -> dict[str, Any]:
-    """Measure one cell, and say which sampler the cell used (and why the run switched) in the result or the failure."""
+    """Measure one cell, and say which sampler the cell used (and why the run switched) in the result or the failure.
+
+    ``host_ram`` is the run's projection state: with it, a cell whose projected anonymous host KV is over the VM's
+    limit is refused before anything of it starts, and every result or failure carries the projection's dict.
+    """
 
     outer_epoch = _CELL_EPOCH.get()  # the cell sets its own; a caller on this thread gets its context back
+    projection: dict[str, Any] = {}
     try:
         result = _measure_generate_cell(
             server, sample_vram_mib, model=model, prompt_tokens=prompt_tokens, concurrency=concurrency,
-            num_predict=num_predict, repeats=repeats, clock=clock,
+            num_predict=num_predict, repeats=repeats, clock=clock, host_ram=host_ram, cgroup_path=cgroup_path,
+            projection=projection,
         )
     except LinuxShapeFailure as exc:
         exc.evidence = {**(exc.evidence or {}), **_sampler_evidence(sample_vram_mib)}
+        if projection:
+            exc.evidence.setdefault("host_ram_projection", projection)
         raise
     finally:
         _CELL_EPOCH.set(outer_epoch)
-    return {**result, **_sampler_evidence(sample_vram_mib)}
+    measured = {**result, **_sampler_evidence(sample_vram_mib)}
+    if projection:
+        measured["host_ram_projection"] = projection
+    return measured
+
+
+def _note_host_ram_load(
+    host_ram: HostRamState | None, server: Any, *, cell: str, num_ctx: int, slots: int
+) -> None:
+    """Make this cell's load the run's last one, when the server log shows it printed its KV size.
+
+    This reads the log before the next ``begin_cell()`` moves its offset. A cell with no new load in its part of
+    the log, or one killed before the size line, leaves the last load as it was.
+    """
+
+    if host_ram is None or host_ram.mode != "on":
+        return
+    record = load_record(_load_report(server), cell=cell, num_ctx_req=num_ctx, slots_req=slots)
+    if record is not None:
+        host_ram.prev_load = record
 
 
 def _measure_generate_cell(
@@ -2098,12 +2315,44 @@ def _measure_generate_cell(
     num_predict: int = 128,
     repeats: int = 3,
     clock: Callable[[], float] = time.perf_counter,
+    host_ram: HostRamState | None = None,
+    cgroup_path: Path | None = None,
+    projection: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Measure one ``(prompt_tokens, concurrency)`` cell on a running ``LinuxOllamaServer``.
 
     The server runs ``concurrency`` slots; the model must load fully on the GPU; every timed call has its own prompt
     prefix and a budget scaled from the cell's own verify call; a prefill rate no card reaches is an unmeasured cell.
+
+    Before any of that, the host-RAM projection (``project_host_ram``) may refuse the cell: nothing is restarted,
+    sampled or sent for it, and it carries no ``peak_mib``. ``projection`` receives the dict the row records.
     """
+
+    num_ctx = ladder_window(prompt_tokens, num_predict)
+    slots = max(1, concurrency)
+    cell = f"cell p{prompt_tokens} c{concurrency}"
+    if projection is None:
+        projection = {}
+    if host_ram is not None and host_ram.mode == "on":
+        host_ram.cells += 1
+        prev = host_ram.prev_load
+        if prev is None:
+            projection.update(
+                host_ram.skipped("first load of run" if host_ram.cells == 1 else "no earlier load with a size line")
+            )
+        else:
+            verdict, reason = project_host_ram(
+                prev, num_ctx_next=num_ctx, slots_next=slots, factor=host_ram.factor,
+                cgroup_max_mib=cgroup_memory_limit_mib(cgroup_path),
+            )
+            projection.update(verdict)
+            if reason is not None:
+                _phase(f"{cell}: refused before its load: {reason}")
+                raise LinuxShapeFailure(
+                    "oom", reason, peak_mib=None, evidence={"host_ram_projection": verdict}
+                )
+    elif host_ram is not None:
+        projection.update(host_ram.skipped(""))
 
     ensure_parallel = getattr(server, "ensure_parallel", None)
     if callable(ensure_parallel):
@@ -2114,11 +2363,9 @@ def _measure_generate_cell(
     epoch = getattr(server, "epoch", None)
     _CELL_EPOCH.set(epoch)  # this cell's thread; the pass workers below carry the same epoch
     cell_started = clock()
-    cell = f"cell p{prompt_tokens} c{concurrency}"
     _phase(f"{cell}: start, sampling VRAM")
     used_before, _ = _sample_during_cell(sample_vram_mib)
     peak_mib = used_before
-    num_ctx = ladder_window(prompt_tokens, num_predict)
     nonce = _cell_nonce(model, prompt_tokens, concurrency)
     sent = {"num_ctx_sent": num_ctx}  # the first probe is sent with this window, so any failure below has one
     calibration_budget = {**sent, "request_timeout_s": CALIBRATION_TIMEOUT_S}
@@ -2126,7 +2373,10 @@ def _measure_generate_cell(
     try:
         words, evaluated, verify_s = _calibrate_ladder_prompt(server, model, prompt_tokens, num_ctx, nonce, concurrency)
     except BaseException as exc:
+        # A partial offload is a load that happened: its size line is the next cell's reference. A kill is not.
+        _note_host_ram_load(host_ram, server, cell=f"p{prompt_tokens} c{concurrency}", num_ctx=num_ctx, slots=slots)
         raise _failure_for(server, exc, peak_mib, calibration_budget) from exc
+    _note_host_ram_load(host_ram, server, cell=f"p{prompt_tokens} c{concurrency}", num_ctx=num_ctx, slots=slots)
     budget_s = request_timeout_s(concurrency, verify_s)
     budget = {**sent, "request_timeout_s": budget_s}
     pass_s = math.ceil(max(1, concurrency) * verify_s) + REQUEST_TIMEOUT_DECODE_ALLOWANCE_S
@@ -2416,8 +2666,16 @@ def run_linux_spec(
     sample_vram_mib: Callable[[], tuple[int, int]] | None = None,
     server: LinuxOllamaServer | None = None,
     on_rows: Callable[[list[dict[str, Any]]], None] | None = None,
+    host_ram_projection: str = "on",
+    host_ram_safety: Any = None,
 ) -> list[dict[str, Any]]:
-    """Execute a ``platform: linux-cuda`` experiment spec and return validated routing rows."""
+    """Execute a ``platform: linux-cuda`` experiment spec and return validated routing rows.
+
+    ``host_ram_projection`` (on or off) and ``host_ram_safety`` (the factor) are checked before the server starts.
+    """
+
+    host_ram_factor = parse_host_ram_safety(host_ram_safety)
+    HostRamState(mode=host_ram_projection, factor=host_ram_factor)  # refuse a bad mode before any device contact
 
     if remote_device is None or sample_vram_mib is None:
         probed_device, probed_sampler = probe_linux_gpu()
@@ -2547,6 +2805,9 @@ def run_linux_spec(
                                     num_predict=num_predict,
                                     prompt_tokens=prompt_len,
                                     concurrency=concurrency,
+                                    host_ram_projection=HostRamState(
+                                        mode=host_ram_projection, factor=host_ram_factor
+                                    ).skipped("no load was attempted: a pre-registered refusal"),
                                     abort_mib=abort_mib,
                                     engine_version=engine_version,
                                     quant=quant,
@@ -2555,6 +2816,20 @@ def run_linux_spec(
                             )
                     continue
                 ollama_tag = _ollama_model_tag(model_tag, quant, entry.get("ollama_tag"))
+                # Fresh for each (model, quant): the first cell of the next one has no load to scale from.
+                ladder_state = HostRamState(mode=host_ram_projection, factor=host_ram_factor)
+
+                def measure_cell(plen: int, conc: int, m: str = ollama_tag, state: HostRamState = ladder_state):
+                    return measure_linux_ollama_generate(
+                        active_server,
+                        sample_vram_mib,
+                        model=m,
+                        prompt_tokens=plen,
+                        concurrency=conc,
+                        num_predict=num_predict,
+                        host_ram=state,
+                    )
+
                 with _unloaded_after(active_server, ollama_tag):
                     rows.extend(
                         run_linux_generate_ladder(
@@ -2571,17 +2846,11 @@ def run_linux_spec(
                             num_predict=num_predict,
                             on_progress=progress,
                             recover=getattr(active_server, "restart_after_deadline", None),
+                            host_ram=ladder_state,
                             engine_version=engine_version,
                             quant=quant,
                             licence=licence,
-                            measure_shape=lambda plen, conc, m=ollama_tag: measure_linux_ollama_generate(
-                                active_server,
-                                sample_vram_mib,
-                                model=m,
-                                prompt_tokens=plen,
-                                concurrency=conc,
-                                num_predict=num_predict,
-                            ),
+                            measure_shape=measure_cell,
                         )
                     )
             return rows

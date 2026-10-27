@@ -23,7 +23,7 @@ FAMILIES_RESOURCE = "interlock/data/model-families.json"
 # packaged copy. Each such line is named exactly; a new one, or a moved one, fails until it is reviewed and listed.
 ESCAPES_ALLOWED = {
     ("src/interlock/families.py", 23),
-    ("src/interlock/harness/linux_cuda.py", 78),
+    ("src/interlock/harness/linux_cuda.py", 84),
 }
 
 
@@ -79,6 +79,44 @@ def test_family_of_and_stamp_family_work_from_a_clean_venv_outside_the_repositor
     )
     env = {k: v for k, v in os.environ.items() if k not in {"PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV"}}
     done = subprocess.run([str(python), "-I", "-c", script], cwd=work, env=env, capture_output=True, text=True)
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.strip() == "ok"
+
+
+def test_the_host_ram_projection_works_from_a_clean_venv_outside_the_repository(tmp_path):
+    """1.0.11: the installed wheel parses a real load block and refuses the T4 load that was killed.
+
+    The two blocks are copied from the receipts (tests/fixtures/ollama_logs/0.40.11/hostram_*.log) and handed to the
+    installed code as text, so the wheel needs no data file for this; its listing is checked for the module.
+    """
+
+    wheel = _build_wheel(tmp_path / "wheel")
+    with zipfile.ZipFile(wheel) as archive:
+        assert "interlock/harness/linux_cuda.py" in archive.namelist()
+    venv = tmp_path / "venv"
+    uv = shutil.which("uv")
+    subprocess.run([uv, "venv", "--python", sys.executable, str(venv)], check=True, capture_output=True)
+    python = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    subprocess.run([uv, "pip", "install", "--python", str(python), str(wheel)], check=True, capture_output=True)
+    logs = ROOT / "tests" / "fixtures" / "ollama_logs" / "0.40.11"
+    refused_prev = (logs / "hostram_s2a_c4_34816_partial.log").read_text(encoding="utf-8")
+    allowed_prev = (logs / "hostram_s1b_c8_69632_partial.log").read_text(encoding="utf-8")
+    work = tmp_path / "elsewhere"
+    work.mkdir()
+    lines = [
+        "from interlock.harness.linux_cuda import load_record, parse_load_report, project_host_ram",
+        f"refused = load_record(parse_load_report({refused_prev!r}), cell='p8192 c4', num_ctx_req=8547, slots_req=4)",
+        "row, reason = project_host_ram(refused, num_ctx_next=16903, slots_next=4, factor=1.05)",
+        "assert row['decision'] == 'refuse' and reason.startswith('projected host RAM: 15544 MiB'), (row, reason)",
+        f"allowed = load_record(parse_load_report({allowed_prev!r}), cell='p8192 c8', num_ctx_req=8547, slots_req=8)",
+        "row, reason = project_host_ram(allowed, num_ctx_next=16903, slots_next=8, factor=1.05)",
+        "assert row['decision'] == 'allow' and reason is None and row['projkv_mib'] == 12021.2, row",
+        "print('ok')",
+    ]
+    env = {k: v for k, v in os.environ.items() if k not in {"PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV"}}
+    done = subprocess.run(
+        [str(python), "-I", "-c", "\n".join(lines)], cwd=work, env=env, capture_output=True, text=True
+    )
     assert done.returncode == 0, done.stderr
     assert done.stdout.strip() == "ok"
 

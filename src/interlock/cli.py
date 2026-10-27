@@ -160,6 +160,25 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     run.add_argument(
+        "--host-ram-projection",
+        choices=("on", "off"),
+        default=None,
+        help=(
+            "linux-cuda generate ladder: on (the default) refuses a cell before its model loads when the anonymous "
+            "KV it is projected to put in host RAM, times --host-ram-safety, is over the VM's limit; off behaves as "
+            "1.0.10 did (no projection) and each row records only mode off"
+        ),
+    )
+    run.add_argument(
+        "--host-ram-safety",
+        default=None,
+        metavar="FACTOR",
+        help=(
+            "the factor on the projected host KV, a finite number above 0 (default 1.05). A factor of 1.05 refuses "
+            "from a projection of 12,337 MiB where the limit is 12,954 MiB. Recorded on every row"
+        ),
+    )
+    run.add_argument(
         "--quarantine",
         type=Path,
         default=None,
@@ -574,6 +593,8 @@ def _cmd_run(args: argparse.Namespace) -> int:
             pairs=pairs,
             models=models,
             quants=quants,
+            host_ram_projection=getattr(args, "host_ram_projection", None),
+            host_ram_safety=getattr(args, "host_ram_safety", None),
         )
     except (
         AdapterError,
