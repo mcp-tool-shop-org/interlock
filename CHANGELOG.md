@@ -10,8 +10,13 @@
 
 ### Added
 
-- **The noise is recorded, not gated.** Every measured generate row's `settings` gains `prefill_ms_passes` (the repeat passes' prefill, in order, without the warm-up) and `prefill_spread` (max over min of those passes, 3 decimals; null with no passes). Every generate row, measured or failed, gains `settings.ttft_floor: "off"`, so a reader can tell 1.0.10 rows from 1.0.9 rows (which have no field).
+- **The noise is recorded, not gated.** Every measured generate row's `settings` gains `prefill_ms_passes` (the repeat passes' prefill, in order, without the warm-up) and `prefill_spread` (max over min of those passes, 3 decimals; null with no passes or when a pass is at or below 0). Every generate row, measured or failed, gains `settings.ttft_floor: "off"`, so a reader can tell 1.0.10 rows from 1.0.9 rows (which have no field).
 - `GENERATE_LADDER_VERSION` stays 4. Nothing measured changes, only which cells are labelled `unmeasured`, the same reasoning that kept 1.0.8 and 1.0.9 at 4; a bump would make the router's newest-version filter split the sweep's repetitions. The router does not filter on `ttft_floor`.
+
+### Docs
+
+- The handbook's experiments page no longer says a cell is unmeasured when its prefill does not grow with the prompt; it describes the prefill ceiling and the recorded spread.
+- **README.fr.md's version line.** Since 1.0.7 the French status line kept "Version 1.0.6" and its correction notice read "Correction dans la version 1.0.9" (the release script's pattern did not match French typography's non-breaking space before the colon, so it changed the wrong marker). Both are corrected: "Version 1.0.10" and "Correction dans la version 1.0.6".
 
 ## [1.0.9] - 2026-10-26
 
