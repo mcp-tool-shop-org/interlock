@@ -20,6 +20,10 @@
 - **The first cell of each run is never projected,** because there is no earlier load to scale from. The ladder starts at p512 c1, and no first load on record was killed (all 34 kills in the seven T4 windows had a projection). The C2 launcher's dead-harness halt (v4p) is the cover if one ever is.
 - **A completed run records the factor it used.** A row from an earlier version has no `host_ram_projection`; one with `{"mode": "off"}` was run with the projection off.
 
+### Docs
+
+- The handbook's experiments page describes the host-RAM projection: what it refuses, the limit and factor, the two flags, the first-cell gap and the false-refusal band. The README's version line, in all eight languages, reads 1.0.11.
+
 ### Coverage
 
 - Measured 93.94% line coverage (full run, 1,299 passed); the enforced floor is 90 (`--cov-fail-under=90` in `pyproject.toml`).
