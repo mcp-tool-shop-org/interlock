@@ -130,7 +130,7 @@
           "scripts"
         ]
       },
-      "cohesion": 0.31392,
+      "cohesion": 0.308149,
       "cohesionDropped": false,
       "confidence": "full",
       "highWater": null,
@@ -169,7 +169,7 @@
       "confidence": "full",
       "highWater": null,
       "name": "tests",
-      "qualifyingSourceCommits": 98,
+      "qualifyingSourceCommits": 97,
       "rebaseline": null
     }
   ],
@@ -218,7 +218,7 @@
       },
       {
         "commits": 67,
-        "lines": 348,
+        "lines": 357,
         "path": "CHANGELOG.md"
       },
       {
@@ -237,43 +237,43 @@
         "path": "LICENSE"
       },
       {
-        "commits": 16,
-        "lines": 652,
+        "commits": 17,
+        "lines": 654,
         "path": "README.es.md"
       },
       {
-        "commits": 16,
-        "lines": 732,
+        "commits": 17,
+        "lines": 734,
         "path": "README.fr.md"
       },
       {
-        "commits": 15,
-        "lines": 688,
+        "commits": 16,
+        "lines": 690,
         "path": "README.hi.md"
       },
       {
-        "commits": 16,
-        "lines": 666,
+        "commits": 17,
+        "lines": 668,
         "path": "README.it.md"
       },
       {
-        "commits": 16,
-        "lines": 788,
+        "commits": 17,
+        "lines": 790,
         "path": "README.ja.md"
       },
       {
-        "commits": 36,
-        "lines": 481,
+        "commits": 37,
+        "lines": 483,
         "path": "README.md"
       },
       {
-        "commits": 16,
-        "lines": 664,
+        "commits": 17,
+        "lines": 666,
         "path": "README.pt-BR.md"
       },
       {
-        "commits": 16,
-        "lines": 732,
+        "commits": 17,
+        "lines": 734,
         "path": "README.zh.md"
       },
       {
@@ -377,8 +377,8 @@
         "path": "assets/logo/switchyard_64.png"
       },
       {
-        "commits": 51,
-        "lines": 988,
+        "commits": 50,
+        "lines": 979,
         "path": "atlas/README.md"
       },
       {
@@ -387,18 +387,18 @@
         "path": "atlas/boundaries.yaml"
       },
       {
-        "commits": 51,
-        "lines": 3298,
+        "commits": 50,
+        "lines": 3282,
         "path": "atlas/page.json"
       },
       {
-        "commits": 51,
-        "lines": 10974,
+        "commits": 50,
+        "lines": 10934,
         "path": "atlas/statistics.json"
       },
       {
-        "commits": 51,
-        "lines": 52169,
+        "commits": 50,
+        "lines": 51952,
         "path": "atlas/structure.json"
       },
       {
@@ -852,8 +852,8 @@
         "path": "interlock}/tasks.py"
       },
       {
-        "commits": 29,
-        "lines": 216,
+        "commits": 30,
+        "lines": 218,
         "path": "pyproject.toml"
       },
       {
@@ -1312,8 +1312,8 @@
         "path": "site/src/content/docs/handbook/configuration.md"
       },
       {
-        "commits": 6,
-        "lines": 121,
+        "commits": 7,
+        "lines": 123,
         "path": "site/src/content/docs/handbook/experiments.md"
       },
       {
@@ -1322,8 +1322,8 @@
         "path": "site/src/content/docs/handbook/getting-started.md"
       },
       {
-        "commits": 13,
-        "lines": 55,
+        "commits": 14,
+        "lines": 57,
         "path": "site/src/content/docs/handbook/index.md"
       },
       {
@@ -1342,8 +1342,8 @@
         "path": "site/src/pages/index.astro"
       },
       {
-        "commits": 13,
-        "lines": 159,
+        "commits": 14,
+        "lines": 161,
         "path": "site/src/site-config.ts"
       },
       {
@@ -1362,8 +1362,8 @@
         "path": "site/tsconfig.json"
       },
       {
-        "commits": 12,
-        "lines": 28,
+        "commits": 13,
+        "lines": 30,
         "path": "src/interlock/__init__.py"
       },
       {
@@ -1437,8 +1437,8 @@
         "path": "src/interlock/harness/lifecycle.py"
       },
       {
-        "commits": 13,
-        "lines": 3839,
+        "commits": 12,
+        "lines": 3854,
         "path": "src/interlock/harness/linux_cuda.py"
       },
       {
@@ -1853,7 +1853,7 @@
       },
       {
         "commits": 4,
-        "lines": 264,
+        "lines": 265,
         "path": "tests/fake_ollama.py"
       },
       {
@@ -2028,7 +2028,7 @@
       },
       {
         "commits": 1,
-        "lines": 192,
+        "lines": 264,
         "path": "tests/test_cell_epoch.py"
       },
       {
@@ -2272,8 +2272,8 @@
         "path": "tests/test_wall_cap_and_hang.py"
       },
       {
-        "commits": 25,
-        "lines": 1730,
+        "commits": 26,
+        "lines": 1732,
         "path": "uv.lock"
       },
       {
@@ -2287,297 +2287,297 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-10-26T22:56:06.131Z",
+  "generatedAt": "2026-10-27T04:42:26.306Z",
   "generatedFrom": {
-    "commit": "2d1f6c041a91d8fccca56883af901a008da804e8"
+    "commit": "ad140352797cc4151d36cced47113e9a6dacda18"
   },
   "pairs": [
     {
       "a": "README.es.md",
       "b": "README.fr.md",
-      "either": 16,
-      "shared": 16,
+      "either": 17,
+      "shared": 17,
       "strength": 1
     },
     {
       "a": "README.es.md",
       "b": "README.hi.md",
-      "either": 16,
-      "shared": 15,
-      "strength": 0.9375
+      "either": 17,
+      "shared": 16,
+      "strength": 0.941176
     },
     {
       "a": "README.es.md",
       "b": "README.it.md",
-      "either": 16,
-      "shared": 16,
+      "either": 17,
+      "shared": 17,
       "strength": 1
     },
     {
       "a": "README.es.md",
       "b": "README.ja.md",
-      "either": 16,
-      "shared": 16,
+      "either": 17,
+      "shared": 17,
       "strength": 1
     },
     {
       "a": "README.es.md",
       "b": "README.pt-BR.md",
-      "either": 16,
-      "shared": 16,
+      "either": 17,
+      "shared": 17,
       "strength": 1
     },
     {
       "a": "README.es.md",
       "b": "README.zh.md",
-      "either": 16,
-      "shared": 16,
+      "either": 17,
+      "shared": 17,
       "strength": 1
     },
     {
       "a": "README.es.md",
       "b": "site/src/content/docs/handbook/index.md",
-      "either": 17,
-      "shared": 12,
-      "strength": 0.705882
+      "either": 18,
+      "shared": 13,
+      "strength": 0.722222
     },
     {
       "a": "README.es.md",
       "b": "site/src/site-config.ts",
-      "either": 17,
-      "shared": 12,
-      "strength": 0.705882
+      "either": 18,
+      "shared": 13,
+      "strength": 0.722222
     },
     {
       "a": "README.es.md",
       "b": "src/interlock/__init__.py",
-      "either": 18,
-      "shared": 9,
-      "strength": 0.5
+      "either": 19,
+      "shared": 10,
+      "strength": 0.526316
     },
     {
       "a": "README.fr.md",
       "b": "README.hi.md",
-      "either": 16,
-      "shared": 15,
-      "strength": 0.9375
+      "either": 17,
+      "shared": 16,
+      "strength": 0.941176
     },
     {
       "a": "README.fr.md",
       "b": "README.it.md",
-      "either": 16,
-      "shared": 16,
+      "either": 17,
+      "shared": 17,
       "strength": 1
     },
     {
       "a": "README.fr.md",
       "b": "README.ja.md",
-      "either": 16,
-      "shared": 16,
+      "either": 17,
+      "shared": 17,
       "strength": 1
     },
     {
       "a": "README.fr.md",
       "b": "README.pt-BR.md",
-      "either": 16,
-      "shared": 16,
+      "either": 17,
+      "shared": 17,
       "strength": 1
     },
     {
       "a": "README.fr.md",
       "b": "README.zh.md",
-      "either": 16,
-      "shared": 16,
+      "either": 17,
+      "shared": 17,
       "strength": 1
     },
     {
       "a": "README.fr.md",
       "b": "site/src/content/docs/handbook/index.md",
-      "either": 17,
-      "shared": 12,
-      "strength": 0.705882
+      "either": 18,
+      "shared": 13,
+      "strength": 0.722222
     },
     {
       "a": "README.fr.md",
       "b": "site/src/site-config.ts",
-      "either": 17,
-      "shared": 12,
-      "strength": 0.705882
+      "either": 18,
+      "shared": 13,
+      "strength": 0.722222
     },
     {
       "a": "README.fr.md",
       "b": "src/interlock/__init__.py",
-      "either": 18,
-      "shared": 9,
-      "strength": 0.5
+      "either": 19,
+      "shared": 10,
+      "strength": 0.526316
     },
     {
       "a": "README.hi.md",
       "b": "README.it.md",
-      "either": 16,
-      "shared": 15,
-      "strength": 0.9375
+      "either": 17,
+      "shared": 16,
+      "strength": 0.941176
     },
     {
       "a": "README.hi.md",
       "b": "README.ja.md",
-      "either": 16,
-      "shared": 15,
-      "strength": 0.9375
+      "either": 17,
+      "shared": 16,
+      "strength": 0.941176
     },
     {
       "a": "README.hi.md",
       "b": "README.pt-BR.md",
-      "either": 16,
-      "shared": 15,
-      "strength": 0.9375
+      "either": 17,
+      "shared": 16,
+      "strength": 0.941176
     },
     {
       "a": "README.hi.md",
       "b": "README.zh.md",
-      "either": 16,
-      "shared": 15,
-      "strength": 0.9375
+      "either": 17,
+      "shared": 16,
+      "strength": 0.941176
     },
     {
       "a": "README.hi.md",
       "b": "site/src/content/docs/handbook/index.md",
-      "either": 17,
-      "shared": 11,
-      "strength": 0.647059
+      "either": 18,
+      "shared": 12,
+      "strength": 0.666667
     },
     {
       "a": "README.hi.md",
       "b": "site/src/site-config.ts",
-      "either": 17,
-      "shared": 11,
-      "strength": 0.647059
+      "either": 18,
+      "shared": 12,
+      "strength": 0.666667
     },
     {
       "a": "README.it.md",
       "b": "README.ja.md",
-      "either": 16,
-      "shared": 16,
+      "either": 17,
+      "shared": 17,
       "strength": 1
     },
     {
       "a": "README.it.md",
       "b": "README.pt-BR.md",
-      "either": 16,
-      "shared": 16,
+      "either": 17,
+      "shared": 17,
       "strength": 1
     },
     {
       "a": "README.it.md",
       "b": "README.zh.md",
-      "either": 16,
-      "shared": 16,
+      "either": 17,
+      "shared": 17,
       "strength": 1
     },
     {
       "a": "README.it.md",
       "b": "site/src/content/docs/handbook/index.md",
-      "either": 17,
-      "shared": 12,
-      "strength": 0.705882
+      "either": 18,
+      "shared": 13,
+      "strength": 0.722222
     },
     {
       "a": "README.it.md",
       "b": "site/src/site-config.ts",
-      "either": 17,
-      "shared": 12,
-      "strength": 0.705882
+      "either": 18,
+      "shared": 13,
+      "strength": 0.722222
     },
     {
       "a": "README.it.md",
       "b": "src/interlock/__init__.py",
-      "either": 18,
-      "shared": 9,
-      "strength": 0.5
+      "either": 19,
+      "shared": 10,
+      "strength": 0.526316
     },
     {
       "a": "README.ja.md",
       "b": "README.pt-BR.md",
-      "either": 16,
-      "shared": 16,
+      "either": 17,
+      "shared": 17,
       "strength": 1
     },
     {
       "a": "README.ja.md",
       "b": "README.zh.md",
-      "either": 16,
-      "shared": 16,
+      "either": 17,
+      "shared": 17,
       "strength": 1
     },
     {
       "a": "README.ja.md",
       "b": "site/src/content/docs/handbook/index.md",
-      "either": 17,
-      "shared": 12,
-      "strength": 0.705882
+      "either": 18,
+      "shared": 13,
+      "strength": 0.722222
     },
     {
       "a": "README.ja.md",
       "b": "site/src/site-config.ts",
-      "either": 17,
-      "shared": 12,
-      "strength": 0.705882
+      "either": 18,
+      "shared": 13,
+      "strength": 0.722222
     },
     {
       "a": "README.ja.md",
       "b": "src/interlock/__init__.py",
-      "either": 18,
-      "shared": 9,
-      "strength": 0.5
+      "either": 19,
+      "shared": 10,
+      "strength": 0.526316
     },
     {
       "a": "README.pt-BR.md",
       "b": "README.zh.md",
-      "either": 16,
-      "shared": 16,
+      "either": 17,
+      "shared": 17,
       "strength": 1
     },
     {
       "a": "README.pt-BR.md",
       "b": "site/src/content/docs/handbook/index.md",
-      "either": 17,
-      "shared": 12,
-      "strength": 0.705882
+      "either": 18,
+      "shared": 13,
+      "strength": 0.722222
     },
     {
       "a": "README.pt-BR.md",
       "b": "site/src/site-config.ts",
-      "either": 17,
-      "shared": 12,
-      "strength": 0.705882
+      "either": 18,
+      "shared": 13,
+      "strength": 0.722222
     },
     {
       "a": "README.pt-BR.md",
       "b": "src/interlock/__init__.py",
-      "either": 18,
-      "shared": 9,
-      "strength": 0.5
+      "either": 19,
+      "shared": 10,
+      "strength": 0.526316
     },
     {
       "a": "README.zh.md",
       "b": "site/src/content/docs/handbook/index.md",
-      "either": 17,
-      "shared": 12,
-      "strength": 0.705882
+      "either": 18,
+      "shared": 13,
+      "strength": 0.722222
     },
     {
       "a": "README.zh.md",
       "b": "site/src/site-config.ts",
-      "either": 17,
-      "shared": 12,
-      "strength": 0.705882
+      "either": 18,
+      "shared": 13,
+      "strength": 0.722222
     },
     {
       "a": "README.zh.md",
       "b": "src/interlock/__init__.py",
-      "either": 18,
-      "shared": 9,
-      "strength": 0.5
+      "either": 19,
+      "shared": 10,
+      "strength": 0.526316
     },
     {
       "a": "SECURITY.md",
@@ -2589,43 +2589,43 @@
     {
       "a": "atlas/README.md",
       "b": "atlas/page.json",
-      "either": 47,
-      "shared": 47,
+      "either": 46,
+      "shared": 46,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/statistics.json",
-      "either": 47,
-      "shared": 47,
+      "either": 46,
+      "shared": 46,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/structure.json",
-      "either": 47,
-      "shared": 47,
+      "either": 46,
+      "shared": 46,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/statistics.json",
-      "either": 47,
-      "shared": 47,
+      "either": 46,
+      "shared": 46,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/structure.json",
-      "either": 47,
-      "shared": 47,
+      "either": 46,
+      "shared": 46,
       "strength": 1
     },
     {
       "a": "atlas/statistics.json",
       "b": "atlas/structure.json",
-      "either": 47,
-      "shared": 47,
+      "either": 46,
+      "shared": 46,
       "strength": 1
     },
     {
@@ -2659,44 +2659,58 @@
     {
       "a": "pyproject.toml",
       "b": "uv.lock",
-      "either": 27,
-      "shared": 21,
-      "strength": 0.777778
+      "either": 28,
+      "shared": 22,
+      "strength": 0.785714
+    },
+    {
+      "a": "site/src/content/docs/handbook/experiments.md",
+      "b": "site/src/content/docs/handbook/index.md",
+      "either": 14,
+      "shared": 7,
+      "strength": 0.5
     },
     {
       "a": "site/src/content/docs/handbook/experiments.md",
       "b": "site/src/content/docs/handbook/usage.md",
-      "either": 9,
+      "either": 10,
       "shared": 5,
-      "strength": 0.555556
+      "strength": 0.5
+    },
+    {
+      "a": "site/src/content/docs/handbook/experiments.md",
+      "b": "site/src/site-config.ts",
+      "either": 14,
+      "shared": 7,
+      "strength": 0.5
     },
     {
       "a": "site/src/content/docs/handbook/index.md",
       "b": "site/src/site-config.ts",
-      "either": 13,
-      "shared": 13,
+      "either": 14,
+      "shared": 14,
       "strength": 1
     },
     {
       "a": "site/src/content/docs/handbook/index.md",
       "b": "src/interlock/__init__.py",
-      "either": 14,
-      "shared": 10,
-      "strength": 0.714286
+      "either": 15,
+      "shared": 11,
+      "strength": 0.733333
     },
     {
       "a": "site/src/site-config.ts",
       "b": "src/interlock/__init__.py",
-      "either": 14,
-      "shared": 10,
-      "strength": 0.714286
+      "either": 15,
+      "shared": 11,
+      "strength": 0.733333
     },
     {
       "a": "src/interlock/__init__.py",
       "b": "uv.lock",
-      "either": 22,
-      "shared": 11,
-      "strength": 0.5
+      "either": 23,
+      "shared": 12,
+      "strength": 0.521739
     },
     {
       "a": "src/interlock/harness/fill.py",
@@ -2715,9 +2729,9 @@
     {
       "a": "src/interlock/harness/linux_cuda.py",
       "b": "tests/test_linux_cuda.py",
-      "either": 13,
+      "either": 12,
       "shared": 7,
-      "strength": 0.538462
+      "strength": 0.583333
     },
     {
       "a": "src/interlock/importers/remote.py",
@@ -2849,7 +2863,7 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-10-26T18:40:12-04:00",
+    "headDate": "2026-10-26T19:25:20-04:00",
     "inScopeFiles": 311,
     "pinnedStart": null,
     "priorFloor": "fallen",
@@ -2858,7 +2872,7 @@
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-04-29T22:40:12.000Z",
+    "since": "2026-04-29T23:25:20.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",

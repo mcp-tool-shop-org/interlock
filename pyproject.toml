@@ -1,6 +1,6 @@
 [project]
 name = "mcptoolshop-interlock"
-version = "1.0.9"
+version = "1.0.10"
 description = "Local AI device router: it sends each job to a model, an engine and a device named by a measured receipt."
 readme = "README.md"
 requires-python = ">=3.13"
