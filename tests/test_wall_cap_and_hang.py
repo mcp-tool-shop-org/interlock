@@ -240,6 +240,7 @@ def test_the_t4_r4_hang_after_a_host_ram_kill_ends_as_a_row_the_next_cell_starts
             spec, root=tmp_path, run_id="c2-hang", date="2026-10-26",
             python_path=str(tmp_path.parent / "external-python"),
             models=["qwen3:8b"],
+            host_ram_projection="off",  # the real kills this test needs are what the projection now refuses
             seams={"server": server, "remote_device": IDENT, "sample_vram_mib": sampler},
         )
 

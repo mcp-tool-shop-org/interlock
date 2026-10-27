@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+## [1.0.11] - 2026-10-27
+
+### Added
+
+- **A cell whose projected anonymous host KV is over the VM's limit is refused before its model loads.** Three T4 windows lost their kernel to a cgroup OOM kill after a `llama-server` SIGKILL (s1r, s2a, s2a2): 34 loads across seven windows were killed, every one a load whose KV spilled to host RAM past what the VM holds. Before a generate cell starts, interlock now scales the previous load's `llama_kv_cache: size` by the requested `num_ctx` times the slots (`req_total`; llama's padded `n_ctx` is not used), takes off the KV the GPU held (`max(0, kv_total_prev x req_total_next / req_total_prev - kv_gpu_prev)`), and refuses the cell when that projection times the factor is over the limit: Ollama's reported system memory less its 0.1 GiB rounding (12,953.6 MiB on a T4), or the cgroup's `/sys/fs/cgroup/memory.max` when that is readable, a number and lower (`bound_by` says which). The mapped weights (`CPU_Mapped`) are file-backed pages the kernel can evict and the cgroup kills on anonymous memory, so they are recorded (`mapped_prev`, `proj_mapped_mib`) and not tested: with them, four completed loads (s1b qwen3:8b Q8_0, projected 12,540 to 14,445 MiB) would have been refused at any factor.
+- **The replay over the seven T4 windows** (`tests/test_host_ram_projection.py`, from `tests/fixtures/host_ram_replay.tsv`): of 234 attributed generate-ladder loads, 12 are the first of their run and are never projected; of the other 222, 0 of 188 completed loads are refused and 34 of 34 killed loads are. The largest completed projection is 12,021.2 MiB (s1b load 45, qwen3:8b Q8_0 p16384 c8, partial offload; times 1.05 is 12,622.2) and the smallest killed one 14,804.2 MiB (s1a, s2a and s2a2 load 12, phi3.5 Q4_K_M p16384 c4; times 1.05 is 15,544.4). Any factor from 0.875 to 1.077 separates them; 1.05 is the default.
+- **`interlock run --host-ram-projection on|off`** (default on; `off` runs as 1.0.10 did and each row records only `{"mode": "off"}`) **and `--host-ram-safety FACTOR`** (default 1.05; a finite number above 0, otherwise refused with a structured `host_ram_safety_invalid` error, a hint and a non-zero exit). They are defined in `cli.py`, checked in `harness/runner.py` before any device contact, and handed to `run_linux_spec`.
+- **`settings.host_ram_projection`, one dict on every generate-ladder row.** A projected cell records `mode`, `decision` (`allow` or `refuse`), `factor`, `limit_mib`, `bound_by`, the source load (`source_load`, its requested `num_ctx` and slots, `req_total_prev`, `n_ctx_prev`, `kv_total_prev`, `kv_gpu_prev`, `mapped_prev`) and the next cell's (`num_ctx_req_next`, `slots_req_next`, `req_total_next`, `kv_total_next`, `projkv_mib`, `proj_mapped_mib`, `host_projected_mib`), and the system memory (`system_total_mib`, `margin_mib`, `cgroup_max_mib`). A cell that was not projected records `{"mode": "on", "decision": "skipped", "skipped": "<why>", "factor": ...}`: the run's first load, a pre-registered refusal row, or a cell run through a measure function that reported none.
+- **A refused row** is `oom`, with `settings.failure_reason` starting `projected host RAM:` and every number. It sends no request and restarts nothing, and carries no `peak_mib` (the VRAM sampled before a load is the previous cell's, 14,320 MiB on s1r2 row 13). A real kill keeps 1.0.10's `host RAM: the load needed ...` wording, so the two cannot be mistaken for each other.
+- **`parse_load_report`** returns three more keys, `n_ctx`, `kv_total_mib` (the `llama_kv_cache: size` line, absent from a killed load) and `gpu_kv_mib` (the `CUDA<n> KV buffer size` lines; 0 when a size line has none; None with no size line). The projection's state is per ladder run (each model and quant starts fresh), is kept across the server restarts that change the slot count, and is replaced only by a load that printed its size line: a refused cell or a killed one leaves the last load as it was, so the cell after a refusal still scales from the last load that happened.
+- `GENERATE_LADDER_VERSION` stays 4. Cell shapes, prompts and measured speeds are unchanged, only which cells are measured, as in 1.0.8, 1.0.9 and 1.0.10; a bump would make the router's newest-version filter split the sweep's repetitions. Rows with `settings.host_ram_projection` are 1.0.11 rows; the router does not read it.
+
+### Limits
+
+- **False refusals are possible in the band** between `limit / factor` and `limit`: on a T4, a projected anonymous KV of 12,337 to 12,954 MiB. The projection overstates a partial load, because Ollama hands the VRAM freed by offloading fewer weight layers to the KV (s1b load 45: projected 12,021 MiB, actual 10,184). The closest completed load on record is s1b qwen3:8b Q8_0 p16384 c8, projected 12,021, which clears the 12,337 line by 316 MiB (331 MiB under the limit once multiplied). **The live check:** any `projected host RAM:` row on a cell that loaded as a partial offload in rep s1 is a false refusal.
+- **The first cell of each run is never projected,** because there is no earlier load to scale from. The one kill of that shape on record is T4 s1r, phi3.5 FP16 c8, `num_ctx` 270336 (host need 30,767 MiB). The C2 launcher's dead-harness halt (v4p) is the cover for it.
+- **A completed run records the factor it used.** A row from an earlier version has no `host_ram_projection`; one with `{"mode": "off"}` was run with the projection off.
+
+### Coverage
+
+- Measured 93.94% line coverage (full run, 1,296 passed); the enforced floor is 90 (`--cov-fail-under=90` in `pyproject.toml`).
+
 ## [1.0.10] - 2026-10-27
 
 ### Fixed

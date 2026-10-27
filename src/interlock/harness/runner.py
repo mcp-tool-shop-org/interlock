@@ -2259,6 +2259,8 @@ def run_spec(
     models: list[str] | None = None,
     trace: str = "off",
     quants: list[str] | None = None,
+    host_ram_projection: str | None = None,
+    host_ram_safety: str | float | None = None,
 ) -> list[dict]:
     """Run a committed spec. Every refusal lands before device contact.
 
@@ -2292,6 +2294,12 @@ def run_spec(
             raise RunnerError("--quants is for a linux-cuda spec")
         roster = chosen_models if chosen_models is not None else resolve_models(spec, None)[0]
         chosen_models = resolve_quants(roster, quants)
+    if host_ram_projection is not None or host_ram_safety is not None:
+        from interlock.harness.linux_cuda import HostRamState, parse_host_ram_safety
+
+        if spec.get("platform") != "linux-cuda":
+            raise RunnerError("--host-ram-projection and --host-ram-safety are for a linux-cuda spec")
+        HostRamState(mode=host_ram_projection or "on", factor=parse_host_ram_safety(host_ram_safety))
     if trace == "off" and any("trace" in arm for arm in spec.get("arms") or [] if isinstance(arm, dict)):
         # A spec that switches tracing per arm would run both arms untraced: the comparison would be empty.
         raise RunnerError("REFUSED: this spec traces some arms and not others; run it with --trace relay or events")
@@ -2408,6 +2416,8 @@ def run_spec(
                     sample_vram_mib=vram_sampler,
                     server=server,
                     on_rows=lambda done: write_receipt(root, name, done),
+                    host_ram_projection=host_ram_projection or "on",
+                    host_ram_safety=host_ram_safety,
                 )
                 write_receipt(root, name, rows)
                 marker.close(_iso(wall()))
