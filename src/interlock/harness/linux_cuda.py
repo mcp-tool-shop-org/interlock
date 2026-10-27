@@ -764,6 +764,7 @@ def build_linux_failure_row(
         settings["concurrency"] = concurrency
         settings["request_timeout_s"] = request_timeout_s  # the budget in force (None before one existed)
         settings["cell_wall_s"] = CELL_WALL_S
+        settings["ttft_floor"] = "off"  # 1.0.10: no gate on the scaling of the prefill; a row from 1.0.9 has no field
         if vram_sampler is not None:  # which sampler took this cell's readings, and why the run switched
             settings["vram_sampler"] = vram_sampler
             settings["vram_sampler_reason"] = vram_sampler_reason
@@ -1106,10 +1107,6 @@ def run_linux_generate_ladder(
 
     # Concurrency is the outer loop: the server restarts to change its slot count, so each count is set once.
     for concurrency in concurrencies:
-        # (target tokens, prefill ms) of the last cell measured at this concurrency: each cell is compared with the step
-        # before it, not with the first cell, whose fixed per-request cost (T4 r5, c8: 847 ms at 512) overstates the
-        # growth the next cells need. A failed or unmeasured cell does not move it.
-        baseline: tuple[int, float] | None = None
         for prompt_len in sorted(prompt_lengths):
             try:
                 deadline_s = CELL_DEADLINE_S
@@ -1225,40 +1222,18 @@ def run_linux_generate_ladder(
             repeats = sum(1 for s in slots if isinstance(s, Mapping) and s.get("phase") == "repeat") or 1
             evaluated_tokens, token_method = _evaluated_or_requested(measured, prompt_len)
             prefill_ms = float(measured.get("prefill_ms", ttft_ms))
-            reason = _ttft_does_not_scale(baseline, prompt_len, prefill_ms)
-            if reason is None:
-                baseline = (prompt_len, prefill_ms)
-            if reason is not None:
-                append_row(
-                    build_linux_failure_row(
-                        spec_id=spec_id,
-                        spec_rel=spec_rel,
-                        run_id=run_id,
-                        date=date,
-                        task="generate",
-                        model=model,
-                        revision_or_digest=revision_or_digest,
-                        remote_device=remote_device,
-                        failure_class="unmeasured",
-                        reason=reason,
-                        num_ctx=prompt_len,
-                        num_predict=num_predict,
-                        prompt_tokens=evaluated_tokens,
-                        prompt_tokens_target=prompt_len,
-                        prompt_token_method=token_method,
-                        concurrency=concurrency,
-                        request_timeout_s=measured.get("request_timeout_s"),
-                        num_ctx_sent=measured.get("num_ctx_sent"),
-                        vram_sampler=measured.get("vram_sampler"),
-                        vram_sampler_reason=measured.get("vram_sampler_reason"),
-                        peak_mib=peak_mib,
-                        abort_mib=abort_mib,
-                        engine_version=engine_version,
-                        quant=quant,
-                        licence=licence,
-                    )
-                )
-                continue
+            repeat_prefills = [
+                float(slot["prefill_ms"])
+                for slot in slots
+                if isinstance(slot, Mapping)
+                and slot.get("phase") == "repeat"
+                and isinstance(slot.get("prefill_ms"), (int, float))
+            ]
+            # The spread is recorded, never gated on: at concurrency above 1 one pass's mean prefill spikes 2 to 4x (T4
+            # s1b), and a cache hit shows as a prefill far under PREFILL_TOK_S_CEILING, not as a slow pass.
+            prefill_spread = None
+            if repeat_prefills and min(repeat_prefills) > 0:
+                prefill_spread = round(max(repeat_prefills) / min(repeat_prefills), 3)
             row: dict[str, Any] = {
                 "id": f"{spec_id}/{model}/{quant}/{remote_device.card}/p{prompt_len}-c{concurrency}/{run_id}",
                 "task": "generate",
@@ -1298,6 +1273,9 @@ def run_linux_generate_ladder(
                     "throughput_method": measured.get("throughput_method", "ollama_durations_decode_window"),
                     "end_to_end_tok_s": measured.get("end_to_end_tok_s"),
                     "prefill_ms": prefill_ms,
+                    "prefill_ms_passes": repeat_prefills,
+                    "prefill_spread": prefill_spread,
+                    "ttft_floor": "off",
                     "overhead_ms": measured.get("overhead_ms"),
                     "per_request_decode_tok_s": measured.get("per_request_decode_tok_s"),
                     "ttft_ms": ttft_ms,
@@ -1674,11 +1652,11 @@ LADDER_CTX_MARGIN = 64
 LADDER_PROBE_WORDS = (64, 192)  # small enough never to overflow a window
 LADDER_TOKEN_TOLERANCE = 0.02  # the evaluated prompt must be within 2% of the target
 # A prefill faster than this cannot be real on any card this harness targets; it means llama-server answered from its
-# prompt cache (it reuses the longest common prefix). A cell above it is unmeasured.
+# prompt cache (it reuses the longest common prefix). A cell above it is unmeasured. This is the only cache check: every
+# call starts with its own prefix from character 0, so a broken scheme reuses nearly the whole prompt and the prefill
+# collapses to a few milliseconds, far over this. (Until 1.0.10 a floor on the scaling of the prefill across cells was a
+# second check; it tripped on noisy baselines and could not catch a hit that this ceiling does not.)
 PREFILL_TOK_S_CEILING = 250_000.0
-# Prefill time grows with the prompt: from the previous measured cell at a concurrency, a longer cell's prefill must be
-# at least this fraction of the proportional growth. A cached cell stays flat, far under it.
-TTFT_SCALING_FLOOR = 0.6
 # One request's budget. Calibration calls are single requests (a partial offload is caught before they matter). A timed
 # call gets three times what `concurrency` verify-sized requests need, plus decode, clamped; the budget is recorded in
 # every generate row. After the residency check a timeout can only be a fully resident cell that is slow.
@@ -2080,22 +2058,6 @@ def _calibrate_ladder_prompt(
         "unmeasured",
         f"the prompt evaluated to {evaluated} tokens, not the target {target} (num_ctx {num_ctx}); "
         "the cell would time a different length than it records",
-    )
-
-
-def _ttft_does_not_scale(baseline: tuple[int, float] | None, prompt_len: int, prefill_ms: float) -> str | None:
-    """A reason when a longer cell's prefill did not grow with its prompt, which means the prefill was cached."""
-
-    if baseline is None or prompt_len <= baseline[0]:
-        return None
-    base_len, base_prefill = baseline
-    required = TTFT_SCALING_FLOOR * base_prefill * (prompt_len / base_len)
-    if prefill_ms >= required:
-        return None
-    return (
-        f"prefill {prefill_ms:.1f} ms at {prompt_len} tokens is under {required:.1f} ms, {TTFT_SCALING_FLOOR:.0%} of "
-        f"the growth from {base_prefill:.1f} ms at {base_len} tokens: the prefill did not scale with the prompt "
-        "(a prompt-cache hit)"
     )
 
 

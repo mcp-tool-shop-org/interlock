@@ -35,7 +35,7 @@
   "changes": {
     "fileCounts": {
       "added": 0,
-      "changed": 4,
+      "changed": 17,
       "moved": 0,
       "parts": 3,
       "removed": 0
@@ -43,13 +43,13 @@
     "items": [
       {
         "kind": "counts",
-        "sentence": "Nothing structural changed since 2026-10-26; 4 files changed content.",
+        "sentence": "Nothing structural changed since 2026-10-26; 17 files changed content.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "50238e13fd021c4c37d0c154336d1330c073c945",
-      "generatedAt": "2026-10-26T22:39:15.435Z"
+      "commit": "2d1f6c041a91d8fccca56883af901a008da804e8",
+      "generatedAt": "2026-10-26T22:56:06.131Z"
     },
     "unchanged": true
   },
@@ -72,7 +72,7 @@
     {
       "a": "site/src/site-config.ts",
       "b": "src/interlock/__init__.py",
-      "either": 14,
+      "either": 15,
       "partLabels": [
         null,
         "src"
@@ -82,7 +82,7 @@
         "src"
       ],
       "relation": "unassigned",
-      "shared": 10
+      "shared": 11
     },
     {
       "a": "src/interlock/importers/remote.py",
@@ -136,7 +136,7 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 16 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 2,
-  "commit": "2d1f6c041a91d8fccca56883af901a008da804e8",
+  "commit": "ad140352797cc4151d36cced47113e9a6dacda18",
   "defaultBranch": "main",
   "derived": "10 parts, mostly Python (116 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
   "doors": [
@@ -301,7 +301,7 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-10-26T22:56:06.131Z",
+  "generatedAt": "2026-10-27T04:42:26.306Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "5 writes and 6 reads use paths built at run time and are not named here.",

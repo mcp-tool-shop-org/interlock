@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [1.0.10] - 2026-10-27
+
+### Fixed
+
+- **The TTFT scaling floor no longer gates a cell.** T4 s1b (qwen3:8b Q4_K_M) lost 7 of 21 generate cells to it (c4 at 1024 to 8192 and c8 at 1024 to 4096), and T4 s1a lost 2 phi3.5 FP16 cells (c4 2048, c8 1024) the same way. Its baseline was noise, not warm-up: every cell already runs a warm-up pass, and at concurrency above 1 a single pass's mean prefill spikes by 2 to 4x, so the median of three repeats can still be a spike. Q4_K_M c4 512 had passes of 4,529 (warm-up), then 4,052, 1,099 and 3,747 ms (median 3,747; Q6_K and Q8_0 at the same shape: 1,109); c8 512 had 1,587, 3,306, 1,584 and 2,334 (median 2,334, against about 1,520 to 1,559); phi3.5 FP16 c4 1024 had 1,127, 2,542, 1,878 and 1,843. One spiked baseline made the next, correct cell fail the 60% floor, and because the baseline never moved on a failure every later cell at that concurrency failed too. The floor could not catch the event it was built for either: every call starts with its own prefix from character 0, llama-server reuses only the longest common token prefix, so a real cache hit is all or nothing and gives a prefill of a few milliseconds, which `PREFILL_TOK_S_CEILING` (250,000 tok/s, about 2 ms at 512 tokens) already catches and still does. `TTFT_SCALING_FLOOR` and `_ttft_does_not_scale` are deleted (the recorded spread below replaces them as the diagnostic).
+
+### Added
+
+- **The noise is recorded, not gated.** Every measured generate row's `settings` gains `prefill_ms_passes` (the repeat passes' prefill, in order, without the warm-up) and `prefill_spread` (max over min of those passes, 3 decimals; null with no passes). Every generate row, measured or failed, gains `settings.ttft_floor: "off"`, so a reader can tell 1.0.10 rows from 1.0.9 rows (which have no field).
+- `GENERATE_LADDER_VERSION` stays 4. Nothing measured changes, only which cells are labelled `unmeasured`, the same reasoning that kept 1.0.8 and 1.0.9 at 4; a bump would make the router's newest-version filter split the sweep's repetitions. The router does not filter on `ttft_floor`.
+
 ## [1.0.9] - 2026-10-26
 
 ### Fixed
