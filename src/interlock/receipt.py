@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
@@ -186,7 +188,7 @@ _TIMING = (
 )
 _REMOTE_FAILURES = frozenset({"oom", "load_refused", "timeout", "ctx_exceeded"})
 # A cell that was not measured: untimed like a capability row, and never read as one (it is not in _REMOTE_FAILURES).
-_MEASUREMENT_FAILURES = frozenset({"sampler_error", "generation_aborted", "unmeasured"})
+_MEASUREMENT_FAILURES = frozenset({"sampler_error", "generation_aborted", "unmeasured", "load_failed"})
 MEASUREMENT_OUTCOMES = _MEASUREMENT_FAILURES
 _UNTIMED = frozenset(
     {"device_lost", "hang", "compile_rejected", "compile_timeout"} | _REMOTE_FAILURES | _MEASUREMENT_FAILURES
@@ -344,6 +346,40 @@ def _check_residency(row: dict) -> None:
         raise ReceiptError(f"{row['id']}: gpu_resident must record whether size_vram equals size")
     if stated != (size == vram):
         raise ReceiptError(f"{row['id']}: gpu_resident is true only when size_vram equals size")
+
+
+def read_row_load_info(row: Mapping[str, Any]) -> dict[str, Any]:
+    """Read model-manager load fields from ``row`` with backward-compatible defaults for older rows.
+
+    Older rows written before the model manager existed only carry ``model.size`` and ``model.size_vram`` (when a load
+    was observed); for those rows ``cold_load_s``, ``warm``, and ``reloaded`` read as ``None`` and
+    ``offload_fraction`` is derived from ``size_vram / size`` when ``size > 0`` (or ``None`` when absent).
+    """
+
+    model = row.get("model") if isinstance(row.get("model"), Mapping) else {}
+    settings = row.get("settings") if isinstance(row.get("settings"), Mapping) else {}
+
+    def _pick(key: str) -> Any:
+        for source in (row, settings, model):
+            if key in source and source[key] is not None:
+                return source[key]
+        return None
+
+    size = _pick("size")
+    size_vram = _pick("size_vram")
+    offload_fraction = _pick("offload_fraction")
+    if offload_fraction is None and isinstance(size, int) and isinstance(size_vram, int) and size > 0:
+        offload_fraction = round(size_vram / size, 6)
+    return {
+        "cold_load_s": _pick("cold_load_s"),
+        "warm": _pick("warm"),
+        "size": size,
+        "size_vram": size_vram,
+        "offload_fraction": offload_fraction,
+        "reloaded": _pick("reloaded"),
+        "load_signal": _pick("load_signal"),
+        "expires_at": _pick("expires_at"),
+    }
 
 
 def _format_error(error: ValidationError) -> str:

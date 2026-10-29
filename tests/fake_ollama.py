@@ -49,6 +49,10 @@ class FakeOllama:
         system_total_mib: float = 12975.0,
         log_lines: bool = True,
         kill_early: bool = False,
+        cold_load_s: float = 0.0,
+        warm_load_s: float = 0.0,
+        never_ready: bool = False,
+        poll_step_s: float = 10.0,
     ) -> None:
         self.tokens_per_word = tokens_per_word
         self.prefill_tok_s = prefill_tok_s
@@ -69,7 +73,13 @@ class FakeOllama:
         self.log_text = ""
         self._log_start = 0
         self.kill_early = kill_early  # killed after its system-memory line, before any load_tensors block
-        self.all_calls: list[dict[str, Any]] = []  # every request, probes included
+        self.cold_load_s = cold_load_s
+        self.warm_load_s = warm_load_s
+        self.never_ready = never_ready
+        self.poll_step_s = poll_step_s
+        self.all_calls: list[dict[str, Any]] = []  # every generation/calibration request, probes included
+        self.load_calls: list[dict[str, Any]] = []  # empty-prompt load requests from the model manager
+        self.unload_calls: list[str] = []
         self.timeouts: list[float | None] = []
         self._load = {"on_gpu": layers_total, "cpu_kv": 0.0, "kv": 0.0, "killed": False}
         self.version = "0.40.11"
@@ -88,6 +98,8 @@ class FakeOllama:
         self._arrival = 0.0
         self._last_words: list[str] = []
         self._loaded_ctx: int | None = None
+        self._resident: bool = False
+        self._loaded_model: str = "m"
 
     # -- the server surface the harness uses -------------------------------------------------------------------------
     def _refuse_stale(self) -> None:
@@ -97,10 +109,46 @@ class FakeOllama:
             self.stale_calls += 1
             raise
 
-    def get(self, _path: str) -> dict[str, Any]:
+    def get(self, path: str) -> dict[str, Any]:
         self._refuse_stale()
-        size = self.weights_mib + self._load["kv"]
-        return {"models": [{"name": "m", "size": size, "size_vram": size - self._load["cpu_kv"]}]}
+        if path.endswith("/api/version"):
+            return {"version": self.version}
+        if path.endswith("/api/tags"):
+            return {
+                "models": [
+                    {
+                        "name": self._loaded_model,
+                        "model": self._loaded_model,
+                        "size": int(self.weights_mib * 1024 * 1024),
+                    }
+                ]
+            }
+        if not self._resident or self.never_ready:
+            if self.never_ready and self.load_calls:
+                with self._lock:
+                    self._now += self.poll_step_s
+            return {"models": []}
+        size = int(self.weights_mib + self._load["kv"])
+        size_vram = int(size - self._load["cpu_kv"])
+        return {
+            "models": [
+                {
+                    "name": self._loaded_model,
+                    "model": self._loaded_model,
+                    "size": size,
+                    "size_vram": size_vram,
+                    "expires_at": "2026-10-29T09:00:00Z",
+                }
+            ]
+        }
+
+    def evict(self, _model: str | None = None) -> None:
+        """Evict the currently resident model from ``/api/ps`` without restarting the server."""
+
+        with self._lock:
+            self._resident = False
+            self._loaded_ctx = None
+            self._last_words = []
 
     def begin_cell(self) -> None:
         self.epoch += 1
@@ -112,6 +160,7 @@ class FakeOllama:
         self._slot_free = [self._now] * self.num_parallel
         self._last_words = []
         self._loaded_ctx = None
+        self._resident = False
 
     def load_report(self) -> dict[str, Any]:
         return parse_load_report(self.log_text[self._log_start :])
@@ -197,32 +246,96 @@ class FakeOllama:
     def stop(self) -> None:
         return None
 
-    def unload(self, _model: str) -> None:
-        return None
+    def unload(self, model: str) -> None:
+        self.unload_calls.append(model)
+        self.evict(model)
 
     def post(self, path: str, payload: dict[str, Any], timeout: float | None = None) -> dict[str, Any]:
         self._refuse_stale()
         if path != "/api/generate":
             return {}
+        prompt = str(payload.get("prompt") or "")
+        model = str(payload.get("model") or "m")
+        if payload.get("keep_alive") == 0 and prompt == "":
+            self.unload(model)
+            return {
+                "model": model,
+                "created_at": "2026-10-29T00:00:00Z",
+                "response": "",
+                "done": True,
+                "done_reason": "unload",
+            }
+        if prompt == "":
+            options = payload.get("options") or {}
+            num_ctx = int(options.get("num_ctx") or self._loaded_ctx or 2048)
+            with self._lock:
+                was_resident = self._resident and not self.never_ready
+                ctx_changed = self._loaded_ctx != num_ctx
+                load_s = 0.0
+                if not was_resident:
+                    load_s = self.cold_load_s
+                elif ctx_changed:
+                    load_s = self.warm_load_s
+                self.load_calls.append(
+                    {
+                        "model": model,
+                        "num_ctx": num_ctx,
+                        "timeout": timeout,
+                        "warm": was_resident,
+                        "load_s": load_s,
+                        "keep_alive": payload.get("keep_alive"),
+                    }
+                )
+                if not was_resident or ctx_changed:
+                    self._loaded_ctx = num_ctx
+                    self._last_words = []
+                    self._log_load(num_ctx)
+                if self._load["killed"]:
+                    self.kills += 1
+                    self._resident = False
+                    raise RuntimeError(
+                        "HTTP 500: llama-server process has terminated: "
+                        "signal: killed (the load needed more host memory)"
+                    )
+                self._now += load_s
+                self._arrival = self._now
+                self._slot_free = [max(s, self._now) for s in self._slot_free]
+                limit = 120.0 if timeout is None else timeout
+                if load_s > limit:
+                    self._resident = False
+                    raise TimeoutError(f"timed out after {limit:.0f} s")
+                if not self.never_ready:
+                    self._resident = True
+                    self._loaded_model = model
+            return {
+                "model": model,
+                "created_at": "2026-10-29T00:00:00Z",
+                "response": "",
+                "done": True,
+                "done_reason": "load",
+            }
         if "options" not in payload:  # an unload or a pull is not a generation
             return {}
         options = payload["options"]
         num_predict = int(options.get("num_predict") or 1)
-        words = payload["prompt"].split()
+        words = prompt.split()
         with self._lock:
             if num_predict == 1:
                 self._arrival = self._now  # the calibration's calls are sequential: each starts when the last ended
             epoch = _CELL_EPOCH.get()
             self.all_calls.append(
-                {"prompt": payload["prompt"], "num_predict": num_predict, "timeout": timeout, "epoch": epoch}
+                {"prompt": prompt, "num_predict": num_predict, "timeout": timeout, "epoch": epoch}
             )
             self.timeouts.append(timeout)
-            if self._loaded_ctx != options["num_ctx"]:
+            load_s = 0.0
+            if not self._resident or self._loaded_ctx != options["num_ctx"]:
+                load_s = self.cold_load_s if not self._resident else self.warm_load_s
                 self._loaded_ctx = options["num_ctx"]
                 self._last_words = []  # a reload drops the cache
                 self._log_load(options["num_ctx"])
             if self._load["killed"]:
                 self.kills += 1
+                self._resident = False
                 raise RuntimeError(
                     "HTTP 500: llama-server process has terminated: signal: killed (the load needed more host memory)"
                 )
@@ -241,15 +354,18 @@ class FakeOllama:
             index = min(range(len(self._slot_free)), key=self._slot_free.__getitem__)
             start = max(self._slot_free[index], self._arrival)
             overhead = self.overhead_s + self.overhead_s_per_ktok * evaluated / 1000.0
-            finish = start + overhead + prefill_s + decode_s
+            finish = start + load_s + overhead + prefill_s + decode_s
             self._slot_free[index] = finish
             self._now = max(self._now, finish)
             total_s = finish - self._arrival  # Ollama's total_duration counts the wait for a free slot
             limit = 120.0 if timeout is None else timeout  # the fixed urlopen timeout a caller gets without one
             if total_s > limit:
                 raise TimeoutError(f"timed out after {limit:.0f} s")
+            if not self.never_ready:
+                self._resident = True
+                self._loaded_model = model
             if num_predict > 1:
-                self.prompts.append(payload["prompt"])
+                self.prompts.append(prompt)
                 self.contexts.append(options["num_ctx"])
                 self.evaluated_counts.append(evaluated)
         return {
@@ -257,6 +373,6 @@ class FakeOllama:
             "prompt_eval_duration": int(prefill_s * 1e9),
             "eval_count": num_predict,
             "eval_duration": int(decode_s * 1e9),
-            "load_duration": 0,
+            "load_duration": int(load_s * 1e9),
             "total_duration": int(total_s * 1e9),
         }
