@@ -1133,6 +1133,22 @@ def _shape_suffix(
     return ("/" + "-".join(parts)) if parts else ""
 
 
+def _unload_step_models(step_state: Mapping[str, Any]) -> None:
+    """Unload any model touched during a ``fill-card`` or ``generate-ladder`` step."""
+
+    seen: set[tuple[int, str]] = set()
+    for mgr, tag in step_state.get("loaded_pairs") or []:
+        bare = _bare_tag(tag)
+        key = (id(mgr), bare)
+        if key in seen:
+            continue
+        seen.add(key)
+        try:
+            mgr.unload(tag)
+        except (OSError, RuntimeError, ValueError, StaleCell):
+            pass
+
+
 def run_linux_fill_card(
     *,
     spec_id: str,
@@ -1150,6 +1166,7 @@ def run_linux_fill_card(
     engine_version: str = UNRECORDED,
     quant: str = UNRECORDED,
     licence: str = UNRECORDED,
+    model_manager: OllamaModelManager | None = None,
 ) -> dict[str, Any]:
     """Find the largest resident ``num_ctx`` under ``floor(vram_mib * abort_fraction)`` on Linux CUDA.
 
@@ -1160,237 +1177,278 @@ def run_linux_fill_card(
     If even the floor grain fails, a failure row is returned.
     """
 
-    abort_mib = compute_abort_mib(remote_device.vram_mib, abort_fraction)
-    if grain <= 0 or trained_ctx < grain:
-        return build_linux_failure_row(
-            spec_id=spec_id,
-            spec_rel=spec_rel,
-            run_id=run_id,
-            date=date,
-            task="generate",
-            model=model,
-            revision_or_digest=revision_or_digest,
-            remote_device=remote_device,
-            failure_class="ctx_exceeded",
-            reason=f"trained_ctx {trained_ctx} is below grain {grain}",
-            num_ctx=trained_ctx,
-            abort_mib=abort_mib,
-            engine_version=engine_version,
-            quant=quant,
-            licence=licence,
-        )
-
-    candidates: list[int] = [grain]
-    cursor = grain * 2
-    while cursor <= trained_ctx:
-        candidates.append(cursor)
-        cursor *= 2
-    top_grain = (trained_ctx // grain) * grain
-    if candidates[-1] != top_grain and top_grain > candidates[-1]:
-        candidates.append(top_grain)
-
-    def _eval_window(
-        candidate: int, ref_prompt_rate: float | None
-    ) -> tuple[Mapping[str, Any] | None, tuple[str, str, int | None, dict[str, Any]] | None]:
-        try:
-            reading = measure_window(candidate)
-        except LinuxShapeFailure as exc:
-            return None, (exc.failure_class, exc.reason, exc.peak_mib, dict(exc.evidence or {}))
-        size = int(reading["size"])
-        size_vram = int(reading["size_vram"])
-        peak_mib = int(reading["peak_mib"])
-        prompt_rate = float(reading["prompt_tok_s"])
-        reading_ev = {
-            "size": size,
-            "size_vram": size_vram,
-            "offload_fraction": reading.get("offload_fraction", round(size_vram / size, 6) if size > 0 else None),
-            "cold_load_s": reading.get("cold_load_s"),
-            "warm": reading.get("warm"),
-            "reloaded": reading.get("reloaded"),
-            "load_signal": reading.get("load_signal"),
-            "expires_at": reading.get("expires_at"),
-        }
-        if size_vram < size:
-            return None, (
-                "oom",
-                f"partial layer offload at num_ctx {candidate} (size_vram {size_vram} < size {size})",
-                peak_mib,
-                reading_ev,
-            )
-        if peak_mib >= abort_mib:
-            return None, (
-                "oom",
-                f"peak {peak_mib} MiB reached abort_mib {abort_mib} MiB at num_ctx {candidate}",
-                peak_mib,
-                reading_ev,
-            )
-        if ref_prompt_rate is not None and prompt_rate < spill_prompt_ratio * ref_prompt_rate:
-            return None, (
-                "oom",
-                f"prompt_tok_s {prompt_rate:.1f} fell below {spill_prompt_ratio}x previous {ref_prompt_rate:.1f}",
-                peak_mib,
-                reading_ev,
-            )
-        return reading, None
-
-    best_ctx: int | None = None
-    best_reading: Mapping[str, Any] | None = None
-    first_cold_load_s: float | None = None
-    any_reloaded = False
-    prev_prompt_rate: float | None = None
-    last_failure: tuple[str, str, int | None, dict[str, Any]] | None = None
-    failed_ctx: int | None = None
-    measurement_failed = False
-
-    for candidate in candidates:
-        reading, failure = _eval_window(candidate, prev_prompt_rate)
-        if failure is not None or reading is None:
-            last_failure = failure
-            failed_ctx = candidate
-            measurement_failed = failure is not None and failure[0] in MEASUREMENT_FAILURE_CLASSES
-            break
-        if first_cold_load_s is None and reading.get("cold_load_s") is not None:
-            first_cold_load_s = float(reading["cold_load_s"])
-        if reading.get("reloaded"):
-            any_reloaded = True
-        best_ctx = candidate
-        best_reading = reading
-        prev_prompt_rate = float(reading["prompt_tok_s"])
-
-    if not measurement_failed and best_ctx is not None and failed_ctx is not None and failed_ctx - best_ctx > grain:
-        low_steps = best_ctx // grain
-        high_steps = failed_ctx // grain
-        while high_steps - low_steps > 1:
-            mid_steps = (low_steps + high_steps) // 2
-            mid_ctx = mid_steps * grain
-            reading, failure = _eval_window(mid_ctx, prev_prompt_rate)
-            if failure is None and reading is not None:
-                if reading.get("reloaded"):
-                    any_reloaded = True
-                best_ctx = mid_ctx
-                best_reading = reading
-                prev_prompt_rate = float(reading["prompt_tok_s"])
-                low_steps = mid_steps
-            else:
-                last_failure = failure
-                high_steps = mid_steps
-                if failure is not None and failure[0] in MEASUREMENT_FAILURE_CLASSES:
-                    measurement_failed = True
-                    break
-
-    if measurement_failed or best_ctx is None or best_reading is None:
-        f_class, f_reason, f_peak, f_ev = last_failure or ("load_refused", "no resident window found", None, {})
-        return build_linux_failure_row(
-            spec_id=spec_id,
-            spec_rel=spec_rel,
-            run_id=run_id,
-            date=date,
-            task="generate",
-            model=model,
-            revision_or_digest=revision_or_digest,
-            remote_device=remote_device,
-            failure_class=f_class,
-            reason=f_reason,
-            num_ctx=grain,
-            peak_mib=f_peak,
-            abort_mib=abort_mib,
-            engine_version=engine_version,
-            quant=quant,
-            licence=licence,
-            size=f_ev.get("size"),
-            size_vram=f_ev.get("size_vram"),
-            offload_fraction=f_ev.get("offload_fraction"),
-            cold_load_s=f_ev.get("cold_load_s") if f_ev.get("cold_load_s") is not None else first_cold_load_s,
-            warm=f_ev.get("warm"),
-            reloaded=f_ev.get("reloaded"),
-            load_signal=f_ev.get("load_signal"),
-            expires_at=f_ev.get("expires_at"),
-            load_cap_s=f_ev.get("load_cap_s"),
-            last_engine_status=f_ev.get("last_engine_status"),
-            load_record=f_ev.get("load_record"),
-        )
-
-    decode_tok_s = float(best_reading["decode_tok_s"])
-    ttft_ms = float(best_reading["ttft_ms"])
-    prompt_tok_s = float(best_reading["prompt_tok_s"])
-    peak_mib = int(best_reading["peak_mib"])
-    size = int(best_reading["size"])
-    size_vram = int(best_reading["size_vram"])
-    raw_slots = best_reading.get("slots")
-    slots = (
-        list(raw_slots)
-        if isinstance(raw_slots, list) and len(raw_slots) >= 2
-        else [
-            {"phase": "warmup", "throughput": decode_tok_s, "latency_ms": ttft_ms, "ttft_ms": ttft_ms},
-            {"phase": "repeat", "throughput": decode_tok_s, "latency_ms": ttft_ms, "ttft_ms": ttft_ms},
-        ]
-    )
-    repeats = sum(1 for s in slots if isinstance(s, Mapping) and s.get("phase") == "repeat") or 1
-    row: dict[str, Any] = {
-        "id": f"{spec_id}/{model}/{quant}/{remote_device.card}-fill/{run_id}",
-        "task": "generate",
-        "model": {
-            "repo_or_tag": model,
-            "revision_or_digest": revision_or_digest,
-            "quant": quant,
-            "licence": licence,
-            "size": size,
-            "size_vram": size_vram,
-        },
-        "engine": {"name": "ollama", "version": engine_version},
-        "device": remote_device.logical_device,
-        "remote_device": remote_device.to_dict(),
-        "gpu_resident": True,
-        "settings": {
-            "thinking_level": "off",
-            "num_predict": 1,
-            "num_ctx": best_ctx,
-            "batch": None,
-            "static_shape": None,
-            "precision": None,
-            "max_resident_ctx": best_ctx,
-            "peak_mib": peak_mib,
-            "abort_mib": abort_mib,
-            "abort_fraction": float(abort_fraction),
-            "ttft_ms": ttft_ms,
-            "decode_tok_s": decode_tok_s,
-            "prompt_tok_s": prompt_tok_s,
-        },
-        "quality": [],
-        "latency": {
-            "cold_ms": None,
-            "warm_p50_ms": ttft_ms,
-            "warm_p95_ms": ttft_ms,
-            "throughput": decode_tok_s,
-            "throughput_unit": "tok/s",
-            "compile_ms": None,
-        },
-        "artifacts": {"slots": slots},
-        "date": date,
-        "repeats": repeats,
-        "provisional": False,
-        "provenance": {"experiment_spec": spec_rel, "run_id": run_id},
-        "notes": f"resident up to num_ctx {best_ctx} (peak {peak_mib} MiB < abort {abort_mib} MiB)",
+    step_state: dict[str, Any] = {
+        "manager": model_manager,
+        "quant": quant,
+        "loaded_pairs": [],
     }
-    _stamp_load_fields(
-        row,
-        size=size,
-        size_vram=size_vram,
-        offload_fraction=best_reading.get("offload_fraction"),
-        cold_load_s=(
-            first_cold_load_s
-            if first_cold_load_s is not None
-            else float(best_reading.get("cold_load_s") or 0.0)
-        ),
-        warm=bool(best_reading.get("warm")) if best_reading.get("warm") is not None else False,
-        reloaded=bool(any_reloaded or best_reading.get("reloaded")),
-        load_signal=best_reading.get("load_signal"),
-        expires_at=best_reading.get("expires_at"),
-    )
-    stamp_family(row)
-    _mark_rig_check(row, remote_device)
-    validate_row(row)
-    return row
+    step_token = _ACTIVE_LADDER_STEP.set(step_state)
+    try:
+        abort_mib = compute_abort_mib(remote_device.vram_mib, abort_fraction)
+        if grain <= 0 or trained_ctx < grain:
+            return build_linux_failure_row(
+                spec_id=spec_id,
+                spec_rel=spec_rel,
+                run_id=run_id,
+                date=date,
+                task="generate",
+                model=model,
+                revision_or_digest=revision_or_digest,
+                remote_device=remote_device,
+                failure_class="ctx_exceeded",
+                reason=f"trained_ctx {trained_ctx} is below grain {grain}",
+                num_ctx=trained_ctx,
+                abort_mib=abort_mib,
+                engine_version=engine_version,
+                quant=quant,
+                licence=licence,
+            )
+
+        candidates: list[int] = [grain]
+        cursor = grain * 2
+        while cursor <= trained_ctx:
+            candidates.append(cursor)
+            cursor *= 2
+        top_grain = (trained_ctx // grain) * grain
+        if candidates[-1] != top_grain and top_grain > candidates[-1]:
+            candidates.append(top_grain)
+
+        def _eval_window(
+            candidate: int, ref_prompt_rate: float | None
+        ) -> tuple[Mapping[str, Any] | None, tuple[str, str, int | None, dict[str, Any]] | None]:
+            try:
+                reading = measure_window(candidate)
+            except LinuxShapeFailure as exc:
+                return None, (exc.failure_class, exc.reason, exc.peak_mib, dict(exc.evidence or {}))
+            size = int(reading["size"])
+            size_vram = int(reading["size_vram"])
+            peak_mib = int(reading["peak_mib"])
+            prompt_rate = float(reading["prompt_tok_s"])
+            reading_ev = {
+                "size": size,
+                "size_vram": size_vram,
+                "offload_fraction": reading.get("offload_fraction", round(size_vram / size, 6) if size > 0 else None),
+                "cold_load_s": reading.get("cold_load_s"),
+                "warm": reading.get("warm"),
+                "reloaded": reading.get("reloaded"),
+                "load_signal": reading.get("load_signal"),
+                "expires_at": reading.get("expires_at"),
+            }
+            if size_vram < size:
+                return None, (
+                    "oom",
+                    f"partial layer offload at num_ctx {candidate} (size_vram {size_vram} < size {size})",
+                    peak_mib,
+                    reading_ev,
+                )
+            if peak_mib >= abort_mib:
+                return None, (
+                    "oom",
+                    f"peak {peak_mib} MiB reached abort_mib {abort_mib} MiB at num_ctx {candidate}",
+                    peak_mib,
+                    reading_ev,
+                )
+            if ref_prompt_rate is not None and prompt_rate < spill_prompt_ratio * ref_prompt_rate:
+                return None, (
+                    "oom",
+                    f"prompt_tok_s {prompt_rate:.1f} fell below {spill_prompt_ratio}x previous {ref_prompt_rate:.1f}",
+                    peak_mib,
+                    reading_ev,
+                )
+            return reading, None
+
+        best_ctx: int | None = None
+        best_reading: Mapping[str, Any] | None = None
+        first_cold_load_s: float | None = None
+        first_warm: bool | None = None
+        any_reloaded = False
+        prev_prompt_rate: float | None = None
+        last_failure: tuple[str, str, int | None, dict[str, Any]] | None = None
+        failed_ctx: int | None = None
+        measurement_failed = False
+
+        def _note_probe_load(probe_doc: Mapping[str, Any]) -> None:
+            nonlocal first_cold_load_s, first_warm, any_reloaded
+            if first_cold_load_s is None and probe_doc.get("cold_load_s") is not None:
+                first_cold_load_s = float(probe_doc["cold_load_s"])
+                if probe_doc.get("warm") is not None:
+                    first_warm = bool(probe_doc["warm"])
+            if probe_doc.get("reloaded"):
+                any_reloaded = True
+                if probe_doc.get("cold_load_s") is not None:
+                    first_cold_load_s = float(probe_doc["cold_load_s"])
+                first_warm = False
+
+        for candidate in candidates:
+            reading, failure = _eval_window(candidate, prev_prompt_rate)
+            if failure is not None or reading is None:
+                if failure is not None:
+                    _note_probe_load(failure[3])
+                last_failure = failure
+                failed_ctx = candidate
+                measurement_failed = failure is not None and failure[0] in MEASUREMENT_FAILURE_CLASSES
+                break
+            _note_probe_load(reading)
+            best_ctx = candidate
+            best_reading = reading
+            prev_prompt_rate = float(reading["prompt_tok_s"])
+
+        if not measurement_failed and best_ctx is not None and failed_ctx is not None and failed_ctx - best_ctx > grain:
+            low_steps = best_ctx // grain
+            high_steps = failed_ctx // grain
+            while high_steps - low_steps > 1:
+                mid_steps = (low_steps + high_steps) // 2
+                mid_ctx = mid_steps * grain
+                reading, failure = _eval_window(mid_ctx, prev_prompt_rate)
+                if failure is None and reading is not None:
+                    _note_probe_load(reading)
+                    best_ctx = mid_ctx
+                    best_reading = reading
+                    prev_prompt_rate = float(reading["prompt_tok_s"])
+                    low_steps = mid_steps
+                else:
+                    if failure is not None:
+                        _note_probe_load(failure[3])
+                    last_failure = failure
+                    high_steps = mid_steps
+                    if failure is not None and failure[0] in MEASUREMENT_FAILURE_CLASSES:
+                        measurement_failed = True
+                        break
+
+        if measurement_failed or best_ctx is None or best_reading is None:
+            f_class, f_reason, f_peak, f_ev = last_failure or ("load_refused", "no resident window found", None, {})
+            return build_linux_failure_row(
+                spec_id=spec_id,
+                spec_rel=spec_rel,
+                run_id=run_id,
+                date=date,
+                task="generate",
+                model=model,
+                revision_or_digest=revision_or_digest,
+                remote_device=remote_device,
+                failure_class=f_class,
+                reason=f_reason,
+                num_ctx=grain,
+                peak_mib=f_peak,
+                abort_mib=abort_mib,
+                engine_version=engine_version,
+                quant=quant,
+                licence=licence,
+                size=f_ev.get("size"),
+                size_vram=f_ev.get("size_vram"),
+                offload_fraction=f_ev.get("offload_fraction"),
+                cold_load_s=f_ev.get("cold_load_s") if f_ev.get("cold_load_s") is not None else first_cold_load_s,
+                warm=(
+                    False
+                    if (any_reloaded or f_ev.get("reloaded"))
+                    else (f_ev.get("warm") if f_ev.get("warm") is not None else first_warm)
+                ),
+                reloaded=(
+                    bool(any_reloaded or f_ev.get("reloaded"))
+                    if (any_reloaded or f_ev.get("reloaded") is not None)
+                    else None
+                ),
+                load_signal=f_ev.get("load_signal"),
+                expires_at=f_ev.get("expires_at"),
+                load_cap_s=f_ev.get("load_cap_s"),
+                last_engine_status=f_ev.get("last_engine_status"),
+                load_record=f_ev.get("load_record"),
+            )
+
+        decode_tok_s = float(best_reading["decode_tok_s"])
+        ttft_ms = float(best_reading["ttft_ms"])
+        prompt_tok_s = float(best_reading["prompt_tok_s"])
+        peak_mib = int(best_reading["peak_mib"])
+        size = int(best_reading["size"])
+        size_vram = int(best_reading["size_vram"])
+        raw_slots = best_reading.get("slots")
+        slots = (
+            list(raw_slots)
+            if isinstance(raw_slots, list) and len(raw_slots) >= 2
+            else [
+                {"phase": "warmup", "throughput": decode_tok_s, "latency_ms": ttft_ms, "ttft_ms": ttft_ms},
+                {"phase": "repeat", "throughput": decode_tok_s, "latency_ms": ttft_ms, "ttft_ms": ttft_ms},
+            ]
+        )
+        repeats = sum(1 for s in slots if isinstance(s, Mapping) and s.get("phase") == "repeat") or 1
+        row: dict[str, Any] = {
+            "id": f"{spec_id}/{model}/{quant}/{remote_device.card}-fill/{run_id}",
+            "task": "generate",
+            "model": {
+                "repo_or_tag": model,
+                "revision_or_digest": revision_or_digest,
+                "quant": quant,
+                "licence": licence,
+                "size": size,
+                "size_vram": size_vram,
+            },
+            "engine": {"name": "ollama", "version": engine_version},
+            "device": remote_device.logical_device,
+            "remote_device": remote_device.to_dict(),
+            "gpu_resident": True,
+            "settings": {
+                "thinking_level": "off",
+                "num_predict": 1,
+                "num_ctx": best_ctx,
+                "batch": None,
+                "static_shape": None,
+                "precision": None,
+                "max_resident_ctx": best_ctx,
+                "peak_mib": peak_mib,
+                "abort_mib": abort_mib,
+                "abort_fraction": float(abort_fraction),
+                "ttft_ms": ttft_ms,
+                "decode_tok_s": decode_tok_s,
+                "prompt_tok_s": prompt_tok_s,
+            },
+            "quality": [],
+            "latency": {
+                "cold_ms": None,
+                "warm_p50_ms": ttft_ms,
+                "warm_p95_ms": ttft_ms,
+                "throughput": decode_tok_s,
+                "throughput_unit": "tok/s",
+                "compile_ms": None,
+            },
+            "artifacts": {"slots": slots},
+            "date": date,
+            "repeats": repeats,
+            "provisional": False,
+            "provenance": {"experiment_spec": spec_rel, "run_id": run_id},
+            "notes": f"resident up to num_ctx {best_ctx} (peak {peak_mib} MiB < abort {abort_mib} MiB)",
+        }
+        reloaded = bool(any_reloaded or best_reading.get("reloaded"))
+        warm = (
+            False
+            if reloaded
+            else (
+                first_warm
+                if first_warm is not None
+                else (bool(best_reading.get("warm")) if best_reading.get("warm") is not None else False)
+            )
+        )
+        _stamp_load_fields(
+            row,
+            size=size,
+            size_vram=size_vram,
+            offload_fraction=best_reading.get("offload_fraction"),
+            cold_load_s=(
+                first_cold_load_s
+                if first_cold_load_s is not None
+                else float(best_reading.get("cold_load_s") or 0.0)
+            ),
+            warm=warm,
+            reloaded=reloaded,
+            load_signal=best_reading.get("load_signal"),
+            expires_at=best_reading.get("expires_at"),
+        )
+        stamp_family(row)
+        _mark_rig_check(row, remote_device)
+        validate_row(row)
+        return row
+    finally:
+        _ACTIVE_LADDER_STEP.reset(step_token)
+        _unload_step_models(step_state)
 
 
 class _ProgressRows(list):
@@ -1450,6 +1508,7 @@ def run_linux_generate_ladder(
         "manager": model_manager,
         "quant": quant,
         "size_bytes": size_bytes,
+        "loaded_pairs": [],
     }
 
     def append_row(row: dict[str, Any]) -> None:
@@ -1465,235 +1524,238 @@ def run_linux_generate_ladder(
         finally:
             _ACTIVE_LADDER_STEP.reset(token)
 
-    # Concurrency is the outer loop: the server restarts to change its slot count, so each count is set once.
-    for concurrency in concurrencies:
-        for prompt_len in sorted(prompt_lengths):
-            try:
-                deadline_s = CELL_DEADLINE_S
-                measured = _with_deadline(
-                    lambda plen=prompt_len, conc=concurrency: _run_cell(plen, conc),
-                    deadline_s,
-                    lambda plen=prompt_len, conc=concurrency, limit=deadline_s: LinuxShapeFailure(
-                        "unmeasured",
-                        f"cell p{plen} c{conc} did not finish within its {limit:g} s outer deadline (a call did not "
-                        "return)",
-                        evidence={"num_ctx_sent": None, "request_timeout_s": None, "cell_deadline": True},
-                    ),
-                )
-            except LinuxShapeFailure as exc:
-                _phase(f"cell p{prompt_len} c{concurrency}: end, {exc.failure_class}")
-                deadline_fired = bool((exc.evidence or {}).get("cell_deadline"))
-                restarted_now = False
-                if deadline_fired:
-                    # The abandoned cell's thread may still be inside a request. The epoch refuses what it sends next;
-                    # restarting the server kills the request it is in, so nothing of it reaches the next cell.
-                    if recover is not None:
-                        _phase(f"cell p{prompt_len} c{concurrency}: outer deadline fired; restarting the server")
-                        recover()
-                        restarted_now = True
-                        mgr = step_state.get("manager")
-                        if mgr is not None and hasattr(mgr, "forget"):
-                            mgr.forget(model)
-                    else:
-                        _phase(
-                            f"cell p{prompt_len} c{concurrency}: outer deadline fired; no recover hook, server not "
-                            "restarted"
+    try:
+        # Concurrency is the outer loop: the server restarts to change its slot count, so each count is set once.
+        for concurrency in concurrencies:
+            for prompt_len in sorted(prompt_lengths):
+                try:
+                    deadline_s = CELL_DEADLINE_S
+                    measured = _with_deadline(
+                        lambda plen=prompt_len, conc=concurrency: _run_cell(plen, conc),
+                        deadline_s,
+                        lambda plen=prompt_len, conc=concurrency, limit=deadline_s: LinuxShapeFailure(
+                            "unmeasured",
+                            f"cell p{plen} c{conc} did not finish within its {limit:g} s outer deadline (a call did "
+                            "not return)",
+                            evidence={"num_ctx_sent": None, "request_timeout_s": None, "cell_deadline": True},
+                        ),
+                    )
+                except LinuxShapeFailure as exc:
+                    _phase(f"cell p{prompt_len} c{concurrency}: end, {exc.failure_class}")
+                    deadline_fired = bool((exc.evidence or {}).get("cell_deadline"))
+                    restarted_now = False
+                    if deadline_fired:
+                        # The abandoned cell's thread may still be inside a request. The epoch refuses what it sends
+                        # next; restarting the server kills the request it is in, so nothing reaches the next cell.
+                        if recover is not None:
+                            _phase(f"cell p{prompt_len} c{concurrency}: outer deadline fired; restarting the server")
+                            recover()
+                            restarted_now = True
+                            mgr = step_state.get("manager")
+                            if mgr is not None and hasattr(mgr, "forget"):
+                                mgr.forget(model)
+                        else:
+                            _phase(
+                                f"cell p{prompt_len} c{concurrency}: outer deadline fired; no recover hook, server not "
+                                "restarted"
+                            )
+                    ev = exc.evidence or {}
+                    append_row(
+                        build_linux_failure_row(
+                            spec_id=spec_id,
+                            spec_rel=spec_rel,
+                            run_id=run_id,
+                            date=date,
+                            task="generate",
+                            model=model,
+                            revision_or_digest=revision_or_digest,
+                            remote_device=remote_device,
+                            failure_class=exc.failure_class,
+                            reason=exc.reason,
+                            num_ctx=prompt_len,
+                            num_predict=num_predict,
+                            prompt_tokens=prompt_len,
+                            concurrency=concurrency,
+                            offload=ev.get("offload"),
+                            request_timeout_s=ev.get("request_timeout_s"),
+                            num_ctx_sent=ev.get("num_ctx_sent"),
+                            vram_sampler=ev.get("vram_sampler"),
+                            vram_sampler_reason=ev.get("vram_sampler_reason"),
+                            host_ram_projection=ev.get("host_ram_projection") or not_run,
+                            peak_mib=exc.peak_mib,
+                            abort_mib=abort_mib,
+                            engine_version=engine_version,
+                            quant=quant,
+                            licence=licence,
+                            load_cap_s=ev.get("load_cap_s"),
+                            last_engine_status=ev.get("last_engine_status"),
+                            load_record=ev.get("load_record"),
                         )
-                ev = exc.evidence or {}
-                append_row(
-                    build_linux_failure_row(
-                        spec_id=spec_id,
-                        spec_rel=spec_rel,
-                        run_id=run_id,
-                        date=date,
-                        task="generate",
-                        model=model,
-                        revision_or_digest=revision_or_digest,
-                        remote_device=remote_device,
-                        failure_class=exc.failure_class,
-                        reason=exc.reason,
-                        num_ctx=prompt_len,
-                        num_predict=num_predict,
-                        prompt_tokens=prompt_len,
-                        concurrency=concurrency,
-                        offload=ev.get("offload"),
-                        request_timeout_s=ev.get("request_timeout_s"),
-                        num_ctx_sent=ev.get("num_ctx_sent"),
-                        vram_sampler=ev.get("vram_sampler"),
-                        vram_sampler_reason=ev.get("vram_sampler_reason"),
-                        host_ram_projection=ev.get("host_ram_projection") or not_run,
-                        peak_mib=exc.peak_mib,
-                        abort_mib=abort_mib,
-                        engine_version=engine_version,
-                        quant=quant,
-                        licence=licence,
-                        load_cap_s=ev.get("load_cap_s"),
-                        last_engine_status=ev.get("last_engine_status"),
-                        load_record=ev.get("load_record"),
                     )
-                )
-                restarted["pending"] = restarted_now  # the next row is the first after a restart that happened
-                if exc.failure_class == "load_failed":
-                    return rows
-                continue
+                    restarted["pending"] = restarted_now  # the next row is the first after a restart that happened
+                    if exc.failure_class == "load_failed":
+                        return rows
+                    continue
 
-            ttft_ms = float(measured["ttft_ms"])
-            decode_tok_s = float(measured["decode_tok_s"])
-            latency_ms = float(measured.get("latency_ms", ttft_ms))
-            peak_mib = int(measured["peak_mib"])
-            size = int(measured["size"])
-            size_vram = int(measured["size_vram"])
-            if size_vram < size or peak_mib >= abort_mib:
-                reason = (
-                    f"partial offload ({size_vram} < {size})"
-                    if size_vram < size
-                    else f"peak {peak_mib} MiB >= abort_mib {abort_mib} MiB"
-                )
-                append_row(
-                    build_linux_failure_row(
-                        spec_id=spec_id,
-                        spec_rel=spec_rel,
-                        run_id=run_id,
-                        date=date,
-                        task="generate",
-                        model=model,
-                        revision_or_digest=revision_or_digest,
-                        remote_device=remote_device,
-                        failure_class="oom",
-                        reason=reason,
-                        num_ctx=prompt_len,
-                        num_predict=num_predict,
-                        prompt_tokens=_evaluated_or_requested(measured, prompt_len)[0],
-                        prompt_tokens_target=prompt_len,
-                        prompt_token_method=_evaluated_or_requested(measured, prompt_len)[1],
-                        concurrency=concurrency,
-                        request_timeout_s=measured.get("request_timeout_s"),
-                        num_ctx_sent=measured.get("num_ctx_sent"),
-                        vram_sampler=measured.get("vram_sampler"),
-                        vram_sampler_reason=measured.get("vram_sampler_reason"),
-                        host_ram_projection=measured.get("host_ram_projection") or not_run,
-                        peak_mib=peak_mib,
-                        abort_mib=abort_mib,
-                        engine_version=engine_version,
-                        quant=quant,
-                        licence=licence,
-                        size=size,
-                        size_vram=size_vram,
-                        offload_fraction=measured.get("offload_fraction"),
-                        cold_load_s=measured.get("cold_load_s"),
-                        warm=measured.get("warm"),
-                        reloaded=measured.get("reloaded"),
-                        load_signal=measured.get("load_signal"),
-                        expires_at=measured.get("expires_at"),
+                ttft_ms = float(measured["ttft_ms"])
+                decode_tok_s = float(measured["decode_tok_s"])
+                latency_ms = float(measured.get("latency_ms", ttft_ms))
+                peak_mib = int(measured["peak_mib"])
+                size = int(measured["size"])
+                size_vram = int(measured["size_vram"])
+                if size_vram < size or peak_mib >= abort_mib:
+                    reason = (
+                        f"partial offload ({size_vram} < {size})"
+                        if size_vram < size
+                        else f"peak {peak_mib} MiB >= abort_mib {abort_mib} MiB"
                     )
-                )
-                continue
+                    append_row(
+                        build_linux_failure_row(
+                            spec_id=spec_id,
+                            spec_rel=spec_rel,
+                            run_id=run_id,
+                            date=date,
+                            task="generate",
+                            model=model,
+                            revision_or_digest=revision_or_digest,
+                            remote_device=remote_device,
+                            failure_class="oom",
+                            reason=reason,
+                            num_ctx=prompt_len,
+                            num_predict=num_predict,
+                            prompt_tokens=_evaluated_or_requested(measured, prompt_len)[0],
+                            prompt_tokens_target=prompt_len,
+                            prompt_token_method=_evaluated_or_requested(measured, prompt_len)[1],
+                            concurrency=concurrency,
+                            request_timeout_s=measured.get("request_timeout_s"),
+                            num_ctx_sent=measured.get("num_ctx_sent"),
+                            vram_sampler=measured.get("vram_sampler"),
+                            vram_sampler_reason=measured.get("vram_sampler_reason"),
+                            host_ram_projection=measured.get("host_ram_projection") or not_run,
+                            peak_mib=peak_mib,
+                            abort_mib=abort_mib,
+                            engine_version=engine_version,
+                            quant=quant,
+                            licence=licence,
+                            size=size,
+                            size_vram=size_vram,
+                            offload_fraction=measured.get("offload_fraction"),
+                            cold_load_s=measured.get("cold_load_s"),
+                            warm=measured.get("warm"),
+                            reloaded=measured.get("reloaded"),
+                            load_signal=measured.get("load_signal"),
+                            expires_at=measured.get("expires_at"),
+                        )
+                    )
+                    continue
 
-            raw_slots = measured.get("slots")
-            slots = (
-                list(raw_slots)
-                if isinstance(raw_slots, list) and len(raw_slots) >= 2
-                else [
-                    {"phase": "warmup", "throughput": decode_tok_s, "latency_ms": latency_ms, "ttft_ms": ttft_ms},
-                    {"phase": "repeat", "throughput": decode_tok_s, "latency_ms": latency_ms, "ttft_ms": ttft_ms},
+                raw_slots = measured.get("slots")
+                slots = (
+                    list(raw_slots)
+                    if isinstance(raw_slots, list) and len(raw_slots) >= 2
+                    else [
+                        {"phase": "warmup", "throughput": decode_tok_s, "latency_ms": latency_ms, "ttft_ms": ttft_ms},
+                        {"phase": "repeat", "throughput": decode_tok_s, "latency_ms": latency_ms, "ttft_ms": ttft_ms},
+                    ]
+                )
+                repeats = sum(1 for s in slots if isinstance(s, Mapping) and s.get("phase") == "repeat") or 1
+                evaluated_tokens, token_method = _evaluated_or_requested(measured, prompt_len)
+                prefill_ms = float(measured.get("prefill_ms", ttft_ms))
+                repeat_prefills = [
+                    float(slot["prefill_ms"])
+                    for slot in slots
+                    if isinstance(slot, Mapping)
+                    and slot.get("phase") == "repeat"
+                    and isinstance(slot.get("prefill_ms"), (int, float))
                 ]
-            )
-            repeats = sum(1 for s in slots if isinstance(s, Mapping) and s.get("phase") == "repeat") or 1
-            evaluated_tokens, token_method = _evaluated_or_requested(measured, prompt_len)
-            prefill_ms = float(measured.get("prefill_ms", ttft_ms))
-            repeat_prefills = [
-                float(slot["prefill_ms"])
-                for slot in slots
-                if isinstance(slot, Mapping)
-                and slot.get("phase") == "repeat"
-                and isinstance(slot.get("prefill_ms"), (int, float))
-            ]
-            # The spread is recorded, never gated on: at concurrency above 1 one pass's mean prefill spikes 2 to 4x (T4
-            # s1b), and a cache hit shows as a prefill far under PREFILL_TOK_S_CEILING, not as a slow pass.
-            prefill_spread = None
-            if repeat_prefills and min(repeat_prefills) > 0:
-                prefill_spread = round(max(repeat_prefills) / min(repeat_prefills), 3)
-            row: dict[str, Any] = {
-                "id": f"{spec_id}/{model}/{quant}/{remote_device.card}/p{prompt_len}-c{concurrency}/{run_id}",
-                "task": "generate",
-                "model": {
-                    "repo_or_tag": model,
-                    "revision_or_digest": revision_or_digest,
-                    "quant": quant,
-                    "licence": licence,
-                    "size": size,
-                    "size_vram": size_vram,
-                },
-                "engine": {"name": "ollama", "version": engine_version},
-                "device": remote_device.logical_device,
-                "remote_device": remote_device.to_dict(),
-                "gpu_resident": True,
-                "settings": {
-                    "thinking_level": "off",
-                    "num_predict": num_predict,
-                    "num_ctx": int(measured.get("num_ctx_sent") or prompt_len),  # what the request sent
-                    "cell_tokens": prompt_len,  # the nominal cell size
-                    "num_ctx_source": "sent" if measured.get("num_ctx_sent") else "nominal: no request was sent",
-                    "batch": None,
-                    "static_shape": None,
-                    "precision": None,
-                    "prompt_tokens": evaluated_tokens,
-                    "prompt_tokens_target": prompt_len,
-                    "prompt_token_method": token_method,
-                    "ladder_version": GENERATE_LADDER_VERSION,
-                    "concurrency": concurrency,
-                    "prefix_caching": "off",  # every timed call has its own prefix, so no prefix is cached
-                    "request_timeout_s": measured.get("request_timeout_s"),
-                    "cell_wall_s": CELL_WALL_S,
-                    "vram_sampler": measured.get("vram_sampler"),
-                    "vram_sampler_reason": measured.get("vram_sampler_reason"),
-                    "parallel_slots": measured.get("parallel_slots", concurrency),
-                    "parallel_slots_source": measured.get("parallel_slots_source", "requested"),
-                    "throughput_method": measured.get("throughput_method", "ollama_durations_decode_window"),
-                    "end_to_end_tok_s": measured.get("end_to_end_tok_s"),
-                    "prefill_ms": prefill_ms,
-                    "prefill_ms_passes": repeat_prefills,
-                    "prefill_spread": prefill_spread,
-                    "ttft_floor": "off",
-                    "host_ram_projection": measured.get("host_ram_projection") or not_run,
-                    "overhead_ms": measured.get("overhead_ms"),
-                    "per_request_decode_tok_s": measured.get("per_request_decode_tok_s"),
-                    "ttft_ms": ttft_ms,
-                    "decode_tok_s": decode_tok_s,
-                    "peak_mib": peak_mib,
-                    "abort_mib": abort_mib,
-                },
-                "quality": [],
-                "latency": {
-                    "cold_ms": None,
-                    "warm_p50_ms": latency_ms,
-                    "warm_p95_ms": latency_ms,
-                    "throughput": decode_tok_s,
-                    "throughput_unit": "tok/s",
-                    "compile_ms": None,
-                },
-                "artifacts": {"slots": slots},
-                "date": date,
-                "repeats": repeats,
-                "provisional": False,
-                "provenance": {"experiment_spec": spec_rel, "run_id": run_id},
-            }
-            _stamp_load_fields(
-                row,
-                size=size,
-                size_vram=size_vram,
-                offload_fraction=measured.get("offload_fraction"),
-                cold_load_s=float(measured.get("cold_load_s") or 0.0),
-                warm=bool(measured.get("warm")) if measured.get("warm") is not None else False,
-                reloaded=bool(measured.get("reloaded")),
-                load_signal=measured.get("load_signal"),
-                expires_at=measured.get("expires_at"),
-            )
-            stamp_family(row)
-            _mark_rig_check(row, remote_device)
-            validate_row(row)
-            append_row(row)
-    return rows
+                # The spread is recorded, never gated on: at concurrency above 1 one pass's mean prefill spikes 2 to
+                # 4x (T4 s1b), and a cache hit shows as a prefill far under PREFILL_TOK_S_CEILING, not as a slow pass.
+                prefill_spread = None
+                if repeat_prefills and min(repeat_prefills) > 0:
+                    prefill_spread = round(max(repeat_prefills) / min(repeat_prefills), 3)
+                row: dict[str, Any] = {
+                    "id": f"{spec_id}/{model}/{quant}/{remote_device.card}/p{prompt_len}-c{concurrency}/{run_id}",
+                    "task": "generate",
+                    "model": {
+                        "repo_or_tag": model,
+                        "revision_or_digest": revision_or_digest,
+                        "quant": quant,
+                        "licence": licence,
+                        "size": size,
+                        "size_vram": size_vram,
+                    },
+                    "engine": {"name": "ollama", "version": engine_version},
+                    "device": remote_device.logical_device,
+                    "remote_device": remote_device.to_dict(),
+                    "gpu_resident": True,
+                    "settings": {
+                        "thinking_level": "off",
+                        "num_predict": num_predict,
+                        "num_ctx": int(measured.get("num_ctx_sent") or prompt_len),  # what the request sent
+                        "cell_tokens": prompt_len,  # the nominal cell size
+                        "num_ctx_source": "sent" if measured.get("num_ctx_sent") else "nominal: no request was sent",
+                        "batch": None,
+                        "static_shape": None,
+                        "precision": None,
+                        "prompt_tokens": evaluated_tokens,
+                        "prompt_tokens_target": prompt_len,
+                        "prompt_token_method": token_method,
+                        "ladder_version": GENERATE_LADDER_VERSION,
+                        "concurrency": concurrency,
+                        "prefix_caching": "off",  # every timed call has its own prefix, so no prefix is cached
+                        "request_timeout_s": measured.get("request_timeout_s"),
+                        "cell_wall_s": CELL_WALL_S,
+                        "vram_sampler": measured.get("vram_sampler"),
+                        "vram_sampler_reason": measured.get("vram_sampler_reason"),
+                        "parallel_slots": measured.get("parallel_slots", concurrency),
+                        "parallel_slots_source": measured.get("parallel_slots_source", "requested"),
+                        "throughput_method": measured.get("throughput_method", "ollama_durations_decode_window"),
+                        "end_to_end_tok_s": measured.get("end_to_end_tok_s"),
+                        "prefill_ms": prefill_ms,
+                        "prefill_ms_passes": repeat_prefills,
+                        "prefill_spread": prefill_spread,
+                        "ttft_floor": "off",
+                        "host_ram_projection": measured.get("host_ram_projection") or not_run,
+                        "overhead_ms": measured.get("overhead_ms"),
+                        "per_request_decode_tok_s": measured.get("per_request_decode_tok_s"),
+                        "ttft_ms": ttft_ms,
+                        "decode_tok_s": decode_tok_s,
+                        "peak_mib": peak_mib,
+                        "abort_mib": abort_mib,
+                    },
+                    "quality": [],
+                    "latency": {
+                        "cold_ms": None,
+                        "warm_p50_ms": latency_ms,
+                        "warm_p95_ms": latency_ms,
+                        "throughput": decode_tok_s,
+                        "throughput_unit": "tok/s",
+                        "compile_ms": None,
+                    },
+                    "artifacts": {"slots": slots},
+                    "date": date,
+                    "repeats": repeats,
+                    "provisional": False,
+                    "provenance": {"experiment_spec": spec_rel, "run_id": run_id},
+                }
+                _stamp_load_fields(
+                    row,
+                    size=size,
+                    size_vram=size_vram,
+                    offload_fraction=measured.get("offload_fraction"),
+                    cold_load_s=float(measured.get("cold_load_s") or 0.0),
+                    warm=bool(measured.get("warm")) if measured.get("warm") is not None else False,
+                    reloaded=bool(measured.get("reloaded")),
+                    load_signal=measured.get("load_signal"),
+                    expires_at=measured.get("expires_at"),
+                )
+                stamp_family(row)
+                _mark_rig_check(row, remote_device)
+                validate_row(row)
+                append_row(row)
+        return rows
+    finally:
+        _unload_step_models(step_state)
 
 
 def run_linux_throughput_ladder(
@@ -2001,12 +2063,46 @@ def measure_linux_ollama_window(
 ) -> dict[str, Any]:
     """Measure one ``num_ctx`` window against a running ``LinuxOllamaServer`` and VRAM sampler."""
 
+    step_state = _ACTIVE_LADDER_STEP.get()
+    manager = model_manager
+    if manager is None and step_state is not None and step_state.get("manager") is not None:
+        manager = step_state["manager"]
+    if manager is None:
+        manager = OllamaModelManager(server)
+        if step_state is not None:
+            step_state["manager"] = manager
+    if step_state is not None:
+        step_state.setdefault("loaded_pairs", []).append((manager, model))
+
     used_before, _ = _sample_with_deadline(sample_vram_mib)
     peak_mib = used_before
-    manager = model_manager or OllamaModelManager(server)
     load_rec: LoadRecord | None = None
     try:
         load_rec = manager.ensure_loaded(model, quant, num_ctx, size_bytes=size_bytes)
+        if load_rec.size is not None and load_rec.size_vram is not None and load_rec.size_vram < load_rec.size:
+            used_after, _ = _sample_during_cell(sample_vram_mib)
+            peak_mib = max(peak_mib, used_after)
+            size = int(load_rec.size)
+            size_vram = int(load_rec.size_vram)
+            offload_fraction = (
+                load_rec.offload_fraction
+                if load_rec.offload_fraction is not None
+                else (round(size_vram / size, 6) if size > 0 else 0.0)
+            )
+            return {
+                "size": size,
+                "size_vram": size_vram,
+                "offload_fraction": offload_fraction,
+                "cold_load_s": load_rec.cold_load_s,
+                "warm": load_rec.warm,
+                "reloaded": load_rec.reloaded,
+                "load_signal": load_rec.signal,
+                "expires_at": load_rec.expires_at,
+                "peak_mib": peak_mib,
+                "prompt_tok_s": 0.0,
+                "decode_tok_s": 0.0,
+                "ttft_ms": 0.0,
+            }
         resp = _post(
             server,
             "/api/generate",
@@ -2382,6 +2478,8 @@ def _failure_for(
 
     if isinstance(exc, LinuxShapeFailure):
         failure = exc
+        if failure.peak_mib is None and peak_mib is not None:
+            failure.peak_mib = peak_mib
     elif "signal: killed" in str(exc).lower():
         report = _load_report(server)
         cpu_kv, mapped = report.get("cpu_kv_mib"), report.get("cpu_mapped_mib")
@@ -2562,6 +2660,21 @@ def _measure_generate_cell(
     num_ctx = ladder_window(prompt_tokens, num_predict)
     slots = max(1, concurrency)
     cell = f"cell p{prompt_tokens} c{concurrency}"
+    step_state = _ACTIVE_LADDER_STEP.get()
+    active_manager = model_manager
+    eff_quant = quant
+    eff_size_bytes = size_bytes
+    if active_manager is None and step_state is not None:
+        if step_state.get("manager") is None:
+            step_state["manager"] = OllamaModelManager(server, clock=clock)
+        active_manager = step_state["manager"]
+        if eff_quant == UNRECORDED and step_state.get("quant"):
+            eff_quant = str(step_state["quant"])
+        if eff_size_bytes is None and step_state.get("size_bytes") is not None:
+            eff_size_bytes = int(step_state["size_bytes"])
+    if active_manager is not None and step_state is not None:
+        step_state.setdefault("loaded_pairs", []).append((active_manager, model))
+
     if projection is None:
         projection = {}
     if host_ram is not None and host_ram.mode == "on":
@@ -2598,19 +2711,6 @@ def _measure_generate_cell(
     used_before, _ = _sample_during_cell(sample_vram_mib)
     peak_mib = used_before
 
-    step_state = _ACTIVE_LADDER_STEP.get()
-    active_manager = model_manager
-    eff_quant = quant
-    eff_size_bytes = size_bytes
-    if active_manager is None and step_state is not None:
-        if step_state.get("manager") is None:
-            step_state["manager"] = OllamaModelManager(server, clock=clock)
-        active_manager = step_state["manager"]
-        if eff_quant == UNRECORDED and step_state.get("quant"):
-            eff_quant = str(step_state["quant"])
-        if eff_size_bytes is None and step_state.get("size_bytes") is not None:
-            eff_size_bytes = int(step_state["size_bytes"])
-
     sent = {"num_ctx_sent": num_ctx}  # the first probe is sent with this window, so any failure below has one
     calibration_budget = {**sent, "request_timeout_s": CALIBRATION_TIMEOUT_S}
     load_rec: LoadRecord | None = None
@@ -2618,12 +2718,7 @@ def _measure_generate_cell(
         try:
             if parallel_restarted and hasattr(active_manager, "forget") and not active_manager.still_loaded(model):
                 active_manager.forget(model)
-            if not active_manager.has_loaded(model) or not active_manager.still_loaded(model):
-                load_rec = active_manager.ensure_loaded(model, eff_quant, num_ctx, size_bytes=eff_size_bytes)
-            elif model_manager is not None:
-                load_rec = active_manager.ensure_loaded(model, eff_quant, num_ctx, size_bytes=eff_size_bytes)
-            else:
-                load_rec = active_manager.current_record(model)
+            load_rec = active_manager.ensure_loaded(model, eff_quant, num_ctx, size_bytes=eff_size_bytes)
         except BaseException as exc:
             _note_host_ram_load(host_ram, server, cell=f"p{prompt_tokens} c{concurrency}", num_ctx=num_ctx, slots=slots)
             raise _failure_for(server, exc, peak_mib, calibration_budget) from exc
@@ -2916,17 +3011,14 @@ def _relative_spec_posix(spec_path: Path, spec_rel: str | None) -> str:
 
 
 @contextmanager
-def _unloaded_after(server: Any, tag: str, *, model_manager: OllamaModelManager | None = None) -> Iterator[None]:
+def _unloaded_after(server: Any, tag: str) -> Iterator[None]:
     """Unload ``tag`` when its cells end, however they end, so the next quant's baseline is an empty card."""
 
     try:
         yield
     finally:
         try:
-            if model_manager is not None:
-                model_manager.unload(tag)
-            else:
-                server.unload(tag)
+            server.unload(tag)
         except (OSError, RuntimeError, ValueError):
             pass
 
@@ -3022,36 +3114,36 @@ def run_linux_spec(
                 ollama_tag = _ollama_model_tag(model_tag, quant, entry.get("ollama_tag"))
                 entry_size_bytes = int(entry["size_bytes"]) if entry.get("size_bytes") is not None else None
                 fill_manager = OllamaModelManager(active_server, engine_version=engine_version)
-                with _unloaded_after(active_server, ollama_tag, model_manager=fill_manager):
-                    rows.append(
-                        run_linux_fill_card(
-                            spec_id=spec_id,
-                            spec_rel=resolved_spec_rel,
-                            run_id=run_id,
-                            date=date,
-                            remote_device=remote_device,
-                            model=model_tag,
-                            revision_or_digest=digest,
-                            trained_ctx=trained_ctx,
-                            abort_fraction=abort_fraction,
-                            grain=grain,
-                            spill_prompt_ratio=spill_ratio,
-                            engine_version=engine_version,
-                            quant=quant,
-                            licence=licence,
-                            measure_window=lambda ctx, m=ollama_tag, q=quant, mgr=fill_manager, sb=entry_size_bytes: (
-                                measure_linux_ollama_window(
-                                    active_server,
-                                    sample_vram_mib,
-                                    model=m,
-                                    num_ctx=ctx,
-                                    quant=q,
-                                    model_manager=mgr,
-                                    size_bytes=sb,
-                                )
-                            ),
-                        )
+                rows.append(
+                    run_linux_fill_card(
+                        spec_id=spec_id,
+                        spec_rel=resolved_spec_rel,
+                        run_id=run_id,
+                        date=date,
+                        remote_device=remote_device,
+                        model=model_tag,
+                        revision_or_digest=digest,
+                        trained_ctx=trained_ctx,
+                        abort_fraction=abort_fraction,
+                        grain=grain,
+                        spill_prompt_ratio=spill_ratio,
+                        engine_version=engine_version,
+                        quant=quant,
+                        licence=licence,
+                        model_manager=fill_manager,
+                        measure_window=lambda ctx, m=ollama_tag, q=quant, mgr=fill_manager, sb=entry_size_bytes: (
+                            measure_linux_ollama_window(
+                                active_server,
+                                sample_vram_mib,
+                                model=m,
+                                num_ctx=ctx,
+                                quant=q,
+                                model_manager=mgr,
+                                size_bytes=sb,
+                            )
+                        ),
                     )
+                )
             return rows
 
         if mode == "generate-ladder":
@@ -3118,31 +3210,30 @@ def run_linux_spec(
                         host_ram=state,
                     )
 
-                with _unloaded_after(active_server, ollama_tag, model_manager=ladder_manager):
-                    rows.extend(
-                        run_linux_generate_ladder(
-                            spec_id=spec_id,
-                            spec_rel=resolved_spec_rel,
-                            run_id=run_id,
-                            date=date,
-                            remote_device=remote_device,
-                            model=model_tag,
-                            revision_or_digest=digest,
-                            prompt_lengths=prompt_lengths,
-                            concurrencies=concurrencies,
-                            abort_fraction=abort_fraction,
-                            num_predict=num_predict,
-                            on_progress=progress,
-                            recover=getattr(active_server, "restart_after_deadline", None),
-                            host_ram=ladder_state,
-                            model_manager=ladder_manager,
-                            size_bytes=entry_size_bytes,
-                            engine_version=engine_version,
-                            quant=quant,
-                            licence=licence,
-                            measure_shape=measure_cell,
-                        )
+                rows.extend(
+                    run_linux_generate_ladder(
+                        spec_id=spec_id,
+                        spec_rel=resolved_spec_rel,
+                        run_id=run_id,
+                        date=date,
+                        remote_device=remote_device,
+                        model=model_tag,
+                        revision_or_digest=digest,
+                        prompt_lengths=prompt_lengths,
+                        concurrencies=concurrencies,
+                        abort_fraction=abort_fraction,
+                        num_predict=num_predict,
+                        on_progress=progress,
+                        recover=getattr(active_server, "restart_after_deadline", None),
+                        host_ram=ladder_state,
+                        model_manager=ladder_manager,
+                        size_bytes=entry_size_bytes,
+                        engine_version=engine_version,
+                        quant=quant,
+                        licence=licence,
+                        measure_shape=measure_cell,
                     )
+                )
             return rows
 
         if mode == "batch-ladder":

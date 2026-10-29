@@ -248,8 +248,16 @@ def test_eviction_mid_ladder_reloads_and_flags_reloaded_with_second_cold_load_s(
     assert rows[1]["settings"]["reloaded"] is True
     assert rows[1]["model"]["reloaded"] is True
 
-    # Cell 2 (p2048): still resident -> warm=True, reloaded=True (preserved from step or False on current_record)
+    # Cell 2 (p2048): still resident -> warm=True, reloaded=False; context change reloaded via ensure_loaded
     assert rows[2]["warm"] is True
+    assert rows[2]["reloaded"] is False
+    assert rows[2]["settings"]["reloaded"] is False
+    assert rows[2]["model"]["reloaded"] is False
+    assert rows[2]["cold_load_s"] == pytest.approx(2.0)
+    assert len(server.load_calls) == 3
+    assert [call["num_ctx"] for call in server.load_calls] == [714, 1236, 2280]
+    assert server.unload_calls == ["qwen3:14b-q8_0"]
+    assert manager.still_loaded("qwen3:14b-q8_0") is False
 
 
 def test_partial_offload_records_size_size_vram_and_offload_fraction_below_one():
@@ -263,8 +271,9 @@ def test_partial_offload_records_size_size_vram_and_offload_fraction_below_one()
     assert rec.offload_fraction is not None and 0.0 < rec.offload_fraction < 1.0
     assert rec.offload_fraction == pytest.approx(rec.size_vram / rec.size, abs=1e-6)
 
-    # Also verify a partial-offload failure row from fill-card carries size, size_vram, and offload_fraction < 1
-    fill_server = FakeOllama(cold_load_s=12.0, vram_mib=2500.0, weights_mib=2400.0)
+    # Also verify a partial-offload failure row from fill-card carries size, size_vram, and offload_fraction < 1,
+    # and short-circuits before sending the 120 s timed probe (decode_tok_s=0.1 would take 160 s for 16 tokens).
+    fill_server = FakeOllama(cold_load_s=12.0, decode_tok_s=0.1, vram_mib=2500.0, weights_mib=2400.0)
     fill_mgr = OllamaModelManager(fill_server)
     row = run_linux_fill_card(
         spec_id="C2-FILL-CARD",
@@ -290,6 +299,7 @@ def test_partial_offload_records_size_size_vram_and_offload_fraction_below_one()
     )
     validate_row(row)
     assert row["outcome"] == "oom"
+    assert len(fill_server.all_calls) == 0
     assert row["size_vram"] < row["size"]
     assert 0.0 < row["offload_fraction"] < 1.0
     assert row["gpu_resident"] is False
@@ -350,9 +360,208 @@ def test_c2_86_replay_fill_card_alone_with_84s_cold_load_produces_real_row_not_t
     assert row["cold_load_s"] == pytest.approx(84.0)
     assert row["settings"]["cold_load_s"] == pytest.approx(84.0)
     assert row["model"]["cold_load_s"] == pytest.approx(84.0)
+    assert row["warm"] is False
+    assert row["settings"]["warm"] is False
+    assert row["model"]["warm"] is False
     assert row["offload_fraction"] == 1.0
     assert row["reloaded"] is False
     assert row["size"] == row["size_vram"] > 0
+
+
+def test_fill_card_mid_sweep_eviction_reloads_and_records_second_cold_load_s_with_warm_false():
+    server = FakeOllama(cold_load_s=34.0, warm_load_s=2.5, vram_mib=23034.0, weights_mib=8000.0)
+    manager = OllamaModelManager(server)
+
+    def measure_window(ctx: int) -> dict[str, Any]:
+        if ctx == 4096:
+            server.evict()
+            server.cold_load_s = 26.5
+        return measure_linux_ollama_window(
+            server,
+            lambda: (12000, 23034),
+            model="qwen3:14b-q4_k_m",
+            num_ctx=ctx,
+            quant="Q4_K_M",
+            model_manager=manager,
+        )
+
+    row = run_linux_fill_card(
+        spec_id="C2-FILL-CARD",
+        spec_rel="experiments/c2-fill-card/spec.yaml",
+        run_id="c2-fill-evict",
+        date="2026-10-29",
+        remote_device=IDENT_T4,
+        model="qwen3:14b",
+        revision_or_digest="d" * 64,
+        trained_ctx=8192,
+        abort_fraction=0.90,
+        grain=2048,
+        quant="Q4_K_M",
+        licence="apache-2.0",
+        measure_window=measure_window,
+    )
+    validate_row(row)
+    assert is_speed_row(row) is True
+    assert row["settings"]["max_resident_ctx"] == 8192
+    assert row["reloaded"] is True
+    assert row["settings"]["reloaded"] is True
+    assert row["model"]["reloaded"] is True
+    assert row["warm"] is False
+    assert row["settings"]["warm"] is False
+    assert row["model"]["warm"] is False
+    assert row["cold_load_s"] == pytest.approx(26.5)
+    assert row["settings"]["cold_load_s"] == pytest.approx(26.5)
+    assert row["model"]["cold_load_s"] == pytest.approx(26.5)
+
+    # Also verify bisection-phase eviction updates cold_load_s and flags reloaded=True, warm=False
+    bisect_server = FakeOllama(cold_load_s=30.0, warm_load_s=2.0, vram_mib=23034.0, weights_mib=8000.0)
+    bisect_mgr = OllamaModelManager(bisect_server)
+
+    def measure_bisect_window(ctx: int) -> dict[str, Any]:
+        if ctx == 6144:
+            bisect_server.evict()
+            bisect_server.cold_load_s = 22.25
+        vram_used = 15000 if ctx >= 8192 else 11000
+        return measure_linux_ollama_window(
+            bisect_server,
+            lambda: (vram_used, 15360),
+            model="qwen3:14b-q4_k_m",
+            num_ctx=ctx,
+            quant="Q4_K_M",
+            model_manager=bisect_mgr,
+        )
+
+    bisect_row = run_linux_fill_card(
+        spec_id="C2-FILL-CARD",
+        spec_rel="experiments/c2-fill-card/spec.yaml",
+        run_id="c2-fill-bisect-evict",
+        date="2026-10-29",
+        remote_device=IDENT_T4,
+        model="qwen3:14b",
+        revision_or_digest="d" * 64,
+        trained_ctx=8192,
+        abort_fraction=0.90,
+        grain=2048,
+        quant="Q4_K_M",
+        licence="apache-2.0",
+        measure_window=measure_bisect_window,
+    )
+    validate_row(bisect_row)
+    assert bisect_row["settings"]["max_resident_ctx"] == 6144
+    assert bisect_row["reloaded"] is True
+    assert bisect_row["warm"] is False
+    assert bisect_row["cold_load_s"] == pytest.approx(22.25)
+
+
+def test_direct_fill_card_and_generate_ladder_unload_on_every_exit_path():
+    # 1. Direct run_linux_fill_card unloads on normal completion and on uncaught exception
+    fill_server = FakeOllama(cold_load_s=8.0, vram_mib=23034.0, weights_mib=5000.0)
+    fill_row = run_linux_fill_card(
+        spec_id="C2-FILL-CARD",
+        spec_rel="experiments/c2-fill-card/spec.yaml",
+        run_id="c2-direct-fill-unload",
+        date="2026-10-29",
+        remote_device=IDENT_T4,
+        model="qwen3:8b",
+        revision_or_digest="e" * 64,
+        trained_ctx=4096,
+        abort_fraction=0.90,
+        grain=2048,
+        quant="Q4_K_M",
+        licence="apache-2.0",
+        measure_window=lambda ctx: measure_linux_ollama_window(
+            fill_server,
+            lambda: (6000, 15360),
+            model="qwen3:8b-q4_k_m",
+            num_ctx=ctx,
+            quant="Q4_K_M",
+        ),
+    )
+    assert is_speed_row(fill_row) is True
+    assert fill_server.unload_calls == ["qwen3:8b-q4_k_m"]
+    assert OllamaModelManager(fill_server).still_loaded("qwen3:8b-q4_k_m") is False
+
+    err_fill_server = FakeOllama(cold_load_s=5.0, vram_mib=23034.0, weights_mib=5000.0)
+    err_fill_mgr = OllamaModelManager(err_fill_server)
+
+    def exploding_window(ctx: int) -> dict[str, Any]:
+        err_fill_mgr.ensure_loaded("qwen3:8b-q4_k_m", "Q4_K_M", ctx)
+        raise RuntimeError("fill probe boom")
+
+    with pytest.raises(RuntimeError, match="fill probe boom"):
+        run_linux_fill_card(
+            spec_id="C2-FILL-CARD",
+            spec_rel="experiments/c2-fill-card/spec.yaml",
+            run_id="c2-direct-fill-boom",
+            date="2026-10-29",
+            remote_device=IDENT_T4,
+            model="qwen3:8b",
+            revision_or_digest="e" * 64,
+            trained_ctx=4096,
+            abort_fraction=0.90,
+            grain=2048,
+            quant="Q4_K_M",
+            licence="apache-2.0",
+            measure_window=exploding_window,
+        )
+    assert err_fill_server.unload_calls == ["qwen3:8b-q4_k_m"]
+    assert err_fill_mgr.still_loaded("qwen3:8b-q4_k_m") is False
+
+    # 2. Direct run_linux_generate_ladder unloads on normal completion, load_failed early exit, and exception
+    gen_server = FakeOllama(cold_load_s=6.0, vram_mib=23034.0, weights_mib=5000.0)
+    gen_mgr = OllamaModelManager(gen_server)
+    gen_rows = run_linux_generate_ladder(
+        spec_id="C2-GENERATE",
+        spec_rel="experiments/c2-generate/spec.yaml",
+        run_id="c2-direct-gen-unload",
+        date="2026-10-29",
+        remote_device=IDENT_T4,
+        model="qwen3:8b",
+        revision_or_digest="e" * 64,
+        prompt_lengths=(512, 1024),
+        concurrencies=(1,),
+        quant="Q4_K_M",
+        licence="apache-2.0",
+        model_manager=gen_mgr,
+        measure_shape=lambda plen, conc: measure_linux_ollama_generate(
+            gen_server,
+            lambda: (6000, 15360),
+            model="qwen3:8b-q4_k_m",
+            prompt_tokens=plen,
+            concurrency=conc,
+            repeats=1,
+            clock=gen_server.clock,
+        ),
+    )
+    assert len(gen_rows) == 2
+    assert gen_server.unload_calls == ["qwen3:8b-q4_k_m"]
+    assert gen_mgr.still_loaded("qwen3:8b-q4_k_m") is False
+
+    err_gen_server = FakeOllama(cold_load_s=4.0, vram_mib=23034.0, weights_mib=5000.0)
+    err_gen_mgr = OllamaModelManager(err_gen_server)
+
+    def exploding_cell(plen: int, conc: int) -> dict[str, Any]:
+        err_gen_mgr.ensure_loaded("qwen3:8b-q4_k_m", "Q4_K_M", plen)
+        raise RuntimeError("ladder cell boom")
+
+    with pytest.raises(RuntimeError, match="ladder cell boom"):
+        run_linux_generate_ladder(
+            spec_id="C2-GENERATE",
+            spec_rel="experiments/c2-generate/spec.yaml",
+            run_id="c2-direct-gen-boom",
+            date="2026-10-29",
+            remote_device=IDENT_T4,
+            model="qwen3:8b",
+            revision_or_digest="e" * 64,
+            prompt_lengths=(512,),
+            concurrencies=(1,),
+            quant="Q4_K_M",
+            licence="apache-2.0",
+            model_manager=err_gen_mgr,
+            measure_shape=exploding_cell,
+        )
+    assert err_gen_server.unload_calls == ["qwen3:8b-q4_k_m"]
+    assert err_gen_mgr.still_loaded("qwen3:8b-q4_k_m") is False
 
 
 def test_ollama_context_change_reloads_and_records_warm_or_cold():
@@ -360,7 +569,9 @@ def test_ollama_context_change_reloads_and_records_warm_or_cold():
     manager = OllamaModelManager(server)
 
     # 1. First load at ctx=2048 is cold (warm=False, reloaded=False, cold_load_s=42.0)
+    assert manager.has_loaded("qwen3:14b-q8_0") is False
     r1 = manager.ensure_loaded("qwen3:14b-q8_0", "Q8_0", 2048)
+    assert manager.has_loaded("qwen3:14b-q8_0") is True
     assert r1.warm is False
     assert r1.reloaded is False
     assert r1.cold_load_s == pytest.approx(42.0)
@@ -388,6 +599,13 @@ def test_ollama_context_change_reloads_and_records_warm_or_cold():
     assert r3.reloaded is True
     assert r3.cold_load_s == pytest.approx(42.0)
     assert len(server.load_calls) == 3
+
+    # current_record on a resident model does not copy reloaded=True or cold_load_s=42.0 from the previous reload
+    cur = manager.current_record("qwen3:14b-q8_0")
+    assert cur is not None
+    assert cur.warm is True
+    assert cur.reloaded is False
+    assert cur.cold_load_s == pytest.approx(0.0)
 
     # 5. keep() and unload() exercise the full ModelManager interface
     assert isinstance(manager, ModelManager) or hasattr(manager, "keep")

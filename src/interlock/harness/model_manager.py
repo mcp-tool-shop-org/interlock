@@ -271,25 +271,23 @@ class OllamaModelManager:
     def current_record(self, model: str) -> LoadRecord | None:
         """Read current ``/api/ps`` state for an already-loaded model without triggering a reload."""
 
-        bare = bare_model_tag(model)
         entry, _ = self._query_ps(model)
         if entry is None:
             return None
         size = int(entry["size"])
         size_vram = int(entry["size_vram"])
         offload_fraction = round(size_vram / size, 6) if size > 0 else None
-        prev = self._last_record.get(bare)
         return LoadRecord(
             engine="ollama",
             engine_version=self.engine_version,
             signal=OLLAMA_READY_SIGNAL,
-            cold_load_s=prev.cold_load_s if prev is not None else 0.0,
+            cold_load_s=0.0,
             warm=True,
             size=size,
             size_vram=size_vram,
             offload_fraction=offload_fraction,
             expires_at=entry.get("expires_at"),
-            reloaded=prev.reloaded if prev is not None else False,
+            reloaded=False,
             reason=None,
             model=model,
         )
@@ -308,6 +306,7 @@ class OllamaModelManager:
         """Ask Ollama to load ``model`` at ``ctx`` and wait until ``/api/ps`` confirms residency under ``cap_s``."""
 
         from interlock.harness.linux_cuda import (
+            _ACTIVE_LADDER_STEP,
             StaleCell,
             _failure_for,
             classify_linux_error,
@@ -315,6 +314,9 @@ class OllamaModelManager:
 
         if ctx is None and num_ctx is not None:
             ctx = num_ctx
+        step_state = _ACTIVE_LADDER_STEP.get()
+        if step_state is not None:
+            step_state.setdefault("loaded_pairs", []).append((self, model))
         bare = bare_model_tag(model)
         ever_loaded = bare in self._ever_loaded
         pre_entry, last_status = self._query_ps(model, allow_single_fallback=ever_loaded)
