@@ -49,7 +49,7 @@ UNRECORDED = "unrecorded"
 FAILURE_CLASSES = ("oom", "load_refused", "timeout", "ctx_exceeded")
 # A cell that was not measured. It says nothing about what the card can load, so it is not a capability outcome and
 # a spec cannot pre-register it (spec.py checks FAILURE_CLASSES, which stays the capability set).
-MEASUREMENT_FAILURE_CLASSES = ("sampler_error", "generation_aborted", "unmeasured")
+MEASUREMENT_FAILURE_CLASSES = ("sampler_error", "generation_aborted", "unmeasured", "load_failed")
 ROW_FAILURE_CLASSES = FAILURE_CLASSES + MEASUREMENT_FAILURE_CLASSES
 GENERATE_PROMPT_LENGTHS = (512, 1024, 2048, 4096, 8192, 16384, 32768)
 GENERATE_CONCURRENCIES = (1, 4, 8)
@@ -199,6 +199,17 @@ class LinuxShapeFailure(Exception):
         self.reason = reason.strip()
         self.peak_mib = peak_mib
         self.evidence = evidence  # what the failure was read from, put in the row (offload, request_timeout_s)
+
+
+from interlock.harness.model_manager import (  # noqa: E402
+    OLLAMA_READY_SIGNAL,
+    LoadRecord,
+    OllamaModelManager,
+)
+
+_ACTIVE_LADDER_STEP: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar(
+    "interlock_active_ladder_step", default=None
+)
 
 
 @dataclass(frozen=True)
@@ -865,6 +876,64 @@ class LinuxOllamaServer:
                 self._log_handle = None
 
 
+def _stamp_load_fields(
+    row: dict[str, Any],
+    *,
+    size: int | None = None,
+    size_vram: int | None = None,
+    offload_fraction: float | None = None,
+    cold_load_s: float | None = None,
+    warm: bool | None = None,
+    reloaded: bool | None = None,
+    load_signal: str | None = None,
+    expires_at: str | None = None,
+    load_cap_s: float | None = None,
+    last_engine_status: str | None = None,
+) -> None:
+    """Stamp residency and load-lifecycle fields onto ``row``, ``row['model']``, and ``row['settings']``."""
+
+    if offload_fraction is None and size is not None and size_vram is not None and size > 0:
+        offload_fraction = round(size_vram / size, 6)
+    model_doc = row.setdefault("model", {})
+    settings = row.setdefault("settings", {})
+    if size is not None:
+        model_doc["size"] = int(size)
+        settings["size"] = int(size)
+        row["size"] = int(size)
+    if size_vram is not None:
+        model_doc["size_vram"] = int(size_vram)
+        settings["size_vram"] = int(size_vram)
+        row["size_vram"] = int(size_vram)
+    if offload_fraction is not None:
+        model_doc["offload_fraction"] = float(offload_fraction)
+        settings["offload_fraction"] = float(offload_fraction)
+        row["offload_fraction"] = float(offload_fraction)
+    if cold_load_s is not None:
+        model_doc["cold_load_s"] = float(cold_load_s)
+        settings["cold_load_s"] = float(cold_load_s)
+        row["cold_load_s"] = float(cold_load_s)
+    if warm is not None:
+        model_doc["warm"] = bool(warm)
+        settings["warm"] = bool(warm)
+        row["warm"] = bool(warm)
+    if reloaded is not None:
+        model_doc["reloaded"] = bool(reloaded)
+        settings["reloaded"] = bool(reloaded)
+        row["reloaded"] = bool(reloaded)
+    if load_signal is not None:
+        settings["load_signal"] = str(load_signal)
+        row["load_signal"] = str(load_signal)
+    if expires_at is not None:
+        settings["expires_at"] = str(expires_at)
+        row["expires_at"] = str(expires_at)
+    if load_cap_s is not None:
+        settings["load_cap_s"] = float(load_cap_s)
+    if last_engine_status is not None:
+        settings["last_engine_status"] = str(last_engine_status)
+    if size is not None and size_vram is not None and "gpu_resident" not in row:
+        row["gpu_resident"] = bool(size == size_vram)
+
+
 def build_linux_failure_row(
     *,
     spec_id: str,
@@ -896,6 +965,17 @@ def build_linux_failure_row(
     vram_sampler: str | None = None,
     vram_sampler_reason: str | None = None,
     host_ram_projection: dict[str, Any] | None = None,
+    size: int | None = None,
+    size_vram: int | None = None,
+    offload_fraction: float | None = None,
+    cold_load_s: float | None = None,
+    warm: bool | None = None,
+    reloaded: bool | None = None,
+    load_signal: str | None = None,
+    expires_at: str | None = None,
+    load_cap_s: float | None = None,
+    last_engine_status: str | None = None,
+    load_record: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a schema-valid capability/failure row for a failed remote shape."""
 
@@ -957,6 +1037,27 @@ def build_linux_failure_row(
         settings["num_ctx_source"] = "sent" if num_ctx_sent is not None else "nominal: no request was sent"
     if offload is not None:
         settings["offload"] = offload
+        if size is None and offload.get("size") is not None:
+            size = int(offload["size"])
+        if size_vram is None and offload.get("size_vram") is not None:
+            size_vram = int(offload["size_vram"])
+    if isinstance(load_record, Mapping):
+        if size is None and load_record.get("size") is not None:
+            size = int(load_record["size"])
+        if size_vram is None and load_record.get("size_vram") is not None:
+            size_vram = int(load_record["size_vram"])
+        if offload_fraction is None and load_record.get("offload_fraction") is not None:
+            offload_fraction = float(load_record["offload_fraction"])
+        if cold_load_s is None and load_record.get("cold_load_s") is not None:
+            cold_load_s = float(load_record["cold_load_s"])
+        if warm is None and load_record.get("warm") is not None:
+            warm = bool(load_record["warm"])
+        if reloaded is None and load_record.get("reloaded") is not None:
+            reloaded = bool(load_record["reloaded"])
+        if load_signal is None and load_record.get("signal") is not None:
+            load_signal = str(load_record["signal"])
+        if expires_at is None and load_record.get("expires_at") is not None:
+            expires_at = str(load_record["expires_at"])
     if peak_mib is not None:
         settings["peak_mib"] = peak_mib
     if abort_mib is not None:
@@ -991,6 +1092,19 @@ def build_linux_failure_row(
         "outcome": failure_class,
         "notes": note,
     }
+    _stamp_load_fields(
+        row,
+        size=size,
+        size_vram=size_vram,
+        offload_fraction=offload_fraction,
+        cold_load_s=cold_load_s,
+        warm=warm,
+        reloaded=reloaded,
+        load_signal=load_signal,
+        expires_at=expires_at,
+        load_cap_s=load_cap_s,
+        last_engine_status=last_engine_status,
+    )
     stamp_family(row)
     _mark_rig_check(row, remote_device)
     validate_row(row)
@@ -1077,39 +1191,54 @@ def run_linux_fill_card(
 
     def _eval_window(
         candidate: int, ref_prompt_rate: float | None
-    ) -> tuple[Mapping[str, Any] | None, tuple[str, str, int | None] | None]:
+    ) -> tuple[Mapping[str, Any] | None, tuple[str, str, int | None, dict[str, Any]] | None]:
         try:
             reading = measure_window(candidate)
         except LinuxShapeFailure as exc:
-            return None, (exc.failure_class, exc.reason, exc.peak_mib)
+            return None, (exc.failure_class, exc.reason, exc.peak_mib, dict(exc.evidence or {}))
         size = int(reading["size"])
         size_vram = int(reading["size_vram"])
         peak_mib = int(reading["peak_mib"])
         prompt_rate = float(reading["prompt_tok_s"])
+        reading_ev = {
+            "size": size,
+            "size_vram": size_vram,
+            "offload_fraction": reading.get("offload_fraction", round(size_vram / size, 6) if size > 0 else None),
+            "cold_load_s": reading.get("cold_load_s"),
+            "warm": reading.get("warm"),
+            "reloaded": reading.get("reloaded"),
+            "load_signal": reading.get("load_signal"),
+            "expires_at": reading.get("expires_at"),
+        }
         if size_vram < size:
             return None, (
                 "oom",
                 f"partial layer offload at num_ctx {candidate} (size_vram {size_vram} < size {size})",
                 peak_mib,
+                reading_ev,
             )
         if peak_mib >= abort_mib:
             return None, (
                 "oom",
                 f"peak {peak_mib} MiB reached abort_mib {abort_mib} MiB at num_ctx {candidate}",
                 peak_mib,
+                reading_ev,
             )
         if ref_prompt_rate is not None and prompt_rate < spill_prompt_ratio * ref_prompt_rate:
             return None, (
                 "oom",
                 f"prompt_tok_s {prompt_rate:.1f} fell below {spill_prompt_ratio}x previous {ref_prompt_rate:.1f}",
                 peak_mib,
+                reading_ev,
             )
         return reading, None
 
     best_ctx: int | None = None
     best_reading: Mapping[str, Any] | None = None
+    first_cold_load_s: float | None = None
+    any_reloaded = False
     prev_prompt_rate: float | None = None
-    last_failure: tuple[str, str, int | None] | None = None
+    last_failure: tuple[str, str, int | None, dict[str, Any]] | None = None
     failed_ctx: int | None = None
     measurement_failed = False
 
@@ -1120,6 +1249,10 @@ def run_linux_fill_card(
             failed_ctx = candidate
             measurement_failed = failure is not None and failure[0] in MEASUREMENT_FAILURE_CLASSES
             break
+        if first_cold_load_s is None and reading.get("cold_load_s") is not None:
+            first_cold_load_s = float(reading["cold_load_s"])
+        if reading.get("reloaded"):
+            any_reloaded = True
         best_ctx = candidate
         best_reading = reading
         prev_prompt_rate = float(reading["prompt_tok_s"])
@@ -1132,6 +1265,8 @@ def run_linux_fill_card(
             mid_ctx = mid_steps * grain
             reading, failure = _eval_window(mid_ctx, prev_prompt_rate)
             if failure is None and reading is not None:
+                if reading.get("reloaded"):
+                    any_reloaded = True
                 best_ctx = mid_ctx
                 best_reading = reading
                 prev_prompt_rate = float(reading["prompt_tok_s"])
@@ -1144,7 +1279,7 @@ def run_linux_fill_card(
                     break
 
     if measurement_failed or best_ctx is None or best_reading is None:
-        f_class, f_reason, f_peak = last_failure or ("load_refused", "no resident window found", None)
+        f_class, f_reason, f_peak, f_ev = last_failure or ("load_refused", "no resident window found", None, {})
         return build_linux_failure_row(
             spec_id=spec_id,
             spec_rel=spec_rel,
@@ -1162,6 +1297,17 @@ def run_linux_fill_card(
             engine_version=engine_version,
             quant=quant,
             licence=licence,
+            size=f_ev.get("size"),
+            size_vram=f_ev.get("size_vram"),
+            offload_fraction=f_ev.get("offload_fraction"),
+            cold_load_s=f_ev.get("cold_load_s") if f_ev.get("cold_load_s") is not None else first_cold_load_s,
+            warm=f_ev.get("warm"),
+            reloaded=f_ev.get("reloaded"),
+            load_signal=f_ev.get("load_signal"),
+            expires_at=f_ev.get("expires_at"),
+            load_cap_s=f_ev.get("load_cap_s"),
+            last_engine_status=f_ev.get("last_engine_status"),
+            load_record=f_ev.get("load_record"),
         )
 
     decode_tok_s = float(best_reading["decode_tok_s"])
@@ -1226,6 +1372,21 @@ def run_linux_fill_card(
         "provenance": {"experiment_spec": spec_rel, "run_id": run_id},
         "notes": f"resident up to num_ctx {best_ctx} (peak {peak_mib} MiB < abort {abort_mib} MiB)",
     }
+    _stamp_load_fields(
+        row,
+        size=size,
+        size_vram=size_vram,
+        offload_fraction=best_reading.get("offload_fraction"),
+        cold_load_s=(
+            first_cold_load_s
+            if first_cold_load_s is not None
+            else float(best_reading.get("cold_load_s") or 0.0)
+        ),
+        warm=bool(best_reading.get("warm")) if best_reading.get("warm") is not None else False,
+        reloaded=bool(any_reloaded or best_reading.get("reloaded")),
+        load_signal=best_reading.get("load_signal"),
+        expires_at=best_reading.get("expires_at"),
+    )
     stamp_family(row)
     _mark_rig_check(row, remote_device)
     validate_row(row)
@@ -1270,6 +1431,8 @@ def run_linux_generate_ladder(
     on_progress: Callable[[list[dict[str, Any]]], None] | None = None,
     recover: Callable[[], None] | None = None,
     host_ram: HostRamState | None = None,
+    model_manager: OllamaModelManager | None = None,
+    size_bytes: int | None = None,
 ) -> list[dict[str, Any]]:
     """Sweep generate TTFT and decode tok/s across prompt lengths 512..32k at concurrencies 1, 4, 8.
 
@@ -1283,6 +1446,11 @@ def run_linux_generate_ladder(
     not_run = host_ram.skipped("the measure function reported no projection")
     rows: list[dict[str, Any]] = _ProgressRows(on_progress)
     restarted = {"pending": False}
+    step_state: dict[str, Any] = {
+        "manager": model_manager,
+        "quant": quant,
+        "size_bytes": size_bytes,
+    }
 
     def append_row(row: dict[str, Any]) -> None:
         if restarted["pending"]:  # the first row after a restart says so
@@ -1290,13 +1458,20 @@ def run_linux_generate_ladder(
             restarted["pending"] = False
         rows.append(row)
 
+    def _run_cell(plen: int, conc: int) -> Mapping[str, Any]:
+        token = _ACTIVE_LADDER_STEP.set(step_state)
+        try:
+            return measure_shape(plen, conc)
+        finally:
+            _ACTIVE_LADDER_STEP.reset(token)
+
     # Concurrency is the outer loop: the server restarts to change its slot count, so each count is set once.
     for concurrency in concurrencies:
         for prompt_len in sorted(prompt_lengths):
             try:
                 deadline_s = CELL_DEADLINE_S
                 measured = _with_deadline(
-                    lambda plen=prompt_len, conc=concurrency: measure_shape(plen, conc),
+                    lambda plen=prompt_len, conc=concurrency: _run_cell(plen, conc),
                     deadline_s,
                     lambda plen=prompt_len, conc=concurrency, limit=deadline_s: LinuxShapeFailure(
                         "unmeasured",
@@ -1316,11 +1491,15 @@ def run_linux_generate_ladder(
                         _phase(f"cell p{prompt_len} c{concurrency}: outer deadline fired; restarting the server")
                         recover()
                         restarted_now = True
+                        mgr = step_state.get("manager")
+                        if mgr is not None and hasattr(mgr, "forget"):
+                            mgr.forget(model)
                     else:
                         _phase(
                             f"cell p{prompt_len} c{concurrency}: outer deadline fired; no recover hook, server not "
                             "restarted"
                         )
+                ev = exc.evidence or {}
                 append_row(
                     build_linux_failure_row(
                         spec_id=spec_id,
@@ -1337,20 +1516,25 @@ def run_linux_generate_ladder(
                         num_predict=num_predict,
                         prompt_tokens=prompt_len,
                         concurrency=concurrency,
-                        offload=(exc.evidence or {}).get("offload"),
-                        request_timeout_s=(exc.evidence or {}).get("request_timeout_s"),
-                        num_ctx_sent=(exc.evidence or {}).get("num_ctx_sent"),
-                        vram_sampler=(exc.evidence or {}).get("vram_sampler"),
-                        vram_sampler_reason=(exc.evidence or {}).get("vram_sampler_reason"),
-                        host_ram_projection=(exc.evidence or {}).get("host_ram_projection") or not_run,
+                        offload=ev.get("offload"),
+                        request_timeout_s=ev.get("request_timeout_s"),
+                        num_ctx_sent=ev.get("num_ctx_sent"),
+                        vram_sampler=ev.get("vram_sampler"),
+                        vram_sampler_reason=ev.get("vram_sampler_reason"),
+                        host_ram_projection=ev.get("host_ram_projection") or not_run,
                         peak_mib=exc.peak_mib,
                         abort_mib=abort_mib,
                         engine_version=engine_version,
                         quant=quant,
                         licence=licence,
+                        load_cap_s=ev.get("load_cap_s"),
+                        last_engine_status=ev.get("last_engine_status"),
+                        load_record=ev.get("load_record"),
                     )
                 )
                 restarted["pending"] = restarted_now  # the next row is the first after a restart that happened
+                if exc.failure_class == "load_failed":
+                    return rows
                 continue
 
             ttft_ms = float(measured["ttft_ms"])
@@ -1393,6 +1577,14 @@ def run_linux_generate_ladder(
                         engine_version=engine_version,
                         quant=quant,
                         licence=licence,
+                        size=size,
+                        size_vram=size_vram,
+                        offload_fraction=measured.get("offload_fraction"),
+                        cold_load_s=measured.get("cold_load_s"),
+                        warm=measured.get("warm"),
+                        reloaded=measured.get("reloaded"),
+                        load_signal=measured.get("load_signal"),
+                        expires_at=measured.get("expires_at"),
                     )
                 )
                 continue
@@ -1486,6 +1678,17 @@ def run_linux_generate_ladder(
                 "provisional": False,
                 "provenance": {"experiment_spec": spec_rel, "run_id": run_id},
             }
+            _stamp_load_fields(
+                row,
+                size=size,
+                size_vram=size_vram,
+                offload_fraction=measured.get("offload_fraction"),
+                cold_load_s=float(measured.get("cold_load_s") or 0.0),
+                warm=bool(measured.get("warm")) if measured.get("warm") is not None else False,
+                reloaded=bool(measured.get("reloaded")),
+                load_signal=measured.get("load_signal"),
+                expires_at=measured.get("expires_at"),
+            )
             stamp_family(row)
             _mark_rig_check(row, remote_device)
             validate_row(row)
@@ -1581,6 +1784,8 @@ def run_linux_throughput_ladder(
                             engine_version=engine_version,
                             quant=task_quant,
                             licence=task_licence,
+                            size=size,
+                            size_vram=size_vram,
                         )
                     )
                     continue
@@ -1646,6 +1851,7 @@ def run_linux_throughput_ladder(
                     "provisional": False,
                     "provenance": {"experiment_spec": spec_rel, "run_id": run_id},
                 }
+                _stamp_load_fields(row, size=size, size_vram=size_vram)
                 stamp_family(row)
                 _mark_rig_check(row, remote_device)
                 validate_row(row)
@@ -1788,13 +1994,21 @@ def measure_linux_ollama_window(
     *,
     model: str,
     num_ctx: int,
+    quant: str = UNRECORDED,
+    model_manager: OllamaModelManager | None = None,
+    size_bytes: int | None = None,
+    probe_timeout_s: float = 120.0,
 ) -> dict[str, Any]:
     """Measure one ``num_ctx`` window against a running ``LinuxOllamaServer`` and VRAM sampler."""
 
     used_before, _ = _sample_with_deadline(sample_vram_mib)
     peak_mib = used_before
+    manager = model_manager or OllamaModelManager(server)
+    load_rec: LoadRecord | None = None
     try:
-        resp = server.post(
+        load_rec = manager.ensure_loaded(model, quant, num_ctx, size_bytes=size_bytes)
+        resp = _post(
+            server,
             "/api/generate",
             {
                 "model": model,
@@ -1802,6 +2016,7 @@ def measure_linux_ollama_window(
                 "stream": False,
                 "options": {"num_ctx": num_ctx, "num_predict": 16, "temperature": 0.0},
             },
+            probe_timeout_s,
         )
         if isinstance(resp, Mapping) and resp.get("error"):
             raise RuntimeError(str(resp["error"]))
@@ -1809,7 +2024,10 @@ def measure_linux_ollama_window(
         peak_mib = max(peak_mib, used_after)
         size, size_vram = _query_ps_entry(server, model)
     except BaseException as exc:
-        raise classify_linux_error(exc, peak_mib=peak_mib) from exc
+        failure = classify_linux_error(exc, peak_mib=peak_mib)
+        if load_rec is not None:
+            failure.evidence = {**(failure.evidence or {}), "load_record": load_rec.to_dict()}
+        raise failure from exc
 
     prompt_eval_count = max(1, int(resp.get("prompt_eval_count") or 16))
     prompt_eval_ns = max(1, int(resp.get("prompt_eval_duration") or 10_000_000))
@@ -1818,9 +2036,16 @@ def measure_linux_ollama_window(
     ttft_ms = round(prompt_eval_ns / 1_000_000.0, 3)
     prompt_tok_s = round(prompt_eval_count / (prompt_eval_ns / 1_000_000_000.0), 3)
     decode_tok_s = round(eval_count / (eval_ns / 1_000_000_000.0), 3)
+    offload_fraction = round(size_vram / size, 6) if size > 0 else 0.0
     return {
         "size": size,
         "size_vram": size_vram,
+        "offload_fraction": offload_fraction,
+        "cold_load_s": load_rec.cold_load_s if load_rec is not None else 0.0,
+        "warm": load_rec.warm if load_rec is not None else False,
+        "reloaded": load_rec.reloaded if load_rec is not None else False,
+        "load_signal": load_rec.signal if load_rec is not None else OLLAMA_READY_SIGNAL,
+        "expires_at": load_rec.expires_at if load_rec is not None else None,
         "peak_mib": peak_mib,
         "prompt_tok_s": prompt_tok_s,
         "decode_tok_s": decode_tok_s,
@@ -2261,6 +2486,9 @@ def measure_linux_ollama_generate(
     clock: Callable[[], float] = time.perf_counter,
     host_ram: HostRamState | None = None,
     cgroup_path: Path | None = None,
+    model_manager: OllamaModelManager | None = None,
+    quant: str = UNRECORDED,
+    size_bytes: int | None = None,
 ) -> dict[str, Any]:
     """Measure one cell, and say which sampler the cell used (and why the run switched) in the result or the failure.
 
@@ -2274,7 +2502,7 @@ def measure_linux_ollama_generate(
         result = _measure_generate_cell(
             server, sample_vram_mib, model=model, prompt_tokens=prompt_tokens, concurrency=concurrency,
             num_predict=num_predict, repeats=repeats, clock=clock, host_ram=host_ram, cgroup_path=cgroup_path,
-            projection=projection,
+            projection=projection, model_manager=model_manager, quant=quant, size_bytes=size_bytes,
         )
     except LinuxShapeFailure as exc:
         exc.evidence = {**(exc.evidence or {}), **_sampler_evidence(sample_vram_mib)}
@@ -2318,6 +2546,9 @@ def _measure_generate_cell(
     host_ram: HostRamState | None = None,
     cgroup_path: Path | None = None,
     projection: dict[str, Any] | None = None,
+    model_manager: OllamaModelManager | None = None,
+    quant: str = UNRECORDED,
+    size_bytes: int | None = None,
 ) -> dict[str, Any]:
     """Measure one ``(prompt_tokens, concurrency)`` cell on a running ``LinuxOllamaServer``.
 
@@ -2354,21 +2585,54 @@ def _measure_generate_cell(
     elif host_ram is not None:
         projection.update(host_ram.skipped(""))
 
+    restarts_before = getattr(server, "restarts", 0)
     ensure_parallel = getattr(server, "ensure_parallel", None)
     if callable(ensure_parallel):
         ensure_parallel(max(1, concurrency))
+    parallel_restarted = getattr(server, "restarts", 0) != restarts_before
     begin_cell = getattr(server, "begin_cell", None)
     if callable(begin_cell):
         begin_cell()  # a new epoch, and the log is read from here: this cell's load, not an earlier cell's
     epoch = getattr(server, "epoch", None)
-    _CELL_EPOCH.set(epoch)  # this cell's thread; the pass workers below carry the same epoch
-    cell_started = clock()
     _phase(f"{cell}: start, sampling VRAM")
     used_before, _ = _sample_during_cell(sample_vram_mib)
     peak_mib = used_before
-    nonce = _cell_nonce(model, prompt_tokens, concurrency)
+
+    step_state = _ACTIVE_LADDER_STEP.get()
+    active_manager = model_manager
+    eff_quant = quant
+    eff_size_bytes = size_bytes
+    if active_manager is None and step_state is not None:
+        if step_state.get("manager") is None:
+            step_state["manager"] = OllamaModelManager(server, clock=clock)
+        active_manager = step_state["manager"]
+        if eff_quant == UNRECORDED and step_state.get("quant"):
+            eff_quant = str(step_state["quant"])
+        if eff_size_bytes is None and step_state.get("size_bytes") is not None:
+            eff_size_bytes = int(step_state["size_bytes"])
+
     sent = {"num_ctx_sent": num_ctx}  # the first probe is sent with this window, so any failure below has one
     calibration_budget = {**sent, "request_timeout_s": CALIBRATION_TIMEOUT_S}
+    load_rec: LoadRecord | None = None
+    if active_manager is not None:
+        try:
+            if parallel_restarted and hasattr(active_manager, "forget") and not active_manager.still_loaded(model):
+                active_manager.forget(model)
+            if not active_manager.has_loaded(model) or not active_manager.still_loaded(model):
+                load_rec = active_manager.ensure_loaded(model, eff_quant, num_ctx, size_bytes=eff_size_bytes)
+            elif model_manager is not None:
+                load_rec = active_manager.ensure_loaded(model, eff_quant, num_ctx, size_bytes=eff_size_bytes)
+            else:
+                load_rec = active_manager.current_record(model)
+        except BaseException as exc:
+            _note_host_ram_load(host_ram, server, cell=f"p{prompt_tokens} c{concurrency}", num_ctx=num_ctx, slots=slots)
+            raise _failure_for(server, exc, peak_mib, calibration_budget) from exc
+
+    _CELL_EPOCH.set(epoch)  # this cell's thread; the pass workers below carry the same epoch
+    cell_started = clock()
+    nonce = _cell_nonce(model, prompt_tokens, concurrency)
+    if load_rec is not None:
+        calibration_budget["load_record"] = load_rec.to_dict()
     _phase(f"{cell}: calibrating (num_ctx {num_ctx}, {concurrency} slot(s))")
     try:
         words, evaluated, verify_s = _calibrate_ladder_prompt(server, model, prompt_tokens, num_ctx, nonce, concurrency)
@@ -2379,6 +2643,8 @@ def _measure_generate_cell(
     _note_host_ram_load(host_ram, server, cell=f"p{prompt_tokens} c{concurrency}", num_ctx=num_ctx, slots=slots)
     budget_s = request_timeout_s(concurrency, verify_s)
     budget = {**sent, "request_timeout_s": budget_s}
+    if load_rec is not None:
+        budget["load_record"] = load_rec.to_dict()
     pass_s = math.ceil(max(1, concurrency) * verify_s) + REQUEST_TIMEOUT_DECODE_ALLOWANCE_S
     projected_s = (1 + max(1, repeats)) * pass_s
     _phase(
@@ -2513,6 +2779,7 @@ def _measure_generate_cell(
     overhead_ms = float(sorted(float(s["overhead_ms"]) for s in repeat_slots)[mid])
     decode_tok_s = float(sorted(float(s["throughput"]) for s in repeat_slots)[mid])
     total_ms = float(sorted(float(s["latency_ms"]) for s in repeat_slots)[mid])
+    offload_fraction = round(size_vram / size, 6) if size > 0 else 0.0
     return {
         "ttft_ms": ttft_ms,
         "prefill_ms": prefill_ms,
@@ -2522,6 +2789,12 @@ def _measure_generate_cell(
         "peak_mib": peak_mib,
         "size": size,
         "size_vram": size_vram,
+        "offload_fraction": offload_fraction,
+        "cold_load_s": load_rec.cold_load_s if load_rec is not None else 0.0,
+        "warm": load_rec.warm if load_rec is not None else False,
+        "reloaded": load_rec.reloaded if load_rec is not None else False,
+        "load_signal": load_rec.signal if load_rec is not None else OLLAMA_READY_SIGNAL,
+        "expires_at": load_rec.expires_at if load_rec is not None else None,
         "slots": slots,
         "prompt_tokens_evaluated": evaluated,
         "prompt_tokens_target": prompt_tokens,
@@ -2643,14 +2916,17 @@ def _relative_spec_posix(spec_path: Path, spec_rel: str | None) -> str:
 
 
 @contextmanager
-def _unloaded_after(server: Any, tag: str) -> Iterator[None]:
+def _unloaded_after(server: Any, tag: str, *, model_manager: OllamaModelManager | None = None) -> Iterator[None]:
     """Unload ``tag`` when its cells end, however they end, so the next quant's baseline is an empty card."""
 
     try:
         yield
     finally:
         try:
-            server.unload(tag)
+            if model_manager is not None:
+                model_manager.unload(tag)
+            else:
+                server.unload(tag)
         except (OSError, RuntimeError, ValueError):
             pass
 
@@ -2744,7 +3020,9 @@ def run_linux_spec(
                     )
                     continue
                 ollama_tag = _ollama_model_tag(model_tag, quant, entry.get("ollama_tag"))
-                with _unloaded_after(active_server, ollama_tag):
+                entry_size_bytes = int(entry["size_bytes"]) if entry.get("size_bytes") is not None else None
+                fill_manager = OllamaModelManager(active_server, engine_version=engine_version)
+                with _unloaded_after(active_server, ollama_tag, model_manager=fill_manager):
                     rows.append(
                         run_linux_fill_card(
                             spec_id=spec_id,
@@ -2761,8 +3039,16 @@ def run_linux_spec(
                             engine_version=engine_version,
                             quant=quant,
                             licence=licence,
-                            measure_window=lambda ctx, m=ollama_tag: measure_linux_ollama_window(
-                                active_server, sample_vram_mib, model=m, num_ctx=ctx
+                            measure_window=lambda ctx, m=ollama_tag, q=quant, mgr=fill_manager, sb=entry_size_bytes: (
+                                measure_linux_ollama_window(
+                                    active_server,
+                                    sample_vram_mib,
+                                    model=m,
+                                    num_ctx=ctx,
+                                    quant=q,
+                                    model_manager=mgr,
+                                    size_bytes=sb,
+                                )
                             ),
                         )
                     )
@@ -2816,8 +3102,10 @@ def run_linux_spec(
                             )
                     continue
                 ollama_tag = _ollama_model_tag(model_tag, quant, entry.get("ollama_tag"))
+                entry_size_bytes = int(entry["size_bytes"]) if entry.get("size_bytes") is not None else None
                 # Fresh for each (model, quant): the first cell of the next one has no load to scale from.
                 ladder_state = HostRamState(mode=host_ram_projection, factor=host_ram_factor)
+                ladder_manager = OllamaModelManager(active_server, engine_version=engine_version)
 
                 def measure_cell(plen: int, conc: int, m: str = ollama_tag, state: HostRamState = ladder_state):
                     return measure_linux_ollama_generate(
@@ -2830,7 +3118,7 @@ def run_linux_spec(
                         host_ram=state,
                     )
 
-                with _unloaded_after(active_server, ollama_tag):
+                with _unloaded_after(active_server, ollama_tag, model_manager=ladder_manager):
                     rows.extend(
                         run_linux_generate_ladder(
                             spec_id=spec_id,
@@ -2847,6 +3135,8 @@ def run_linux_spec(
                             on_progress=progress,
                             recover=getattr(active_server, "restart_after_deadline", None),
                             host_ram=ladder_state,
+                            model_manager=ladder_manager,
+                            size_bytes=entry_size_bytes,
                             engine_version=engine_version,
                             quant=quant,
                             licence=licence,

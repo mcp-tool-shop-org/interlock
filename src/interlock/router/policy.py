@@ -83,6 +83,7 @@ EXCLUDED_OUTCOMES = (
     "sampler_error",
     "generation_aborted",
     "unmeasured",
+    "load_failed",
 )
 
 _KNOWN_PREFIX = frozenset({"on", "off", "default"})
@@ -141,7 +142,7 @@ def decide(rows: Sequence[Mapping], request: Request) -> Decision | Refusal:
         outcome = row.get("outcome")
         if outcome in EXCLUDED_OUTCOMES and _task_model(row, request):
             excluded.append({"id": str(row["id"]), "code": str(outcome)})
-            unmeasured = outcome in {"sampler_error", "generation_aborted", "unmeasured"}
+            unmeasured = outcome in {"sampler_error", "generation_aborted", "unmeasured", "load_failed"}
             measured = None if unmeasured else _measured_failure_reason(row)
             if measured is not None:
                 failure_reasons.append(f"{row.get('device')}: {measured}")

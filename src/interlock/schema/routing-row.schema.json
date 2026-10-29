@@ -51,7 +51,11 @@
         "quant": {"type": "string", "minLength": 1},
         "licence": {"type": "string", "minLength": 1},
         "size": {"type": ["integer", "null"], "minimum": 0},
-        "size_vram": {"type": ["integer", "null"], "minimum": 0}
+        "size_vram": {"type": ["integer", "null"], "minimum": 0},
+        "offload_fraction": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "cold_load_s": {"type": ["number", "null"], "minimum": 0},
+        "warm": {"type": ["boolean", "null"]},
+        "reloaded": {"type": ["boolean", "null"]}
       }
     },
     "engine": {
@@ -111,7 +115,17 @@
         "prompt_tokens_target": {"type": ["integer", "null"], "minimum": 0},
         "prompt_token_search": {"type": ["integer", "null"], "minimum": 0},
         "prompt_token_cold": {"type": ["integer", "null"], "minimum": 0},
-        "truncated_tokens": {"type": ["integer", "null"], "minimum": 0}
+        "truncated_tokens": {"type": ["integer", "null"], "minimum": 0},
+        "cold_load_s": {"type": ["number", "null"], "minimum": 0},
+        "warm": {"type": ["boolean", "null"]},
+        "size": {"type": ["integer", "null"], "minimum": 0},
+        "size_vram": {"type": ["integer", "null"], "minimum": 0},
+        "offload_fraction": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "reloaded": {"type": ["boolean", "null"]},
+        "load_signal": {"type": ["string", "null"]},
+        "expires_at": {"type": ["string", "null"]},
+        "load_cap_s": {"type": ["number", "null"], "minimum": 0},
+        "last_engine_status": {"type": ["string", "null"]}
       }
     },
     "quality": {
@@ -155,9 +169,18 @@
         "ctx_exceeded",
         "sampler_error",
         "generation_aborted",
-        "unmeasured"
+        "unmeasured",
+        "load_failed"
       ]
     },
+    "cold_load_s": {"type": ["number", "null"], "minimum": 0},
+    "warm": {"type": ["boolean", "null"]},
+    "size": {"type": ["integer", "null"], "minimum": 0},
+    "size_vram": {"type": ["integer", "null"], "minimum": 0},
+    "offload_fraction": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    "reloaded": {"type": ["boolean", "null"]},
+    "load_signal": {"type": ["string", "null"]},
+    "expires_at": {"type": ["string", "null"]},
     "parity_valid": {"type": "boolean"},
     "partial": {"type": "boolean"},
     "aborted": {"type": "boolean"},
