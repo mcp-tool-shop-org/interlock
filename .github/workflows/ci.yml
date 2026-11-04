@@ -102,10 +102,13 @@ jobs:
         run: |
           uv run python -c "
           import sys
-          from tests.test_desktop_names import scan_tree
-          hits = scan_tree()
+          from tests.test_desktop_names import MIN_CHECKED_FILES, scan_tree
+          hits, read_count = scan_tree()
           if hits:
               print('\n'.join(hits), file=sys.stderr)
+              sys.exit(1)
+          if read_count < MIN_CHECKED_FILES:
+              print(f'checked only {read_count} files (floor is {MIN_CHECKED_FILES})', file=sys.stderr)
               sys.exit(1)
           "
 

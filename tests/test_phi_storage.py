@@ -1186,7 +1186,7 @@ def test_the_after_call_rank_records_only_os_class_names_and_counts_others(monke
         "ollama.exe",
         "llama-server",
         "llama-server.exe",
-    } <= watch_mod.OS_PROCESS_NAMES
+    } == watch_mod.OS_PROCESS_NAMES
     assert slept == [1.0]
     # With limit 5: beta-browser.exe (3.0), System (1.0), gamma-editor.exe (0.75),
     # svchost.exe (0.5), Ollama.exe (0.25) -> 3 allowed names and 2 others.
