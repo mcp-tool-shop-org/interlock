@@ -326,6 +326,29 @@ _DISK = _DiskRate()
 # How long the after-call rank waits between its two process snapshots.
 TOP_AFTER_GAP_S = 1.0
 
+# Fixed allow-list of OS-class process names and the run's own model processes.
+# Any other process name ranked after a slot is recorded as {"other": <count>}.
+OS_PROCESS_NAMES: frozenset[str] = frozenset(
+    {
+        "system",
+        "registry",
+        "smss.exe",
+        "csrss.exe",
+        "wininit.exe",
+        "services.exe",
+        "lsass.exe",
+        "svchost.exe",
+        "dwm.exe",
+        "explorer.exe",
+        "python",
+        "python.exe",
+        "ollama",
+        "ollama.exe",
+        "llama-server",
+        "llama-server.exe",
+    }
+)
+
 
 def _own_pids() -> set[int] | None:
     """This process and its children. None when that tree cannot be read."""
@@ -375,12 +398,14 @@ def _top_other(
     *,
     sleep: Callable[[float], None] | None = None,
     gap_s: float = TOP_AFTER_GAP_S,
-) -> list[str]:
+) -> list[str | dict[str, int]]:
     """Other processes ranked by CPU time gained between two snapshots.
 
     The rank is the user-plus-system time gained across about a second.
     pid 0 is always left out. This process and its children are left out.
     pid 4 (System) stays, so it ranks only when the kernel was busy.
+    Only OS-class names in ``OS_PROCESS_NAMES`` are recorded by name; every
+    other ranked process is folded into ``{"other": <count>}``.
     ``SlotProbe.close`` calls this after the measured call, and only when
     that slot's CPU max is over 30%.
     """
@@ -408,7 +433,16 @@ def _top_other(
             continue
         ranked.append((delta, name))
     ranked.sort(key=lambda item: item[0], reverse=True)
-    return [name for _delta, name in ranked[:limit]]
+    out: list[str | dict[str, int]] = []
+    other_count = 0
+    for _delta, name in ranked[:limit]:
+        if name.lower() in OS_PROCESS_NAMES:
+            out.append(name)
+        else:
+            other_count += 1
+    if other_count:
+        out.append({"other": other_count})
+    return out
 
 
 def read_slot(drive: str | None) -> dict:
