@@ -98,6 +98,17 @@ jobs:
       - name: Empty table
         run: uv run interlock check
 
+      - name: Desktop app name grep gate
+        run: |
+          uv run python -c "
+          import sys
+          from tests.test_desktop_names import scan_tree
+          hits = scan_tree()
+          if hits:
+              print('\n'.join(hits), file=sys.stderr)
+              sys.exit(1)
+          "
+
   # Python 3.13. A job of its own so the required status check "test" keeps its name (it runs on 3.15).
   # Lint, tests with the coverage floor, and the wheel install run here; the audit, Atlas check and
   # Codecov upload run once, on the 3.15 job above, and the fuzz step runs on the 3.14 job.
