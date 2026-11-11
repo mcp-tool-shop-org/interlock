@@ -34,26 +34,78 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 0,
-      "changed": 17,
+      "added": 12,
+      "changed": 32,
       "moved": 0,
-      "parts": 3,
+      "parts": 4,
       "removed": 0
     },
     "items": [
       {
+        "kind": "door",
+        "sentence": "CI now also runs tests/test_desktop_names.py.",
+        "subjects": [
+          ".github/workflows/ci.yml",
+          "tests/test_desktop_names.py"
+        ]
+      },
+      {
+        "kind": "landing",
+        "sentence": ".github/ is now read by tests/test_desktop_names.py.",
+        "subjects": [
+          ".github/",
+          "tests/test_desktop_names.py"
+        ]
+      },
+      {
+        "kind": "landing",
+        "sentence": "docs/ is now read by tests/test_desktop_names.py.",
+        "subjects": [
+          "docs/",
+          "tests/test_desktop_names.py"
+        ]
+      },
+      {
+        "kind": "landing",
+        "sentence": "experiments/ is now also read by tests/test_desktop_names.py.",
+        "subjects": [
+          "experiments/",
+          "tests/test_desktop_names.py"
+        ]
+      },
+      {
+        "kind": "landing",
+        "sentence": "And 9 more new writers and readers of places.",
+        "subjects": []
+      },
+      {
         "kind": "counts",
-        "sentence": "Nothing structural changed since 2026-10-26; 17 files changed content.",
+        "sentence": "12 files added and 32 changed content, across 4 parts.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "2d1f6c041a91d8fccca56883af901a008da804e8",
-      "generatedAt": "2026-10-26T22:56:06.131Z"
+      "commit": "ad140352797cc4151d36cced47113e9a6dacda18",
+      "generatedAt": "2026-10-27T04:42:26.306Z"
     },
-    "unchanged": true
+    "unchanged": false
   },
   "changesTogether": [
+    {
+      "a": "site/src/site-config.ts",
+      "b": "src/interlock/__init__.py",
+      "either": 17,
+      "partLabels": [
+        null,
+        "src"
+      ],
+      "parts": [
+        null,
+        "src"
+      ],
+      "relation": "unassigned",
+      "shared": 13
+    },
     {
       "a": "src/switchyard/adapters/openvino.py",
       "b": "tests/test_openvino_adapter.py",
@@ -70,36 +122,6 @@
       "shared": 17
     },
     {
-      "a": "site/src/site-config.ts",
-      "b": "src/interlock/__init__.py",
-      "either": 15,
-      "partLabels": [
-        null,
-        "src"
-      ],
-      "parts": [
-        null,
-        "src"
-      ],
-      "relation": "unassigned",
-      "shared": 11
-    },
-    {
-      "a": "src/interlock/importers/remote.py",
-      "b": "src/interlock/receipt.py",
-      "either": 7,
-      "partLabels": [
-        "src",
-        "src"
-      ],
-      "parts": [
-        "src",
-        "src"
-      ],
-      "relation": "inside",
-      "shared": 4
-    },
-    {
       "a": "src/interlock/harness/fill.py",
       "b": "tests/test_e5_preflight.py",
       "either": 9,
@@ -112,6 +134,21 @@
         "tests"
       ],
       "relation": "b-imports-a",
+      "shared": 5
+    },
+    {
+      "a": "tests/fake_ollama.py",
+      "b": "tests/test_packaging.py",
+      "either": 9,
+      "partLabels": [
+        "tests",
+        "tests"
+      ],
+      "parts": [
+        "tests",
+        "tests"
+      ],
+      "relation": "inside",
       "shared": 5
     },
     {
@@ -131,14 +168,14 @@
     }
   ],
   "changesTogetherNote": [
-    "2 files changed together with their own tests, as expected.",
+    "1 file changed together with its own test, as expected.",
     "Confidence is low: fewer than 25 source files reach 10 revisions in the window.",
     "Window: 180 days; a pair counts from 3 shared commits, since 16 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
-  "changesTogetherWithTests": 2,
-  "commit": "ad140352797cc4151d36cced47113e9a6dacda18",
+  "changesTogetherWithTests": 1,
+  "commit": "0c48a09442d5c0f468bd27f09f6be005b0611891",
   "defaultBranch": "main",
-  "derived": "10 parts, mostly Python (116 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
+  "derived": "10 parts, mostly Python (123 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.",
   "doors": [
     {
       "checks": [],
@@ -153,12 +190,12 @@
         {
           "boundary": "src",
           "depth": 0,
-          "files": 55
+          "files": 57
         },
         {
           "boundary": "tests",
           "depth": 0,
-          "files": 58
+          "files": 63
         },
         {
           "boundary": "scripts",
@@ -169,10 +206,11 @@
       "runs": [
         "src/interlock/cli.py",
         "tests/fuzz_receipts.py",
+        "tests/test_desktop_names.py",
         "tests/"
       ],
-      "runsCount": 3,
-      "runsMore": 0,
+      "runsCount": 4,
+      "runsMore": 63,
       "sends": [
         "uploads coverage to Codecov"
       ],
@@ -198,7 +236,7 @@
         {
           "boundary": "src",
           "depth": 0,
-          "files": 56
+          "files": 58
         }
       ],
       "runs": [],
@@ -276,7 +314,7 @@
         {
           "boundary": "src",
           "depth": 0,
-          "files": 50
+          "files": 51
         }
       ],
       "runs": [
@@ -299,14 +337,14 @@
       "to": "src"
     }
   ],
-  "engine": "1.24.0",
+  "engine": "1.26.0",
   "generated": [],
-  "generatedAt": "2026-10-27T04:42:26.306Z",
+  "generatedAt": "2026-11-11T22:19:56.062Z",
   "limits": [
     "1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.",
     "5 writes and 6 reads use paths built at run time and are not named here.",
-    "17 writes and 46 reads go to a path their caller passes, not to this repository.",
-    "5 reads go to the directory the command is run in (experiments/, interlock.toml and receipts/), not to this repository.",
+    "17 writes and 49 reads go to a path their caller passes, not to this repository.",
+    "7 reads go to the directory the command is run in (experiments/, interlock.toml, logs/ and 2 more places), not to this repository.",
     "18 files belong to no part: site/astro.config.mjs, site/package-lock.json, site/package.json and 15 more.",
     "Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window."
   ],
@@ -327,6 +365,14 @@
   "readers": [],
   "repo": "mcp-tool-shop-org/interlock",
   "sequences": [],
+  "startBeside": [
+    {
+      "files": [
+        "src/interlock/families.py"
+      ],
+      "from": "src/interlock/receipt.py"
+    }
+  ],
   "startDoor": ".github/workflows/ci.yml",
   "startHere": [
     ".github/workflows/ci.yml",
@@ -336,11 +382,12 @@
   ],
   "summary": "interlock routes each job to a model, engine and device from a receipt-backed table.",
   "summaryFrom": "person",
-  "testFiles": 85,
+  "testFiles": 95,
   "testedBy": {
     "scripts": 2,
-    "src": 55
+    "src": 59
   },
+  "testedCodeParts": 2,
   "unnamedWrites": 5,
   "unread": [],
   "unreadFiles": 0,
