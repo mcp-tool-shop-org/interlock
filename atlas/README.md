@@ -1,20 +1,25 @@
 # interlock: how it works
 
-Mapped at 2026-10-27 from commit ad14035 by Atlas 1.24.0.
+Mapped at 2026-11-11 from commit 0c48a09 by Atlas 1.26.0.
 
 ## What this is
 
 interlock routes each job to a model, engine and device from a receipt-backed table. (written by a person)
 
-10 parts, mostly Python (116 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.
+10 parts, mostly Python (123 files), CSS (2), TypeScript (2), Astro (1), JavaScript (1) and shell (1). Work enters through 5 doors; the busiest is CI, which reaches 3 parts. It publishes to PyPI. It deploys a site to GitHub Pages. People run interlock.
 
-## What changed since 2026-10-26 (2d1f6c0)
+## What changed since 2026-10-27 (ad14035)
 
-Nothing structural changed since 2026-10-26; 17 files changed content.
+- CI now also runs tests/test_desktop_names.py.
+- .github/ is now read by tests/test_desktop_names.py.
+- docs/ is now read by tests/test_desktop_names.py.
+- experiments/ is now also read by tests/test_desktop_names.py.
+- And 9 more new writers and readers of places.
+- 12 files added and 32 changed content, across 4 parts.
 
 ## What comes in
 
-1. **CI.** On a pull request to main; on a push to main touching 11 paths; or by hand. Runs src/interlock/cli.py, tests/fuzz_receipts.py and tests/.
+1. **CI.** On a pull request to main; on a push to main touching 11 paths; or by hand. Runs src/interlock/cli.py, tests/fuzz_receipts.py, tests/test_desktop_names.py and 63 more.
 2. **Release.** When a release is published; or by hand. Checks src/interlock/.
 3. **Deploy site to GitHub Pages.** On a push to main touching 2 paths; or by hand. Runs site/astro.config.mjs and site/src/.
 4. **OpenSSF Scorecard.** On a `branch_protection_rule` event; on a schedule (`43 15 * * 1`), Monday at 15:43 UTC; or by hand. Runs no file this map can see.
@@ -22,7 +27,7 @@ Nothing structural changed since 2026-10-26; 17 files changed content.
 
 ## What happens through CI
 
-1. The workflow runs src/interlock/cli.py in src and tests/fuzz_receipts.py and tests/ in tests.
+1. The workflow runs src/interlock/cli.py in src and tests/fuzz_receipts.py, tests/test_desktop_names.py and tests/ in tests.
 2. That reaches scripts (2 files).
 3. It uploads coverage to Codecov.
 
@@ -47,13 +52,13 @@ CI writes nothing this map can see.
 
 ## What tends to change together
 
+- **site/src/site-config.ts** and **src/interlock/__init__.py** changed together in 13 of 17 commits.
 - **src/switchyard/adapters/openvino.py** and **tests/test_openvino_adapter.py** changed together in 17 of 23 commits.
-- **site/src/site-config.ts** and **src/interlock/__init__.py** changed together in 11 of 15 commits.
-- **src/interlock/importers/remote.py** and **src/interlock/receipt.py** changed together in 4 of 7 commits, inside the src part.
 - **src/interlock/harness/fill.py** and **tests/test_e5_preflight.py** changed together in 5 of 9 commits, and the tests part imports the src part.
+- **tests/fake_ollama.py** and **tests/test_packaging.py** changed together in 5 of 9 commits, inside the tests part.
 - **src/switchyard/harness/receipts.py** and **src/switchyard/receipt.py** changed together in 7 of 13 commits.
 
-2 files changed together with their own tests, as expected.
+1 file changed together with its own test, as expected.
 
 Confidence is low: fewer than 25 source files reach 10 revisions in the window.
 
@@ -87,12 +92,14 @@ People write .github/, assets/, docs/, experiments/, receipts/, the repository r
 
 Read those in order to follow one pull request end to end.
 
+Beside the path, src/interlock/receipt.py also calls src/interlock/families.py.
+
 ## What this map cannot see
 
 - 1 import site names a declared dependency that shares its name with a local module (openvino); it is read as the dependency, which is not in this repository.
 - 5 writes and 6 reads use paths built at run time and are not named here.
-- 17 writes and 46 reads go to a path their caller passes, not to this repository.
-- 5 reads go to the directory the command is run in (experiments/, interlock.toml and receipts/), not to this repository.
+- 17 writes and 49 reads go to a path their caller passes, not to this repository.
+- 7 reads go to the directory the command is run in (experiments/, interlock.toml, logs/ and 2 more places), not to this repository.
 - 18 files belong to no part: site/astro.config.mjs, site/package-lock.json, site/package.json and 15 more.
 - Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window.
 

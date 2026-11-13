@@ -420,7 +420,7 @@ def test_the_live_gpu_reader_names_only_compute_workloads(monkeypatch):
     def run(argv, **kwargs):
         if "--query-gpu=memory.used" in argv:
             return subprocess.CompletedProcess(argv, 0, "2751\n", "")
-        rows = ("1, C:\\Windows\\explorer.exe\n2, C:\\Program Files\\Google\\chrome.exe\n"
+        rows = ("1, C:\\Windows\\explorer.exe\n2, C:\\Windows\\System32\\dwm.exe\n"
                 "3, E:\\AI\\envs\\py\\python.exe\n")
         return subprocess.CompletedProcess(argv, 0, rows, "")
 

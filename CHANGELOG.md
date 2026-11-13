@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Slot probe (`top_after_call`) records only OS-class and model-runner process names (`OS_PROCESS_NAMES` in `src/interlock/harness/watch.py`), folding every other process into `{"other": <count>}`, and a CI grep gate (`tests/test_desktop_names.py` and `.github/workflows/ci.yml`) refuses personal desktop app names in source, test, docs and script files.
+
 ## [1.0.11] - 2026-10-27
 
 ### Added
