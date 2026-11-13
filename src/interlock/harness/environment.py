@@ -110,7 +110,7 @@ def _read_npu_driver() -> str:
 
 
 _DISPLAY_CLASS = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
-# Where the Intel Graphics Software override lands: a percent of system RAM the
+# Where the Intel display-driver memory override lands: a percent of system RAM the
 # iGPU and NPU may pin. Found on the Robot rig as 57 (36.1 GB of 63 GB).
 _OVERRIDE_SUBKEY = "GMM"
 _OVERRIDE_VALUE = "GpuSystemMemoryPinninglimit"

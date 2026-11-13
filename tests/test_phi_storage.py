@@ -1018,7 +1018,7 @@ class _Proc:
         return _Times(user, system)
 
 
-def _ranked(monkeypatch: pytest.MonkeyPatch) -> tuple[list[str], list[float]]:
+def _ranked(monkeypatch: pytest.MonkeyPatch) -> tuple[list[str | dict[str, int]], list[float]]:
     """A world whose instant percents and CPU-time deltas disagree."""
 
     procs = [
@@ -1027,7 +1027,7 @@ def _ranked(monkeypatch: pytest.MonkeyPatch) -> tuple[list[str], list[float]]:
         _Proc(10, "interlock", [(0, 0), (50, 50)], percent=90),
         _Proc(11, "child", [(0, 0), (40, 40)], percent=80),
         _Proc(12, "percent-decoy", [(10, 0), (10.125, 0)], percent=95),
-        _Proc(13, "delta-worker", [(1, 1), (4, 1)], percent=1),
+        _Proc(13, "svchost.exe", [(1, 1), (4, 1)], percent=1),
         _Proc(14, "middle", [(2, 0), (2.5, 0.25)], percent=40),
         _Proc(16, "went-backwards", [(8, 0), (4, 0)], percent=70),
         _Proc(17, "unreadable", [], boom=True),
@@ -1069,9 +1069,9 @@ def test_the_after_call_rank_skips_pid_0_and_this_tree_and_keeps_system(monkeypa
 
 def test_the_after_call_rank_uses_cpu_time_between_snapshots(monkeypatch: pytest.MonkeyPatch):
     names, slept = _ranked(monkeypatch)
-    # delta-worker gained 3 s, System 1 s, middle 0.75 s. percent-decoy gained
-    # 0.125 s. late is absent from the first snapshot, so it has no delta.
-    assert names == ["delta-worker", "System", "middle"]
+    # svchost.exe gained 3 s, System 1 s, middle 0.75 s (non-OS -> {"other": 1}).
+    # percent-decoy gained 0.125 s. late is absent from the first snapshot, so it has no delta.
+    assert names == ["svchost.exe", "System", {"other": 1}]
     assert "percent-decoy" not in names
     assert "late" not in names
     assert "went-backwards" not in names
@@ -1131,3 +1131,77 @@ def test_the_after_call_rank_returns_nothing_when_the_tree_cannot_be_read(monkey
 
     monkeypatch.setattr(watch_mod, "psutil", None)
     assert watch_mod._top_other() == []
+
+
+def test_the_after_call_rank_records_only_os_class_names_and_counts_others(monkeypatch: pytest.MonkeyPatch):
+    def make_procs():
+        return [
+            _Proc(0, "System Idle Process", [(100, 0), (400, 0)], percent=99),
+            _Proc(4, "System", [(1, 1), (2, 1)], percent=5),
+            _Proc(10, "interlock", [(0, 0), (50, 50)], percent=90),
+            _Proc(11, "child", [(0, 0), (40, 40)], percent=80),
+            _Proc(12, "alpha-desktop.exe", [(10, 0), (10.125, 0)], percent=95),
+            _Proc(13, "beta-browser.exe", [(1, 1), (4, 1)], percent=1),
+            _Proc(14, "gamma-editor.exe", [(2, 0), (2.5, 0.25)], percent=40),
+            _Proc(15, "svchost.exe", [(1, 0), (1.5, 0)], percent=10),
+            _Proc(16, "Ollama.exe", [(0, 0), (0.25, 0)], percent=2),
+        ]
+
+    active = make_procs()
+
+    class Psutil:
+        def Process(self):
+            class Me:
+                pid = 10
+
+                def children(self, recursive=False):
+                    return [type("Child", (), {"pid": 11})()]
+
+            return Me()
+
+        def process_iter(self):
+            return list(active)
+
+    monkeypatch.setattr(watch_mod, "psutil", Psutil())
+    slept: list[float] = []
+    # Top 3 by CPU delta are beta-browser.exe (3.0 s), System (1.0 s), gamma-editor.exe (0.75 s).
+    # Only OS-class names stay; every other name becomes "other" with a count.
+    names = watch_mod._top_other(3, sleep=lambda seconds: slept.append(seconds))
+    assert names == ["System", {"other": 2}]
+    assert isinstance(watch_mod.OS_PROCESS_NAMES, frozenset)
+    assert {
+        "system",
+        "registry",
+        "smss.exe",
+        "csrss.exe",
+        "wininit.exe",
+        "services.exe",
+        "lsass.exe",
+        "svchost.exe",
+        "dwm.exe",
+        "explorer.exe",
+        "python",
+        "python.exe",
+        "ollama",
+        "ollama.exe",
+        "llama-server",
+        "llama-server.exe",
+    } == watch_mod.OS_PROCESS_NAMES
+    assert slept == [1.0]
+    # With limit 5: beta-browser.exe (3.0), System (1.0), gamma-editor.exe (0.75),
+    # svchost.exe (0.5), Ollama.exe (0.25) -> 3 allowed names and 2 others.
+    active = make_procs()
+    top5 = watch_mod._top_other(5, sleep=lambda _seconds: None)
+    assert top5 == ["System", "svchost.exe", "Ollama.exe", {"other": 2}]
+    # When all top entries are allowed OS-class names, no "other" entry is added.
+    active = [
+        _Proc(4, "System", [(1, 1), (3, 1)]),
+        _Proc(15, "svchost.exe", [(1, 0), (2, 0)]),
+        _Proc(16, "llama-server.exe", [(0, 0), (0.5, 0)]),
+    ]
+    assert watch_mod._top_other(3, sleep=lambda _seconds: None) == [
+        "System",
+        "svchost.exe",
+        "llama-server.exe",
+    ]
+
